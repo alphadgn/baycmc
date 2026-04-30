@@ -2,7 +2,11 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { verifyMessage, getAddress } from "viem";
 import { createHmac, randomBytes } from "crypto";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+
+async function getAdmin() {
+  const mod = await import("@/integrations/supabase/client.server");
+  return mod.supabaseAdmin;
+}
 
 const NONCE_TTL_SECONDS = 5 * 60;
 
