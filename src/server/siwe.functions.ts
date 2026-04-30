@@ -93,6 +93,8 @@ export const verifySignature = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const wallet = getAddress(data.wallet);
     const walletLower = wallet.toLowerCase();
+    const supabaseAdmin = await getAdmin();
+
 
     // Extract nonce from message
     const nonceMatch = data.message.match(/Nonce: ([a-f0-9]+)/);
