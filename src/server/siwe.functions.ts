@@ -59,7 +59,9 @@ export const requestNonce = createServerFn({ method: "POST" })
     const wallet = getAddress(data.wallet); // checksummed
     const nonce = randomBytes(16).toString("hex");
     const issuedAt = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + NONCE_TTL_SECONDS * 1000).toISOString();
     const supabaseAdmin = await getAdmin();
+
 
     const { error } = await supabaseAdmin.from("auth_nonces").insert({
       wallet_address: wallet.toLowerCase(),
