@@ -2,7 +2,11 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { verifyMessage, getAddress } from "viem";
 import { createHmac, randomBytes } from "crypto";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+
+async function getAdmin() {
+  const mod = await import("@/integrations/supabase/client.server");
+  return mod.supabaseAdmin;
+}
 
 const NONCE_TTL_SECONDS = 5 * 60;
 
@@ -56,6 +60,8 @@ export const requestNonce = createServerFn({ method: "POST" })
     const nonce = randomBytes(16).toString("hex");
     const issuedAt = new Date().toISOString();
     const expiresAt = new Date(Date.now() + NONCE_TTL_SECONDS * 1000).toISOString();
+    const supabaseAdmin = await getAdmin();
+
 
     const { error } = await supabaseAdmin.from("auth_nonces").insert({
       wallet_address: wallet.toLowerCase(),
@@ -87,6 +93,8 @@ export const verifySignature = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const wallet = getAddress(data.wallet);
     const walletLower = wallet.toLowerCase();
+    const supabaseAdmin = await getAdmin();
+
 
     // Extract nonce from message
     const nonceMatch = data.message.match(/Nonce: ([a-f0-9]+)/);
