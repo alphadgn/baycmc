@@ -163,20 +163,21 @@ function EntranceBody({
           return;
         }
 
-        // verified
-        clearTimers();
-        setPhase("verifying");
-        const { error } = await supabase.auth.setSession({
-          access_token: res.session.access_token,
-          refresh_token: res.session.refresh_token,
-        });
-        if (error) {
-          failWith(error.message);
-          return;
+        if (res.status === "verified") {
+          clearTimers();
+          setPhase("verifying");
+          const { error } = await supabase.auth.setSession({
+            access_token: res.session.access_token,
+            refresh_token: res.session.refresh_token,
+          });
+          if (error) {
+            failWith(error.message);
+            return;
+          }
+          toast.success("Verified — BAYC/MAYC ownership confirmed");
+          setPhase("done");
+          onOpenChange(false);
         }
-        toast.success("Verified — BAYC/MAYC ownership confirmed");
-        setPhase("done");
-        onOpenChange(false);
       } catch (e) {
         transientErrorsRef.current += 1;
         if (transientErrorsRef.current >= MAX_TRANSIENT_ERRORS) {
