@@ -26,7 +26,7 @@ function Index() {
           <div className="mx-auto max-w-3xl text-center">
             <div className="inline-flex items-center gap-2 rounded-full border border-gold/30 bg-gold/5 px-3 py-1 text-xs font-medium text-gold uppercase tracking-wider">
               <span className="inline-block h-1.5 w-1.5 rounded-full bg-gold animate-pulse-glow" />
-              Members only · BAYC verified
+              Members only · BAYC/MAYC
             </div>
             <h1 className="mt-6 font-display text-5xl font-bold leading-[1.05] tracking-tight sm:text-6xl lg:text-7xl">
               The private clubhouse for{" "}
@@ -88,9 +88,9 @@ function Index() {
           </div>
           <div className="mx-auto mt-12 grid max-w-5xl gap-6 sm:grid-cols-3">
             {[
-              { n: "01", t: "Connect", d: "Use MetaMask, WalletConnect, or any supported wallet via Reown AppKit." },
-              { n: "02", t: "Sign", d: "Prove ownership with a single off-chain signature. Replay-proof, gas-free." },
-              { n: "03", t: "Verify", d: "We check BAYC ownership on-chain (and delegate.cash vaults) in real time." },
+              { n: "01", t: "Open Tokenproof", d: "Tap Entrance to launch the Tokenproof verification flow — no wallet connection in-browser." },
+              { n: "02", t: "Scan & Approve", d: "Scan the QR with your Tokenproof app and approve the request from your wallet on your phone." },
+              { n: "03", t: "You're In", d: "Tokenproof confirms your BAYC/MAYC ownership and we sign you in instantly." },
             ].map((s) => (
               <div key={s.n} className="glass rounded-2xl p-6 shadow-card">
                 <div className="font-display text-xs text-gold tracking-widest">{s.n}</div>

@@ -33,9 +33,10 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --font-display: "Allura", "Pinyon Script", "Great Vibes", cursive;
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
   --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-logo: "Allura", "Pinyon Script", "Great Vibes", cursive;
 }
 
 :root {
@@ -112,13 +113,17 @@
 
   h1, h2, h3, h4, h5, h6, .font-display {
     font-family: var(--font-display);
-    letter-spacing: 0;
-    /* Script font reads better with normal weight */
-    font-weight: 400;
+    letter-spacing: -0.02em;
+    font-weight: 700;
   }
   .font-sans-display {
     font-family: var(--font-sans);
     letter-spacing: -0.02em;
+  }
+  .font-logo {
+    font-family: var(--font-logo);
+    font-weight: 400;
+    letter-spacing: 0;
   }
 }
 
