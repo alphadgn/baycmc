@@ -4,7 +4,7 @@ import { useAccount } from "wagmi";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
-import { verifyBayc } from "@/server/verification.functions";
+import { verifyBayc, verifyOtherpage } from "@/server/verification.functions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/profile")({
