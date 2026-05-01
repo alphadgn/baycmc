@@ -1,22 +1,32 @@
-import { useEffect, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const queryClient = new QueryClient();
 
+const Web3ReadyCtx = createContext(false);
+export const useWeb3Ready = () => useContext(Web3ReadyCtx);
+
 /**
- * Web3Provider is strictly client-only.
+ * Web3Provider is strictly client-only. Wagmi + Reown AppKit touch `window`,
+ * `localStorage`, and `indexedDB` at module-evaluation time. Importing them
+ * statically anywhere reachable from the SSR entry crashes the Worker
+ * runtime with `HTTPError 500`. We dynamic-import the adapter inside an
+ * effect so the SSR pass renders the children without a wagmi provider.
  *
- * Wagmi + Reown AppKit touch `window`, `localStorage`, and `indexedDB` at
- * module-evaluation time. Importing them statically anywhere reachable from
- * the SSR entry crashes the Worker runtime with `HTTPError 500`. We dynamic-
- * import the adapter inside `useEffect` so the SSR pass renders the children
- * directly (still valid HTML — just no wallet UI until hydration).
+ * Components that need wagmi hooks should gate on `useWeb3Ready()` so they
+ * never call those hooks before WagmiProvider has mounted.
  */
 export function Web3Provider({ children }: { children: ReactNode }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [wagmiConfig, setWagmiConfig] = useState<any>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [WagmiProviderCmp, setWagmiProviderCmp] = useState<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [wagmiConfig, setWagmiConfig] = useState<any>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,17 +45,19 @@ export function Web3Provider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // SSR + pre-hydration: render children inside react-query only, no wagmi.
-  // Components that need wallet state must guard for it (useAccount returns
-  // disconnected state when there is no WagmiProvider ancestor — handled by
-  // the AppHeader's conditional rendering).
   if (!WagmiProviderCmp || !wagmiConfig) {
-    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+    return (
+      <Web3ReadyCtx.Provider value={false}>
+        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      </Web3ReadyCtx.Provider>
+    );
   }
 
   return (
-    <WagmiProviderCmp config={wagmiConfig}>
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    </WagmiProviderCmp>
+    <Web3ReadyCtx.Provider value={true}>
+      <WagmiProviderCmp config={wagmiConfig}>
+        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      </WagmiProviderCmp>
+    </Web3ReadyCtx.Provider>
   );
 }
