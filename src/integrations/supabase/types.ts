@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_settings: {
+        Row: {
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Relationships: []
+      }
       auth_nonces: {
         Row: {
           consumed: boolean
@@ -100,6 +121,7 @@ export type Database = {
           delegation_verified: boolean
           id: string
           lumina_verified: boolean
+          otherpage_token_ids: number[]
           otherpage_verified: boolean
           updated_at: string
           user_id: string
@@ -112,6 +134,7 @@ export type Database = {
           delegation_verified?: boolean
           id?: string
           lumina_verified?: boolean
+          otherpage_token_ids?: number[]
           otherpage_verified?: boolean
           updated_at?: string
           user_id: string
@@ -124,6 +147,7 @@ export type Database = {
           delegation_verified?: boolean
           id?: string
           lumina_verified?: boolean
+          otherpage_token_ids?: number[]
           otherpage_verified?: boolean
           updated_at?: string
           user_id?: string

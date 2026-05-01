@@ -4,7 +4,7 @@ import { useAccount } from "wagmi";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
-import { verifyBayc } from "@/server/verification.functions";
+import { verifyBayc, verifyOtherpage } from "@/server/verification.functions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/profile")({
@@ -44,10 +44,12 @@ function ProfilePage() {
   const [bio, setBio] = useState("");
   const [saving, setSaving] = useState(false);
   const [verifyingBayc, setVerifyingBayc] = useState(false);
+  const [verifyingOther, setVerifyingOther] = useState(false);
   const [loadState, setLoadState] = useState<LoadState>("idle");
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const verifyBaycFn = useServerFn(verifyBayc);
+  const verifyOtherpageFn = useServerFn(verifyOtherpage);
 
   // Lazy-load all server data after mount. We never block render on this —
   // the component shows a skeleton fallback while loadState !== "ready".
@@ -134,6 +136,34 @@ function ProfilePage() {
       toast.error(e instanceof Error ? e.message : "Verification failed");
     } finally {
       setVerifyingBayc(false);
+    }
+  }
+
+  async function runOtherpageVerify() {
+    if (!address) {
+      toast.error("Connect a wallet first");
+      return;
+    }
+    setVerifyingOther(true);
+    try {
+      const res = await verifyOtherpageFn({ data: { wallet: address } });
+      if (!res.configured) {
+        toast.error("Otherpage gating isn't configured yet");
+      } else if (res.verified) {
+        toast.success("Otherpage premium access confirmed");
+      } else {
+        toast.error(res.error || "No qualifying Otherpage tokens");
+      }
+      const { data: v } = await supabase
+        .from("user_verifications")
+        .select("*")
+        .eq("user_id", user!.id)
+        .single();
+      if (v) setVerif(v as VerifRow);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Verification failed");
+    } finally {
+      setVerifyingOther(false);
     }
   }
 
@@ -259,7 +289,15 @@ function ProfilePage() {
             <VerifyRow
               label="Otherpage premium"
               ok={!!verif?.otherpage_verified}
-              action={<span className="text-xs text-muted-foreground">Coming soon</span>}
+              action={
+                <button
+                  onClick={runOtherpageVerify}
+                  disabled={verifyingOther}
+                  className="rounded-md border border-gold/40 bg-gold/10 px-3 py-1.5 text-xs font-semibold text-gold hover:bg-gold/20 disabled:opacity-50"
+                >
+                  {verifyingOther ? "Checking…" : verif?.otherpage_verified ? "Re-check" : "Verify"}
+                </button>
+              }
             />
           </ul>
         </section>
