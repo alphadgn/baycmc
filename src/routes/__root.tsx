@@ -19,7 +19,7 @@ function NotFoundComponent() {
             to="/"
             className="inline-flex items-center justify-center rounded-md bg-gradient-gold px-4 py-2 text-sm font-semibold text-gold-foreground shadow-gold"
           >
-            Back to The Clubhouse
+            Back to BAYCMC
           </Link>
         </div>
       </div>
@@ -32,9 +32,9 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "The Clubhouse — token-gated for verified BAYC holders" },
+      { title: "BAYCMC — token-gated for verified BAYC holders" },
       { name: "description", content: "An exclusive social and real-time platform for verified Bored Ape Yacht Club holders." },
-      { property: "og:title", content: "The Clubhouse" },
+      { property: "og:title", content: "BAYCMC" },
       { property: "og:description", content: "Exclusive token-gated platform for BAYC holders." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

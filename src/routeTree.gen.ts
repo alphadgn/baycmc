@@ -12,6 +12,11 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
+import { Route as AuthenticatedMessagesRouteImport } from './routes/_authenticated/messages'
+import { Route as AuthenticatedLifersRouteImport } from './routes/_authenticated/lifers'
+import { Route as AuthenticatedLifersIndexRouteImport } from './routes/_authenticated/lifers/index'
+import { Route as AuthenticatedLifersRoomRouteImport } from './routes/_authenticated/lifers/room'
+import { Route as AuthenticatedLifersMessagesRouteImport } from './routes/_authenticated/lifers/messages'
 
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
@@ -27,27 +32,90 @@ const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
   path: '/profile',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedMessagesRoute = AuthenticatedMessagesRouteImport.update({
+  id: '/messages',
+  path: '/messages',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedLifersRoute = AuthenticatedLifersRouteImport.update({
+  id: '/lifers',
+  path: '/lifers',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedLifersIndexRoute =
+  AuthenticatedLifersIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedLifersRoute,
+  } as any)
+const AuthenticatedLifersRoomRoute = AuthenticatedLifersRoomRouteImport.update({
+  id: '/room',
+  path: '/room',
+  getParentRoute: () => AuthenticatedLifersRoute,
+} as any)
+const AuthenticatedLifersMessagesRoute =
+  AuthenticatedLifersMessagesRouteImport.update({
+    id: '/messages',
+    path: '/messages',
+    getParentRoute: () => AuthenticatedLifersRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/lifers': typeof AuthenticatedLifersRouteWithChildren
+  '/messages': typeof AuthenticatedMessagesRoute
   '/profile': typeof AuthenticatedProfileRoute
+  '/lifers/messages': typeof AuthenticatedLifersMessagesRoute
+  '/lifers/room': typeof AuthenticatedLifersRoomRoute
+  '/lifers/': typeof AuthenticatedLifersIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/messages': typeof AuthenticatedMessagesRoute
   '/profile': typeof AuthenticatedProfileRoute
+  '/lifers/messages': typeof AuthenticatedLifersMessagesRoute
+  '/lifers/room': typeof AuthenticatedLifersRoomRoute
+  '/lifers': typeof AuthenticatedLifersIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
+  '/_authenticated/lifers': typeof AuthenticatedLifersRouteWithChildren
+  '/_authenticated/messages': typeof AuthenticatedMessagesRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
+  '/_authenticated/lifers/messages': typeof AuthenticatedLifersMessagesRoute
+  '/_authenticated/lifers/room': typeof AuthenticatedLifersRoomRoute
+  '/_authenticated/lifers/': typeof AuthenticatedLifersIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/profile'
+  fullPaths:
+    | '/'
+    | '/lifers'
+    | '/messages'
+    | '/profile'
+    | '/lifers/messages'
+    | '/lifers/room'
+    | '/lifers/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/profile'
-  id: '__root__' | '/' | '/_authenticated' | '/_authenticated/profile'
+  to:
+    | '/'
+    | '/messages'
+    | '/profile'
+    | '/lifers/messages'
+    | '/lifers/room'
+    | '/lifers'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/_authenticated/lifers'
+    | '/_authenticated/messages'
+    | '/_authenticated/profile'
+    | '/_authenticated/lifers/messages'
+    | '/_authenticated/lifers/room'
+    | '/_authenticated/lifers/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -78,14 +146,68 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProfileRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/messages': {
+      id: '/_authenticated/messages'
+      path: '/messages'
+      fullPath: '/messages'
+      preLoaderRoute: typeof AuthenticatedMessagesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/lifers': {
+      id: '/_authenticated/lifers'
+      path: '/lifers'
+      fullPath: '/lifers'
+      preLoaderRoute: typeof AuthenticatedLifersRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/lifers/': {
+      id: '/_authenticated/lifers/'
+      path: '/'
+      fullPath: '/lifers/'
+      preLoaderRoute: typeof AuthenticatedLifersIndexRouteImport
+      parentRoute: typeof AuthenticatedLifersRoute
+    }
+    '/_authenticated/lifers/room': {
+      id: '/_authenticated/lifers/room'
+      path: '/room'
+      fullPath: '/lifers/room'
+      preLoaderRoute: typeof AuthenticatedLifersRoomRouteImport
+      parentRoute: typeof AuthenticatedLifersRoute
+    }
+    '/_authenticated/lifers/messages': {
+      id: '/_authenticated/lifers/messages'
+      path: '/messages'
+      fullPath: '/lifers/messages'
+      preLoaderRoute: typeof AuthenticatedLifersMessagesRouteImport
+      parentRoute: typeof AuthenticatedLifersRoute
+    }
   }
 }
 
+interface AuthenticatedLifersRouteChildren {
+  AuthenticatedLifersMessagesRoute: typeof AuthenticatedLifersMessagesRoute
+  AuthenticatedLifersRoomRoute: typeof AuthenticatedLifersRoomRoute
+  AuthenticatedLifersIndexRoute: typeof AuthenticatedLifersIndexRoute
+}
+
+const AuthenticatedLifersRouteChildren: AuthenticatedLifersRouteChildren = {
+  AuthenticatedLifersMessagesRoute: AuthenticatedLifersMessagesRoute,
+  AuthenticatedLifersRoomRoute: AuthenticatedLifersRoomRoute,
+  AuthenticatedLifersIndexRoute: AuthenticatedLifersIndexRoute,
+}
+
+const AuthenticatedLifersRouteWithChildren =
+  AuthenticatedLifersRoute._addFileChildren(AuthenticatedLifersRouteChildren)
+
 interface AuthenticatedRouteChildren {
+  AuthenticatedLifersRoute: typeof AuthenticatedLifersRouteWithChildren
+  AuthenticatedMessagesRoute: typeof AuthenticatedMessagesRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedLifersRoute: AuthenticatedLifersRouteWithChildren,
+  AuthenticatedMessagesRoute: AuthenticatedMessagesRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
 }
 
