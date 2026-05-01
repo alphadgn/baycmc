@@ -204,22 +204,19 @@ function ProfilePage() {
         </section>
 
         <section className="glass rounded-2xl p-6 shadow-card lg:col-span-2">
-          <h2 className="font-display text-xl font-semibold">Token Proof</h2>
+          <h2 className="font-display text-xl font-semibold">Verification</h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            On-chain proof of ownership. Re-checked at every gated request.
+            Status from your last Tokenproof entrance. Re-verify any time by
+            tapping <span className="font-semibold text-foreground">Entrance</span> in the header.
           </p>
           <ul className="mt-5 space-y-3">
             <VerifyRow
-              label="BAYC ownership"
+              label="BAYC/MAYC (Tokenproof)"
               ok={!!verif?.bayc_verified}
               action={
-                <button
-                  onClick={runBaycVerify}
-                  disabled={verifyingBayc}
-                  className="rounded-md border border-gold/40 bg-gold/10 px-3 py-1.5 text-xs font-semibold text-gold hover:bg-gold/20 disabled:opacity-50"
-                >
-                  {verifyingBayc ? "Checking…" : verif?.bayc_verified ? "Re-check" : "Verify"}
-                </button>
+                <span className="text-xs text-muted-foreground">
+                  {verif?.bayc_verified ? "Verified" : "Not verified"}
+                </span>
               }
             />
             <VerifyRow
@@ -231,13 +228,9 @@ function ProfilePage() {
               label="Otherpage premium"
               ok={!!verif?.otherpage_verified}
               action={
-                <button
-                  onClick={runOtherpageVerify}
-                  disabled={verifyingOther}
-                  className="rounded-md border border-gold/40 bg-gold/10 px-3 py-1.5 text-xs font-semibold text-gold hover:bg-gold/20 disabled:opacity-50"
-                >
-                  {verifyingOther ? "Checking…" : verif?.otherpage_verified ? "Re-check" : "Verify"}
-                </button>
+                <span className="text-xs text-muted-foreground">
+                  {verif?.otherpage_verified ? "Verified" : "Checked at gated rooms"}
+                </span>
               }
             />
           </ul>
