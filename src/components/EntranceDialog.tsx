@@ -8,6 +8,7 @@ import { requestNonce, verifySignature } from "@/server/siwe.functions";
 import { verifyBayc } from "@/server/verification.functions";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { useWeb3Ready } from "@/components/Web3Provider";
 
 interface EntranceDialogProps {
   open: boolean;
@@ -17,11 +18,36 @@ interface EntranceDialogProps {
 type Step = "choose" | "wallet" | "siwe" | "tokenproof";
 
 /**
- * Entrance modal — chooser for the two sign-in / verification options:
- *  1. Connect Wallet + SIWE  (required first; creates a session)
- *  2. Token Proof verification (BAYC balanceOf, gates main areas)
+ * Entrance modal — chooser for the two sign-in / verification options.
+ * Wagmi hooks must NOT run until WagmiProvider has mounted on the client,
+ * so the body that uses them is split into a child component gated on
+ * `useWeb3Ready()`.
  */
 export function EntranceDialog({ open, onOpenChange }: EntranceDialogProps) {
+  const ready = useWeb3Ready();
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="font-display text-2xl">Entrance</DialogTitle>
+          <DialogDescription>
+            Pick a verification option. Wallet sign-in opens the main areas; Token Proof
+            confirms BAYC ownership for gated access.
+          </DialogDescription>
+        </DialogHeader>
+        {ready ? (
+          <EntranceBody onOpenChange={onOpenChange} />
+        ) : (
+          <div className="py-8 text-center text-xs text-muted-foreground">
+            Initializing wallet provider…
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EntranceBody({ onOpenChange }: { onOpenChange: (open: boolean) => void }) {
   const [step, setStep] = useState<Step>("choose");
   const { address, isConnected } = useAccount();
   const { disconnectAsync } = useDisconnect();
