@@ -1,16 +1,13 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useAccount, useDisconnect, useSignMessage } from "wagmi";
+import { useAppKit } from "@reown/appkit/react";
 import { useAuth, signOut } from "@/lib/auth/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
 import { requestNonce, verifySignature } from "@/server/siwe.functions";
 import { toast } from "sonner";
 
-/**
- * AppHeader is rendered inside Web3Provider, but Web3Provider only mounts
- * wagmi after hydration. To keep this component SSR-safe, we lazily import
- * wagmi + appkit hooks inside an effect and render a static shell first.
- */
 export function AppHeader() {
   const { isAuthenticated } = useAuth();
   const [mounted, setMounted] = useState(false);
@@ -38,6 +35,9 @@ export function AppHeader() {
         </nav>
 
         <div className="flex items-center gap-2">
+          {/* WalletControls relies on a WagmiProvider ancestor. Web3Provider
+              mounts that provider lazily after hydration, so we wait for both
+              this component to mount AND the next render tick. */}
           {mounted ? <WalletControls /> : <WalletPlaceholder />}
         </div>
       </div>
@@ -46,23 +46,23 @@ export function AppHeader() {
 }
 
 function WalletPlaceholder() {
-  return (
-    <div className="h-9 w-32 animate-pulse rounded-md bg-secondary/40" aria-hidden="true" />
-  );
+  return <div className="h-9 w-32 animate-pulse rounded-md bg-secondary/40" aria-hidden />;
 }
 
 function WalletControls() {
-  // Lazy access to wagmi/appkit so this code path never executes during SSR.
-  // We import the hooks via require-style dynamic state to keep types simple.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
-  const wagmi = require("wagmi") as typeof import("wagmi");
-  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
-  const appkit = require("@reown/appkit/react") as typeof import("@reown/appkit/react");
-
-  const { address, isConnected } = wagmi.useAccount();
-  const { disconnectAsync } = wagmi.useDisconnect();
-  const { signMessageAsync } = wagmi.useSignMessage();
-  const { open } = appkit.useAppKit();
+  // These hooks need a WagmiProvider in the tree. Web3Provider mounts that
+  // provider via dynamic import in its own effect — by the time this child
+  // re-renders after `mounted=true`, WagmiProvider is in place.
+  let walletState: { address?: `0x${string}`; isConnected: boolean };
+  try {
+    walletState = useAccount();
+  } catch {
+    return <WalletPlaceholder />;
+  }
+  const { address, isConnected } = walletState;
+  const { disconnectAsync } = useDisconnect();
+  const { signMessageAsync } = useSignMessage();
+  const { open } = useAppKit();
   const { isAuthenticated } = useAuth();
   const [signing, setSigning] = useState(false);
 
