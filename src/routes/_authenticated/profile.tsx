@@ -44,10 +44,12 @@ function ProfilePage() {
   const [bio, setBio] = useState("");
   const [saving, setSaving] = useState(false);
   const [verifyingBayc, setVerifyingBayc] = useState(false);
+  const [verifyingOther, setVerifyingOther] = useState(false);
   const [loadState, setLoadState] = useState<LoadState>("idle");
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const verifyBaycFn = useServerFn(verifyBayc);
+  const verifyOtherpageFn = useServerFn(verifyOtherpage);
 
   // Lazy-load all server data after mount. We never block render on this —
   // the component shows a skeleton fallback while loadState !== "ready".
