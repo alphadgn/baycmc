@@ -40,7 +40,7 @@
 :root {
   --radius: 0.5rem;
 
-  /* The Clubhouse — dark luxury palette (BAYC-inspired) */
+  /* BAYCMC — dark luxury palette (BAYC-inspired) */
   --background: oklch(0.14 0.01 80);
   --foreground: oklch(0.96 0.02 85);
 

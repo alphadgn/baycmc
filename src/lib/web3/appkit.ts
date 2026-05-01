@@ -22,7 +22,7 @@ export function initAppKit() {
     networks: [...networks],
     projectId: REOWN_PROJECT_ID,
     metadata: {
-      name: "The Clubhouse",
+      name: "BAYCMC",
       description: "Token-gated social platform for verified BAYC holders",
       url: window.location.origin,
       icons: [`${window.location.origin}/favicon.ico`],

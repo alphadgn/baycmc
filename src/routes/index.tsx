@@ -4,7 +4,7 @@ import { useAuth } from "@/lib/auth/useAuth";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "The Clubhouse — token-gated for verified BAYC holders" },
+      { title: "BAYCMC — token-gated for verified BAYC holders" },
       { name: "description", content: "An exclusive social and real-time platform for verified Bored Ape Yacht Club holders. Verify your BAYC, then drop in." },
     ],
   }),
@@ -42,7 +42,7 @@ function Index() {
                   to="/profile"
                   className="rounded-md bg-gradient-gold px-6 py-3 text-base font-semibold text-gold-foreground shadow-gold transition hover:opacity-90"
                 >
-                  Enter the Clubhouse →
+                  Enter BAYCMC →
                 </Link>
               ) : (
                 <a
@@ -136,7 +136,7 @@ function Index() {
 
       <footer className="border-t border-border/50">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-4 py-10 text-sm text-muted-foreground sm:flex-row sm:px-6">
-          <p>© The Clubhouse. Independent and unaffiliated with Yuga Labs.</p>
+          <p>© BAYCMC. Independent and unaffiliated with Yuga Labs.</p>
           <p className="font-mono text-xs">v0.1 · foundation</p>
         </div>
       </footer>

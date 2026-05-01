@@ -1,0 +1,57 @@
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth/useAuth";
+
+export interface VerificationStatus {
+  loading: boolean;
+  tokenProof: boolean; // BAYC verified
+  otherpage: boolean;
+  isLifer: boolean; // both
+  refresh: () => Promise<void>;
+}
+
+/**
+ * Verification status for the current user. Drives access to gated UI.
+ *
+ * Note: this is a UI hint only. All actual access control is enforced
+ * server-side via RLS (see `is_token_proof_verified` and `is_lifer` SQL
+ * helpers) and per-request Token Proof checks.
+ */
+export function useVerificationStatus(): VerificationStatus {
+  const { user, loading: authLoading } = useAuth();
+  const [tokenProof, setTokenProof] = useState(false);
+  const [otherpage, setOtherpage] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  async function load() {
+    if (!user) {
+      setTokenProof(false);
+      setOtherpage(false);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const { data } = await supabase
+      .from("user_verifications")
+      .select("bayc_verified, otherpage_verified")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    setTokenProof(!!data?.bayc_verified);
+    setOtherpage(!!data?.otherpage_verified);
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    if (authLoading) return;
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, authLoading]);
+
+  return {
+    loading: authLoading || loading,
+    tokenProof,
+    otherpage,
+    isLifer: tokenProof && otherpage,
+    refresh: load,
+  };
+}
