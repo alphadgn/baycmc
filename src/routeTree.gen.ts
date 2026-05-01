@@ -11,12 +11,17 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedRoomsRouteImport } from './routes/_authenticated/rooms'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 import { Route as AuthenticatedMessagesRouteImport } from './routes/_authenticated/messages'
 import { Route as AuthenticatedLifersRouteImport } from './routes/_authenticated/lifers'
+import { Route as AuthenticatedFeedRouteImport } from './routes/_authenticated/feed'
+import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedLifersIndexRouteImport } from './routes/_authenticated/lifers/index'
+import { Route as AuthenticatedRoomsRoomIdRouteImport } from './routes/_authenticated/rooms.$roomId'
 import { Route as AuthenticatedLifersRoomRouteImport } from './routes/_authenticated/lifers/room'
 import { Route as AuthenticatedLifersMessagesRouteImport } from './routes/_authenticated/lifers/messages'
+import { Route as AuthenticatedAdminOtherpageRouteImport } from './routes/_authenticated/admin.otherpage'
 
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
@@ -26,6 +31,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRoomsRoute = AuthenticatedRoomsRouteImport.update({
+  id: '/rooms',
+  path: '/rooms',
+  getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
   id: '/profile',
@@ -42,11 +52,27 @@ const AuthenticatedLifersRoute = AuthenticatedLifersRouteImport.update({
   path: '/lifers',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedFeedRoute = AuthenticatedFeedRouteImport.update({
+  id: '/feed',
+  path: '/feed',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedLifersIndexRoute =
   AuthenticatedLifersIndexRouteImport.update({
     id: '/',
     path: '/',
     getParentRoute: () => AuthenticatedLifersRoute,
+  } as any)
+const AuthenticatedRoomsRoomIdRoute =
+  AuthenticatedRoomsRoomIdRouteImport.update({
+    id: '/$roomId',
+    path: '/$roomId',
+    getParentRoute: () => AuthenticatedRoomsRoute,
   } as any)
 const AuthenticatedLifersRoomRoute = AuthenticatedLifersRoomRouteImport.update({
   id: '/room',
@@ -59,62 +85,98 @@ const AuthenticatedLifersMessagesRoute =
     path: '/messages',
     getParentRoute: () => AuthenticatedLifersRoute,
   } as any)
+const AuthenticatedAdminOtherpageRoute =
+  AuthenticatedAdminOtherpageRouteImport.update({
+    id: '/otherpage',
+    path: '/otherpage',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/feed': typeof AuthenticatedFeedRoute
   '/lifers': typeof AuthenticatedLifersRouteWithChildren
   '/messages': typeof AuthenticatedMessagesRoute
   '/profile': typeof AuthenticatedProfileRoute
+  '/rooms': typeof AuthenticatedRoomsRouteWithChildren
+  '/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
   '/lifers/messages': typeof AuthenticatedLifersMessagesRoute
   '/lifers/room': typeof AuthenticatedLifersRoomRoute
+  '/rooms/$roomId': typeof AuthenticatedRoomsRoomIdRoute
   '/lifers/': typeof AuthenticatedLifersIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/feed': typeof AuthenticatedFeedRoute
   '/messages': typeof AuthenticatedMessagesRoute
   '/profile': typeof AuthenticatedProfileRoute
+  '/rooms': typeof AuthenticatedRoomsRouteWithChildren
+  '/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
   '/lifers/messages': typeof AuthenticatedLifersMessagesRoute
   '/lifers/room': typeof AuthenticatedLifersRoomRoute
+  '/rooms/$roomId': typeof AuthenticatedRoomsRoomIdRoute
   '/lifers': typeof AuthenticatedLifersIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
+  '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/_authenticated/feed': typeof AuthenticatedFeedRoute
   '/_authenticated/lifers': typeof AuthenticatedLifersRouteWithChildren
   '/_authenticated/messages': typeof AuthenticatedMessagesRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
+  '/_authenticated/rooms': typeof AuthenticatedRoomsRouteWithChildren
+  '/_authenticated/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
   '/_authenticated/lifers/messages': typeof AuthenticatedLifersMessagesRoute
   '/_authenticated/lifers/room': typeof AuthenticatedLifersRoomRoute
+  '/_authenticated/rooms/$roomId': typeof AuthenticatedRoomsRoomIdRoute
   '/_authenticated/lifers/': typeof AuthenticatedLifersIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
+    | '/feed'
     | '/lifers'
     | '/messages'
     | '/profile'
+    | '/rooms'
+    | '/admin/otherpage'
     | '/lifers/messages'
     | '/lifers/room'
+    | '/rooms/$roomId'
     | '/lifers/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
+    | '/feed'
     | '/messages'
     | '/profile'
+    | '/rooms'
+    | '/admin/otherpage'
     | '/lifers/messages'
     | '/lifers/room'
+    | '/rooms/$roomId'
     | '/lifers'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
+    | '/_authenticated/admin'
+    | '/_authenticated/feed'
     | '/_authenticated/lifers'
     | '/_authenticated/messages'
     | '/_authenticated/profile'
+    | '/_authenticated/rooms'
+    | '/_authenticated/admin/otherpage'
     | '/_authenticated/lifers/messages'
     | '/_authenticated/lifers/room'
+    | '/_authenticated/rooms/$roomId'
     | '/_authenticated/lifers/'
   fileRoutesById: FileRoutesById
 }
@@ -139,6 +201,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/rooms': {
+      id: '/_authenticated/rooms'
+      path: '/rooms'
+      fullPath: '/rooms'
+      preLoaderRoute: typeof AuthenticatedRoomsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/profile': {
       id: '/_authenticated/profile'
       path: '/profile'
@@ -160,12 +229,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLifersRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/feed': {
+      id: '/_authenticated/feed'
+      path: '/feed'
+      fullPath: '/feed'
+      preLoaderRoute: typeof AuthenticatedFeedRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/lifers/': {
       id: '/_authenticated/lifers/'
       path: '/'
       fullPath: '/lifers/'
       preLoaderRoute: typeof AuthenticatedLifersIndexRouteImport
       parentRoute: typeof AuthenticatedLifersRoute
+    }
+    '/_authenticated/rooms/$roomId': {
+      id: '/_authenticated/rooms/$roomId'
+      path: '/$roomId'
+      fullPath: '/rooms/$roomId'
+      preLoaderRoute: typeof AuthenticatedRoomsRoomIdRouteImport
+      parentRoute: typeof AuthenticatedRoomsRoute
     }
     '/_authenticated/lifers/room': {
       id: '/_authenticated/lifers/room'
@@ -181,8 +271,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLifersMessagesRouteImport
       parentRoute: typeof AuthenticatedLifersRoute
     }
+    '/_authenticated/admin/otherpage': {
+      id: '/_authenticated/admin/otherpage'
+      path: '/otherpage'
+      fullPath: '/admin/otherpage'
+      preLoaderRoute: typeof AuthenticatedAdminOtherpageRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
   }
 }
+
+interface AuthenticatedAdminRouteChildren {
+  AuthenticatedAdminOtherpageRoute: typeof AuthenticatedAdminOtherpageRoute
+}
+
+const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
+  AuthenticatedAdminOtherpageRoute: AuthenticatedAdminOtherpageRoute,
+}
+
+const AuthenticatedAdminRouteWithChildren =
+  AuthenticatedAdminRoute._addFileChildren(AuthenticatedAdminRouteChildren)
 
 interface AuthenticatedLifersRouteChildren {
   AuthenticatedLifersMessagesRoute: typeof AuthenticatedLifersMessagesRoute
@@ -199,16 +307,33 @@ const AuthenticatedLifersRouteChildren: AuthenticatedLifersRouteChildren = {
 const AuthenticatedLifersRouteWithChildren =
   AuthenticatedLifersRoute._addFileChildren(AuthenticatedLifersRouteChildren)
 
+interface AuthenticatedRoomsRouteChildren {
+  AuthenticatedRoomsRoomIdRoute: typeof AuthenticatedRoomsRoomIdRoute
+}
+
+const AuthenticatedRoomsRouteChildren: AuthenticatedRoomsRouteChildren = {
+  AuthenticatedRoomsRoomIdRoute: AuthenticatedRoomsRoomIdRoute,
+}
+
+const AuthenticatedRoomsRouteWithChildren =
+  AuthenticatedRoomsRoute._addFileChildren(AuthenticatedRoomsRouteChildren)
+
 interface AuthenticatedRouteChildren {
+  AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
+  AuthenticatedFeedRoute: typeof AuthenticatedFeedRoute
   AuthenticatedLifersRoute: typeof AuthenticatedLifersRouteWithChildren
   AuthenticatedMessagesRoute: typeof AuthenticatedMessagesRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
+  AuthenticatedRoomsRoute: typeof AuthenticatedRoomsRouteWithChildren
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
+  AuthenticatedFeedRoute: AuthenticatedFeedRoute,
   AuthenticatedLifersRoute: AuthenticatedLifersRouteWithChildren,
   AuthenticatedMessagesRoute: AuthenticatedMessagesRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
+  AuthenticatedRoomsRoute: AuthenticatedRoomsRouteWithChildren,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
@@ -222,12 +347,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

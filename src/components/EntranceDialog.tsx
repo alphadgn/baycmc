@@ -15,13 +15,9 @@ interface EntranceDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-type Step = "choose" | "wallet" | "siwe" | "tokenproof";
-
 /**
- * Entrance modal — chooser for the two sign-in / verification options.
- * Wagmi hooks must NOT run until WagmiProvider has mounted on the client,
- * so the body that uses them is split into a child component gated on
- * `useWeb3Ready()`.
+ * Entrance modal — single Token Proof flow.
+ * One button orchestrates wallet connect → SIWE sign-in → on-chain BAYC check.
  */
 export function EntranceDialog({ open, onOpenChange }: EntranceDialogProps) {
   const ready = useWeb3Ready();
@@ -29,10 +25,10 @@ export function EntranceDialog({ open, onOpenChange }: EntranceDialogProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-display text-2xl">Entrance</DialogTitle>
-          <DialogDescription>
-            Pick a verification option. Wallet sign-in opens the main areas; Token Proof
-            confirms BAYC ownership for gated access.
+          <DialogTitle className="font-display text-3xl text-gradient-gold">Entrance</DialogTitle>
+          <DialogDescription className="font-sans-display">
+            Verify BAYC ownership with a single signature. We'll connect your
+            wallet, sign you in, and check your tokens on-chain.
           </DialogDescription>
         </DialogHeader>
         {ready ? (
@@ -47,171 +43,129 @@ export function EntranceDialog({ open, onOpenChange }: EntranceDialogProps) {
   );
 }
 
+type Phase = "idle" | "connecting" | "signing" | "verifying" | "done";
+
 function EntranceBody({ onOpenChange }: { onOpenChange: (open: boolean) => void }) {
-  const [step, setStep] = useState<Step>("choose");
   const { address, isConnected } = useAccount();
   const { disconnectAsync } = useDisconnect();
   const { signMessageAsync } = useSignMessage();
   const { open: openAppKit } = useAppKit();
-  const { isAuthenticated, user } = useAuth();
-  const [busy, setBusy] = useState(false);
+  const { isAuthenticated } = useAuth();
+  const [phase, setPhase] = useState<Phase>("idle");
 
   const reqNonce = useServerFn(requestNonce);
   const verifySig = useServerFn(verifySignature);
   const verifyBaycFn = useServerFn(verifyBayc);
 
-  async function handleConnectWallet() {
-    setStep("wallet");
-    await openAppKit();
-  }
+  const busy = phase !== "idle" && phase !== "done";
 
-  async function handleSiwe() {
-    if (!isConnected || !address) {
-      toast.error("Connect your wallet first");
-      return;
-    }
-    setStep("siwe");
-    setBusy(true);
+  async function handleEnter() {
     try {
-      const { message } = await reqNonce({
-        data: {
-          wallet: address,
-          domain: window.location.host,
-          uri: window.location.origin,
-        },
-      });
-      const signature = await signMessageAsync({ message });
-      const result = await verifySig({
-        data: { wallet: address, message, signature },
-      });
-      const { error } = await supabase.auth.setSession({
-        access_token: result.access_token,
-        refresh_token: result.refresh_token,
-      });
-      if (error) throw error;
-      toast.success("Signed in to BAYCMC");
-      setStep("choose");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Sign-in failed");
-      setStep("choose");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleTokenProof() {
-    if (!isAuthenticated || !user) {
-      toast.error("Sign in first to run Token Proof");
-      return;
-    }
-    if (!address) {
-      toast.error("Connect your wallet");
-      return;
-    }
-    setStep("tokenproof");
-    setBusy(true);
-    try {
-      const res = await verifyBaycFn({ data: { wallet: address } });
-      if (res.verified) {
-        toast.success(`Token Proof verified — ${res.balance} BAYC`);
-        onOpenChange(false);
-      } else {
-        toast.error(res.error || "No BAYC found in this wallet");
+      // 1) Connect wallet if needed
+      let walletAddress = address;
+      if (!isConnected || !walletAddress) {
+        setPhase("connecting");
+        await openAppKit();
+        // Wait briefly for wagmi state to settle
+        for (let i = 0; i < 30; i++) {
+          await new Promise((r) => setTimeout(r, 200));
+          if (window?.localStorage) {
+            // re-read by triggering a tick — caller's state will refresh on next render
+          }
+          break;
+        }
+        toast.info("Wallet connection requested — tap Enter again once connected.");
+        setPhase("idle");
+        return;
       }
-      setStep("choose");
+
+      // 2) SIWE sign-in if not yet authenticated
+      if (!isAuthenticated) {
+        setPhase("signing");
+        const { message } = await reqNonce({
+          data: {
+            wallet: walletAddress,
+            domain: window.location.host,
+            uri: window.location.origin,
+          },
+        });
+        const signature = await signMessageAsync({ message });
+        const result = await verifySig({
+          data: { wallet: walletAddress, message, signature },
+        });
+        const { error } = await supabase.auth.setSession({
+          access_token: result.access_token,
+          refresh_token: result.refresh_token,
+        });
+        if (error) throw error;
+      }
+
+      // 3) Token Proof
+      setPhase("verifying");
+      const res = await verifyBaycFn({ data: { wallet: walletAddress } });
+      if (!res.verified) {
+        toast.error(res.error || "No BAYC tokens found in this wallet");
+        setPhase("idle");
+        return;
+      }
+      toast.success(`Welcome — ${res.balance} BAYC verified`);
+      setPhase("done");
+      onOpenChange(false);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Token Proof failed");
-      setStep("choose");
-    } finally {
-      setBusy(false);
+      toast.error(e instanceof Error ? e.message : "Entrance failed");
+      setPhase("idle");
     }
   }
 
   async function handleDisconnect() {
     await disconnectAsync().catch(() => {});
-    toast.success("Wallet disconnected");
+    await supabase.auth.signOut();
+    toast.success("Disconnected");
   }
 
+  const buttonLabel =
+    phase === "connecting"
+      ? "Connecting wallet…"
+      : phase === "signing"
+      ? "Sign in your wallet…"
+      : phase === "verifying"
+      ? "Checking BAYC on-chain…"
+      : !isConnected
+      ? "Connect Wallet & Verify"
+      : !isAuthenticated
+      ? "Sign In & Verify"
+      : "Run Token Proof";
+
   return (
-    <div className="space-y-3 pt-2">
-      <EntranceOption
-        n="01"
-        title={isConnected ? `Wallet connected · ${address?.slice(0, 6)}…${address?.slice(-4)}` : "Connect Wallet"}
-        description="Use any supported wallet via Reown AppKit."
-        cta={isConnected ? "Reopen" : "Connect"}
-        onClick={handleConnectWallet}
-        done={isConnected}
-        disabled={busy}
-      />
-      <EntranceOption
-        n="02"
-        title="Sign In (SIWE)"
-        description="Prove wallet ownership with a single off-chain signature."
-        cta={isAuthenticated ? "Signed in ✓" : busy && step === "siwe" ? "Signing…" : "Sign"}
-        onClick={handleSiwe}
-        done={isAuthenticated}
-        disabled={busy || !isConnected || isAuthenticated}
-      />
-      <EntranceOption
-        n="03"
-        title="Token Proof"
-        description="On-chain BAYC balanceOf check. Required for main areas."
-        cta={busy && step === "tokenproof" ? "Checking…" : "Verify"}
-        onClick={handleTokenProof}
-        disabled={busy || !isAuthenticated}
-      />
+    <div className="space-y-4 pt-2">
+      <div className="rounded-xl border border-gold/30 bg-gradient-to-br from-gold/10 via-transparent to-accent/5 p-5">
+        <div className="font-display text-3xl text-gradient-gold">Token Proof</div>
+        <p className="mt-2 text-sm text-muted-foreground font-sans-display">
+          On-chain BAYC <code className="font-mono text-xs">balanceOf</code> check.
+          Required to enter every area of BAYCMC.
+        </p>
+        <button
+          onClick={handleEnter}
+          disabled={busy}
+          className="mt-4 w-full rounded-md bg-gradient-gold px-4 py-3 text-sm font-semibold text-gold-foreground shadow-gold transition disabled:opacity-50 hover:opacity-90 font-sans-display"
+        >
+          {buttonLabel}
+        </button>
+        {isConnected && address && (
+          <p className="mt-2 text-center text-[11px] text-muted-foreground font-mono">
+            {address.slice(0, 6)}…{address.slice(-4)}
+          </p>
+        )}
+      </div>
 
       {isConnected && (
         <button
           onClick={handleDisconnect}
-          className="w-full rounded-md border border-border bg-secondary/30 px-3 py-2 text-xs text-muted-foreground hover:bg-secondary"
+          className="w-full rounded-md border border-border bg-secondary/30 px-3 py-2 text-xs text-muted-foreground hover:bg-secondary font-sans-display"
         >
           Disconnect wallet
         </button>
       )}
-    </div>
-  );
-}
-
-function EntranceOption({
-  n,
-  title,
-  description,
-  cta,
-  onClick,
-  done,
-  disabled,
-}: {
-  n: string;
-  title: string;
-  description: string;
-  cta: string;
-  onClick: () => void;
-  done?: boolean;
-  disabled?: boolean;
-}) {
-  return (
-    <div
-      className={`rounded-xl border p-4 transition ${
-        done
-          ? "border-success/40 bg-success/5"
-          : "border-border bg-secondary/20 hover:border-gold/40"
-      }`}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1">
-          <div className="font-display text-[10px] tracking-widest text-gold">{n}</div>
-          <h4 className="mt-1 font-display text-sm font-semibold">{title}</h4>
-          <p className="mt-1 text-xs text-muted-foreground">{description}</p>
-        </div>
-        <button
-          onClick={onClick}
-          disabled={disabled}
-          className="rounded-md bg-gradient-gold px-3 py-1.5 text-xs font-semibold text-gold-foreground shadow-gold disabled:opacity-50"
-        >
-          {cta}
-        </button>
-      </div>
     </div>
   );
 }
