@@ -19,24 +19,30 @@ export function AppHeader() {
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
           <Link to="/" className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-md bg-gradient-gold shadow-gold" />
-            <span className="font-display text-lg font-bold tracking-tight">
+            <span className="font-display text-3xl tracking-tight">
               <span className="text-gradient-gold">BAYCMC</span>
             </span>
           </Link>
 
-          <nav className="hidden items-center gap-6 text-sm md:flex">
+          <nav className="hidden items-center gap-5 text-sm md:flex font-sans-display">
             <Link to="/" className="text-muted-foreground hover:text-foreground transition">
               Home
             </Link>
             {isAuthenticated && (
-              <Link to="/profile" className="text-muted-foreground hover:text-foreground transition">
-                Profile
-              </Link>
-            )}
-            {isAuthenticated && (
-              <Link to="/messages" className="text-muted-foreground hover:text-foreground transition">
-                Messages
-              </Link>
+              <>
+                <Link to="/feed" className="text-muted-foreground hover:text-foreground transition">
+                  Feed
+                </Link>
+                <Link to="/messages" className="text-muted-foreground hover:text-foreground transition">
+                  Messages
+                </Link>
+                <Link to="/rooms" className="text-muted-foreground hover:text-foreground transition">
+                  Rooms
+                </Link>
+                <Link to="/profile" className="text-muted-foreground hover:text-foreground transition">
+                  Profile
+                </Link>
+              </>
             )}
             {/* Lifer-only links — completely invisible to non-Lifers. */}
             {isLifer && (
@@ -46,12 +52,6 @@ export function AppHeader() {
                   className="text-gold hover:text-gold/80 transition font-semibold"
                 >
                   Lifers
-                </Link>
-                <Link
-                  to="/lifers/room"
-                  className="text-gold hover:text-gold/80 transition font-semibold"
-                >
-                  Room
                 </Link>
                 <Link
                   to="/lifers/messages"
