@@ -35,7 +35,7 @@ function buildSiweMessage(params: {
     `${domain} wants you to sign in with your Ethereum account:`,
     address,
     "",
-    "Sign in to The Clubhouse — token-gated platform for verified BAYC holders.",
+    "Sign in to BAYCMC — token-gated platform for verified BAYC holders.",
     "",
     `URI: ${uri}`,
     "Version: 1",
