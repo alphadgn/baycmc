@@ -289,7 +289,15 @@ function ProfilePage() {
             <VerifyRow
               label="Otherpage premium"
               ok={!!verif?.otherpage_verified}
-              action={<span className="text-xs text-muted-foreground">Coming soon</span>}
+              action={
+                <button
+                  onClick={runOtherpageVerify}
+                  disabled={verifyingOther}
+                  className="rounded-md border border-gold/40 bg-gold/10 px-3 py-1.5 text-xs font-semibold text-gold hover:bg-gold/20 disabled:opacity-50"
+                >
+                  {verifyingOther ? "Checking…" : verif?.otherpage_verified ? "Re-check" : "Verify"}
+                </button>
+              }
             />
           </ul>
         </section>
