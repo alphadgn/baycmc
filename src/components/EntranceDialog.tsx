@@ -133,55 +133,43 @@ function EntranceBody({ onOpenChange }: { onOpenChange: (open: boolean) => void 
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="font-display text-2xl">Entrance</DialogTitle>
-          <DialogDescription>
-            Pick a verification option. Wallet sign-in opens the main areas; Token Proof
-            confirms BAYC ownership for gated access.
-          </DialogDescription>
-        </DialogHeader>
+    <div className="space-y-3 pt-2">
+      <EntranceOption
+        n="01"
+        title={isConnected ? `Wallet connected · ${address?.slice(0, 6)}…${address?.slice(-4)}` : "Connect Wallet"}
+        description="Use any supported wallet via Reown AppKit."
+        cta={isConnected ? "Reopen" : "Connect"}
+        onClick={handleConnectWallet}
+        done={isConnected}
+        disabled={busy}
+      />
+      <EntranceOption
+        n="02"
+        title="Sign In (SIWE)"
+        description="Prove wallet ownership with a single off-chain signature."
+        cta={isAuthenticated ? "Signed in ✓" : busy && step === "siwe" ? "Signing…" : "Sign"}
+        onClick={handleSiwe}
+        done={isAuthenticated}
+        disabled={busy || !isConnected || isAuthenticated}
+      />
+      <EntranceOption
+        n="03"
+        title="Token Proof"
+        description="On-chain BAYC balanceOf check. Required for main areas."
+        cta={busy && step === "tokenproof" ? "Checking…" : "Verify"}
+        onClick={handleTokenProof}
+        disabled={busy || !isAuthenticated}
+      />
 
-        <div className="space-y-3 pt-2">
-          <EntranceOption
-            n="01"
-            title={isConnected ? `Wallet connected · ${address?.slice(0, 6)}…${address?.slice(-4)}` : "Connect Wallet"}
-            description="Use any supported wallet via Reown AppKit."
-            cta={isConnected ? "Reopen" : "Connect"}
-            onClick={handleConnectWallet}
-            done={isConnected}
-            disabled={busy}
-          />
-          <EntranceOption
-            n="02"
-            title="Sign In (SIWE)"
-            description="Prove wallet ownership with a single off-chain signature."
-            cta={isAuthenticated ? "Signed in ✓" : busy && step === "siwe" ? "Signing…" : "Sign"}
-            onClick={handleSiwe}
-            done={isAuthenticated}
-            disabled={busy || !isConnected || isAuthenticated}
-          />
-          <EntranceOption
-            n="03"
-            title="Token Proof"
-            description="On-chain BAYC balanceOf check. Required for main areas."
-            cta={busy && step === "tokenproof" ? "Checking…" : "Verify"}
-            onClick={handleTokenProof}
-            disabled={busy || !isAuthenticated}
-          />
-
-          {isConnected && (
-            <button
-              onClick={handleDisconnect}
-              className="w-full rounded-md border border-border bg-secondary/30 px-3 py-2 text-xs text-muted-foreground hover:bg-secondary"
-            >
-              Disconnect wallet
-            </button>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+      {isConnected && (
+        <button
+          onClick={handleDisconnect}
+          className="w-full rounded-md border border-border bg-secondary/30 px-3 py-2 text-xs text-muted-foreground hover:bg-secondary"
+        >
+          Disconnect wallet
+        </button>
+      )}
+    </div>
   );
 }
 
