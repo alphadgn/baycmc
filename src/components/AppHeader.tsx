@@ -1,17 +1,17 @@
 import { Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useAccount, useDisconnect, useSignMessage } from "wagmi";
 import { useAppKit } from "@reown/appkit/react";
 import { useAuth, signOut } from "@/lib/auth/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
 import { requestNonce, verifySignature } from "@/server/siwe.functions";
+import { useWeb3Ready } from "@/components/Web3Provider";
 import { toast } from "sonner";
 
 export function AppHeader() {
   const { isAuthenticated } = useAuth();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const ready = useWeb3Ready();
 
   return (
     <header className="sticky top-0 z-50 glass">
@@ -35,10 +35,7 @@ export function AppHeader() {
         </nav>
 
         <div className="flex items-center gap-2">
-          {/* WalletControls relies on a WagmiProvider ancestor. Web3Provider
-              mounts that provider lazily after hydration, so we wait for both
-              this component to mount AND the next render tick. */}
-          {mounted ? <WalletControls /> : <WalletPlaceholder />}
+          {ready ? <WalletControls /> : <WalletPlaceholder />}
         </div>
       </div>
     </header>
@@ -50,16 +47,7 @@ function WalletPlaceholder() {
 }
 
 function WalletControls() {
-  // These hooks need a WagmiProvider in the tree. Web3Provider mounts that
-  // provider via dynamic import in its own effect — by the time this child
-  // re-renders after `mounted=true`, WagmiProvider is in place.
-  let walletState: { address?: `0x${string}`; isConnected: boolean };
-  try {
-    walletState = useAccount();
-  } catch {
-    return <WalletPlaceholder />;
-  }
-  const { address, isConnected } = walletState;
+  const { address, isConnected } = useAccount();
   const { disconnectAsync } = useDisconnect();
   const { signMessageAsync } = useSignMessage();
   const { open } = useAppKit();
