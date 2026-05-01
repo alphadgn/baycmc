@@ -101,20 +101,21 @@ export const verifySignature = createServerFn({ method: "POST" })
     if (!nonceMatch) throw new Error("Malformed SIWE message: missing nonce");
     const nonce = nonceMatch[1];
 
-    // Look up nonce
+    // Look up nonce (existence + scope check)
     const { data: nonceRow, error: nonceErr } = await supabaseAdmin
       .from("auth_nonces")
-      .select("*")
+      .select("id, consumed, expires_at, wallet_address")
       .eq("nonce", nonce)
       .eq("wallet_address", walletLower)
-      .single();
-    if (nonceErr || !nonceRow) throw new Error("Invalid or unknown nonce");
+      .maybeSingle();
+    if (nonceErr) throw new Error(`Nonce lookup failed: ${nonceErr.message}`);
+    if (!nonceRow) throw new Error("Invalid or unknown nonce");
     if (nonceRow.consumed) throw new Error("Nonce already used");
     if (new Date(nonceRow.expires_at).getTime() < Date.now()) {
       throw new Error("Nonce expired — request a new one");
     }
 
-    // Verify signature
+    // Verify signature BEFORE consuming so a bad signature doesn't burn the nonce.
     const valid = await verifyMessage({
       address: wallet,
       message: data.message,
@@ -122,11 +123,20 @@ export const verifySignature = createServerFn({ method: "POST" })
     });
     if (!valid) throw new Error("Signature verification failed");
 
-    // Consume nonce
-    await supabaseAdmin
+    // Atomically claim the nonce — guarantees single-use even under concurrent
+    // verify calls. The WHERE ... consumed = false predicate makes the UPDATE
+    // a compare-and-swap; if zero rows are affected someone else won the race.
+    const { data: claimed, error: claimErr } = await supabaseAdmin
       .from("auth_nonces")
       .update({ consumed: true })
-      .eq("id", nonceRow.id);
+      .eq("id", nonceRow.id)
+      .eq("consumed", false)
+      .gt("expires_at", new Date().toISOString())
+      .select("id");
+    if (claimErr) throw new Error(`Nonce claim failed: ${claimErr.message}`);
+    if (!claimed || claimed.length === 0) {
+      throw new Error("Nonce already used or expired");
+    }
 
     // Get-or-create Supabase user keyed by wallet
     const email = walletEmail(wallet);
