@@ -1,10 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { useAccount } from "wagmi";
-import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
-import { verifyBayc, verifyOtherpage } from "@/server/verification.functions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/profile")({
@@ -36,20 +33,14 @@ type LoadState = "idle" | "loading" | "ready" | "error";
 
 function ProfilePage() {
   const { user, loading: authLoading } = useAuth();
-  const { address } = useAccount();
   const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [verif, setVerif] = useState<VerifRow | null>(null);
   const [roles, setRoles] = useState<string[]>([]);
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
   const [saving, setSaving] = useState(false);
-  const [verifyingBayc, setVerifyingBayc] = useState(false);
-  const [verifyingOther, setVerifyingOther] = useState(false);
   const [loadState, setLoadState] = useState<LoadState>("idle");
   const [loadError, setLoadError] = useState<string | null>(null);
-
-  const verifyBaycFn = useServerFn(verifyBayc);
-  const verifyOtherpageFn = useServerFn(verifyOtherpage);
 
   // Lazy-load all server data after mount. We never block render on this —
   // the component shows a skeleton fallback while loadState !== "ready".
@@ -113,59 +104,9 @@ function ProfilePage() {
     else toast.success("Profile saved");
   }
 
-  async function runBaycVerify() {
-    if (!address) {
-      toast.error("Connect a wallet first");
-      return;
-    }
-    setVerifyingBayc(true);
-    try {
-      const res = await verifyBaycFn({ data: { wallet: address } });
-      if (res.verified) {
-        toast.success(`Token proof confirmed — ${res.balance} BAYC found`);
-      } else {
-        toast.error(res.error || "No BAYC found in this wallet");
-      }
-      const { data: v } = await supabase
-        .from("user_verifications")
-        .select("*")
-        .eq("user_id", user!.id)
-        .single();
-      if (v) setVerif(v as VerifRow);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Verification failed");
-    } finally {
-      setVerifyingBayc(false);
-    }
-  }
-
-  async function runOtherpageVerify() {
-    if (!address) {
-      toast.error("Connect a wallet first");
-      return;
-    }
-    setVerifyingOther(true);
-    try {
-      const res = await verifyOtherpageFn({ data: { wallet: address } });
-      if (!res.configured) {
-        toast.error("Otherpage gating isn't configured yet");
-      } else if (res.verified) {
-        toast.success("Otherpage premium access confirmed");
-      } else {
-        toast.error(res.error || "No qualifying Otherpage tokens");
-      }
-      const { data: v } = await supabase
-        .from("user_verifications")
-        .select("*")
-        .eq("user_id", user!.id)
-        .single();
-      if (v) setVerif(v as VerifRow);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Verification failed");
-    } finally {
-      setVerifyingOther(false);
-    }
-  }
+  // Verification is handled at Entrance via Tokenproof; profile only shows
+  // current status. (Otherpage premium check is performed server-side at
+  // gated routes.)
 
   if (authLoading || !user) return <ProfileSkeleton />;
   if (loadState === "loading" || loadState === "idle") return <ProfileSkeleton />;
