@@ -35,6 +35,33 @@ export type Database = {
         }
         Relationships: []
       }
+      audit_logs: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          event_type: string
+          id: string
+          metadata: Json
+          target_id: string | null
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          metadata?: Json
+          target_id?: string | null
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          metadata?: Json
+          target_id?: string | null
+        }
+        Relationships: []
+      }
       auth_nonces: {
         Row: {
           consumed: boolean
@@ -110,6 +137,154 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          body: string | null
+          created_at: string
+          id: string
+          kind: string
+          read_at: string | null
+          title: string
+          url: string | null
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          kind: string
+          read_at?: string | null
+          title: string
+          url?: string | null
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          read_at?: string | null
+          title?: string
+          url?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      otherpage_settings: {
+        Row: {
+          api_url: string | null
+          chain_id: number
+          contract_address: string | null
+          enabled: boolean
+          id: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          api_url?: string | null
+          chain_id?: number
+          contract_address?: string | null
+          enabled?: boolean
+          id?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          api_url?: string | null
+          chain_id?: number
+          contract_address?: string | null
+          enabled?: boolean
+          id?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      post_comments: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_comments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      post_likes: {
+        Row: {
+          created_at: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_likes_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      posts: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          image_url: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -137,6 +312,83 @@ export type Database = {
           updated_at?: string
           username?: string | null
           wallet_address?: string
+        }
+        Relationships: []
+      }
+      room_bookings: {
+        Row: {
+          created_at: string
+          ends_at: string
+          id: string
+          notes: string | null
+          override_by: string | null
+          room_id: string
+          starts_at: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          ends_at: string
+          id?: string
+          notes?: string | null
+          override_by?: string | null
+          room_id: string
+          starts_at: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          ends_at?: string
+          id?: string
+          notes?: string | null
+          override_by?: string | null
+          room_id?: string
+          starts_at?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_bookings_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rooms: {
+        Row: {
+          active: boolean
+          capacity: number
+          created_at: string
+          description: string | null
+          id: string
+          livekit_room: string
+          name: string
+          tier: Database["public"]["Enums"]["room_tier"]
+        }
+        Insert: {
+          active?: boolean
+          capacity?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          livekit_room: string
+          name: string
+          tier?: Database["public"]["Enums"]["room_tier"]
+        }
+        Update: {
+          active?: boolean
+          capacity?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          livekit_room?: string
+          name?: string
+          tier?: Database["public"]["Enums"]["room_tier"]
         }
         Relationships: []
       }
@@ -217,9 +469,14 @@ export type Database = {
       }
       is_lifer: { Args: { _user_id: string }; Returns: boolean }
       is_token_proof_verified: { Args: { _user_id: string }; Returns: boolean }
+      log_audit_event: {
+        Args: { _event_type: string; _metadata?: Json; _target_id?: string }
+        Returns: string
+      }
     }
     Enums: {
       app_role: "super_admin" | "admin" | "verified_user" | "chapter_leader"
+      room_tier: "token_proof" | "lifer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -348,6 +605,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["super_admin", "admin", "verified_user", "chapter_leader"],
+      room_tier: ["token_proof", "lifer"],
     },
   },
 } as const
