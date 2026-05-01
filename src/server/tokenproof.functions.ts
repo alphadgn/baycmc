@@ -3,7 +3,7 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 /**
- * Tokenproof partner-API integration.
+ * Tokenproof partner-API integration — the ONLY entrance verification path.
  *
  * Tokenproof handles wallet connection + signature on the user's phone via
  * the Tokenproof app. Our server only:
@@ -13,12 +13,16 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
  *      Tokenproof attests holds BAYC or MAYC.
  *
  * Required secret: `TOKENPROOF_API_KEY` (partner credential from
- * tokenproof.xyz). Optional: `TOKENPROOF_PARTNER_ID`,
- * `TOKENPROOF_POLICY_ID` (BAYC/MAYC ownership policy configured in the
- * partner dashboard).
+ * tokenproof.xyz). Optional: `TOKENPROOF_POLICY_ID` (BAYC/MAYC ownership
+ * policy configured in the partner dashboard). When no policy is set, the
+ * BAYC and MAYC mainnet contracts are passed inline.
  */
 
 const TP_BASE = "https://api.tokenproof.xyz";
+
+// Sessions older than this are considered expired by us, even if Tokenproof
+// has not surfaced an "expired" status yet. Keeps the UI from polling forever.
+const SESSION_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 function requireApiKey(): string {
   const key = process.env.TOKENPROOF_API_KEY;
@@ -30,33 +34,56 @@ function requireApiKey(): string {
   return key;
 }
 
+// In-memory map of session start times so the server can enforce a TTL even
+// if Tokenproof doesn't return one. Keyed by Tokenproof session id.
+const sessionStartedAt = new Map<string, number>();
+
+function pruneOldSessions() {
+  const now = Date.now();
+  for (const [id, started] of sessionStartedAt) {
+    if (now - started > SESSION_TTL_MS * 2) sessionStartedAt.delete(id);
+  }
+}
+
 export const startTokenproofSession = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({}).parse(d))
   .handler(async () => {
     const apiKey = requireApiKey();
     const policyId = process.env.TOKENPROOF_POLICY_ID;
 
-    const res = await fetch(`${TP_BASE}/v2/authenticate/init`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": apiKey,
-      },
-      body: JSON.stringify({
-        policy_id: policyId,
-        // BAYC + MAYC contracts as a fallback when no policy is set up.
-        collections: policyId
-          ? undefined
-          : [
-              { chain: "ethereum", address: "0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D" }, // BAYC
-              { chain: "ethereum", address: "0x60E4d786628Fea6478F785A6d7e704777c86a7c6" }, // MAYC
-            ],
-      }),
-    });
+    let res: Response;
+    try {
+      res = await fetch(`${TP_BASE}/v2/authenticate/init`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-api-key": apiKey,
+        },
+        body: JSON.stringify({
+          policy_id: policyId,
+          collections: policyId
+            ? undefined
+            : [
+                // BAYC
+                { chain: "ethereum", address: "0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D" },
+                // MAYC
+                { chain: "ethereum", address: "0x60E4d786628Fea6478F785A6d7e704777c86a7c6" },
+              ],
+        }),
+      });
+    } catch (e) {
+      console.error("Tokenproof init network error", e);
+      throw new Error("Couldn't reach Tokenproof. Check your connection and try again.");
+    }
 
     if (!res.ok) {
       const txt = await res.text().catch(() => "");
-      throw new Error(`Tokenproof init failed (${res.status}): ${txt}`);
+      console.error(`Tokenproof init ${res.status}: ${txt}`);
+      throw new Error(
+        res.status === 401 || res.status === 403
+          ? "Tokenproof rejected our credentials. The site admin needs to update TOKENPROOF_API_KEY."
+          : `Tokenproof couldn't start a session (${res.status}). Try again in a moment.`,
+      );
     }
 
     const data = (await res.json()) as {
@@ -65,21 +92,25 @@ export const startTokenproofSession = createServerFn({ method: "POST" })
       qr_code_url?: string;
     };
 
+    pruneOldSessions();
+    sessionStartedAt.set(data.session_id, Date.now());
+
     return {
       sessionId: data.session_id,
       authUrl: data.auth_url,
       qrUrl:
         data.qr_code_url ??
         `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(data.auth_url)}`,
+      expiresAt: Date.now() + SESSION_TTL_MS,
     };
   });
 
 type PollResult =
   | { status: "pending" }
-  | { status: "rejected" | "expired" }
+  | { status: "rejected" | "expired"; reason?: string }
   | {
       status: "verified";
-      collection: string | null;
+      collection: "BAYC/MAYC";
       session: { access_token: string; refresh_token: string };
     };
 
@@ -90,36 +121,61 @@ export const pollTokenproofSession = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<PollResult> => {
     const apiKey = requireApiKey();
 
-    const res = await fetch(
-      `${TP_BASE}/v2/authenticate/session/${data.sessionId}`,
-      { headers: { "x-api-key": apiKey } },
-    );
+    // Local TTL check — if we issued this session more than SESSION_TTL_MS
+    // ago, treat it as expired regardless of what Tokenproof says.
+    const startedAt = sessionStartedAt.get(data.sessionId);
+    if (startedAt && Date.now() - startedAt > SESSION_TTL_MS) {
+      sessionStartedAt.delete(data.sessionId);
+      return { status: "expired", reason: "Session timed out — start a new one." };
+    }
 
+    let res: Response;
+    try {
+      res = await fetch(
+        `${TP_BASE}/v2/authenticate/session/${encodeURIComponent(data.sessionId)}`,
+        { headers: { "x-api-key": apiKey } },
+      );
+    } catch (e) {
+      console.error("Tokenproof poll network error", e);
+      // Transient network blip — let the client keep polling.
+      return { status: "pending" };
+    }
+
+    if (res.status === 404) {
+      sessionStartedAt.delete(data.sessionId);
+      return { status: "expired", reason: "Session no longer exists." };
+    }
     if (!res.ok) {
-      throw new Error(`Tokenproof poll failed (${res.status})`);
+      console.error(`Tokenproof poll ${res.status}`);
+      return { status: "pending" };
     }
 
     const body = (await res.json()) as {
       status: "pending" | "approved" | "rejected" | "expired";
       wallet?: string;
-      collection?: { name?: string } | null;
     };
 
     if (body.status === "pending") return { status: "pending" };
-    if (body.status === "rejected" || body.status === "expired") {
-      return { status: body.status };
+    if (body.status === "rejected") {
+      sessionStartedAt.delete(data.sessionId);
+      return { status: "rejected", reason: "You declined the request in Tokenproof." };
+    }
+    if (body.status === "expired") {
+      sessionStartedAt.delete(data.sessionId);
+      return { status: "expired", reason: "The Tokenproof session expired." };
     }
 
     // Approved — mint a Supabase session for this wallet.
     const wallet = body.wallet?.toLowerCase();
-    if (!wallet) throw new Error("Tokenproof did not return a wallet address");
+    if (!wallet) {
+      throw new Error("Tokenproof approved the session but didn't return a wallet.");
+    }
 
     const email = `${wallet}@wallet.baycmc.local`;
     const password = `tp:${wallet}:${process.env.SUPABASE_SERVICE_ROLE_KEY?.slice(0, 16) ?? ""}`;
 
-    // Ensure user exists
     const { data: existing } =
-      await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1 });
+      await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
     const found = existing?.users.find((u) => u.email === email);
     let userId = found?.id;
 
@@ -134,7 +190,6 @@ export const pollTokenproofSession = createServerFn({ method: "POST" })
       userId = created.user!.id;
     }
 
-    // Upsert profile + verification flag (BAYC verified covers MAYC too here)
     await supabaseAdmin.from("profiles").upsert(
       { id: userId, wallet_address: wallet },
       { onConflict: "id" },
@@ -148,16 +203,17 @@ export const pollTokenproofSession = createServerFn({ method: "POST" })
       { onConflict: "user_id" },
     );
 
-    // Sign in as that user to get tokens.
     const { data: signIn, error: signInErr } =
       await supabaseAdmin.auth.signInWithPassword({ email, password });
     if (signInErr || !signIn.session) {
       throw signInErr ?? new Error("Could not mint session");
     }
 
+    sessionStartedAt.delete(data.sessionId);
+
     return {
       status: "verified",
-      collection: body.collection?.name ?? null,
+      collection: "BAYC/MAYC",
       session: {
         access_token: signIn.session.access_token,
         refresh_token: signIn.session.refresh_token,

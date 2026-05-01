@@ -23,8 +23,8 @@ interface EntranceDialogProps {
 /**
  * Entrance modal — Tokenproof verification only.
  *
- * No wallet connect, no SIWE signature in-browser. The user authenticates
- * via tokenproof.xyz on their phone (scanning a QR), and Tokenproof attests
+ * No wallet connect, no SIWE in-browser. The user authenticates via
+ * tokenproof.xyz on their phone (scanning a QR), and Tokenproof attests
  * their BAYC/MAYC ownership. Our server polls Tokenproof and creates a
  * Supabase session on success.
  */
@@ -35,80 +35,160 @@ export function EntranceDialog({ open, onOpenChange }: EntranceDialogProps) {
         <DialogHeader>
           <DialogTitle className="text-3xl text-gradient-gold">Entrance</DialogTitle>
           <DialogDescription>
-            Verify BAYC or MAYC ownership with Tokenproof. No wallet connection
+            Verify BAYC/MAYC ownership with Tokenproof. No wallet connection
             in your browser — scan a QR with the Tokenproof app to enter.
           </DialogDescription>
         </DialogHeader>
-        <EntranceBody onOpenChange={onOpenChange} />
+        <EntranceBody open={open} onOpenChange={onOpenChange} />
       </DialogContent>
     </Dialog>
   );
 }
 
-type Phase = "idle" | "starting" | "waiting" | "done";
+type Phase =
+  | "idle"
+  | "starting"
+  | "waiting"
+  | "verifying"
+  | "done"
+  | "error";
 
-function EntranceBody({ onOpenChange }: { onOpenChange: (open: boolean) => void }) {
+const SESSION_TTL_MS = 5 * 60 * 1000;
+const POLL_INTERVAL_MS = 2500;
+const MAX_TRANSIENT_ERRORS = 4;
+
+function EntranceBody({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const { isAuthenticated } = useAuth();
   const [phase, setPhase] = useState<Phase>("idle");
   const [authUrl, setAuthUrl] = useState<string | null>(null);
   const [qrUrl, setQrUrl] = useState<string | null>(null);
-  const pollRef = useRef<number | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [secondsLeft, setSecondsLeft] = useState<number>(0);
 
+  const pollRef = useRef<number | null>(null);
+  const tickRef = useRef<number | null>(null);
+  const expiresAtRef = useRef<number | null>(null);
+  const transientErrorsRef = useRef(0);
+
+  function clearTimers() {
+    if (pollRef.current) {
+      window.clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+    if (tickRef.current) {
+      window.clearInterval(tickRef.current);
+      tickRef.current = null;
+    }
+  }
+
+  function resetState() {
+    clearTimers();
+    setAuthUrl(null);
+    setQrUrl(null);
+    setErrorMsg(null);
+    setSecondsLeft(0);
+    expiresAtRef.current = null;
+    transientErrorsRef.current = 0;
+  }
+
+  // Reset whenever the dialog closes so reopening gives a fresh start.
   useEffect(() => {
-    return () => {
-      if (pollRef.current) window.clearInterval(pollRef.current);
-    };
-  }, []);
+    if (!open) {
+      resetState();
+      setPhase("idle");
+    }
+  }, [open]);
+
+  useEffect(() => () => clearTimers(), []);
 
   const startFn = useServerFn(startTokenproofSession);
   const pollFn = useServerFn(pollTokenproofSession);
 
+  function failWith(message: string) {
+    clearTimers();
+    setErrorMsg(message);
+    setPhase("error");
+  }
+
   async function handleStart() {
+    resetState();
+    setPhase("starting");
+    let started: { sessionId: string; authUrl: string; qrUrl: string; expiresAt: number };
     try {
-      setPhase("starting");
-      const { sessionId, authUrl, qrUrl } = await startFn({ data: {} });
-      setAuthUrl(authUrl);
-      setQrUrl(qrUrl);
-      setPhase("waiting");
-
-      // Open the hosted Tokenproof page in a new tab as a fallback for desktop
-      if (typeof window !== "undefined" && window.innerWidth < 768) {
-        window.open(authUrl, "_blank", "noopener,noreferrer");
-      }
-
-      // Poll the server for completion
-      pollRef.current = window.setInterval(async () => {
-        try {
-          const res = await pollFn({ data: { sessionId } });
-          if (res.status === "verified" && res.session) {
-            window.clearInterval(pollRef.current!);
-            const { error } = await supabase.auth.setSession({
-              access_token: res.session.access_token,
-              refresh_token: res.session.refresh_token,
-            });
-            if (error) throw error;
-            toast.success(
-              `Verified — ${res.collection ?? "BAYC/MAYC"} ownership confirmed`,
-            );
-            setPhase("done");
-            onOpenChange(false);
-          } else if (res.status === "rejected" || res.status === "expired") {
-            window.clearInterval(pollRef.current!);
-            toast.error(`Tokenproof ${res.status}`);
-            setPhase("idle");
-            setAuthUrl(null);
-            setQrUrl(null);
-          }
-        } catch (e) {
-          window.clearInterval(pollRef.current!);
-          toast.error(e instanceof Error ? e.message : "Verification failed");
-          setPhase("idle");
-        }
-      }, 2500);
+      started = await startFn({ data: {} });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not start Tokenproof");
-      setPhase("idle");
+      const msg = e instanceof Error ? e.message : "Couldn't start Tokenproof.";
+      failWith(msg);
+      return;
     }
+
+    setAuthUrl(started.authUrl);
+    setQrUrl(started.qrUrl);
+    expiresAtRef.current = started.expiresAt;
+    setSecondsLeft(Math.max(0, Math.round((started.expiresAt - Date.now()) / 1000)));
+    setPhase("waiting");
+
+    // Open hosted page on small screens — most people scan from a different
+    // device, but on mobile it's faster to deep-link.
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      window.open(started.authUrl, "_blank", "noopener,noreferrer");
+    }
+
+    // Countdown tick (display only — server still owns the canonical TTL)
+    tickRef.current = window.setInterval(() => {
+      if (!expiresAtRef.current) return;
+      const left = Math.max(0, Math.round((expiresAtRef.current - Date.now()) / 1000));
+      setSecondsLeft(left);
+      if (left === 0) {
+        failWith("Session timed out. Tap Try again to start a new one.");
+      }
+    }, 1000);
+
+    // Poll for completion
+    pollRef.current = window.setInterval(async () => {
+      try {
+        const res = await pollFn({ data: { sessionId: started.sessionId } });
+        transientErrorsRef.current = 0;
+
+        if (res.status === "pending") return;
+
+        if (res.status === "rejected" || res.status === "expired") {
+          failWith(res.reason ?? `Tokenproof ${res.status}.`);
+          return;
+        }
+
+        // verified
+        clearTimers();
+        setPhase("verifying");
+        const { error } = await supabase.auth.setSession({
+          access_token: res.session.access_token,
+          refresh_token: res.session.refresh_token,
+        });
+        if (error) {
+          failWith(error.message);
+          return;
+        }
+        toast.success("Verified — BAYC/MAYC ownership confirmed");
+        setPhase("done");
+        onOpenChange(false);
+      } catch (e) {
+        transientErrorsRef.current += 1;
+        if (transientErrorsRef.current >= MAX_TRANSIENT_ERRORS) {
+          const msg =
+            e instanceof Error
+              ? e.message
+              : "Lost connection to Tokenproof. Try again.";
+          failWith(msg);
+        }
+        // Otherwise: silently keep polling — likely a transient network blip.
+      }
+    }, POLL_INTERVAL_MS);
   }
 
   async function handleSignOut() {
@@ -116,13 +196,23 @@ function EntranceBody({ onOpenChange }: { onOpenChange: (open: boolean) => void 
     toast.success("Signed out");
   }
 
+  const showRetry = phase === "error";
+  const buttonLabel =
+    phase === "starting"
+      ? "Preparing Tokenproof…"
+      : phase === "verifying"
+      ? "Signing you in…"
+      : showRetry
+      ? "Try again"
+      : "Verify with Tokenproof";
+
   return (
     <div className="space-y-4 pt-2">
       <div className="rounded-xl border border-gold/30 bg-gradient-to-br from-gold/10 via-transparent to-accent/5 p-5">
         <div className="text-2xl font-bold text-gradient-gold">Tokenproof</div>
         <p className="mt-2 text-sm text-muted-foreground">
-          Required to enter every area of BAYCMC. Verifies BAYC or MAYC
-          ownership via{" "}
+          Required to enter every area of BAYCMC. Verifies BAYC/MAYC ownership
+          via{" "}
           <a
             href="https://tokenproof.xyz"
             target="_blank"
@@ -154,18 +244,36 @@ function EntranceBody({ onOpenChange }: { onOpenChange: (open: boolean) => void 
               .
             </p>
             <p className="text-center text-[11px] text-muted-foreground">
-              Waiting for approval…
+              Waiting for approval — {formatTime(secondsLeft)} remaining
             </p>
+            <button
+              onClick={() => failWith("Cancelled. Tap Try again to restart.")}
+              className="mt-1 rounded-md border border-border bg-secondary/30 px-3 py-1 text-[11px] text-muted-foreground hover:bg-secondary"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : phase === "error" ? (
+          <div className="mt-4 space-y-3">
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {errorMsg ?? "Something went wrong."}
+            </div>
+            <button
+              onClick={handleStart}
+              className="w-full rounded-md bg-gradient-gold px-4 py-3 text-sm font-semibold text-gold-foreground shadow-gold hover:opacity-90"
+            >
+              {buttonLabel}
+            </button>
           </div>
         ) : (
           <button
             onClick={handleStart}
-            disabled={phase === "starting"}
+            disabled={
+              phase === "starting" || phase === "verifying" || phase === "done"
+            }
             className="mt-4 w-full rounded-md bg-gradient-gold px-4 py-3 text-sm font-semibold text-gold-foreground shadow-gold transition disabled:opacity-50 hover:opacity-90"
           >
-            {phase === "starting"
-              ? "Preparing Tokenproof…"
-              : "Verify with Tokenproof"}
+            {buttonLabel}
           </button>
         )}
       </div>
@@ -180,4 +288,10 @@ function EntranceBody({ onOpenChange }: { onOpenChange: (open: boolean) => void 
       )}
     </div>
   );
+}
+
+function formatTime(seconds: number) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
 }
