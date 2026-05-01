@@ -9,6 +9,16 @@ import {
   invalidateTokenProof,
 } from "@/server/token-proof.server";
 
+/**
+ * Server-side verification helpers.
+ *
+ * Note: BAYC/MAYC ownership verification at the entrance is handled by
+ * Tokenproof (`@/server/tokenproof.functions`). The functions here are
+ * server-only utilities used by gated server routes (premium access checks,
+ * delegate.cash, Otherpage admin gating). They are NOT called from the
+ * Entrance dialog.
+ */
+
 function client() {
   return createPublicClient({ chain: mainnet, transport: http(ETH_RPC_URL) });
 }
@@ -17,52 +27,8 @@ const delegateAbi = parseAbi([
   "function checkDelegateForContract(address to, address from, address contract_, bytes32 rights) view returns (bool)",
 ]);
 
-const erc721Abi = parseAbi([
-  "function balanceOf(address owner) view returns (uint256)",
-]);
-
 // ---------------------------------------------------------------------------
-// BAYC verification — Token Proof (fresh on-chain balanceOf, server-side cache)
-// ---------------------------------------------------------------------------
-
-export const verifyBayc = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((input: { wallet: string }) =>
-    z.object({ wallet: z.string().regex(/^0x[a-fA-F0-9]{40}$/) }).parse(input),
-  )
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
-    const wallet = getAddress(data.wallet);
-
-    // Force a fresh look — the user explicitly asked us to (re)verify.
-    invalidateTokenProof({ wallet, contract: BAYC_CONTRACT });
-    const proof = await requireTokenProof({
-      wallet,
-      contract: BAYC_CONTRACT,
-      minBalance: 1,
-    });
-
-    if (proof.reason) {
-      return { verified: false, balance: 0, error: proof.reason };
-    }
-
-    const { error } = await supabase
-      .from("user_verifications")
-      .upsert(
-        {
-          user_id: userId,
-          bayc_verified: proof.verified,
-          verified_at: proof.verified ? new Date().toISOString() : null,
-        },
-        { onConflict: "user_id" },
-      );
-    if (error) console.error("Failed to persist BAYC verification", error);
-
-    return { verified: proof.verified, balance: proof.balance, error: null as string | null };
-  });
-
-// ---------------------------------------------------------------------------
-// Delegation (delegate.cash) — keeps existing semantics
+// Delegation (delegate.cash)
 // ---------------------------------------------------------------------------
 
 export const verifyDelegation = createServerFn({ method: "POST" })
@@ -95,7 +61,6 @@ export const verifyDelegation = createServerFn({ method: "POST" })
 
     if (!isDelegated) return { verified: false, error: "No active BAYC delegation" };
 
-    // Vault must currently hold BAYC for delegation to count.
     invalidateTokenProof({ wallet: vault, contract: BAYC_CONTRACT });
     const vaultProof = await requireTokenProof({
       wallet: vault,
@@ -118,43 +83,6 @@ export const verifyDelegation = createServerFn({ method: "POST" })
       verified: vaultProof.verified,
       error: vaultProof.verified ? null : "Vault holds no BAYC",
     };
-  });
-
-// ---------------------------------------------------------------------------
-// Lumina — backend-only. UI surfaces have been removed; this remains for
-// internal/server-side checks only and is NEVER called from the client.
-// ---------------------------------------------------------------------------
-
-export const verifyLumina = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((input: { wallet: string }) =>
-    z.object({ wallet: z.string().regex(/^0x[a-fA-F0-9]{40}$/) }).parse(input),
-  )
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
-    const apiKey = process.env.LUMINA_API_KEY;
-    if (!apiKey) {
-      return { verified: false, error: "Lumina not configured", configured: false };
-    }
-    try {
-      const res = await fetch("https://api.lumina.xyz/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({ wallet: data.wallet }),
-      });
-      if (!res.ok) {
-        return { verified: false, error: `Lumina API ${res.status}`, configured: true };
-      }
-      const json = (await res.json()) as { verified?: boolean };
-      const verified = !!json.verified;
-      await supabase
-        .from("user_verifications")
-        .upsert({ user_id: userId, lumina_verified: verified }, { onConflict: "user_id" });
-      return { verified, error: null as string | null, configured: true };
-    } catch (e) {
-      console.error("Lumina request failed", e);
-      return { verified: false, error: "Lumina request failed", configured: true };
-    }
   });
 
 // ---------------------------------------------------------------------------
@@ -186,55 +114,9 @@ async function loadOtherpageGate(
   };
 }
 
-export const verifyOtherpage = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((input: { wallet: string }) =>
-    z.object({ wallet: z.string().regex(/^0x[a-fA-F0-9]{40}$/) }).parse(input),
-  )
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
-    const wallet = getAddress(data.wallet);
-
-    const gate = await loadOtherpageGate(supabase);
-    if (!gate || !gate.contract) {
-      return {
-        verified: false,
-        configured: false,
-        error: "Otherpage contract not configured by admin",
-      };
-    }
-
-    invalidateTokenProof({ wallet, contract: gate.contract, chainId: gate.chain_id });
-    const proof = await requireTokenProof({
-      wallet,
-      contract: gate.contract,
-      minBalance: gate.min_balance,
-      chainId: gate.chain_id,
-    });
-
-    if (proof.reason) {
-      return { verified: false, configured: true, error: proof.reason };
-    }
-
-    await supabase
-      .from("user_verifications")
-      .upsert(
-        { user_id: userId, otherpage_verified: proof.verified },
-        { onConflict: "user_id" },
-      );
-
-    return {
-      verified: proof.verified,
-      configured: true,
-      balance: proof.balance,
-      error: null as string | null,
-    };
-  });
-
 /**
- * Gate-check for premium-room access. Performs a FRESH on-chain check (cache
- * may serve a recent value but never older than POSITIVE_TTL_MS). Always
- * called from the server side immediately before granting access.
+ * Gate-check for premium-room access. Always called from the server side
+ * immediately before granting access.
  */
 export const checkPremiumAccess = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -290,7 +172,6 @@ export const setOtherpageGate = createServerFn({ method: "POST" })
       min_balance: data.minBalance ?? 1,
       chain_id: data.chainId ?? 1,
     };
-    // RLS enforces super_admin-only writes; this update will fail otherwise.
     const { error } = await supabase
       .from("app_settings")
       .upsert(
