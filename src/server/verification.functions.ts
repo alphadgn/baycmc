@@ -273,6 +273,7 @@ export const getOtherpageGate = createServerFn({ method: "GET" })
   });
 
 export const setOtherpageGate = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: { contract: string; minBalance?: number; chainId?: number }) =>
     z
       .object({
@@ -282,7 +283,6 @@ export const setOtherpageGate = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .middleware([requireSupabaseAuth])
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const value = {
