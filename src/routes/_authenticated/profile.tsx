@@ -139,6 +139,34 @@ function ProfilePage() {
     }
   }
 
+  async function runOtherpageVerify() {
+    if (!address) {
+      toast.error("Connect a wallet first");
+      return;
+    }
+    setVerifyingOther(true);
+    try {
+      const res = await verifyOtherpageFn({ data: { wallet: address } });
+      if (!res.configured) {
+        toast.error("Otherpage gating isn't configured yet");
+      } else if (res.verified) {
+        toast.success("Otherpage premium access confirmed");
+      } else {
+        toast.error(res.error || "No qualifying Otherpage tokens");
+      }
+      const { data: v } = await supabase
+        .from("user_verifications")
+        .select("*")
+        .eq("user_id", user!.id)
+        .single();
+      if (v) setVerif(v as VerifRow);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Verification failed");
+    } finally {
+      setVerifyingOther(false);
+    }
+  }
+
   if (authLoading || !user) return <ProfileSkeleton />;
   if (loadState === "loading" || loadState === "idle") return <ProfileSkeleton />;
   if (loadState === "error") {
