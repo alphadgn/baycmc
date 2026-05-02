@@ -30,7 +30,13 @@ export function PrivyVerifyCard({ onVerified }: { onVerified: () => void }) {
       try {
         const cfg = await fetchConfig();
         if (cancelled) return;
-        if (!cfg.configured) {
+        const id = (cfg.appId ?? "").trim();
+        const valid =
+          cfg.configured &&
+          id.length >= 20 &&
+          id.length <= 40 &&
+          /^[a-z0-9]+$/i.test(id);
+        if (!valid) {
           setConfigured(false);
           return;
         }
