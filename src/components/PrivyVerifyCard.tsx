@@ -3,7 +3,10 @@ import { useServerFn } from "@tanstack/react-start";
 import { Wallet } from "lucide-react";
 import { SiweMessage } from "siwe";
 import { supabase } from "@/integrations/supabase/client";
-import { verifyPrivyOwnership } from "@/server/privy.functions";
+import {
+  verifyPrivyOwnership,
+  getPrivyPublicConfig,
+} from "@/server/privy.functions";
 import { toast } from "sonner";
 
 /**
