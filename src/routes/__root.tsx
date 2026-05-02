@@ -72,6 +72,9 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
+  useEffect(() => {
+    installDiagnostics();
+  }, []);
   return (
     <Web3Provider>
       <PrivyAppProvider>
