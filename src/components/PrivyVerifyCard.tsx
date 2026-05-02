@@ -21,7 +21,13 @@ export function PrivyVerifyCard({ onVerified }: { onVerified: () => void }) {
   const [hooks, setHooks] = useState<{ usePrivy: any; useWallets: any } | null>(
     null,
   );
-  const [configured, setConfigured] = useState<boolean | null>(null);
+  type ConfigState =
+    | { kind: "loading" }
+    | { kind: "missing" }
+    | { kind: "wrong-secret-type" }
+    | { kind: "invalid-format" }
+    | { kind: "ok" };
+  const [configState, setConfigState] = useState<ConfigState>({ kind: "loading" });
   const fetchConfig = useServerFn(getPrivyPublicConfig);
 
   useEffect(() => {
@@ -31,21 +37,29 @@ export function PrivyVerifyCard({ onVerified }: { onVerified: () => void }) {
         const cfg = await fetchConfig();
         if (cancelled) return;
         const id = (cfg.appId ?? "").trim();
+        if (!cfg.configured || !id) {
+          setConfigState({ kind: "missing" });
+          return;
+        }
+        // The user pasted a Privy *app secret* into the App ID slot.
+        if (/^privy_app_secret/i.test(id)) {
+          setConfigState({ kind: "wrong-secret-type" });
+          return;
+        }
         const valid =
-          cfg.configured &&
           id.length >= 20 &&
           id.length <= 40 &&
           /^[a-z0-9]+$/i.test(id);
         if (!valid) {
-          setConfigured(false);
+          setConfigState({ kind: "invalid-format" });
           return;
         }
-        setConfigured(true);
+        setConfigState({ kind: "ok" });
         const mod = await import("@privy-io/react-auth");
         if (cancelled) return;
         setHooks({ usePrivy: mod.usePrivy, useWallets: mod.useWallets });
       } catch {
-        if (!cancelled) setConfigured(false);
+        if (!cancelled) setConfigState({ kind: "missing" });
       }
     })();
     return () => {
@@ -53,11 +67,19 @@ export function PrivyVerifyCard({ onVerified }: { onVerified: () => void }) {
     };
   }, [fetchConfig]);
 
-  // When Privy isn't configured (no PRIVY_APP_ID secret), hide the card
-  // entirely instead of mounting hooks that throw "invalid Privy app ID".
-  if (configured === false) return null;
+  // Always render the card so users can see "Connect a wallet" as a
+  // sign-in option even when Privy is not yet configured. We surface the
+  // exact misconfiguration so the admin knows what to fix.
+  if (configState.kind !== "ok" || !hooks) {
+    const message =
+      configState.kind === "wrong-secret-type"
+        ? "Privy isn't quite configured: the PRIVY_APP_ID secret currently holds a Privy *app secret* (starts with `privy_app_secret_`). Paste the public App ID from your Privy dashboard instead."
+        : configState.kind === "invalid-format"
+        ? "Privy isn't quite configured: the PRIVY_APP_ID value doesn't look like a valid App ID. Copy it from your Privy dashboard."
+        : configState.kind === "missing"
+        ? "Wallet sign-in is being set up. Use Tokenproof above to enter for now."
+        : null;
 
-  if (!hooks) {
     return (
       <div className="rounded-xl border border-border bg-secondary/20 p-5">
         <div className="flex items-center gap-2">
@@ -68,7 +90,13 @@ export function PrivyVerifyCard({ onVerified }: { onVerified: () => void }) {
           Or connect any EVM wallet via Privy. We'll verify BAYC/MAYC ownership
           on-chain — no Tokenproof required.
         </p>
-        <div className="mt-4 h-10 animate-pulse rounded-md bg-muted/30" />
+        {message ? (
+          <div className="mt-4 rounded-md border border-gold/30 bg-gold/5 px-3 py-2 text-xs text-muted-foreground">
+            {message}
+          </div>
+        ) : (
+          <div className="mt-4 h-10 animate-pulse rounded-md bg-muted/30" />
+        )}
       </div>
     );
   }
