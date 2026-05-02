@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { Copy, QrCode, RefreshCw, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
+import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import {
   startTokenproofSession,
   pollTokenproofSession,
@@ -23,10 +25,10 @@ interface EntranceDialogProps {
 /**
  * Entrance modal — Tokenproof verification only.
  *
- * No wallet connect, no SIWE in-browser. The user authenticates via
- * tokenproof.xyz on their phone (scanning a QR), and Tokenproof attests
- * their BAYC/MAYC ownership. Our server polls Tokenproof and creates a
- * Supabase session on success.
+ * Flow: tap Verify → server creates Tokenproof session → user gets a deep
+ * link (copyable) and an on-demand QR. We poll until approved/rejected/
+ * expired. On expiry, a new session is auto-created. After approval we
+ * surface a BAYC or MAYC badge based on what Tokenproof returned.
  */
 export function EntranceDialog({ open, onOpenChange }: EntranceDialogProps) {
   return (
@@ -36,7 +38,7 @@ export function EntranceDialog({ open, onOpenChange }: EntranceDialogProps) {
           <DialogTitle className="text-3xl text-gradient-gold">Entrance</DialogTitle>
           <DialogDescription>
             Verify BAYC/MAYC ownership with Tokenproof. No wallet connection
-            in your browser — scan a QR with the Tokenproof app to enter.
+            in your browser — approve the request in the Tokenproof app.
           </DialogDescription>
         </DialogHeader>
         <EntranceBody open={open} onOpenChange={onOpenChange} />
@@ -45,6 +47,7 @@ export function EntranceDialog({ open, onOpenChange }: EntranceDialogProps) {
   );
 }
 
+type ErrorKind = "network" | "rejected" | "credentials" | "timeout" | "unknown";
 type Phase =
   | "idle"
   | "starting"
@@ -57,6 +60,39 @@ const SESSION_TTL_MS = 5 * 60 * 1000;
 const POLL_INTERVAL_MS = 2500;
 const MAX_TRANSIENT_ERRORS = 4;
 
+const ERROR_COPY: Record<ErrorKind, string> = {
+  network:
+    "We couldn't reach Tokenproof. Check your internet connection and try again.",
+  rejected:
+    "You declined the verification request. Tap Start over to try again.",
+  credentials:
+    "Tokenproof rejected our credentials. The site admin needs to update the API key — please try again later.",
+  timeout:
+    "Your verification session timed out. We started a new one — scan or tap to continue.",
+  unknown:
+    "Something went wrong. Tap Start over to begin a fresh verification.",
+};
+
+function classifyError(message: string | undefined | null): ErrorKind {
+  const m = (message ?? "").toLowerCase();
+  if (
+    m.includes("network") ||
+    m.includes("fetch") ||
+    m.includes("connection") ||
+    m.includes("reach tokenproof")
+  ) {
+    return "network";
+  }
+  if (m.includes("declin") || m.includes("reject")) return "rejected";
+  if (m.includes("credential") || m.includes("api key") || m.includes("api_key")) {
+    return "credentials";
+  }
+  if (m.includes("timed out") || m.includes("timeout") || m.includes("expired")) {
+    return "timeout";
+  }
+  return "unknown";
+}
+
 function EntranceBody({
   open,
   onOpenChange,
@@ -65,16 +101,21 @@ function EntranceBody({
   onOpenChange: (open: boolean) => void;
 }) {
   const { isAuthenticated } = useAuth();
+  const { collection: verifiedCollection, tokenProof } =
+    useVerificationStatus();
   const [phase, setPhase] = useState<Phase>("idle");
   const [authUrl, setAuthUrl] = useState<string | null>(null);
   const [qrUrl, setQrUrl] = useState<string | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [showQr, setShowQr] = useState(false);
+  const [errorKind, setErrorKind] = useState<ErrorKind | null>(null);
   const [secondsLeft, setSecondsLeft] = useState<number>(0);
+  const [verifiedAs, setVerifiedAs] = useState<"BAYC" | "MAYC" | null>(null);
 
   const pollRef = useRef<number | null>(null);
   const tickRef = useRef<number | null>(null);
   const expiresAtRef = useRef<number | null>(null);
   const transientErrorsRef = useRef(0);
+  const autoRestartedRef = useRef(false);
 
   function clearTimers() {
     if (pollRef.current) {
@@ -91,10 +132,12 @@ function EntranceBody({
     clearTimers();
     setAuthUrl(null);
     setQrUrl(null);
-    setErrorMsg(null);
+    setShowQr(false);
+    setErrorKind(null);
     setSecondsLeft(0);
     expiresAtRef.current = null;
     transientErrorsRef.current = 0;
+    autoRestartedRef.current = false;
   }
 
   // Reset whenever the dialog closes so reopening gives a fresh start.
@@ -102,6 +145,7 @@ function EntranceBody({
     if (!open) {
       resetState();
       setPhase("idle");
+      setVerifiedAs(null);
     }
   }, [open]);
 
@@ -110,10 +154,18 @@ function EntranceBody({
   const startFn = useServerFn(startTokenproofSession);
   const pollFn = useServerFn(pollTokenproofSession);
 
-  function failWith(message: string) {
+  function failWith(kind: ErrorKind, opts?: { autoRestart?: boolean }) {
     clearTimers();
-    setErrorMsg(message);
+    setErrorKind(kind);
     setPhase("error");
+    // Auto-restart the session for timeouts so the user doesn't have to
+    // tap twice — the dialog is already open and they're waiting.
+    if (opts?.autoRestart && !autoRestartedRef.current) {
+      autoRestartedRef.current = true;
+      window.setTimeout(() => {
+        void handleStart();
+      }, 600);
+    }
   }
 
   async function handleStart() {
@@ -123,8 +175,8 @@ function EntranceBody({
     try {
       started = await startFn({ data: {} });
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Couldn't start Tokenproof.";
-      failWith(msg);
+      const msg = e instanceof Error ? e.message : "";
+      failWith(classifyError(msg));
       return;
     }
 
@@ -134,19 +186,13 @@ function EntranceBody({
     setSecondsLeft(Math.max(0, Math.round((started.expiresAt - Date.now()) / 1000)));
     setPhase("waiting");
 
-    // Open hosted page on small screens — most people scan from a different
-    // device, but on mobile it's faster to deep-link.
-    if (typeof window !== "undefined" && window.innerWidth < 768) {
-      window.open(started.authUrl, "_blank", "noopener,noreferrer");
-    }
-
     // Countdown tick (display only — server still owns the canonical TTL)
     tickRef.current = window.setInterval(() => {
       if (!expiresAtRef.current) return;
       const left = Math.max(0, Math.round((expiresAtRef.current - Date.now()) / 1000));
       setSecondsLeft(left);
       if (left === 0) {
-        failWith("Session timed out. Tap Try again to start a new one.");
+        failWith("timeout", { autoRestart: true });
       }
     }, 1000);
 
@@ -158,8 +204,16 @@ function EntranceBody({
 
         if (res.status === "pending") return;
 
-        if (res.status === "rejected" || res.status === "expired") {
-          failWith(res.reason ?? `Tokenproof ${res.status}.`);
+        if (res.status === "rejected") {
+          failWith("rejected");
+          return;
+        }
+        if (res.status === "expired") {
+          failWith("timeout", { autoRestart: true });
+          return;
+        }
+        if (res.status === "credentials") {
+          failWith("credentials");
           return;
         }
 
@@ -171,21 +225,20 @@ function EntranceBody({
             refresh_token: res.session.refresh_token,
           });
           if (error) {
-            failWith(error.message);
+            failWith(classifyError(error.message));
             return;
           }
-          toast.success("Verified — BAYC/MAYC ownership confirmed");
+          setVerifiedAs(res.collection);
+          toast.success(`Verified — ${res.collection} ownership confirmed`);
           setPhase("done");
-          onOpenChange(false);
+          // Brief delay so the user sees the badge before close.
+          window.setTimeout(() => onOpenChange(false), 1500);
         }
       } catch (e) {
         transientErrorsRef.current += 1;
         if (transientErrorsRef.current >= MAX_TRANSIENT_ERRORS) {
-          const msg =
-            e instanceof Error
-              ? e.message
-              : "Lost connection to Tokenproof. Try again.";
-          failWith(msg);
+          const msg = e instanceof Error ? e.message : "";
+          failWith(classifyError(msg) === "unknown" ? "network" : classifyError(msg));
         }
         // Otherwise: silently keep polling — likely a transient network blip.
       }
@@ -197,6 +250,16 @@ function EntranceBody({
     toast.success("Signed out");
   }
 
+  async function handleCopyLink() {
+    if (!authUrl) return;
+    try {
+      await navigator.clipboard.writeText(authUrl);
+      toast.success("Tokenproof link copied");
+    } catch {
+      toast.error("Couldn't copy — long-press the link to copy manually");
+    }
+  }
+
   const showRetry = phase === "error";
   const buttonLabel =
     phase === "starting"
@@ -204,11 +267,22 @@ function EntranceBody({
       : phase === "verifying"
       ? "Signing you in…"
       : showRetry
-      ? "Try again"
+      ? "Start over"
       : "Verify with Tokenproof";
+
+  const badgeCollection = verifiedAs ?? (tokenProof ? verifiedCollection : null);
 
   return (
     <div className="space-y-4 pt-2">
+      {badgeCollection && (
+        <div className="flex items-center justify-center">
+          <span className="inline-flex items-center gap-2 rounded-full border border-gold/40 bg-gold/10 px-3 py-1 text-xs font-semibold text-gold">
+            <span className="h-1.5 w-1.5 rounded-full bg-gold animate-pulse-glow" />
+            Verified · {badgeCollection}
+          </span>
+        </div>
+      )}
+
       <div className="rounded-xl border border-gold/30 bg-gradient-to-br from-gold/10 via-transparent to-accent/5 p-5">
         <div className="text-2xl font-bold text-gradient-gold">Tokenproof</div>
         <p className="mt-2 text-sm text-muted-foreground">
@@ -225,53 +299,81 @@ function EntranceBody({
           .
         </p>
 
-        {phase === "waiting" && qrUrl ? (
-          <div className="mt-4 flex flex-col items-center gap-3">
-            <img
-              src={qrUrl}
-              alt="Scan with the Tokenproof app"
-              className="h-48 w-48 rounded-md border border-gold/30 bg-white p-2"
-            />
-            <p className="text-center text-xs text-muted-foreground">
-              Scan with the Tokenproof app, or{" "}
+        {phase === "waiting" && authUrl ? (
+          <div className="mt-4 space-y-3">
+            <div className="flex flex-col gap-2">
               <a
-                href={authUrl ?? "#"}
+                href={authUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="underline hover:text-gold"
+                className="inline-flex items-center justify-center gap-2 rounded-md bg-gradient-gold px-4 py-2.5 text-sm font-semibold text-gold-foreground shadow-gold hover:opacity-90"
               >
-                open it directly
+                <ExternalLink className="h-4 w-4" />
+                Open in Tokenproof app
               </a>
-              .
-            </p>
-            <p className="text-center text-[11px] text-muted-foreground">
-              Waiting for approval — {formatTime(secondsLeft)} remaining
-            </p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={handleCopyLink}
+                  className="inline-flex items-center justify-center gap-2 rounded-md border border-border bg-secondary/40 px-3 py-2 text-xs font-medium hover:bg-secondary"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                  Copy link
+                </button>
+                <button
+                  onClick={() => setShowQr((v) => !v)}
+                  className="inline-flex items-center justify-center gap-2 rounded-md border border-border bg-secondary/40 px-3 py-2 text-xs font-medium hover:bg-secondary"
+                >
+                  <QrCode className="h-3.5 w-3.5" />
+                  {showQr ? "Hide QR" : "Show QR"}
+                </button>
+              </div>
+            </div>
+
+            {showQr && qrUrl && (
+              <div className="flex flex-col items-center gap-2 pt-1">
+                <img
+                  src={qrUrl}
+                  alt="Scan with the Tokenproof app"
+                  className="h-44 w-44 rounded-md border border-gold/30 bg-white p-2"
+                />
+                <p className="text-center text-[11px] text-muted-foreground">
+                  Scan with the Tokenproof app on your phone
+                </p>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-1 text-[11px] text-muted-foreground">
+              <span>Waiting for approval…</span>
+              <span className="font-mono">{formatTime(secondsLeft)} left</span>
+            </div>
             <button
-              onClick={() => failWith("Cancelled. Tap Try again to restart.")}
-              className="mt-1 rounded-md border border-border bg-secondary/30 px-3 py-1 text-[11px] text-muted-foreground hover:bg-secondary"
+              onClick={() => failWith("unknown")}
+              className="w-full rounded-md border border-border bg-secondary/30 px-3 py-1.5 text-[11px] text-muted-foreground hover:bg-secondary"
             >
               Cancel
             </button>
           </div>
-        ) : phase === "error" ? (
+        ) : phase === "error" && errorKind ? (
           <div className="mt-4 space-y-3">
             <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {errorMsg ?? "Something went wrong."}
+              {ERROR_COPY[errorKind]}
             </div>
             <button
               onClick={handleStart}
-              className="w-full rounded-md bg-gradient-gold px-4 py-3 text-sm font-semibold text-gold-foreground shadow-gold hover:opacity-90"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-gradient-gold px-4 py-3 text-sm font-semibold text-gold-foreground shadow-gold hover:opacity-90"
             >
+              <RefreshCw className="h-4 w-4" />
               {buttonLabel}
             </button>
+          </div>
+        ) : phase === "done" ? (
+          <div className="mt-4 rounded-md border border-gold/30 bg-gold/5 px-3 py-3 text-center text-sm text-gold">
+            You're in. Welcome to BAYCMC.
           </div>
         ) : (
           <button
             onClick={handleStart}
-            disabled={
-              phase === "starting" || phase === "verifying" || phase === "done"
-            }
+            disabled={phase === "starting" || phase === "verifying"}
             className="mt-4 w-full rounded-md bg-gradient-gold px-4 py-3 text-sm font-semibold text-gold-foreground shadow-gold transition disabled:opacity-50 hover:opacity-90"
           >
             {buttonLabel}

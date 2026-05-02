@@ -116,7 +116,7 @@ function Index() {
               { t: "Video Calls", d: "1:1 and group, powered by LiveKit.", soon: true },
               { t: "Conference Bookings", d: "20 rooms. Calendar with conflict-free slots.", soon: true },
               { t: "Club Chapters", d: "Apply, lead, host events for your local chapter.", soon: true },
-              { t: "Premium Rooms", d: "Gated by Otherpage.xyz tokens.", soon: true },
+              
             ].map((f) => (
               <div key={f.t} className="glass rounded-2xl p-6 shadow-card transition hover:border-gold/40">
                 <div className="flex items-center justify-between">

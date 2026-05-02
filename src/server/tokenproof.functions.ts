@@ -107,12 +107,34 @@ export const startTokenproofSession = createServerFn({ method: "POST" })
 
 type PollResult =
   | { status: "pending" }
-  | { status: "rejected" | "expired"; reason?: string }
+  | {
+      status: "rejected" | "expired" | "network" | "credentials";
+      reason?: string;
+    }
   | {
       status: "verified";
-      collection: "BAYC/MAYC";
+      collection: "BAYC" | "MAYC";
       session: { access_token: string; refresh_token: string };
     };
+
+const BAYC = "0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d";
+const MAYC = "0x60e4d786628fea6478f785a6d7e704777c86a7c6";
+
+function detectCollection(body: {
+  collection?: string;
+  collections?: Array<{ address?: string; name?: string }>;
+  contract?: string;
+}): "BAYC" | "MAYC" {
+  const raw = (body.collection ?? body.contract ?? "").toLowerCase();
+  if (raw.includes("mayc") || raw === MAYC) return "MAYC";
+  if (raw.includes("bayc") || raw === BAYC) return "BAYC";
+  const hit = body.collections?.find((c) => {
+    const a = (c.address ?? "").toLowerCase();
+    const n = (c.name ?? "").toLowerCase();
+    return a === MAYC || n.includes("mayc");
+  });
+  return hit ? "MAYC" : "BAYC";
+}
 
 export const pollTokenproofSession = createServerFn({ method: "POST" })
   .inputValidator((d) =>
@@ -126,7 +148,10 @@ export const pollTokenproofSession = createServerFn({ method: "POST" })
     const startedAt = sessionStartedAt.get(data.sessionId);
     if (startedAt && Date.now() - startedAt > SESSION_TTL_MS) {
       sessionStartedAt.delete(data.sessionId);
-      return { status: "expired", reason: "Session timed out — start a new one." };
+      return {
+        status: "expired",
+        reason: "Your verification session timed out. Start a new one.",
+      };
     }
 
     let res: Response;
@@ -141,9 +166,19 @@ export const pollTokenproofSession = createServerFn({ method: "POST" })
       return { status: "pending" };
     }
 
+    if (res.status === 401 || res.status === 403) {
+      return {
+        status: "credentials",
+        reason:
+          "Tokenproof rejected our credentials. The site admin needs to update the API key.",
+      };
+    }
     if (res.status === 404) {
       sessionStartedAt.delete(data.sessionId);
-      return { status: "expired", reason: "Session no longer exists." };
+      return {
+        status: "expired",
+        reason: "This verification session no longer exists. Start a new one.",
+      };
     }
     if (!res.ok) {
       console.error(`Tokenproof poll ${res.status}`);
@@ -153,16 +188,25 @@ export const pollTokenproofSession = createServerFn({ method: "POST" })
     const body = (await res.json()) as {
       status: "pending" | "approved" | "rejected" | "expired";
       wallet?: string;
+      collection?: string;
+      contract?: string;
+      collections?: Array<{ address?: string; name?: string }>;
     };
 
     if (body.status === "pending") return { status: "pending" };
     if (body.status === "rejected") {
       sessionStartedAt.delete(data.sessionId);
-      return { status: "rejected", reason: "You declined the request in Tokenproof." };
+      return {
+        status: "rejected",
+        reason: "You declined the request in Tokenproof. Try again to enter.",
+      };
     }
     if (body.status === "expired") {
       sessionStartedAt.delete(data.sessionId);
-      return { status: "expired", reason: "The Tokenproof session expired." };
+      return {
+        status: "expired",
+        reason: "The Tokenproof session expired. Start a new one.",
+      };
     }
 
     // Approved — mint a Supabase session for this wallet.
@@ -170,6 +214,8 @@ export const pollTokenproofSession = createServerFn({ method: "POST" })
     if (!wallet) {
       throw new Error("Tokenproof approved the session but didn't return a wallet.");
     }
+
+    const collection = detectCollection(body);
 
     const email = `${wallet}@wallet.baycmc.local`;
     const password = `tp:${wallet}:${process.env.SUPABASE_SERVICE_ROLE_KEY?.slice(0, 16) ?? ""}`;
@@ -198,6 +244,7 @@ export const pollTokenproofSession = createServerFn({ method: "POST" })
       {
         user_id: userId,
         bayc_verified: true,
+        bayc_collection: collection,
         verified_at: new Date().toISOString(),
       },
       { onConflict: "user_id" },
@@ -213,10 +260,11 @@ export const pollTokenproofSession = createServerFn({ method: "POST" })
 
     return {
       status: "verified",
-      collection: "BAYC/MAYC",
+      collection,
       session: {
         access_token: signIn.session.access_token,
         refresh_token: signIn.session.refresh_token,
       },
     };
   });
+
