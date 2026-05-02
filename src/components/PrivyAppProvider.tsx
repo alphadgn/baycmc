@@ -14,9 +14,10 @@ import { getPrivyPublicConfig } from "@/server/privy.functions";
 function isValidPrivyAppId(id: string | null | undefined): id is string {
   if (!id) return false;
   const trimmed = id.trim();
+  // Reject Privy *app secret* values pasted into the App ID slot.
+  if (/^privy_app_secret/i.test(trimmed)) return false;
   if (trimmed.length < 20 || trimmed.length > 40) return false;
   if (!/^[a-z0-9]+$/i.test(trimmed)) return false;
-  // Reject obvious placeholders.
   if (/^(your|placeholder|test|xxx|change|todo)/i.test(trimmed)) return false;
   return true;
 }
