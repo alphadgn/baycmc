@@ -3,7 +3,10 @@ import { useServerFn } from "@tanstack/react-start";
 import { Wallet } from "lucide-react";
 import { SiweMessage } from "siwe";
 import { supabase } from "@/integrations/supabase/client";
-import { verifyPrivyOwnership } from "@/server/privy.functions";
+import {
+  verifyPrivyOwnership,
+  getPrivyPublicConfig,
+} from "@/server/privy.functions";
 import { toast } from "sonner";
 
 /**
@@ -18,22 +21,35 @@ export function PrivyVerifyCard({ onVerified }: { onVerified: () => void }) {
   const [hooks, setHooks] = useState<{ usePrivy: any; useWallets: any } | null>(
     null,
   );
+  const [configured, setConfigured] = useState<boolean | null>(null);
+  const fetchConfig = useServerFn(getPrivyPublicConfig);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
+        const cfg = await fetchConfig();
+        if (cancelled) return;
+        if (!cfg.configured) {
+          setConfigured(false);
+          return;
+        }
+        setConfigured(true);
         const mod = await import("@privy-io/react-auth");
         if (cancelled) return;
         setHooks({ usePrivy: mod.usePrivy, useWallets: mod.useWallets });
       } catch {
-        // Privy not available — leave the card in its loading shell.
+        if (!cancelled) setConfigured(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [fetchConfig]);
+
+  // When Privy isn't configured (no PRIVY_APP_ID secret), hide the card
+  // entirely instead of mounting hooks that throw "invalid Privy app ID".
+  if (configured === false) return null;
 
   if (!hooks) {
     return (
