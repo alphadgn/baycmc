@@ -415,6 +415,7 @@ export type Database = {
       }
       user_verifications: {
         Row: {
+          bayc_collection: string | null
           bayc_token_ids: number[]
           bayc_verified: boolean
           delegation_vault: string | null
@@ -428,6 +429,7 @@ export type Database = {
           verified_at: string | null
         }
         Insert: {
+          bayc_collection?: string | null
           bayc_token_ids?: number[]
           bayc_verified?: boolean
           delegation_vault?: string | null
@@ -441,6 +443,7 @@ export type Database = {
           verified_at?: string | null
         }
         Update: {
+          bayc_collection?: string | null
           bayc_token_ids?: number[]
           bayc_verified?: boolean
           delegation_vault?: string | null

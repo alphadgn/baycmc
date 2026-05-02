@@ -6,6 +6,7 @@ import { useWeb3Ready } from "@/components/Web3Provider";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import { EntranceDialog } from "@/components/EntranceDialog";
 import { toast } from "sonner";
+import baycLifeLogo from "@/assets/bayc-lifer-logo.png";
 
 export function AppHeader() {
   const { isAuthenticated } = useAuth();

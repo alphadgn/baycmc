@@ -1,0 +1,1 @@
+ALTER TABLE public.user_verifications ADD COLUMN IF NOT EXISTS bayc_collection text CHECK (bayc_collection IN ('BAYC','MAYC'));
