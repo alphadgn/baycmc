@@ -6,7 +6,7 @@ import { useWeb3Ready } from "@/components/Web3Provider";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import { EntranceDialog } from "@/components/EntranceDialog";
 import { toast } from "sonner";
-import baycLifeLogo from "@/assets/bayc-lifer-logo.png";
+import baycmcLogo from "@/assets/baycmc-embroidered-logo.png";
 
 export function AppHeader() {
   const { isAuthenticated } = useAuth();
@@ -20,9 +20,9 @@ export function AppHeader() {
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
           <Link to="/" className="flex items-center gap-2">
             <img
-              src={baycLifeLogo}
-              alt="BAYC Lifer"
-              className="h-10 w-auto select-none"
+              src={baycmcLogo}
+              alt="BAYCMC"
+              className="h-9 w-auto select-none"
               draggable={false}
             />
           </Link>

@@ -1,5 +1,6 @@
 import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
 import { Web3Provider } from "@/components/Web3Provider";
+import { PrivyAppProvider } from "@/components/PrivyAppProvider";
 import { AppHeader } from "@/components/AppHeader";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -71,11 +72,13 @@ function RootShell({ children }: { children: React.ReactNode }) {
 function RootComponent() {
   return (
     <Web3Provider>
-      <div className="min-h-screen grain">
-        <AppHeader />
-        <Outlet />
-        <Toaster />
-      </div>
+      <PrivyAppProvider>
+        <div className="min-h-screen grain">
+          <AppHeader />
+          <Outlet />
+          <Toaster />
+        </div>
+      </PrivyAppProvider>
     </Web3Provider>
   );
 }
