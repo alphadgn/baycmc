@@ -16,11 +16,13 @@ import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedMessagesRouteImport } from './routes/_authenticated/messages'
 import { Route as AuthenticatedLifersRouteImport } from './routes/_authenticated/lifers'
 import { Route as AuthenticatedFeedRouteImport } from './routes/_authenticated/feed'
+import { Route as AuthenticatedApeRidesRouteImport } from './routes/_authenticated/ape-rides'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedLifersIndexRouteImport } from './routes/_authenticated/lifers/index'
 import { Route as AuthenticatedRoomsRoomIdRouteImport } from './routes/_authenticated/rooms.$roomId'
 import { Route as AuthenticatedLifersRoomRouteImport } from './routes/_authenticated/lifers/room'
 import { Route as AuthenticatedLifersMessagesRouteImport } from './routes/_authenticated/lifers/messages'
+import { Route as AuthenticatedApeRidesRideIdRouteImport } from './routes/_authenticated/ape-rides.$rideId'
 import { Route as AuthenticatedAdminOtherpageRouteImport } from './routes/_authenticated/admin.otherpage'
 
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
@@ -57,6 +59,11 @@ const AuthenticatedFeedRoute = AuthenticatedFeedRouteImport.update({
   path: '/feed',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedApeRidesRoute = AuthenticatedApeRidesRouteImport.update({
+  id: '/ape-rides',
+  path: '/ape-rides',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -85,6 +92,12 @@ const AuthenticatedLifersMessagesRoute =
     path: '/messages',
     getParentRoute: () => AuthenticatedLifersRoute,
   } as any)
+const AuthenticatedApeRidesRideIdRoute =
+  AuthenticatedApeRidesRideIdRouteImport.update({
+    id: '/$rideId',
+    path: '/$rideId',
+    getParentRoute: () => AuthenticatedApeRidesRoute,
+  } as any)
 const AuthenticatedAdminOtherpageRoute =
   AuthenticatedAdminOtherpageRouteImport.update({
     id: '/otherpage',
@@ -95,12 +108,14 @@ const AuthenticatedAdminOtherpageRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/ape-rides': typeof AuthenticatedApeRidesRouteWithChildren
   '/feed': typeof AuthenticatedFeedRoute
   '/lifers': typeof AuthenticatedLifersRouteWithChildren
   '/messages': typeof AuthenticatedMessagesRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/rooms': typeof AuthenticatedRoomsRouteWithChildren
   '/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
+  '/ape-rides/$rideId': typeof AuthenticatedApeRidesRideIdRoute
   '/lifers/messages': typeof AuthenticatedLifersMessagesRoute
   '/lifers/room': typeof AuthenticatedLifersRoomRoute
   '/rooms/$roomId': typeof AuthenticatedRoomsRoomIdRoute
@@ -109,11 +124,13 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/ape-rides': typeof AuthenticatedApeRidesRouteWithChildren
   '/feed': typeof AuthenticatedFeedRoute
   '/messages': typeof AuthenticatedMessagesRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/rooms': typeof AuthenticatedRoomsRouteWithChildren
   '/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
+  '/ape-rides/$rideId': typeof AuthenticatedApeRidesRideIdRoute
   '/lifers/messages': typeof AuthenticatedLifersMessagesRoute
   '/lifers/room': typeof AuthenticatedLifersRoomRoute
   '/rooms/$roomId': typeof AuthenticatedRoomsRoomIdRoute
@@ -124,12 +141,14 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/_authenticated/ape-rides': typeof AuthenticatedApeRidesRouteWithChildren
   '/_authenticated/feed': typeof AuthenticatedFeedRoute
   '/_authenticated/lifers': typeof AuthenticatedLifersRouteWithChildren
   '/_authenticated/messages': typeof AuthenticatedMessagesRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/rooms': typeof AuthenticatedRoomsRouteWithChildren
   '/_authenticated/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
+  '/_authenticated/ape-rides/$rideId': typeof AuthenticatedApeRidesRideIdRoute
   '/_authenticated/lifers/messages': typeof AuthenticatedLifersMessagesRoute
   '/_authenticated/lifers/room': typeof AuthenticatedLifersRoomRoute
   '/_authenticated/rooms/$roomId': typeof AuthenticatedRoomsRoomIdRoute
@@ -140,12 +159,14 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/ape-rides'
     | '/feed'
     | '/lifers'
     | '/messages'
     | '/profile'
     | '/rooms'
     | '/admin/otherpage'
+    | '/ape-rides/$rideId'
     | '/lifers/messages'
     | '/lifers/room'
     | '/rooms/$roomId'
@@ -154,11 +175,13 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin'
+    | '/ape-rides'
     | '/feed'
     | '/messages'
     | '/profile'
     | '/rooms'
     | '/admin/otherpage'
+    | '/ape-rides/$rideId'
     | '/lifers/messages'
     | '/lifers/room'
     | '/rooms/$roomId'
@@ -168,12 +191,14 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/_authenticated/admin'
+    | '/_authenticated/ape-rides'
     | '/_authenticated/feed'
     | '/_authenticated/lifers'
     | '/_authenticated/messages'
     | '/_authenticated/profile'
     | '/_authenticated/rooms'
     | '/_authenticated/admin/otherpage'
+    | '/_authenticated/ape-rides/$rideId'
     | '/_authenticated/lifers/messages'
     | '/_authenticated/lifers/room'
     | '/_authenticated/rooms/$roomId'
@@ -236,6 +261,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedFeedRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/ape-rides': {
+      id: '/_authenticated/ape-rides'
+      path: '/ape-rides'
+      fullPath: '/ape-rides'
+      preLoaderRoute: typeof AuthenticatedApeRidesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/admin': {
       id: '/_authenticated/admin'
       path: '/admin'
@@ -271,6 +303,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLifersMessagesRouteImport
       parentRoute: typeof AuthenticatedLifersRoute
     }
+    '/_authenticated/ape-rides/$rideId': {
+      id: '/_authenticated/ape-rides/$rideId'
+      path: '/$rideId'
+      fullPath: '/ape-rides/$rideId'
+      preLoaderRoute: typeof AuthenticatedApeRidesRideIdRouteImport
+      parentRoute: typeof AuthenticatedApeRidesRoute
+    }
     '/_authenticated/admin/otherpage': {
       id: '/_authenticated/admin/otherpage'
       path: '/otherpage'
@@ -291,6 +330,19 @@ const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
 
 const AuthenticatedAdminRouteWithChildren =
   AuthenticatedAdminRoute._addFileChildren(AuthenticatedAdminRouteChildren)
+
+interface AuthenticatedApeRidesRouteChildren {
+  AuthenticatedApeRidesRideIdRoute: typeof AuthenticatedApeRidesRideIdRoute
+}
+
+const AuthenticatedApeRidesRouteChildren: AuthenticatedApeRidesRouteChildren = {
+  AuthenticatedApeRidesRideIdRoute: AuthenticatedApeRidesRideIdRoute,
+}
+
+const AuthenticatedApeRidesRouteWithChildren =
+  AuthenticatedApeRidesRoute._addFileChildren(
+    AuthenticatedApeRidesRouteChildren,
+  )
 
 interface AuthenticatedLifersRouteChildren {
   AuthenticatedLifersMessagesRoute: typeof AuthenticatedLifersMessagesRoute
@@ -320,6 +372,7 @@ const AuthenticatedRoomsRouteWithChildren =
 
 interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
+  AuthenticatedApeRidesRoute: typeof AuthenticatedApeRidesRouteWithChildren
   AuthenticatedFeedRoute: typeof AuthenticatedFeedRoute
   AuthenticatedLifersRoute: typeof AuthenticatedLifersRouteWithChildren
   AuthenticatedMessagesRoute: typeof AuthenticatedMessagesRoute
@@ -329,6 +382,7 @@ interface AuthenticatedRouteChildren {
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
+  AuthenticatedApeRidesRoute: AuthenticatedApeRidesRouteWithChildren,
   AuthenticatedFeedRoute: AuthenticatedFeedRoute,
   AuthenticatedLifersRoute: AuthenticatedLifersRouteWithChildren,
   AuthenticatedMessagesRoute: AuthenticatedMessagesRoute,
