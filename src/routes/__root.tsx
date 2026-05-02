@@ -1,8 +1,10 @@
 import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { Web3Provider } from "@/components/Web3Provider";
 import { PrivyAppProvider } from "@/components/PrivyAppProvider";
 import { AppHeader } from "@/components/AppHeader";
 import { Toaster } from "@/components/ui/sonner";
+import { installDiagnostics } from "@/lib/diagnostics";
 
 import appCss from "../styles.css?url";
 
