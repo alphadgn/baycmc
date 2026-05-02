@@ -42,6 +42,9 @@ export function AppHeader() {
                 <Link to="/rooms" className="text-muted-foreground hover:text-foreground transition">
                   Rooms
                 </Link>
+                <Link to="/ape-rides" className="text-muted-foreground hover:text-foreground transition">
+                  Ape Rides
+                </Link>
                 <Link to="/profile" className="text-muted-foreground hover:text-foreground transition">
                   Profile
                 </Link>

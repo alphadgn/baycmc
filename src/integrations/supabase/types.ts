@@ -14,6 +14,86 @@ export type Database = {
   }
   public: {
     Tables: {
+      ape_ride_requests: {
+        Row: {
+          created_at: string
+          id: string
+          message: string | null
+          ride_id: string
+          status: Database["public"]["Enums"]["ape_ride_request_status"]
+          updated_at: string
+          viewer_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message?: string | null
+          ride_id: string
+          status?: Database["public"]["Enums"]["ape_ride_request_status"]
+          updated_at?: string
+          viewer_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string | null
+          ride_id?: string
+          status?: Database["public"]["Enums"]["ape_ride_request_status"]
+          updated_at?: string
+          viewer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ape_ride_requests_ride_id_fkey"
+            columns: ["ride_id"]
+            isOneToOne: false
+            referencedRelation: "ape_rides"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ape_rides: {
+        Row: {
+          created_at: string
+          ended_at: string | null
+          host_id: string
+          host_lat: number
+          host_lng: number
+          id: string
+          livekit_room: string
+          started_at: string
+          status: Database["public"]["Enums"]["ape_ride_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          ended_at?: string | null
+          host_id: string
+          host_lat: number
+          host_lng: number
+          id?: string
+          livekit_room: string
+          started_at?: string
+          status?: Database["public"]["Enums"]["ape_ride_status"]
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          ended_at?: string | null
+          host_id?: string
+          host_lat?: number
+          host_lng?: number
+          id?: string
+          livekit_room?: string
+          started_at?: string
+          status?: Database["public"]["Enums"]["ape_ride_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       app_settings: {
         Row: {
           key: string
@@ -478,6 +558,8 @@ export type Database = {
       }
     }
     Enums: {
+      ape_ride_request_status: "pending" | "accepted" | "declined" | "cancelled"
+      ape_ride_status: "live" | "ended"
       app_role: "super_admin" | "admin" | "verified_user" | "chapter_leader"
       room_tier: "token_proof" | "lifer"
     }
@@ -607,6 +689,8 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      ape_ride_request_status: ["pending", "accepted", "declined", "cancelled"],
+      ape_ride_status: ["live", "ended"],
       app_role: ["super_admin", "admin", "verified_user", "chapter_leader"],
       room_tier: ["token_proof", "lifer"],
     },
