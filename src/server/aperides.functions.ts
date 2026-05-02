@@ -141,9 +141,11 @@ export const respondApeRideRequest = createServerFn({ method: "POST" })
       .select("id, ride_id, ape_rides!inner(host_id)")
       .eq("id", data.requestId)
       .maybeSingle();
-    // RLS already restricts; double-check
-    // @ts-expect-error nested join
-    if (!req || req.ape_rides?.host_id !== userId) {
+    const joined = req as { ape_rides?: { host_id: string } | { host_id: string }[] } | null;
+    const hostId = Array.isArray(joined?.ape_rides)
+      ? joined?.ape_rides[0]?.host_id
+      : joined?.ape_rides?.host_id;
+    if (!req || hostId !== userId) {
       return { ok: false as const, error: "Not authorized" };
     }
 
