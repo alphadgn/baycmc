@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Copy, QrCode, RefreshCw, ExternalLink, Wallet } from "lucide-react";
-import { usePrivy, useWallets } from "@privy-io/react-auth";
-import { SiweMessage } from "siwe";
+import { Copy, QrCode, RefreshCw, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
@@ -10,7 +8,7 @@ import {
   startTokenproofSession,
   pollTokenproofSession,
 } from "@/server/tokenproof.functions";
-import { verifyPrivyOwnership } from "@/server/privy.functions";
+import { PrivyVerifyCard } from "@/components/PrivyVerifyCard";
 import {
   Dialog,
   DialogContent,
