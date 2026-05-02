@@ -19,10 +19,12 @@ export function AppHeader() {
       <header className="sticky top-0 z-50 glass">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
           <Link to="/" className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-md bg-gradient-gold shadow-gold" />
-            <span className="font-logo text-4xl leading-none">
-              <span className="text-gradient-gold">BAYCMC</span>
-            </span>
+            <img
+              src={baycLifeLogo}
+              alt="BAYC Lifer"
+              className="h-10 w-auto select-none"
+              draggable={false}
+            />
           </Link>
 
           <nav className="hidden items-center gap-5 text-sm md:flex font-sans-display">
