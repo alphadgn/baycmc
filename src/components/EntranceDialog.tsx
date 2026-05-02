@@ -36,7 +36,7 @@ interface EntranceDialogProps {
 export function EntranceDialog({ open, onOpenChange }: EntranceDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-3xl text-gradient-gold">Entrance</DialogTitle>
           <DialogDescription>
