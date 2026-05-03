@@ -186,11 +186,16 @@ function EntranceBody({
       return;
     }
 
+    if (!("sessionId" in started)) {
+      failWith("credentials");
+      return;
+    }
     setAuthUrl(started.authUrl);
     setQrUrl(started.qrUrl);
     expiresAtRef.current = started.expiresAt;
     setSecondsLeft(Math.max(0, Math.round((started.expiresAt - Date.now()) / 1000)));
     setPhase("waiting");
+    const sessionId = started.sessionId;
 
     // Countdown tick (display only — server still owns the canonical TTL)
     tickRef.current = window.setInterval(() => {
