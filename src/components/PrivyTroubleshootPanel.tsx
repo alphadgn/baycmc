@@ -133,7 +133,11 @@ export function PrivyTroubleshootPanel() {
   if (status === "ok" && !open) return null;
 
   return (
-    <div className="rounded-xl border border-border bg-secondary/10 p-4">
+    <div
+      data-testid="privy-troubleshoot-panel"
+      data-status={status}
+      className="rounded-xl border border-border bg-secondary/10 p-4"
+    >
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
