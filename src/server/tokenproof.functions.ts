@@ -105,6 +105,7 @@ export const startTokenproofSession = createServerFn({ method: "POST" })
 
 type PollResult =
   | { status: "pending" }
+  | { status: "not_configured" }
   | {
       status: "rejected" | "expired" | "network" | "credentials";
       reason?: string;
