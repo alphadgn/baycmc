@@ -32,8 +32,91 @@ const erc721Abi = parseAbi([
   "function balanceOf(address owner) view returns (uint256)",
 ]);
 
+// delegate.cash v2 — fetch every vault that has delegated to `to`.
+// Delegation type enum: 0 NONE, 1 ALL, 2 CONTRACT, 3 ERC721, 4 ERC20, 5 ERC1155.
+const delegateRegistryAbi = parseAbi([
+  "struct Delegation { uint8 type_; address to; address from; bytes32 rights; address contract_; uint256 tokenId; uint256 amount; }",
+  "function getIncomingDelegations(address to) view returns (Delegation[])",
+]);
+
 function client() {
   return createPublicClient({ chain: mainnet, transport: http(ETH_RPC_URL) });
+}
+
+async function balancesFor(
+  c: ReturnType<typeof client>,
+  owner: `0x${string}`,
+): Promise<{ bayc: bigint; mayc: bigint }> {
+  const [bayc, mayc] = await Promise.all([
+    c.readContract({
+      address: BAYC,
+      abi: erc721Abi,
+      functionName: "balanceOf",
+      args: [owner],
+    }) as Promise<bigint>,
+    c.readContract({
+      address: MAYC,
+      abi: erc721Abi,
+      functionName: "balanceOf",
+      args: [owner],
+    }) as Promise<bigint>,
+  ]);
+  return { bayc, mayc };
+}
+
+/**
+ * Resolve every "vault" wallet that has delegated authority to `signer`
+ * for either BAYC or MAYC (or for ALL / the entire wallet) via delegate.cash
+ * v2. We treat the signer as a valid holder if any such vault holds the
+ * collection — this is the standard "delegated for vacation/entry" pattern.
+ */
+async function resolveDelegatedVaults(
+  c: ReturnType<typeof client>,
+  signer: `0x${string}`,
+): Promise<`0x${string}`[]> {
+  try {
+    const delegations = (await c.readContract({
+      address: DELEGATE_REGISTRY_V2,
+      abi: delegateRegistryAbi,
+      functionName: "getIncomingDelegations",
+      args: [signer],
+    })) as ReadonlyArray<{
+      type_: number;
+      to: `0x${string}`;
+      from: `0x${string}`;
+      rights: `0x${string}`;
+      contract_: `0x${string}`;
+      tokenId: bigint;
+      amount: bigint;
+    }>;
+
+    const vaults = new Set<string>();
+    for (const d of delegations) {
+      // Only "no rights restriction" (0x00..00) counts for entry — custom
+      // rights strings narrow delegation to specific use-cases.
+      const noRights =
+        d.rights ===
+        "0x0000000000000000000000000000000000000000000000000000000000000000";
+      if (!noRights) continue;
+
+      // ALL → vault delegated their entire wallet.
+      if (d.type_ === 1) {
+        vaults.add(d.from.toLowerCase());
+        continue;
+      }
+      // CONTRACT or ERC721 scoped to BAYC/MAYC contracts.
+      if (d.type_ === 2 || d.type_ === 3) {
+        const c_ = d.contract_.toLowerCase();
+        if (c_ === BAYC.toLowerCase() || c_ === MAYC.toLowerCase()) {
+          vaults.add(d.from.toLowerCase());
+        }
+      }
+    }
+    return [...vaults] as `0x${string}`[];
+  } catch (e) {
+    console.error("delegate.cash lookup failed", e);
+    return [];
+  }
 }
 
 /**
