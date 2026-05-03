@@ -1,5 +1,6 @@
 import { Component, useEffect, useState, type ReactNode } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { mainnet as mainnetChain } from "viem/chains";
 import { getPrivyPublicConfig } from "@/server/privy.functions";
 
 /**
@@ -94,13 +95,30 @@ export function PrivyAppProvider({ children }: { children: ReactNode }) {
             theme: "dark",
             accentColor: "#F5B100",
             logo: undefined,
+            // v3: surface the embedded-wallet creation UI so the modal can
+            // actually progress past the spinner instead of hanging waiting
+            // for a UI step that was never rendered.
+            showWalletUIs: true,
+            walletChainType: "ethereum-only",
           },
+          // v3 requires an explicit chain context for embedded wallet
+          // provisioning. Without `defaultChain` + `supportedChains`, the
+          // "Creating wallet…" modal spins forever because the SDK can't
+          // pick an EVM chain to bind the new key to.
+          defaultChain: mainnetChain,
+          supportedChains: [mainnetChain],
           embeddedWallets: {
             // Auto-provision an embedded Ethereum wallet for email sign-ins
             // that don't already have one linked at Privy. The collection
             // check then runs against this newly created wallet (and any
             // delegate.cash vaults that delegate to it).
-            ethereum: { createOnLogin: "users-without-wallets" },
+            ethereum: {
+              createOnLogin: "users-without-wallets",
+            },
+            // Skip the "secure your wallet" prompt that otherwise blocks
+            // the post-creation flow on mobile.
+            requireUserPasswordOnCreate: false,
+            showWalletUIs: true,
           },
         }}
       >

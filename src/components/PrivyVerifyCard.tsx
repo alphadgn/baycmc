@@ -132,6 +132,11 @@ function PrivyVerifyCardInner({
   const [error, setError] = useState<string | null>(null);
 
   const wallet = wallets[0];
+  // First-time sign-in state: user is authenticated but the embedded
+  // wallet hasn't been provisioned by Privy yet. We surface this as an
+  // explicit status step so the modal flow doesn't look frozen.
+  const isCreatingWallet = authenticated && !wallet;
+  const isVerifying = busy;
 
   async function handleSignAndVerify() {
     if (!wallet) {
@@ -237,19 +242,52 @@ function PrivyVerifyCardInner({
           Connect wallet
         </button>
       ) : (
-        <div className="mt-4 space-y-2">
-          <div className="rounded-md border border-border bg-background/40 px-3 py-2 text-[11px] font-mono text-muted-foreground">
-            {wallet?.address
-              ? `${wallet.address.slice(0, 6)}…${wallet.address.slice(-4)}`
-              : (user?.wallet?.address ?? "No wallet")}
-          </div>
+        <div className="mt-4 space-y-2" data-testid="privy-post-login">
+          {isCreatingWallet && (
+            <div
+              data-testid="privy-status-creating-wallet"
+              className="rounded-md border border-gold/30 bg-gold/5 px-3 py-2 text-xs text-muted-foreground"
+            >
+              <span className="font-semibold text-gold">Step 1 / 2 ·</span>{" "}
+              Creating your embedded wallet… this is a one-time setup for new
+              emails.
+            </div>
+          )}
+          {wallet && (
+            <div
+              data-testid="privy-status-wallet-ready"
+              className="rounded-md border border-border bg-background/40 px-3 py-2 text-[11px] font-mono text-muted-foreground"
+              data-wallet-address={wallet.address}
+            >
+              {`${wallet.address.slice(0, 6)}…${wallet.address.slice(-4)}`}
+            </div>
+          )}
+          {wallet && isVerifying && (
+            <div
+              data-testid="privy-status-verifying"
+              className="rounded-md border border-gold/30 bg-gold/5 px-3 py-2 text-xs text-muted-foreground"
+            >
+              <span className="font-semibold text-gold">Step 2 / 2 ·</span>{" "}
+              Checking BAYC / MAYC ownership and delegate.cash vaults for{" "}
+              {`${wallet.address.slice(0, 6)}…${wallet.address.slice(-4)}`}…
+            </div>
+          )}
           <button
             onClick={handleSignAndVerify}
             disabled={busy || !wallet}
             className="w-full rounded-md bg-gradient-gold px-4 py-2.5 text-sm font-semibold text-gold-foreground shadow-gold disabled:opacity-50 hover:opacity-90"
           >
-            {busy ? "Verifying ownership…" : "Sign & verify holdings"}
+            {isCreatingWallet
+              ? "Waiting for wallet…"
+              : busy
+              ? "Verifying ownership…"
+              : "Sign & verify holdings"}
           </button>
+          {!wallet && !isCreatingWallet && user?.wallet?.address && (
+            <div className="text-[11px] text-muted-foreground font-mono">
+              {user.wallet.address}
+            </div>
+          )}
           <button
             onClick={() => logout()}
             className="w-full rounded-md border border-border bg-secondary/30 px-3 py-1.5 text-[11px] text-muted-foreground hover:bg-secondary"
