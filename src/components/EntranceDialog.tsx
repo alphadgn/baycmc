@@ -210,7 +210,7 @@ function EntranceBody({
     // Poll for completion
     pollRef.current = window.setInterval(async () => {
       try {
-        const res = await pollFn({ data: { sessionId: started.sessionId } });
+        const res = await pollFn({ data: { sessionId } });
         transientErrorsRef.current = 0;
 
         if (res.status === "pending") return;
