@@ -174,3 +174,27 @@
   50% { box-shadow: 0 0 40px oklch(0.78 0.14 78 / 60%); }
 }
 .animate-pulse-glow { animation: pulse-glow 2.4s ease-in-out infinite; }
+
+/* Privy modal — mobile-first overrides */
+@media (max-width: 640px) {
+  [class*="privy"] [class*="modal"],
+  [id^="privy"] [class*="modal"],
+  [data-privy-dialog] {
+    padding-bottom: env(safe-area-inset-bottom, 0) !important;
+    padding-top: env(safe-area-inset-top, 0) !important;
+  }
+  [class*="privy"] input,
+  [id^="privy"] input,
+  [data-privy-dialog] input {
+    font-size: 16px !important; /* prevents iOS zoom & ensures keyboard opens */
+    min-height: 48px !important;
+    -webkit-user-select: text !important;
+    user-select: text !important;
+  }
+  [class*="privy"] button,
+  [id^="privy"] button,
+  [data-privy-dialog] button {
+    min-height: 48px !important;
+    font-size: 15px !important;
+  }
+}
