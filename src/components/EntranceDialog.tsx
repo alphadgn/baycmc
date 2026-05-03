@@ -34,7 +34,43 @@ interface EntranceDialogProps {
 export function EntranceDialog({ open, onOpenChange }: EntranceDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
+      <DialogContent
+        className="max-h-[90vh] w-[calc(100vw-1rem)] max-w-md overflow-y-auto p-4 sm:max-w-md sm:p-6"
+        onInteractOutside={(e) => {
+          // Privy renders its modal in a portal at the body level. Don't
+          // close our dialog (or steal focus) when the user taps inside it.
+          const target = e.target as HTMLElement | null;
+          if (
+            target?.closest(
+              '[id^="privy"], [class*="privy"], [data-privy-dialog]',
+            )
+          ) {
+            e.preventDefault();
+          }
+        }}
+        onFocusOutside={(e) => {
+          // Allow focus to move into Privy's email input so the iOS
+          // keyboard actually opens on tap.
+          const target = e.target as HTMLElement | null;
+          if (
+            target?.closest(
+              '[id^="privy"], [class*="privy"], [data-privy-dialog]',
+            )
+          ) {
+            e.preventDefault();
+          }
+        }}
+        onPointerDownOutside={(e) => {
+          const target = e.target as HTMLElement | null;
+          if (
+            target?.closest(
+              '[id^="privy"], [class*="privy"], [data-privy-dialog]',
+            )
+          ) {
+            e.preventDefault();
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle className="text-3xl text-gradient-gold">Entrance</DialogTitle>
           <DialogDescription>
