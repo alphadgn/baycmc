@@ -140,7 +140,8 @@ export const pollTokenproofSession = createServerFn({ method: "POST" })
     z.object({ sessionId: z.string().min(8) }).parse(d),
   )
   .handler(async ({ data }): Promise<PollResult> => {
-    const apiKey = requireApiKey();
+    const apiKey = getApiKey();
+    if (!apiKey) return { status: "not_configured" };
 
     // Local TTL check — if we issued this session more than SESSION_TTL_MS
     // ago, treat it as expired regardless of what Tokenproof says.
