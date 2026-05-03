@@ -439,6 +439,8 @@ function EntranceBody({
         }}
       />
 
+      <PrivyTroubleshootPanel />
+
       {isAuthenticated && (
         <button
           onClick={handleSignOut}
