@@ -169,23 +169,23 @@ export function PrivyTroubleshootPanel() {
                 list. Add the origin below in your Privy dashboard
                 (Settings → Domains), then tap Re-check.
               </p>
-              <div className="space-y-1">
-                {origins.map((o) => (
-                  <code
-                    key={o}
-                    className="block break-all rounded-md border border-border bg-background/60 px-2 py-1.5 font-mono text-[11px] text-foreground"
-                  >
-                    {o}
-                  </code>
-                ))}
-              </div>
+              <textarea
+                data-testid="privy-allowlist-textarea"
+                readOnly
+                rows={origins.length}
+                value={allowlistText}
+                onFocus={(e) => e.currentTarget.select()}
+                onClick={(e) => (e.currentTarget as HTMLTextAreaElement).select()}
+                className="w-full resize-none rounded-md border border-border bg-background/60 p-2 font-mono text-[11px] text-foreground"
+              />
               <div className="flex flex-wrap gap-2 pt-1">
                 <button
+                  data-testid="privy-allowlist-copy"
                   onClick={copyOrigins}
                   className="inline-flex items-center gap-1.5 rounded-md border border-border bg-secondary/40 px-2.5 py-1.5 text-[11px] hover:bg-secondary"
                 >
                   <Copy className="h-3 w-3" />
-                  Copy origin
+                  Copy all origins
                 </button>
                 <a
                   href="https://dashboard.privy.io"
