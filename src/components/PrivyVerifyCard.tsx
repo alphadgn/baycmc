@@ -16,7 +16,13 @@ import { toast } from "sonner";
  * they're available. This component must NOT statically import
  * `@privy-io/react-auth` anywhere reachable from SSR.
  */
-export function PrivyVerifyCard({ onVerified }: { onVerified: () => void }) {
+export function PrivyVerifyCard({
+  onVerified,
+  onLoginRequested,
+}: {
+  onVerified: () => void;
+  onLoginRequested?: () => void;
+}) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [hooks, setHooks] = useState<{ usePrivy: any; useWallets: any } | null>(
     null,
