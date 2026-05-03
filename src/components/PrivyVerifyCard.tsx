@@ -23,10 +23,16 @@ export function PrivyVerifyCard({
   onVerified: () => void;
   onLoginRequested?: () => void;
 }) {
+  type PrivyHooks = {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    usePrivy: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    useWallets: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    useCreateWallet: any;
+  };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [hooks, setHooks] = useState<{ usePrivy: any; useWallets: any } | null>(
-    null,
-  );
+  const [hooks, setHooks] = useState<PrivyHooks | null>(null);
   type ConfigState =
     | { kind: "loading" }
     | { kind: "missing" }
