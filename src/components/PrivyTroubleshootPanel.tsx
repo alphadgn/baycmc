@@ -152,7 +152,7 @@ export function PrivyTroubleshootPanel() {
             <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />
           )}
           {status === "blocked"
-            ? "Wallet sign-in is blocked by Privy"
+            ? "Wallet sign-in blocked: Privy iframe failed (frame-ancestors / CSP)"
             : status === "ok"
             ? "Privy connection: OK"
             : "Checking Privy connection…"}
