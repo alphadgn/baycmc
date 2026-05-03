@@ -96,7 +96,11 @@ export function PrivyAppProvider({ children }: { children: ReactNode }) {
             logo: undefined,
           },
           embeddedWallets: {
-            ethereum: { createOnLogin: "off" },
+            // Auto-provision an embedded Ethereum wallet for email sign-ins
+            // that don't already have one linked at Privy. The collection
+            // check then runs against this newly created wallet (and any
+            // delegate.cash vaults that delegate to it).
+            ethereum: { createOnLogin: "users-without-wallets" },
           },
         }}
       >
