@@ -172,12 +172,17 @@ function EntranceBody({
   async function handleStart() {
     resetState();
     setPhase("starting");
-    let started: { sessionId: string; authUrl: string; qrUrl: string; expiresAt: number };
+    let started: Awaited<ReturnType<typeof startFn>>;
     try {
       started = await startFn({ data: {} });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "";
       failWith(classifyError(msg));
+      return;
+    }
+
+    if ("notConfigured" in started && started.notConfigured) {
+      failWith("credentials");
       return;
     }
 
