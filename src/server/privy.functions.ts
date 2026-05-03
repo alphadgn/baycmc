@@ -10,7 +10,7 @@ import {
 } from "viem";
 import { mainnet } from "viem/chains";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { ETH_RPC_URL } from "@/lib/web3/constants";
+import { ETH_RPC_URL, DELEGATE_REGISTRY_V2 } from "@/lib/web3/constants";
 
 /**
  * Privy / SIWE entrance verification.
@@ -32,8 +32,91 @@ const erc721Abi = parseAbi([
   "function balanceOf(address owner) view returns (uint256)",
 ]);
 
+// delegate.cash v2 — fetch every vault that has delegated to `to`.
+// Delegation type enum: 0 NONE, 1 ALL, 2 CONTRACT, 3 ERC721, 4 ERC20, 5 ERC1155.
+const delegateRegistryAbi = parseAbi([
+  "struct Delegation { uint8 type_; address to; address from; bytes32 rights; address contract_; uint256 tokenId; uint256 amount; }",
+  "function getIncomingDelegations(address to) view returns (Delegation[])",
+]);
+
 function client() {
   return createPublicClient({ chain: mainnet, transport: http(ETH_RPC_URL) });
+}
+
+async function balancesFor(
+  c: ReturnType<typeof client>,
+  owner: `0x${string}`,
+): Promise<{ bayc: bigint; mayc: bigint }> {
+  const [bayc, mayc] = await Promise.all([
+    c.readContract({
+      address: BAYC,
+      abi: erc721Abi,
+      functionName: "balanceOf",
+      args: [owner],
+    }) as Promise<bigint>,
+    c.readContract({
+      address: MAYC,
+      abi: erc721Abi,
+      functionName: "balanceOf",
+      args: [owner],
+    }) as Promise<bigint>,
+  ]);
+  return { bayc, mayc };
+}
+
+/**
+ * Resolve every "vault" wallet that has delegated authority to `signer`
+ * for either BAYC or MAYC (or for ALL / the entire wallet) via delegate.cash
+ * v2. We treat the signer as a valid holder if any such vault holds the
+ * collection — this is the standard "delegated for vacation/entry" pattern.
+ */
+async function resolveDelegatedVaults(
+  c: ReturnType<typeof client>,
+  signer: `0x${string}`,
+): Promise<`0x${string}`[]> {
+  try {
+    const delegations = (await c.readContract({
+      address: DELEGATE_REGISTRY_V2,
+      abi: delegateRegistryAbi,
+      functionName: "getIncomingDelegations",
+      args: [signer],
+    })) as ReadonlyArray<{
+      type_: number;
+      to: `0x${string}`;
+      from: `0x${string}`;
+      rights: `0x${string}`;
+      contract_: `0x${string}`;
+      tokenId: bigint;
+      amount: bigint;
+    }>;
+
+    const vaults = new Set<string>();
+    for (const d of delegations) {
+      // Only "no rights restriction" (0x00..00) counts for entry — custom
+      // rights strings narrow delegation to specific use-cases.
+      const noRights =
+        d.rights ===
+        "0x0000000000000000000000000000000000000000000000000000000000000000";
+      if (!noRights) continue;
+
+      // ALL → vault delegated their entire wallet.
+      if (d.type_ === 1) {
+        vaults.add(d.from.toLowerCase());
+        continue;
+      }
+      // CONTRACT or ERC721 scoped to BAYC/MAYC contracts.
+      if (d.type_ === 2 || d.type_ === 3) {
+        const c_ = d.contract_.toLowerCase();
+        if (c_ === BAYC.toLowerCase() || c_ === MAYC.toLowerCase()) {
+          vaults.add(d.from.toLowerCase());
+        }
+      }
+    }
+    return [...vaults] as `0x${string}`[];
+  } catch (e) {
+    console.error("delegate.cash lookup failed", e);
+    return [];
+  }
 }
 
 /**
@@ -79,24 +162,21 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
     }
     const wallet = getAddress(address);
 
-    // 2) Check BAYC + MAYC balances on-chain
-    let baycBal = 0n;
-    let maycBal = 0n;
+    // 2) Check BAYC + MAYC balances on-chain. The signer wallet is the
+    //    Privy embedded/connected wallet for the user's email. They may not
+    //    hold the apes directly — instead they may be a "hot" wallet that a
+    //    cold "vault" has delegated to via delegate.cash for entry purposes.
+    //    We therefore also walk every incoming delegation and check those
+    //    vaults' balances. Any positive balance (signer OR delegated vault)
+    //    counts as verified ownership.
+    const c = client();
+
+    let signerBals = { bayc: 0n, mayc: 0n };
+    let vaults: `0x${string}`[] = [];
     try {
-      const c = client();
-      [baycBal, maycBal] = await Promise.all([
-        c.readContract({
-          address: BAYC,
-          abi: erc721Abi,
-          functionName: "balanceOf",
-          args: [wallet],
-        }) as Promise<bigint>,
-        c.readContract({
-          address: MAYC,
-          abi: erc721Abi,
-          functionName: "balanceOf",
-          args: [wallet],
-        }) as Promise<bigint>,
+      [signerBals, vaults] = await Promise.all([
+        balancesFor(c, wallet as `0x${string}`),
+        resolveDelegatedVaults(c, wallet as `0x${string}`),
       ]);
     } catch (e) {
       console.error("RPC balanceOf failed", e);
@@ -105,18 +185,44 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
       );
     }
 
-    if (baycBal === 0n && maycBal === 0n) {
+    let totalBayc = signerBals.bayc;
+    let totalMayc = signerBals.mayc;
+    let delegatedFrom: `0x${string}` | null = null;
+
+    if (totalBayc === 0n && totalMayc === 0n && vaults.length > 0) {
+      // Check each delegated vault until we find one that holds an ape.
+      for (const v of vaults) {
+        try {
+          const b = await balancesFor(c, v);
+          if (b.bayc > 0n || b.mayc > 0n) {
+            totalBayc += b.bayc;
+            totalMayc += b.mayc;
+            delegatedFrom = v;
+            break;
+          }
+        } catch (e) {
+          console.error("RPC balanceOf failed for vault", v, e);
+        }
+      }
+    }
+
+    if (totalBayc === 0n && totalMayc === 0n) {
       return {
         verified: false as const,
         reason:
-          "This wallet doesn't hold any BAYC or MAYC. Try a different wallet.",
+          vaults.length > 0
+            ? "Neither this wallet nor any wallet that delegated to it via delegate.cash holds a BAYC or MAYC. Try a different wallet."
+            : "This wallet doesn't hold any BAYC or MAYC, and no vault has delegated to it. Try a different wallet or set up delegate.cash.",
         wallet,
       };
     }
 
-    const collection: "BAYC" | "MAYC" = baycBal > 0n ? "BAYC" : "MAYC";
+    const collection: "BAYC" | "MAYC" = totalBayc > 0n ? "BAYC" : "MAYC";
 
-    // 3) Mint / fetch Supabase user (same pattern as tokenproof)
+    // 3) Mint / fetch Supabase user (same pattern as tokenproof). We key
+    //    the Supabase user off the *signer* wallet (the Privy email's
+    //    embedded wallet) so the same email always resolves to the same
+    //    account, regardless of which vault delegated this session.
     const lower = wallet.toLowerCase();
     const email = `${lower}@wallet.baycmc.local`;
     const password = `pv:${lower}:${process.env.SUPABASE_SERVICE_ROLE_KEY?.slice(0, 16) ?? ""}`;
@@ -164,6 +270,7 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
       verified: true as const,
       collection,
       wallet,
+      delegatedFrom,
       session: {
         access_token: signIn.session.access_token,
         refresh_token: signIn.session.refresh_token,

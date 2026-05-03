@@ -180,7 +180,11 @@ function PrivyVerifyCardInner({
         return;
       }
 
-      toast.success(`Verified — ${result.collection} ownership confirmed`);
+      toast.success(
+        result.delegatedFrom
+          ? `Verified — ${result.collection} delegated from ${result.delegatedFrom.slice(0, 6)}…${result.delegatedFrom.slice(-4)}`
+          : `Verified — ${result.collection} ownership confirmed`,
+      );
       onVerified();
     } catch (e) {
       const msg = e instanceof Error ? e.message : "";
