@@ -214,6 +214,10 @@ function EntranceBody({
         transientErrorsRef.current = 0;
 
         if (res.status === "pending") return;
+        if (res.status === "not_configured") {
+          failWith("credentials");
+          return;
+        }
 
         if (res.status === "rejected") {
           failWith("rejected");
