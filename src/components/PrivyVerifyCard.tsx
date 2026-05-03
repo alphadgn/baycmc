@@ -63,7 +63,11 @@ export function PrivyVerifyCard({
         setConfigState({ kind: "ok" });
         const mod = await import("@privy-io/react-auth");
         if (cancelled) return;
-        setHooks({ usePrivy: mod.usePrivy, useWallets: mod.useWallets });
+        setHooks({
+          usePrivy: mod.usePrivy,
+          useWallets: mod.useWallets,
+          useCreateWallet: mod.useCreateWallet,
+        });
       } catch {
         if (!cancelled) setConfigState({ kind: "missing" });
       }
@@ -121,22 +125,56 @@ function PrivyVerifyCardInner({
   onLoginRequested,
 }: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  hooks: { usePrivy: any; useWallets: any };
+  hooks: { usePrivy: any; useWallets: any; useCreateWallet: any };
   onVerified: () => void;
   onLoginRequested?: () => void;
 }) {
   const { ready, authenticated, login, logout, user } = hooks.usePrivy();
   const { wallets } = hooks.useWallets();
+  const { createWallet } = hooks.useCreateWallet();
   const verifyFn = useServerFn(verifyPrivyOwnership);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [walletCreateState, setWalletCreateState] = useState<
+    "idle" | "creating" | "failed"
+  >("idle");
 
   const wallet = wallets[0];
+  const hasLinkedWallet = Boolean(user?.wallet?.address || wallets.length > 0);
   // First-time sign-in state: user is authenticated but the embedded
   // wallet hasn't been provisioned by Privy yet. We surface this as an
   // explicit status step so the modal flow doesn't look frozen.
-  const isCreatingWallet = authenticated && !wallet;
+  const isCreatingWallet = authenticated && !wallet && walletCreateState !== "failed";
   const isVerifying = busy;
+
+  useEffect(() => {
+    if (!authenticated || wallet || hasLinkedWallet || walletCreateState !== "idle") {
+      return;
+    }
+
+    let cancelled = false;
+    setWalletCreateState("creating");
+    setError(null);
+
+    void createWallet()
+      .then(() => {
+        if (!cancelled) setWalletCreateState("idle");
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        console.error("Privy embedded wallet creation failed", e);
+        const msg = e instanceof Error ? e.message : "";
+        setWalletCreateState("failed");
+        setError(
+          msg ||
+            "We couldn't create your embedded wallet. Disconnect and try signing in again.",
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authenticated, createWallet, hasLinkedWallet, wallet, walletCreateState]);
 
   async function handleSignAndVerify() {
     if (!wallet) {
