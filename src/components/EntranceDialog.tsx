@@ -9,6 +9,7 @@ import {
   pollTokenproofSession,
 } from "@/server/tokenproof.functions";
 import { PrivyVerifyCard } from "@/components/PrivyVerifyCard";
+import { PrivyTroubleshootPanel } from "@/components/PrivyTroubleshootPanel";
 import {
   Dialog,
   DialogContent,
@@ -437,6 +438,8 @@ function EntranceBody({
           window.setTimeout(() => onOpenChange(false), 1200);
         }}
       />
+
+      <PrivyTroubleshootPanel />
 
       {isAuthenticated && (
         <button
