@@ -189,11 +189,10 @@ function PrivyVerifyCardInner({
     <div className="rounded-xl border border-border bg-secondary/20 p-5">
       <div className="flex items-center gap-2">
         <Wallet className="h-4 w-4 text-gold" />
-        <div className="text-lg font-semibold">Connect a wallet</div>
+        <div className="text-lg font-semibold">Privy</div>
       </div>
       <p className="mt-1 text-sm text-muted-foreground">
-        Or connect any EVM wallet via Privy. We'll verify BAYC/MAYC ownership
-        on-chain — no Tokenproof required.
+        Secure connection options.
       </p>
 
       {error && (
