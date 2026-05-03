@@ -24,14 +24,9 @@ const TP_BASE = "https://api.tokenproof.xyz";
 // has not surfaced an "expired" status yet. Keeps the UI from polling forever.
 const SESSION_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-function requireApiKey(): string {
+function getApiKey(): string | null {
   const key = process.env.TOKENPROOF_API_KEY;
-  if (!key) {
-    throw new Error(
-      "Tokenproof is not configured yet. Add the TOKENPROOF_API_KEY secret to enable verification.",
-    );
-  }
-  return key;
+  return key && key.trim().length > 0 ? key : null;
 }
 
 // In-memory map of session start times so the server can enforce a TTL even
@@ -48,7 +43,10 @@ function pruneOldSessions() {
 export const startTokenproofSession = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({}).parse(d))
   .handler(async () => {
-    const apiKey = requireApiKey();
+    const apiKey = getApiKey();
+    if (!apiKey) {
+      return { notConfigured: true as const };
+    }
     const policyId = process.env.TOKENPROOF_POLICY_ID;
 
     let res: Response;
@@ -107,6 +105,7 @@ export const startTokenproofSession = createServerFn({ method: "POST" })
 
 type PollResult =
   | { status: "pending" }
+  | { status: "not_configured" }
   | {
       status: "rejected" | "expired" | "network" | "credentials";
       reason?: string;
@@ -141,7 +140,8 @@ export const pollTokenproofSession = createServerFn({ method: "POST" })
     z.object({ sessionId: z.string().min(8) }).parse(d),
   )
   .handler(async ({ data }): Promise<PollResult> => {
-    const apiKey = requireApiKey();
+    const apiKey = getApiKey();
+    if (!apiKey) return { status: "not_configured" };
 
     // Local TTL check — if we issued this session more than SESSION_TTL_MS
     // ago, treat it as expired regardless of what Tokenproof says.

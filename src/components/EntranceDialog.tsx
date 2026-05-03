@@ -172,7 +172,7 @@ function EntranceBody({
   async function handleStart() {
     resetState();
     setPhase("starting");
-    let started: { sessionId: string; authUrl: string; qrUrl: string; expiresAt: number };
+    let started: Awaited<ReturnType<typeof startFn>>;
     try {
       started = await startFn({ data: {} });
     } catch (e) {
@@ -181,11 +181,21 @@ function EntranceBody({
       return;
     }
 
+    if ("notConfigured" in started && started.notConfigured) {
+      failWith("credentials");
+      return;
+    }
+
+    if (!("sessionId" in started)) {
+      failWith("credentials");
+      return;
+    }
     setAuthUrl(started.authUrl);
     setQrUrl(started.qrUrl);
     expiresAtRef.current = started.expiresAt;
     setSecondsLeft(Math.max(0, Math.round((started.expiresAt - Date.now()) / 1000)));
     setPhase("waiting");
+    const sessionId = started.sessionId;
 
     // Countdown tick (display only — server still owns the canonical TTL)
     tickRef.current = window.setInterval(() => {
@@ -200,10 +210,14 @@ function EntranceBody({
     // Poll for completion
     pollRef.current = window.setInterval(async () => {
       try {
-        const res = await pollFn({ data: { sessionId: started.sessionId } });
+        const res = await pollFn({ data: { sessionId } });
         transientErrorsRef.current = 0;
 
         if (res.status === "pending") return;
+        if (res.status === "not_configured") {
+          failWith("credentials");
+          return;
+        }
 
         if (res.status === "rejected") {
           failWith("rejected");
