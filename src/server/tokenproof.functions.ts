@@ -24,14 +24,9 @@ const TP_BASE = "https://api.tokenproof.xyz";
 // has not surfaced an "expired" status yet. Keeps the UI from polling forever.
 const SESSION_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-function requireApiKey(): string {
+function getApiKey(): string | null {
   const key = process.env.TOKENPROOF_API_KEY;
-  if (!key) {
-    throw new Error(
-      "Tokenproof is not configured yet. Add the TOKENPROOF_API_KEY secret to enable verification.",
-    );
-  }
-  return key;
+  return key && key.trim().length > 0 ? key : null;
 }
 
 // In-memory map of session start times so the server can enforce a TTL even
