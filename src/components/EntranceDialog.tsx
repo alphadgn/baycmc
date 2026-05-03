@@ -34,7 +34,7 @@ interface EntranceDialogProps {
  */
 export function EntranceDialog({ open, onOpenChange }: EntranceDialogProps) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog modal={false} open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="max-h-[90vh] w-[calc(100vw-1rem)] max-w-md overflow-y-auto p-4 sm:max-w-md sm:p-6"
         onInteractOutside={(e) => {
@@ -438,10 +438,9 @@ function EntranceBody({
           window.setTimeout(() => onOpenChange(false), 1200);
         }}
         onLoginRequested={() => {
-          // Close our dialog so its focus trap releases — otherwise the
-          // Privy email input never gets focus and the mobile keyboard
-          // stays closed.
-          onOpenChange(false);
+          // Keep this dialog mounted so the post-login wallet creation and
+          // verification status can run, while `modal={false}` prevents a
+          // focus trap from blocking Privy's mobile email input.
         }}
       />
 

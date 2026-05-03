@@ -108,12 +108,12 @@ export function PrivyAppProvider({ children }: { children: ReactNode }) {
           defaultChain: mainnetChain,
           supportedChains: [mainnetChain],
           embeddedWallets: {
-            // Auto-provision an embedded Ethereum wallet for email sign-ins
-            // that don't already have one linked at Privy. The collection
-            // check then runs against this newly created wallet (and any
-            // delegate.cash vaults that delegate to it).
+            // Do NOT use Privy's create-on-login modal here: on mobile it can
+            // stay forever on "Creating your wallet". We create the embedded
+            // wallet from our post-login card instead, then continue directly
+            // into the BAYC/MAYC check.
             ethereum: {
-              createOnLogin: "users-without-wallets",
+              createOnLogin: "off",
             },
             // Skip the "secure your wallet" prompt that otherwise blocks
             // the post-creation flow on mobile.
