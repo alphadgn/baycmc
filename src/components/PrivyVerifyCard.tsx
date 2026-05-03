@@ -142,7 +142,7 @@ function PrivyVerifyCardInner({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [walletCreateState, setWalletCreateState] = useState<
-    "idle" | "creating" | "failed"
+    "idle" | "creating" | "created" | "failed"
   >("idle");
 
   const wallet = wallets[0];
@@ -150,7 +150,8 @@ function PrivyVerifyCardInner({
   // First-time sign-in state: user is authenticated but the embedded
   // wallet hasn't been provisioned by Privy yet. We surface this as an
   // explicit status step so the modal flow doesn't look frozen.
-  const isCreatingWallet = authenticated && !wallet && walletCreateState !== "failed";
+  const isCreatingWallet =
+    authenticated && !wallet && walletCreateState !== "failed";
   const isVerifying = busy;
 
   useEffect(() => {
@@ -164,7 +165,7 @@ function PrivyVerifyCardInner({
 
     void createWallet()
       .then(() => {
-        if (!cancelled) setWalletCreateState("idle");
+        if (!cancelled) setWalletCreateState("created");
       })
       .catch((e: unknown) => {
         if (cancelled) return;
