@@ -1,5 +1,6 @@
 import { Component, useEffect, useState, type ReactNode } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { mainnet as mainnetChain } from "viem/chains";
 import { getPrivyPublicConfig } from "@/server/privy.functions";
 
 /**
