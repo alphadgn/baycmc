@@ -105,12 +105,25 @@ export function PrivyTroubleshootPanel() {
     };
   }, []);
 
-  const origins = [origin].filter(Boolean);
+  // The full allowlist Privy needs: the live origin plus the stable
+  // Lovable preview/published hosts. Including all of them up front means
+  // the user only has to paste once and it keeps working across deploys.
+  const PROJECT_ID = "098c1ce2-d90f-4478-895e-745a73b03b4b";
+  const STATIC_ORIGINS = [
+    `https://${PROJECT_ID}.lovableproject.com`,
+    `https://id-preview--${PROJECT_ID}.lovable.app`,
+    `https://project--${PROJECT_ID}.lovable.app`,
+    `https://project--${PROJECT_ID}-dev.lovable.app`,
+  ];
+  const origins = Array.from(
+    new Set([origin, ...STATIC_ORIGINS].filter(Boolean)),
+  );
+  const allowlistText = origins.join("\n");
 
   async function copyOrigins() {
     try {
-      await navigator.clipboard.writeText(origins.join("\n"));
-      toast.success("Origin copied");
+      await navigator.clipboard.writeText(allowlistText);
+      toast.success(`Copied ${origins.length} origins`);
     } catch {
       toast.error("Copy failed — select the text manually");
     }
