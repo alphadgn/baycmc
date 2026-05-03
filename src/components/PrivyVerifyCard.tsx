@@ -219,7 +219,15 @@ function PrivyVerifyCardInner({
         <div className="mt-4 h-10 animate-pulse rounded-md bg-muted/30" />
       ) : !authenticated ? (
         <button
-          onClick={() => login()}
+          onClick={() => {
+            // Close any wrapping Radix Dialog first — its focus trap
+            // prevents Privy's email input (rendered in a separate portal)
+            // from receiving focus, which blocks the iOS/Android keyboard.
+            onLoginRequested?.();
+            // Defer login one tick so the parent dialog can unmount its
+            // focus guard before Privy's modal opens.
+            setTimeout(() => login(), 0);
+          }}
           className="mt-4 w-full rounded-md border border-gold/40 bg-gold/10 px-4 py-2.5 text-sm font-semibold text-gold hover:bg-gold/20"
         >
           Connect wallet
