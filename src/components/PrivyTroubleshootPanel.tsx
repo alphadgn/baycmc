@@ -105,12 +105,25 @@ export function PrivyTroubleshootPanel() {
     };
   }, []);
 
-  const origins = [origin].filter(Boolean);
+  // The full allowlist Privy needs: the live origin plus the stable
+  // Lovable preview/published hosts. Including all of them up front means
+  // the user only has to paste once and it keeps working across deploys.
+  const PROJECT_ID = "098c1ce2-d90f-4478-895e-745a73b03b4b";
+  const STATIC_ORIGINS = [
+    `https://${PROJECT_ID}.lovableproject.com`,
+    `https://id-preview--${PROJECT_ID}.lovable.app`,
+    `https://project--${PROJECT_ID}.lovable.app`,
+    `https://project--${PROJECT_ID}-dev.lovable.app`,
+  ];
+  const origins = Array.from(
+    new Set([origin, ...STATIC_ORIGINS].filter(Boolean)),
+  );
+  const allowlistText = origins.join("\n");
 
   async function copyOrigins() {
     try {
-      await navigator.clipboard.writeText(origins.join("\n"));
-      toast.success("Origin copied");
+      await navigator.clipboard.writeText(allowlistText);
+      toast.success(`Copied ${origins.length} origins`);
     } catch {
       toast.error("Copy failed — select the text manually");
     }
@@ -120,7 +133,11 @@ export function PrivyTroubleshootPanel() {
   if (status === "ok" && !open) return null;
 
   return (
-    <div className="rounded-xl border border-border bg-secondary/10 p-4">
+    <div
+      data-testid="privy-troubleshoot-panel"
+      data-status={status}
+      className="rounded-xl border border-border bg-secondary/10 p-4"
+    >
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -135,7 +152,7 @@ export function PrivyTroubleshootPanel() {
             <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />
           )}
           {status === "blocked"
-            ? "Wallet sign-in is blocked by Privy"
+            ? "Wallet sign-in blocked: Privy iframe failed (frame-ancestors / CSP)"
             : status === "ok"
             ? "Privy connection: OK"
             : "Checking Privy connection…"}
@@ -156,23 +173,23 @@ export function PrivyTroubleshootPanel() {
                 list. Add the origin below in your Privy dashboard
                 (Settings → Domains), then tap Re-check.
               </p>
-              <div className="space-y-1">
-                {origins.map((o) => (
-                  <code
-                    key={o}
-                    className="block break-all rounded-md border border-border bg-background/60 px-2 py-1.5 font-mono text-[11px] text-foreground"
-                  >
-                    {o}
-                  </code>
-                ))}
-              </div>
+              <textarea
+                data-testid="privy-allowlist-textarea"
+                readOnly
+                rows={origins.length}
+                value={allowlistText}
+                onFocus={(e) => e.currentTarget.select()}
+                onClick={(e) => (e.currentTarget as HTMLTextAreaElement).select()}
+                className="w-full resize-none rounded-md border border-border bg-background/60 p-2 font-mono text-[11px] text-foreground"
+              />
               <div className="flex flex-wrap gap-2 pt-1">
                 <button
+                  data-testid="privy-allowlist-copy"
                   onClick={copyOrigins}
                   className="inline-flex items-center gap-1.5 rounded-md border border-border bg-secondary/40 px-2.5 py-1.5 text-[11px] hover:bg-secondary"
                 >
                   <Copy className="h-3 w-3" />
-                  Copy origin
+                  Copy all origins
                 </button>
                 <a
                   href="https://dashboard.privy.io"
