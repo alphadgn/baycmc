@@ -437,6 +437,12 @@ function EntranceBody({
         onVerified={() => {
           window.setTimeout(() => onOpenChange(false), 1200);
         }}
+        onLoginRequested={() => {
+          // Close our dialog so its focus trap releases — otherwise the
+          // Privy email input never gets focus and the mobile keyboard
+          // stays closed.
+          onOpenChange(false);
+        }}
       />
 
       <PrivyTroubleshootPanel />
