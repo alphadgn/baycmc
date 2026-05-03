@@ -43,7 +43,10 @@ function pruneOldSessions() {
 export const startTokenproofSession = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({}).parse(d))
   .handler(async () => {
-    const apiKey = requireApiKey();
+    const apiKey = getApiKey();
+    if (!apiKey) {
+      return { notConfigured: true as const };
+    }
     const policyId = process.env.TOKENPROOF_POLICY_ID;
 
     let res: Response;
