@@ -144,9 +144,11 @@ function PrivyVerifyCardInner({
   const [walletCreateState, setWalletCreateState] = useState<
     "idle" | "creating" | "created" | "failed"
   >("idle");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [createdWallet, setCreatedWallet] = useState<any | null>(null);
 
-  const wallet = wallets[0];
-  const hasLinkedWallet = Boolean(user?.wallet?.address || wallets.length > 0);
+  const wallet = wallets[0] ?? createdWallet;
+  const hasKnownWallet = Boolean(user?.wallet?.address || wallets.length > 0 || createdWallet);
   // First-time sign-in state: user is authenticated but the embedded
   // wallet hasn't been provisioned by Privy yet. We surface this as an
   // explicit status step so the modal flow doesn't look frozen.
@@ -155,7 +157,7 @@ function PrivyVerifyCardInner({
   const isVerifying = busy;
 
   useEffect(() => {
-    if (!authenticated || wallet || hasLinkedWallet || walletCreateState !== "idle") {
+    if (!authenticated || wallet || hasKnownWallet || walletCreateState !== "idle") {
       return;
     }
 
@@ -164,8 +166,10 @@ function PrivyVerifyCardInner({
     setError(null);
 
     void createWallet()
-      .then(() => {
-        if (!cancelled) setWalletCreateState("created");
+      .then((newWallet: unknown) => {
+        if (cancelled) return;
+        setCreatedWallet(newWallet);
+        setWalletCreateState("created");
       })
       .catch((e: unknown) => {
         if (cancelled) return;
@@ -181,7 +185,7 @@ function PrivyVerifyCardInner({
     return () => {
       cancelled = true;
     };
-  }, [authenticated, createWallet, hasLinkedWallet, wallet, walletCreateState]);
+  }, [authenticated, createWallet, hasKnownWallet, wallet, walletCreateState]);
 
   async function handleSignAndVerify() {
     if (!wallet) {
