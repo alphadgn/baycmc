@@ -132,6 +132,11 @@ function PrivyVerifyCardInner({
   const [error, setError] = useState<string | null>(null);
 
   const wallet = wallets[0];
+  // First-time sign-in state: user is authenticated but the embedded
+  // wallet hasn't been provisioned by Privy yet. We surface this as an
+  // explicit status step so the modal flow doesn't look frozen.
+  const isCreatingWallet = authenticated && !wallet;
+  const isVerifying = busy;
 
   async function handleSignAndVerify() {
     if (!wallet) {
