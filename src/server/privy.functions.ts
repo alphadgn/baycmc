@@ -10,7 +10,7 @@ import {
 } from "viem";
 import { mainnet } from "viem/chains";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { ETH_RPC_URL } from "@/lib/web3/constants";
+import { ETH_RPC_URL, DELEGATE_REGISTRY_V2 } from "@/lib/web3/constants";
 
 /**
  * Privy / SIWE entrance verification.
