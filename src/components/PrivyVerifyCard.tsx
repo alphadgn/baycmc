@@ -106,16 +106,24 @@ export function PrivyVerifyCard({
     );
   }
 
-  return <PrivyVerifyCardInner hooks={hooks} onVerified={onVerified} />;
+  return (
+    <PrivyVerifyCardInner
+      hooks={hooks}
+      onVerified={onVerified}
+      onLoginRequested={onLoginRequested}
+    />
+  );
 }
 
 function PrivyVerifyCardInner({
   hooks,
   onVerified,
+  onLoginRequested,
 }: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   hooks: { usePrivy: any; useWallets: any };
   onVerified: () => void;
+  onLoginRequested?: () => void;
 }) {
   const { ready, authenticated, login, logout, user } = hooks.usePrivy();
   const { wallets } = hooks.useWallets();
