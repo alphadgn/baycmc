@@ -148,22 +148,132 @@ function PrivyVerifyCardInner({
   const { createWallet } = hooks.useCreateWallet();
   const { signMessage } = hooks.useSignMessage();
   const verifyFn = useServerFn(verifyPrivyOwnership);
+  type VerificationResult = {
+    collection: "BAYC" | "MAYC";
+    verificationBasis: "direct" | "delegated";
+    wallet: string;
+    delegatedFrom: string | null;
+    delegationDetailsUrl: string | null;
+  };
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [verificationResult, setVerificationResult] =
+    useState<VerificationResult | null>(null);
   const [walletCreateState, setWalletCreateState] = useState<
     "idle" | "creating" | "created" | "failed"
   >("idle");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [createdWallet, setCreatedWallet] = useState<any | null>(null);
+  const autoVerifiedWalletRef = useRef<string | null>(null);
 
   const wallet = wallets[0] ?? createdWallet;
-  const hasKnownWallet = Boolean(user?.wallet?.address || wallets.length > 0 || createdWallet);
+  const hasKnownWallet = Boolean(wallets.length > 0 || createdWallet);
   // First-time sign-in state: user is authenticated but the embedded
   // wallet hasn't been provisioned by Privy yet. We surface this as an
   // explicit status step so the modal flow doesn't look frozen.
   const isCreatingWallet =
-    authenticated && !wallet && walletCreateState !== "failed";
+    authenticated && !wallet && walletCreateState === "creating";
   const isVerifying = busy;
+
+  const verifyWallet = useCallback(
+    async (targetWallet: any) => {
+      if (!targetWallet) {
+        setError("No wallet detected. Reconnect from the Privy modal.");
+        return;
+      }
+      setBusy(true);
+      setError(null);
+      setVerificationResult(null);
+      try {
+        const address = targetWallet.address;
+        const domain = window.location.host;
+        const origin = window.location.origin;
+        const nonce = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+
+        const siwe = new SiweMessage({
+          domain,
+          address,
+          statement: "Sign in to BAYCMC to verify BAYC/MAYC ownership.",
+          uri: origin,
+          version: "1",
+          chainId: 1,
+          nonce,
+          issuedAt: new Date().toISOString(),
+        });
+        const message = siwe.prepareMessage();
+
+        let signature: string;
+        try {
+          const signed = await signMessage(
+            { message },
+            {
+              address,
+              uiOptions: {
+                showWalletUIs: false,
+                title: "Verify ownership",
+                description: "Sign to check BAYC / MAYC ownership.",
+                buttonText: "Sign and verify",
+              },
+            },
+          );
+          signature = signed.signature;
+        } catch {
+          const provider = await targetWallet.getEthereumProvider();
+          signature = (await provider.request({
+            method: "personal_sign",
+            params: [message, address],
+          })) as string;
+        }
+
+        const result = await verifyFn({ data: { message, signature } });
+
+        if (!result.verified) {
+          setError(result.reason ?? "Verification failed.");
+          return;
+        }
+
+        const { error: sessErr } = await supabase.auth.setSession({
+          access_token: result.session.access_token,
+          refresh_token: result.session.refresh_token,
+        });
+        if (sessErr) {
+          setError(sessErr.message);
+          return;
+        }
+
+        setVerificationResult({
+          collection: result.collection,
+          verificationBasis:
+            result.verificationBasis ?? (result.delegatedFrom ? "delegated" : "direct"),
+          wallet: result.wallet,
+          delegatedFrom: result.delegatedFrom ?? null,
+          delegationDetailsUrl: result.delegationDetailsUrl ?? null,
+        });
+
+        toast.success(
+          result.delegatedFrom
+            ? `Verified — ${result.collection} delegated from ${shortAddress(result.delegatedFrom)}`
+            : `Verified — ${result.collection} direct ownership confirmed`,
+        );
+        onVerified();
+      } catch (e) {
+      const msg = e instanceof Error ? e.message : "";
+      if (msg.toLowerCase().includes("user rejected")) {
+        setError("You declined the signature. Try again to enter.");
+      } else if (
+        msg.toLowerCase().includes("network") ||
+        msg.toLowerCase().includes("fetch")
+      ) {
+        setError("Network error reaching Ethereum. Try again in a moment.");
+      } else {
+        setError(msg || "Something went wrong. Try again.");
+      }
+      } finally {
+        setBusy(false);
+      }
+    },
+    [onVerified, signMessage, verifyFn],
+  );
 
   useEffect(() => {
     if (!authenticated || wallet || hasKnownWallet || walletCreateState !== "idle") {
@@ -171,16 +281,26 @@ function PrivyVerifyCardInner({
     }
 
     let cancelled = false;
+    const timeout = window.setTimeout(() => {
+      if (cancelled) return;
+      setWalletCreateState("failed");
+      setError(
+        "Privy wallet creation is taking too long. Disconnect and sign in again to start a fresh wallet session.",
+      );
+    }, 25_000);
+
     setWalletCreateState("creating");
     setError(null);
 
-    void createWallet()
+    void createWallet({ createAdditional: false })
       .then((newWallet: unknown) => {
+        window.clearTimeout(timeout);
         if (cancelled) return;
         setCreatedWallet(newWallet);
         setWalletCreateState("created");
       })
       .catch((e: unknown) => {
+        window.clearTimeout(timeout);
         if (cancelled) return;
         console.error("Privy embedded wallet creation failed", e);
         const msg = e instanceof Error ? e.message : "";
@@ -193,77 +313,19 @@ function PrivyVerifyCardInner({
 
     return () => {
       cancelled = true;
+      window.clearTimeout(timeout);
     };
   }, [authenticated, createWallet, hasKnownWallet, wallet, walletCreateState]);
 
-  async function handleSignAndVerify() {
-    if (!wallet) {
-      setError("No wallet detected. Reconnect from the Privy modal.");
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      const provider = await wallet.getEthereumProvider();
-      const address = wallet.address;
-      const domain = window.location.host;
-      const origin = window.location.origin;
-      const nonce = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+  useEffect(() => {
+    if (walletCreateState !== "created" || !createdWallet?.address || busy) return;
+    if (autoVerifiedWalletRef.current === createdWallet.address) return;
+    autoVerifiedWalletRef.current = createdWallet.address;
+    void verifyWallet(createdWallet);
+  }, [busy, createdWallet, verifyWallet, walletCreateState]);
 
-      const siwe = new SiweMessage({
-        domain,
-        address,
-        statement: "Sign in to BAYCMC to verify BAYC/MAYC ownership.",
-        uri: origin,
-        version: "1",
-        chainId: 1,
-        nonce,
-        issuedAt: new Date().toISOString(),
-      });
-      const message = siwe.prepareMessage();
-
-      const signature = (await provider.request({
-        method: "personal_sign",
-        params: [message, address],
-      })) as string;
-
-      const result = await verifyFn({ data: { message, signature } });
-
-      if (!result.verified) {
-        setError(result.reason ?? "Verification failed.");
-        return;
-      }
-
-      const { error: sessErr } = await supabase.auth.setSession({
-        access_token: result.session.access_token,
-        refresh_token: result.session.refresh_token,
-      });
-      if (sessErr) {
-        setError(sessErr.message);
-        return;
-      }
-
-      toast.success(
-        result.delegatedFrom
-          ? `Verified — ${result.collection} delegated from ${result.delegatedFrom.slice(0, 6)}…${result.delegatedFrom.slice(-4)}`
-          : `Verified — ${result.collection} ownership confirmed`,
-      );
-      onVerified();
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "";
-      if (msg.toLowerCase().includes("user rejected")) {
-        setError("You declined the signature. Try again to enter.");
-      } else if (
-        msg.toLowerCase().includes("network") ||
-        msg.toLowerCase().includes("fetch")
-      ) {
-        setError("Network error reaching Ethereum. Try again in a moment.");
-      } else {
-        setError(msg || "Something went wrong. Try again.");
-      }
-    } finally {
-      setBusy(false);
-    }
+  function handleSignAndVerify() {
+    void verifyWallet(wallet);
   }
 
   return (
