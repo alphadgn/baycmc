@@ -21,9 +21,9 @@ export function AppHeader() {
           <Link
             to="/"
             className="font-lifer text-3xl leading-none tracking-tight text-gradient-gold"
-            aria-label="BAYC lifer est '26"
+            aria-label="BAYCMC"
           >
-            BAYC lifer <span className="text-base align-middle">est '26</span>
+            BAYCMC
           </Link>
 
           <nav className="hidden items-center gap-5 text-sm md:flex font-sans-display">
