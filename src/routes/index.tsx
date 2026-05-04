@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth/useAuth";
+import boredApesImg from "@/assets/bored-apes-embroidered.png";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -29,8 +30,13 @@ function Index() {
               Members only · BAYC/MAYC
             </div>
             <h1 className="mt-6 font-display text-5xl font-bold leading-[1.05] tracking-tight sm:text-6xl lg:text-7xl">
-              The private clubhouse for{" "}
-              <span className="text-embroidered-gold">Bored Apes</span>
+              <span className="block">The private clubhouse for</span>
+              <img
+                src={boredApesImg}
+                alt="Bored Apes"
+                className="mx-auto mt-4 h-20 w-auto select-none sm:h-24 lg:h-28"
+                draggable={false}
+              />
             </h1>
             <p className="mt-6 text-lg leading-relaxed text-muted-foreground sm:text-xl">
               Yacht Club social network, live audio rooms, conference bookings, and local chapter
@@ -81,9 +87,7 @@ function Index() {
         <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6">
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="font-display text-3xl font-bold sm:text-4xl">How access works</h2>
-            <p className="mt-3 text-muted-foreground">
-              Three steps. No passwords, no emails, no surveillance.
-            </p>
+            <p className="mt-3 text-muted-foreground">Three simple steps</p>
           </div>
           <div className="mx-auto mt-12 grid max-w-5xl gap-6 sm:grid-cols-3">
             {[
