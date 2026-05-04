@@ -371,7 +371,6 @@ function PrivyVerifyCardInner({
           msg || "We couldn't create your embedded wallet. Disconnect and try signing in again.",
         );
       });
-
   }, [
     authenticated,
     createWallet,
