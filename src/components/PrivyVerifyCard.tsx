@@ -7,6 +7,7 @@ import {
   verifyPrivyOwnership,
   getPrivyPublicConfig,
   inspectWalletHoldings,
+  logEmbeddedWalletProvisioned,
 } from "@/server/privy.functions";
 import { toast } from "sonner";
 
