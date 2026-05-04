@@ -339,10 +339,14 @@ function PrivyVerifyCardInner({
   }, []);
 
   useEffect(() => {
+    // Auto-provision an embedded EVM wallet for ANY authenticated Privy user
+    // who doesn't already have a wallet linked to their account. This covers
+    // a1cust0msenterprises@gmail.com and every other account uniformly —
+    // existing wallets (linked or freshly created) short-circuit via
+    // `hasKnownWallet`, so we never duplicate a user's existing wallet.
     if (
       !authenticated ||
       !walletsReady ||
-      !loginStartedHere ||
       wallet ||
       hasKnownWallet ||
       walletCreateState !== "idle" ||
