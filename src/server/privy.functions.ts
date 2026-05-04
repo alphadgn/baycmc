@@ -1,13 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { SiweMessage } from "siwe";
-import {
-  createPublicClient,
-  http,
-  getAddress,
-  parseAbi,
-  isAddress,
-} from "viem";
+import { createPublicClient, http, getAddress, parseAbi, isAddress } from "viem";
 import { mainnet } from "viem/chains";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { ETH_RPC_URL, DELEGATE_REGISTRY_V2 } from "@/lib/web3/constants";
@@ -28,9 +22,7 @@ import { ETH_RPC_URL, DELEGATE_REGISTRY_V2 } from "@/lib/web3/constants";
 const BAYC = "0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D" as const;
 const MAYC = "0x60E4d786628Fea6478F785A6d7e704777c86a7c6" as const;
 
-const erc721Abi = parseAbi([
-  "function balanceOf(address owner) view returns (uint256)",
-]);
+const erc721Abi = parseAbi(["function balanceOf(address owner) view returns (uint256)"]);
 
 // delegate.cash v2 — fetch every vault that has delegated to `to`.
 // Delegation type enum: 0 NONE, 1 ALL, 2 CONTRACT, 3 ERC721, 4 ERC20, 5 ERC1155.
@@ -136,8 +128,7 @@ async function resolveDelegatedVaults(
       // Only "no rights restriction" (0x00..00) counts for entry — custom
       // rights strings narrow delegation to specific use-cases.
       const noRights =
-        d.rights ===
-        "0x0000000000000000000000000000000000000000000000000000000000000000";
+        d.rights === "0x0000000000000000000000000000000000000000000000000000000000000000";
       if (!noRights) continue;
 
       // ALL → vault delegated their entire wallet.
@@ -168,12 +159,10 @@ async function resolveDelegatedVaults(
  * We surface them via a server fn so the secret value stays out of the
  * browser bundle until the user actually opens the entrance.
  */
-export const getPrivyPublicConfig = createServerFn({ method: "GET" }).handler(
-  async () => {
-    const appId = process.env.PRIVY_APP_ID ?? "";
-    return { appId, configured: appId.length > 0 };
-  },
-);
+export const getPrivyPublicConfig = createServerFn({ method: "GET" }).handler(async () => {
+  const appId = process.env.PRIVY_APP_ID ?? "";
+  return { appId, configured: appId.length > 0 };
+});
 
 export const verifyPrivyOwnership = createServerFn({ method: "POST" })
   .inputValidator((input: { message: string; signature: string }) =>
@@ -196,9 +185,7 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
       address = result.data.address;
     } catch (e) {
       console.error("SIWE verify failed", e);
-      throw new Error(
-        "We couldn't verify your wallet signature. Please try again.",
-      );
+      throw new Error("We couldn't verify your wallet signature. Please try again.");
     }
 
     if (!isAddress(address)) {
@@ -224,9 +211,7 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
       ]);
     } catch (e) {
       console.error("RPC balanceOf failed", e);
-      throw new Error(
-        "We couldn't reach Ethereum to check your holdings. Try again in a moment.",
-      );
+      throw new Error("We couldn't reach Ethereum to check your holdings. Try again in a moment.");
     }
 
     let totalBayc = signerBals.bayc;
@@ -284,13 +269,12 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
     let userId = found?.id;
 
     if (!userId) {
-      const { data: created, error } =
-        await supabaseAdmin.auth.admin.createUser({
-          email,
-          password,
-          email_confirm: true,
-          user_metadata: { wallet: lower, via: "privy" },
-        });
+      const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { wallet: lower, via: "privy" },
+      });
       if (error) throw error;
       userId = created.user!.id;
     }
@@ -309,8 +293,10 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
       { onConflict: "user_id" },
     );
 
-    const { data: signIn, error: signInErr } =
-      await supabaseAdmin.auth.signInWithPassword({ email, password });
+    const { data: signIn, error: signInErr } = await supabaseAdmin.auth.signInWithPassword({
+      email,
+      password,
+    });
     if (signInErr || !signIn.session) {
       throw signInErr ?? new Error("Could not mint session");
     }

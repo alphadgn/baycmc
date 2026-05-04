@@ -3,11 +3,45 @@ import { useServerFn } from "@tanstack/react-start";
 import { CheckCircle2, ExternalLink, Wallet } from "lucide-react";
 import { SiweMessage } from "siwe";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  verifyPrivyOwnership,
-  getPrivyPublicConfig,
-} from "@/server/privy.functions";
+import { verifyPrivyOwnership, getPrivyPublicConfig } from "@/server/privy.functions";
 import { toast } from "sonner";
+
+type EthereumProviderLike = {
+  request: (args: { method: string; params: unknown[] }) => Promise<unknown>;
+};
+
+type WalletLike = {
+  address: string;
+  getEthereumProvider: () => Promise<EthereumProviderLike>;
+};
+
+type PrivyHooks = {
+  usePrivy: () => {
+    ready: boolean;
+    authenticated: boolean;
+    login: () => void;
+    logout: () => void;
+    user?: { wallet?: { address?: string } };
+  };
+  useWallets: () => { wallets: WalletLike[] };
+  useCreateWallet: () => {
+    createWallet: (options?: { createAdditional?: boolean }) => Promise<WalletLike>;
+  };
+  useSignMessage: () => {
+    signMessage: (
+      input: { message: string },
+      options?: {
+        address?: string;
+        uiOptions?: {
+          showWalletUIs?: boolean;
+          title?: string;
+          description?: string;
+          buttonText?: string;
+        };
+      },
+    ) => Promise<{ signature: string }>;
+  };
+};
 
 /**
  * Privy verification card. The Privy SDK touches `window`/`localStorage` at
@@ -23,17 +57,6 @@ export function PrivyVerifyCard({
   onVerified: () => void;
   onLoginRequested?: () => void;
 }) {
-  type PrivyHooks = {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    usePrivy: any;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    useWallets: any;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    useCreateWallet: any;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    useSignMessage: any;
-  };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [hooks, setHooks] = useState<PrivyHooks | null>(null);
   type ConfigState =
     | { kind: "loading" }
@@ -60,10 +83,7 @@ export function PrivyVerifyCard({
           setConfigState({ kind: "wrong-secret-type" });
           return;
         }
-        const valid =
-          id.length >= 20 &&
-          id.length <= 40 &&
-          /^[a-z0-9]+$/i.test(id);
+        const valid = id.length >= 20 && id.length <= 40 && /^[a-z0-9]+$/i.test(id);
         if (!valid) {
           setConfigState({ kind: "invalid-format" });
           return;
@@ -94,10 +114,10 @@ export function PrivyVerifyCard({
       configState.kind === "wrong-secret-type"
         ? "Privy isn't quite configured: the PRIVY_APP_ID secret currently holds a Privy *app secret* (starts with `privy_app_secret_`). Paste the public App ID from your Privy dashboard instead."
         : configState.kind === "invalid-format"
-        ? "Privy isn't quite configured: the PRIVY_APP_ID value doesn't look like a valid App ID. Copy it from your Privy dashboard."
-        : configState.kind === "missing"
-        ? "Wallet sign-in is being set up. Use Tokenproof above to enter for now."
-        : null;
+          ? "Privy isn't quite configured: the PRIVY_APP_ID value doesn't look like a valid App ID. Copy it from your Privy dashboard."
+          : configState.kind === "missing"
+            ? "Wallet sign-in is being set up. Use Tokenproof above to enter for now."
+            : null;
 
     return (
       <div className="rounded-xl border border-border bg-secondary/20 p-5">
@@ -105,9 +125,7 @@ export function PrivyVerifyCard({
           <Wallet className="h-4 w-4 text-gold" />
           <div className="text-lg font-semibold">Privy</div>
         </div>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Secure connection options.
-        </p>
+        <p className="mt-1 text-sm text-muted-foreground">Secure connection options.</p>
         {message ? (
           <div className="mt-4 rounded-md border border-gold/30 bg-gold/5 px-3 py-2 text-xs text-muted-foreground">
             {message}
@@ -133,13 +151,7 @@ function PrivyVerifyCardInner({
   onVerified,
   onLoginRequested,
 }: {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  hooks: {
-    usePrivy: any;
-    useWallets: any;
-    useCreateWallet: any;
-    useSignMessage: any;
-  };
+  hooks: PrivyHooks;
   onVerified: () => void;
   onLoginRequested?: () => void;
 }) {
@@ -157,13 +169,11 @@ function PrivyVerifyCardInner({
   };
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [verificationResult, setVerificationResult] =
-    useState<VerificationResult | null>(null);
+  const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
   const [walletCreateState, setWalletCreateState] = useState<
     "idle" | "creating" | "created" | "failed"
   >("idle");
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [createdWallet, setCreatedWallet] = useState<any | null>(null);
+  const [createdWallet, setCreatedWallet] = useState<WalletLike | null>(null);
   const autoVerifiedWalletRef = useRef<string | null>(null);
 
   const wallet = wallets[0] ?? createdWallet;
@@ -171,12 +181,11 @@ function PrivyVerifyCardInner({
   // First-time sign-in state: user is authenticated but the embedded
   // wallet hasn't been provisioned by Privy yet. We surface this as an
   // explicit status step so the modal flow doesn't look frozen.
-  const isCreatingWallet =
-    authenticated && !wallet && walletCreateState === "creating";
+  const isCreatingWallet = authenticated && !wallet && walletCreateState === "creating";
   const isVerifying = busy;
 
   const verifyWallet = useCallback(
-    async (targetWallet: any) => {
+    async (targetWallet: WalletLike | null) => {
       if (!targetWallet) {
         setError("No wallet detected. Reconnect from the Privy modal.");
         return;
@@ -260,10 +269,7 @@ function PrivyVerifyCardInner({
         const msg = e instanceof Error ? e.message : "";
         if (msg.toLowerCase().includes("user rejected")) {
           setError("You declined the signature. Try again to enter.");
-        } else if (
-          msg.toLowerCase().includes("network") ||
-          msg.toLowerCase().includes("fetch")
-        ) {
+        } else if (msg.toLowerCase().includes("network") || msg.toLowerCase().includes("fetch")) {
           setError("Network error reaching Ethereum. Try again in a moment.");
         } else {
           setError(msg || "Something went wrong. Try again.");
@@ -293,7 +299,7 @@ function PrivyVerifyCardInner({
     setError(null);
 
     void createWallet({ createAdditional: false })
-      .then((newWallet: unknown) => {
+      .then((newWallet: WalletLike) => {
         window.clearTimeout(timeout);
         if (cancelled) return;
         setCreatedWallet(newWallet);
@@ -306,8 +312,7 @@ function PrivyVerifyCardInner({
         const msg = e instanceof Error ? e.message : "";
         setWalletCreateState("failed");
         setError(
-          msg ||
-            "We couldn't create your embedded wallet. Disconnect and try signing in again.",
+          msg || "We couldn't create your embedded wallet. Disconnect and try signing in again.",
         );
       });
 
@@ -334,9 +339,7 @@ function PrivyVerifyCardInner({
         <Wallet className="h-4 w-4 text-gold" />
         <div className="text-lg font-semibold">Privy</div>
       </div>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Secure connection options.
-      </p>
+      <p className="mt-1 text-sm text-muted-foreground">Secure connection options.</p>
 
       {error && (
         <div className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
@@ -368,9 +371,8 @@ function PrivyVerifyCardInner({
               data-testid="privy-status-creating-wallet"
               className="rounded-md border border-gold/30 bg-gold/5 px-3 py-2 text-xs text-muted-foreground"
             >
-              <span className="font-semibold text-gold">Step 1 / 2 ·</span>{" "}
-              Creating your embedded wallet… this is a one-time setup for new
-              emails.
+              <span className="font-semibold text-gold">Step 1 / 2 ·</span> Creating your embedded
+              wallet… this is a one-time setup for new emails.
             </div>
           )}
           {wallet && (
@@ -388,9 +390,8 @@ function PrivyVerifyCardInner({
               data-testid="privy-status-verifying"
               className="rounded-md border border-gold/30 bg-gold/5 px-3 py-2 text-xs text-muted-foreground"
             >
-              <span className="font-semibold text-gold">Step 2 / 2 ·</span>{" "}
-              Checking BAYC / MAYC ownership and delegate.cash vaults for{" "}
-              {shortAddress(wallet.address)}…
+              <span className="font-semibold text-gold">Step 2 / 2 ·</span> Checking BAYC / MAYC
+              ownership and delegate.cash vaults for {shortAddress(wallet.address)}…
             </div>
           )}
           {verificationResult && (
@@ -425,9 +426,7 @@ function PrivyVerifyCardInner({
                   )}
                 </div>
               ) : (
-                <div className="mt-2">
-                  Access granted by direct ownership in the Privy wallet.
-                </div>
+                <div className="mt-2">Access granted by direct ownership in the Privy wallet.</div>
               )}
             </div>
           )}
@@ -439,13 +438,11 @@ function PrivyVerifyCardInner({
             {isCreatingWallet
               ? "Waiting for wallet…"
               : busy
-              ? "Verifying ownership…"
-              : "Sign & verify holdings"}
+                ? "Verifying ownership…"
+                : "Sign & verify holdings"}
           </button>
           {!wallet && !isCreatingWallet && user?.wallet?.address && (
-            <div className="text-[11px] text-muted-foreground font-mono">
-              {user.wallet.address}
-            </div>
+            <div className="text-[11px] text-muted-foreground font-mono">{user.wallet.address}</div>
           )}
           <button
             onClick={() => logout()}
@@ -458,7 +455,6 @@ function PrivyVerifyCardInner({
     </div>
   );
 }
-
 
 function shortAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
