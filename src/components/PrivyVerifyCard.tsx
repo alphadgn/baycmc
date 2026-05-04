@@ -201,6 +201,7 @@ function PrivyVerifyCardInner({
     "idle" | "creating" | "created" | "failed"
   >("idle");
   const [createdWallet, setCreatedWallet] = useState<WalletLike | null>(null);
+  const [loginStartedHere, setLoginStartedHere] = useState(false);
   const autoVerifiedWalletRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
   const walletCreateStartedRef = useRef(false);
@@ -330,6 +331,7 @@ function PrivyVerifyCardInner({
     if (
       !authenticated ||
       !walletsReady ||
+      !loginStartedHere ||
       wallet ||
       hasKnownWallet ||
       walletCreateState !== "idle" ||
@@ -370,7 +372,7 @@ function PrivyVerifyCardInner({
         );
       });
 
-  }, [authenticated, createWallet, hasKnownWallet, wallet, walletCreateState, walletsReady]);
+  }, [authenticated, createWallet, hasKnownWallet, loginStartedHere, wallet, walletCreateState, walletsReady]);
 
   useEffect(() => {
     if (!authenticated || !wallet?.address || busy) return;
@@ -387,6 +389,7 @@ function PrivyVerifyCardInner({
     if (walletCreateTimeoutRef.current) window.clearTimeout(walletCreateTimeoutRef.current);
     walletCreateStartedRef.current = false;
     walletCreateAttemptRef.current += 1;
+    setLoginStartedHere(true);
     setCreatedWallet(null);
     setVerificationResult(null);
     setError(null);
@@ -397,6 +400,7 @@ function PrivyVerifyCardInner({
     if (walletCreateTimeoutRef.current) window.clearTimeout(walletCreateTimeoutRef.current);
     walletCreateStartedRef.current = false;
     walletCreateAttemptRef.current += 1;
+    setLoginStartedHere(false);
     setCreatedWallet(null);
     setVerificationResult(null);
     setError(null);
