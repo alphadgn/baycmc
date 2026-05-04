@@ -372,7 +372,15 @@ function PrivyVerifyCardInner({
         );
       });
 
-  }, [authenticated, createWallet, hasKnownWallet, loginStartedHere, wallet, walletCreateState, walletsReady]);
+  }, [
+    authenticated,
+    createWallet,
+    hasKnownWallet,
+    loginStartedHere,
+    wallet,
+    walletCreateState,
+    walletsReady,
+  ]);
 
   useEffect(() => {
     if (!authenticated || !wallet?.address || busy) return;
