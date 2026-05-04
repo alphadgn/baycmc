@@ -15,6 +15,17 @@ type WalletLike = {
   getEthereumProvider?: () => Promise<EthereumProviderLike>;
 };
 
+type PrivyLinkedWalletLike = WalletLike & {
+  type?: string;
+  chainType?: string;
+  walletClientType?: string;
+};
+
+type PrivyUserLike = {
+  wallet?: Partial<PrivyLinkedWalletLike> | null;
+  linkedAccounts?: Array<Partial<PrivyLinkedWalletLike> & { type?: string }>;
+};
+
 type PrivyOwnershipResult =
   | {
       verified: false;
@@ -37,9 +48,9 @@ type PrivyHooks = {
     authenticated: boolean;
     login: () => void;
     logout: () => void;
-    user?: { wallet?: { address?: string } } | null;
+    user?: PrivyUserLike | null;
   };
-  useWallets: () => { wallets: WalletLike[] };
+  useWallets: () => { wallets: WalletLike[]; ready: boolean };
   useCreateWallet: () => {
     createWallet: (options?: { createAdditional?: boolean }) => Promise<WalletLike>;
   };
@@ -172,7 +183,7 @@ function PrivyVerifyCardInner({
   onLoginRequested?: () => void;
 }) {
   const { ready, authenticated, login, logout, user } = hooks.usePrivy();
-  const { wallets } = hooks.useWallets();
+  const { wallets, ready: walletsReady } = hooks.useWallets();
   const { createWallet } = hooks.useCreateWallet();
   const { signMessage } = hooks.useSignMessage();
   const verifyFn = useServerFn(verifyPrivyOwnership);
@@ -190,10 +201,16 @@ function PrivyVerifyCardInner({
     "idle" | "creating" | "created" | "failed"
   >("idle");
   const [createdWallet, setCreatedWallet] = useState<WalletLike | null>(null);
+  const [loginStartedHere, setLoginStartedHere] = useState(false);
   const autoVerifiedWalletRef = useRef<string | null>(null);
+  const mountedRef = useRef(true);
+  const walletCreateStartedRef = useRef(false);
+  const walletCreateAttemptRef = useRef(0);
+  const walletCreateTimeoutRef = useRef<number | null>(null);
 
-  const wallet = wallets[0] ?? createdWallet;
-  const hasKnownWallet = Boolean(wallets.length > 0 || createdWallet);
+  const userWallet = getUserWallet(user);
+  const wallet = wallets[0] ?? createdWallet ?? userWallet;
+  const hasKnownWallet = Boolean(wallets.length > 0 || createdWallet || userWallet);
   // First-time sign-in state: user is authenticated but the embedded
   // wallet hasn't been provisioned by Privy yet. We surface this as an
   // explicit status step so the modal flow doesn't look frozen.
@@ -301,16 +318,36 @@ function PrivyVerifyCardInner({
   );
 
   useEffect(() => {
-    if (!authenticated || wallet || hasKnownWallet || walletCreateState !== "idle") {
+    if (!mountedRef.current) mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (walletCreateTimeoutRef.current) {
+        window.clearTimeout(walletCreateTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (
+      !authenticated ||
+      !walletsReady ||
+      !loginStartedHere ||
+      wallet ||
+      hasKnownWallet ||
+      walletCreateState !== "idle" ||
+      walletCreateStartedRef.current
+    ) {
       return;
     }
 
-    let cancelled = false;
-    const timeout = window.setTimeout(() => {
-      if (cancelled) return;
+    walletCreateStartedRef.current = true;
+    const attempt = walletCreateAttemptRef.current + 1;
+    walletCreateAttemptRef.current = attempt;
+    walletCreateTimeoutRef.current = window.setTimeout(() => {
+      if (!mountedRef.current || walletCreateAttemptRef.current !== attempt) return;
       setWalletCreateState("failed");
       setError(
-        "Privy wallet creation is taking too long. Disconnect and sign in again to start a fresh wallet session.",
+        "Privy authenticated your email, but wallet creation did not confirm. Tap Retry wallet creation instead of waiting on the Privy loading screen.",
       );
     }, 25_000);
 
@@ -319,14 +356,14 @@ function PrivyVerifyCardInner({
 
     void createWallet({ createAdditional: false })
       .then((newWallet: WalletLike) => {
-        window.clearTimeout(timeout);
-        if (cancelled) return;
+        if (walletCreateTimeoutRef.current) window.clearTimeout(walletCreateTimeoutRef.current);
+        if (!mountedRef.current || walletCreateAttemptRef.current !== attempt) return;
         setCreatedWallet(newWallet);
         setWalletCreateState("created");
       })
       .catch((e: unknown) => {
-        window.clearTimeout(timeout);
-        if (cancelled) return;
+        if (walletCreateTimeoutRef.current) window.clearTimeout(walletCreateTimeoutRef.current);
+        if (!mountedRef.current || walletCreateAttemptRef.current !== attempt) return;
         console.error("Privy embedded wallet creation failed", e);
         const msg = e instanceof Error ? e.message : "";
         setWalletCreateState("failed");
@@ -334,22 +371,48 @@ function PrivyVerifyCardInner({
           msg || "We couldn't create your embedded wallet. Disconnect and try signing in again.",
         );
       });
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timeout);
-    };
-  }, [authenticated, createWallet, hasKnownWallet, wallet, walletCreateState]);
+  }, [
+    authenticated,
+    createWallet,
+    hasKnownWallet,
+    loginStartedHere,
+    wallet,
+    walletCreateState,
+    walletsReady,
+  ]);
 
   useEffect(() => {
-    if (walletCreateState !== "created" || !createdWallet?.address || busy) return;
-    if (autoVerifiedWalletRef.current === createdWallet.address) return;
-    autoVerifiedWalletRef.current = createdWallet.address;
-    void verifyWallet(createdWallet);
-  }, [busy, createdWallet, verifyWallet, walletCreateState]);
+    if (!authenticated || !wallet?.address || busy) return;
+    if (autoVerifiedWalletRef.current === wallet.address) return;
+    autoVerifiedWalletRef.current = wallet.address;
+    void verifyWallet(wallet);
+  }, [authenticated, busy, verifyWallet, wallet]);
 
   function handleSignAndVerify() {
     void verifyWallet(wallet);
+  }
+
+  function handleRetryWalletCreation() {
+    if (walletCreateTimeoutRef.current) window.clearTimeout(walletCreateTimeoutRef.current);
+    walletCreateStartedRef.current = false;
+    walletCreateAttemptRef.current += 1;
+    setLoginStartedHere(true);
+    setCreatedWallet(null);
+    setVerificationResult(null);
+    setError(null);
+    setWalletCreateState("idle");
+  }
+
+  function handleDisconnect() {
+    if (walletCreateTimeoutRef.current) window.clearTimeout(walletCreateTimeoutRef.current);
+    walletCreateStartedRef.current = false;
+    walletCreateAttemptRef.current += 1;
+    setLoginStartedHere(false);
+    setCreatedWallet(null);
+    setVerificationResult(null);
+    setError(null);
+    setWalletCreateState("idle");
+    logout();
   }
 
   return (
@@ -371,6 +434,7 @@ function PrivyVerifyCardInner({
       ) : !authenticated ? (
         <button
           onClick={() => {
+            setLoginStartedHere(true);
             // Close any wrapping Radix Dialog first — its focus trap
             // prevents Privy's email input (rendered in a separate portal)
             // from receiving focus, which blocks the iOS/Android keyboard.
@@ -460,11 +524,19 @@ function PrivyVerifyCardInner({
                 ? "Verifying ownership…"
                 : "Sign & verify holdings"}
           </button>
+          {walletCreateState === "failed" && !wallet && (
+            <button
+              onClick={handleRetryWalletCreation}
+              className="w-full rounded-md border border-gold/40 bg-gold/10 px-3 py-2 text-xs font-semibold text-gold hover:bg-gold/20"
+            >
+              Retry wallet creation
+            </button>
+          )}
           {!wallet && !isCreatingWallet && user?.wallet?.address && (
             <div className="text-[11px] text-muted-foreground font-mono">{user.wallet.address}</div>
           )}
           <button
-            onClick={() => logout()}
+            onClick={handleDisconnect}
             className="w-full rounded-md border border-border bg-secondary/30 px-3 py-1.5 text-[11px] text-muted-foreground hover:bg-secondary"
           >
             Disconnect
@@ -477,4 +549,19 @@ function PrivyVerifyCardInner({
 
 function shortAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
+}
+
+function getUserWallet(user: PrivyUserLike | null | undefined): WalletLike | null {
+  const linkedWallet = user?.linkedAccounts?.find(
+    (account) =>
+      account.type === "wallet" &&
+      account.chainType === "ethereum" &&
+      typeof account.address === "string" &&
+      account.address.length > 0 &&
+      (account.walletClientType === "privy" || account.walletClientType === "privy-v2"),
+  );
+
+  const candidate = linkedWallet ?? user?.wallet;
+  if (!candidate?.address) return null;
+  return { address: candidate.address };
 }
