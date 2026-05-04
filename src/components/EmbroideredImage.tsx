@@ -8,24 +8,26 @@ const SOURCES = {
 } as const;
 
 export type EmbroideredVariant = keyof typeof SOURCES;
-
-type SizeKey = "sm" | "md" | "lg" | "xl";
+export type EmbroideredSize = "sm" | "md" | "lg" | "xl";
 
 /**
- * Responsive clamp() heights — scale smoothly between viewports without
- * abrupt breakpoint jumps. Min/max keep them readable on small screens
- * and capped on huge ones.
+ * Default responsive clamp() heights. Override per-page via the `sizes` prop
+ * or globally by spreading {@link DEFAULT_EMBROIDERED_SIZES}.
  */
-const SIZE_CLAMPS: Record<SizeKey, string> = {
+export const DEFAULT_EMBROIDERED_SIZES: Record<EmbroideredSize, string> = {
   sm: "clamp(2rem, 6vw, 3.5rem)",
   md: "clamp(3rem, 10vw, 6rem)",
-  lg: "clamp(4rem, 16vw, 12rem)",
-  xl: "clamp(6rem, 28vw, 22rem)",
+  lg: "clamp(2.5rem, 9vw, 5rem)",
+  xl: "clamp(3rem, 12vw, 6rem)",
 };
 
 interface EmbroideredImageProps {
   variant: EmbroideredVariant;
-  size?: SizeKey;
+  size?: EmbroideredSize;
+  /** Override the entire preset map (theme-style). */
+  sizes?: Partial<Record<EmbroideredSize, string>>;
+  /** One-off override — wins over `sizes` and `size`. */
+  clamp?: string;
   alt?: string;
   className?: string;
 }
@@ -33,10 +35,14 @@ interface EmbroideredImageProps {
 export function EmbroideredImage({
   variant,
   size = "md",
+  sizes,
+  clamp,
   alt,
   className,
 }: EmbroideredImageProps) {
   const { src, alt: defaultAlt } = SOURCES[variant];
+  const height =
+    clamp ?? sizes?.[size] ?? DEFAULT_EMBROIDERED_SIZES[size];
 
   return (
     <img
@@ -47,7 +53,7 @@ export function EmbroideredImage({
         "block w-auto max-w-full select-none object-contain",
         className,
       )}
-      style={{ height: SIZE_CLAMPS[size] }}
+      style={{ height }}
     />
   );
 }
