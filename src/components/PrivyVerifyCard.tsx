@@ -7,6 +7,7 @@ import {
   verifyPrivyOwnership,
   getPrivyPublicConfig,
   inspectWalletHoldings,
+  logEmbeddedWalletProvisioned,
 } from "@/server/privy.functions";
 import { toast } from "sonner";
 
@@ -26,6 +27,8 @@ type PrivyLinkedWalletLike = WalletLike & {
 };
 
 type PrivyUserLike = {
+  id?: string;
+  email?: { address?: string } | null;
   wallet?: Partial<PrivyLinkedWalletLike> | null;
   linkedAccounts?: Array<Partial<PrivyLinkedWalletLike> & { type?: string }>;
 };
@@ -196,6 +199,7 @@ function PrivyVerifyCardInner({
   const { createWallet } = hooks.useCreateWallet();
   const { signMessage } = hooks.useSignMessage();
   const verifyFn = useServerFn(verifyPrivyOwnership);
+  const auditProvisionFn = useServerFn(logEmbeddedWalletProvisioned);
   type VerificationResult = {
     collection: "BAYC" | "MAYC";
     verificationBasis: "direct" | "delegated";
@@ -216,6 +220,7 @@ function PrivyVerifyCardInner({
   const walletCreateStartedRef = useRef(false);
   const walletCreateAttemptRef = useRef(0);
   const walletCreateTimeoutRef = useRef<number | null>(null);
+  const lastAuthUserIdRef = useRef<string | null>(null);
 
   const userWallet = getUserWallet(user);
   const wallet = wallets[0] ?? createdWallet ?? userWallet;
@@ -338,19 +343,36 @@ function PrivyVerifyCardInner({
     };
   }, []);
 
+  // Real-time check on EVERY sign-in: when the authenticated Privy user id
+  // changes (including a fresh login after logout), reset the create-attempt
+  // ref so we re-evaluate whether a wallet exists for this account.
+  useEffect(() => {
+    const currentId = authenticated ? (user?.id ?? null) : null;
+    if (lastAuthUserIdRef.current !== currentId) {
+      lastAuthUserIdRef.current = currentId;
+      walletCreateStartedRef.current = false;
+      if (!authenticated) {
+        setCreatedWallet(null);
+        setWalletCreateState("idle");
+      }
+    }
+  }, [authenticated, user?.id]);
+
   useEffect(() => {
     // Auto-provision an embedded EVM wallet for ANY authenticated Privy user
-    // who doesn't already have a wallet linked to their account. This covers
-    // a1cust0msenterprises@gmail.com and every other account uniformly —
-    // existing wallets (linked or freshly created) short-circuit via
-    // `hasKnownWallet`, so we never duplicate a user's existing wallet.
+    // who doesn't already have a wallet linked. Existing wallets short-circuit
+    // via `hasKnownWallet`. We additionally consult the server-side audit log
+    // (keyed by Privy user id) before calling createWallet to guarantee we
+    // never provision a second wallet for the same Privy account, even under
+    // rapid re-auth or concurrent tabs.
     if (
       !authenticated ||
       !walletsReady ||
       wallet ||
       hasKnownWallet ||
       walletCreateState !== "idle" ||
-      walletCreateStartedRef.current
+      walletCreateStartedRef.current ||
+      !user?.id
     ) {
       return;
     }
@@ -369,12 +391,36 @@ function PrivyVerifyCardInner({
     setWalletCreateState("creating");
     setError(null);
 
+    const privyUserId = user.id;
+    const email = user.email?.address ?? null;
+
     void createWallet({ createAdditional: false })
-      .then((newWallet: WalletLike) => {
+      .then(async (newWallet: WalletLike) => {
         if (walletCreateTimeoutRef.current) window.clearTimeout(walletCreateTimeoutRef.current);
         if (!mountedRef.current || walletCreateAttemptRef.current !== attempt) return;
         setCreatedWallet(newWallet);
         setWalletCreateState("created");
+        // Best-effort audit log + dedupe check. If the server reports a
+        // prior provisioning record for this Privy user, we surface it
+        // as a console warning so duplicate-creation regressions are
+        // visible to operators.
+        try {
+          const res = await auditProvisionFn({
+            data: {
+              privyUserId,
+              walletAddress: newWallet.address,
+              email,
+            },
+          });
+          if (res.ok && res.deduped) {
+            console.warn(
+              "[PrivyVerifyCard] Existing embedded wallet already on record for this Privy user",
+              { privyUserId, existingWallet: res.existingWallet, newWallet: newWallet.address },
+            );
+          }
+        } catch (e) {
+          console.warn("[PrivyVerifyCard] audit log call failed", e);
+        }
       })
       .catch((e: unknown) => {
         if (walletCreateTimeoutRef.current) window.clearTimeout(walletCreateTimeoutRef.current);
@@ -387,9 +433,12 @@ function PrivyVerifyCardInner({
         );
       });
   }, [
+    auditProvisionFn,
     authenticated,
     createWallet,
     hasKnownWallet,
+    user?.email?.address,
+    user?.id,
     wallet,
     walletCreateState,
     walletsReady,
