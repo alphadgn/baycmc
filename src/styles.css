@@ -36,8 +36,8 @@
   --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
   --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
-  --font-logo: "Allura", "Pinyon Script", "Great Vibes", cursive;
-  --font-lifer: "Allura", "Pinyon Script", "Great Vibes", cursive;
+  --font-logo: "Yellowtail", "Allura", "Pinyon Script", cursive;
+  --font-lifer: "Yellowtail", "Allura", "Pinyon Script", cursive;
 }
 
 :root {
@@ -129,7 +129,32 @@
   .font-lifer {
     font-family: var(--font-lifer);
     font-weight: 400;
-    letter-spacing: 0;
+    letter-spacing: 0.01em;
+  }
+  /* Embroidered gold text — layered to mimic stitched thread texture */
+  .text-embroidered-gold {
+    font-family: var(--font-lifer);
+    font-weight: 400;
+    background-image:
+      repeating-linear-gradient(
+        45deg,
+        oklch(0.88 0.16 82) 0px,
+        oklch(0.88 0.16 82) 1px,
+        oklch(0.62 0.18 55) 2px,
+        oklch(0.78 0.17 70) 3px
+      ),
+      linear-gradient(135deg, oklch(0.88 0.17 82) 0%, oklch(0.55 0.18 50) 100%);
+    background-blend-mode: overlay, normal;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    text-shadow:
+      0 1px 0 oklch(0.35 0.12 50 / 60%),
+      0 2px 1px oklch(0.20 0.08 50 / 50%),
+      0 0 12px oklch(0.78 0.14 78 / 25%);
+    filter: drop-shadow(0 1px 0 oklch(0.25 0.08 50 / 40%));
+    -webkit-text-stroke: 0.5px oklch(0.45 0.14 60 / 40%);
   }
 }
 

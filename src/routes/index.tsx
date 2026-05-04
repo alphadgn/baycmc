@@ -30,7 +30,7 @@ function Index() {
             </div>
             <h1 className="mt-6 font-display text-5xl font-bold leading-[1.05] tracking-tight sm:text-6xl lg:text-7xl">
               The private clubhouse for{" "}
-              <span className="font-lifer text-gradient-gold">Bored Apes</span>
+              <span className="text-embroidered-gold">Bored Apes</span>
             </h1>
             <p className="mt-6 text-lg leading-relaxed text-muted-foreground sm:text-xl">
               Yacht Club social network, live audio rooms, conference bookings, and local chapter
