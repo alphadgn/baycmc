@@ -1,13 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { SiweMessage } from "siwe";
-import {
-  createPublicClient,
-  http,
-  getAddress,
-  parseAbi,
-  isAddress,
-} from "viem";
+import { createPublicClient, http, getAddress, parseAbi, isAddress } from "viem";
 import { mainnet } from "viem/chains";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { ETH_RPC_URL, DELEGATE_REGISTRY_V2 } from "@/lib/web3/constants";
@@ -28,9 +22,7 @@ import { ETH_RPC_URL, DELEGATE_REGISTRY_V2 } from "@/lib/web3/constants";
 const BAYC = "0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D" as const;
 const MAYC = "0x60E4d786628Fea6478F785A6d7e704777c86a7c6" as const;
 
-const erc721Abi = parseAbi([
-  "function balanceOf(address owner) view returns (uint256)",
-]);
+const erc721Abi = parseAbi(["function balanceOf(address owner) view returns (uint256)"]);
 
 // delegate.cash v2 — fetch every vault that has delegated to `to`.
 // Delegation type enum: 0 NONE, 1 ALL, 2 CONTRACT, 3 ERC721, 4 ERC20, 5 ERC1155.
@@ -43,10 +35,36 @@ function client() {
   return createPublicClient({ chain: mainnet, transport: http(ETH_RPC_URL) });
 }
 
+const POSITIVE_BALANCE_TTL_MS = 60_000;
+const ZERO_BALANCE_TTL_MS = 15_000;
+const DELEGATION_TTL_MS = 30_000;
+
+type BalancePair = { bayc: bigint; mayc: bigint };
+type BalanceCacheEntry = BalancePair & { expiresAt: number };
+type DelegationCacheEntry = { vaults: `0x${string}`[]; expiresAt: number };
+
+const balanceCache = new Map<string, BalanceCacheEntry>();
+const delegationCache = new Map<string, DelegationCacheEntry>();
+
+function balanceCacheKey(owner: `0x${string}`) {
+  return `1:${owner.toLowerCase()}:bayc-mayc`;
+}
+
+function delegationCacheKey(signer: `0x${string}`) {
+  return `1:${signer.toLowerCase()}:incoming-delegations-v2`;
+}
+
 async function balancesFor(
   c: ReturnType<typeof client>,
   owner: `0x${string}`,
-): Promise<{ bayc: bigint; mayc: bigint }> {
+): Promise<BalancePair> {
+  const now = Date.now();
+  const key = balanceCacheKey(owner);
+  const hit = balanceCache.get(key);
+  if (hit && hit.expiresAt > now) {
+    return { bayc: hit.bayc, mayc: hit.mayc };
+  }
+
   const [bayc, mayc] = await Promise.all([
     c.readContract({
       address: BAYC,
@@ -61,6 +79,14 @@ async function balancesFor(
       args: [owner],
     }) as Promise<bigint>,
   ]);
+
+  const hasBalance = bayc > 0n || mayc > 0n;
+  balanceCache.set(key, {
+    bayc,
+    mayc,
+    expiresAt: now + (hasBalance ? POSITIVE_BALANCE_TTL_MS : ZERO_BALANCE_TTL_MS),
+  });
+
   return { bayc, mayc };
 }
 
@@ -74,6 +100,13 @@ async function resolveDelegatedVaults(
   c: ReturnType<typeof client>,
   signer: `0x${string}`,
 ): Promise<`0x${string}`[]> {
+  const now = Date.now();
+  const key = delegationCacheKey(signer);
+  const hit = delegationCache.get(key);
+  if (hit && hit.expiresAt > now) {
+    return hit.vaults;
+  }
+
   try {
     const delegations = (await c.readContract({
       address: DELEGATE_REGISTRY_V2,
@@ -95,24 +128,26 @@ async function resolveDelegatedVaults(
       // Only "no rights restriction" (0x00..00) counts for entry — custom
       // rights strings narrow delegation to specific use-cases.
       const noRights =
-        d.rights ===
-        "0x0000000000000000000000000000000000000000000000000000000000000000";
+        d.rights === "0x0000000000000000000000000000000000000000000000000000000000000000";
       if (!noRights) continue;
 
       // ALL → vault delegated their entire wallet.
       if (d.type_ === 1) {
-        vaults.add(d.from.toLowerCase());
+        vaults.add(getAddress(d.from));
         continue;
       }
       // CONTRACT or ERC721 scoped to BAYC/MAYC contracts.
       if (d.type_ === 2 || d.type_ === 3) {
         const c_ = d.contract_.toLowerCase();
         if (c_ === BAYC.toLowerCase() || c_ === MAYC.toLowerCase()) {
-          vaults.add(d.from.toLowerCase());
+          vaults.add(getAddress(d.from));
         }
       }
     }
-    return [...vaults] as `0x${string}`[];
+
+    const resolved = [...vaults] as `0x${string}`[];
+    delegationCache.set(key, { vaults: resolved, expiresAt: now + DELEGATION_TTL_MS });
+    return resolved;
   } catch (e) {
     console.error("delegate.cash lookup failed", e);
     return [];
@@ -124,12 +159,10 @@ async function resolveDelegatedVaults(
  * We surface them via a server fn so the secret value stays out of the
  * browser bundle until the user actually opens the entrance.
  */
-export const getPrivyPublicConfig = createServerFn({ method: "GET" }).handler(
-  async () => {
-    const appId = process.env.PRIVY_APP_ID ?? "";
-    return { appId, configured: appId.length > 0 };
-  },
-);
+export const getPrivyPublicConfig = createServerFn({ method: "GET" }).handler(async () => {
+  const appId = process.env.PRIVY_APP_ID ?? "";
+  return { appId, configured: appId.length > 0 };
+});
 
 export const verifyPrivyOwnership = createServerFn({ method: "POST" })
   .inputValidator((input: { message: string; signature: string }) =>
@@ -152,9 +185,7 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
       address = result.data.address;
     } catch (e) {
       console.error("SIWE verify failed", e);
-      throw new Error(
-        "We couldn't verify your wallet signature. Please try again.",
-      );
+      throw new Error("We couldn't verify your wallet signature. Please try again.");
     }
 
     if (!isAddress(address)) {
@@ -180,14 +211,13 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
       ]);
     } catch (e) {
       console.error("RPC balanceOf failed", e);
-      throw new Error(
-        "We couldn't reach Ethereum to check your holdings. Try again in a moment.",
-      );
+      throw new Error("We couldn't reach Ethereum to check your holdings. Try again in a moment.");
     }
 
     let totalBayc = signerBals.bayc;
     let totalMayc = signerBals.mayc;
     let delegatedFrom: `0x${string}` | null = null;
+    let verificationBasis: "direct" | "delegated" = "direct";
 
     if (totalBayc === 0n && totalMayc === 0n && vaults.length > 0) {
       // Check each delegated vault until we find one that holds an ape.
@@ -198,6 +228,7 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
             totalBayc += b.bayc;
             totalMayc += b.mayc;
             delegatedFrom = v;
+            verificationBasis = "delegated";
             break;
           }
         } catch (e) {
@@ -218,6 +249,9 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
     }
 
     const collection: "BAYC" | "MAYC" = totalBayc > 0n ? "BAYC" : "MAYC";
+    const delegationDetailsUrl = delegatedFrom
+      ? `https://delegate.cash/registry?delegate=${wallet}&vault=${delegatedFrom}`
+      : null;
 
     // 3) Mint / fetch Supabase user (same pattern as tokenproof). We key
     //    the Supabase user off the *signer* wallet (the Privy email's
@@ -235,13 +269,12 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
     let userId = found?.id;
 
     if (!userId) {
-      const { data: created, error } =
-        await supabaseAdmin.auth.admin.createUser({
-          email,
-          password,
-          email_confirm: true,
-          user_metadata: { wallet: lower, via: "privy" },
-        });
+      const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { wallet: lower, via: "privy" },
+      });
       if (error) throw error;
       userId = created.user!.id;
     }
@@ -260,8 +293,10 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
       { onConflict: "user_id" },
     );
 
-    const { data: signIn, error: signInErr } =
-      await supabaseAdmin.auth.signInWithPassword({ email, password });
+    const { data: signIn, error: signInErr } = await supabaseAdmin.auth.signInWithPassword({
+      email,
+      password,
+    });
     if (signInErr || !signIn.session) {
       throw signInErr ?? new Error("Could not mint session");
     }
@@ -270,7 +305,9 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
       verified: true as const,
       collection,
       wallet,
+      verificationBasis,
       delegatedFrom,
+      delegationDetailsUrl,
       session: {
         access_token: signIn.session.access_token,
         refresh_token: signIn.session.refresh_token,
