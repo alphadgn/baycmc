@@ -31,10 +31,12 @@ function Index() {
             </div>
             <h1 className="mt-6 font-display text-5xl font-bold leading-[1.05] tracking-tight sm:text-6xl lg:text-7xl">
               <span className="block">The private clubhouse for</span>
+              {/* Image height ≈ 1.4× the surrounding font size so the
+                  embroidered letters match the cap-height of the text line. */}
               <img
                 src={boredApesImg}
                 alt="Bored Apes"
-                className="mx-auto mt-4 h-20 w-auto select-none sm:h-24 lg:h-28"
+                className="mx-auto mt-2 block h-[4.2rem] w-auto select-none sm:mt-3 sm:h-[5.25rem] lg:h-[6.3rem]"
                 draggable={false}
               />
             </h1>
