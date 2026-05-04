@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Wallet } from "lucide-react";
+import { CheckCircle2, ExternalLink, Wallet } from "lucide-react";
 import { SiweMessage } from "siwe";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -30,6 +30,8 @@ export function PrivyVerifyCard({
     useWallets: any;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     useCreateWallet: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    useSignMessage: any;
   };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [hooks, setHooks] = useState<PrivyHooks | null>(null);
@@ -73,6 +75,7 @@ export function PrivyVerifyCard({
           usePrivy: mod.usePrivy,
           useWallets: mod.useWallets,
           useCreateWallet: mod.useCreateWallet,
+          useSignMessage: mod.useSignMessage,
         });
       } catch {
         if (!cancelled) setConfigState({ kind: "missing" });
@@ -131,13 +134,19 @@ function PrivyVerifyCardInner({
   onLoginRequested,
 }: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  hooks: { usePrivy: any; useWallets: any; useCreateWallet: any };
+  hooks: {
+    usePrivy: any;
+    useWallets: any;
+    useCreateWallet: any;
+    useSignMessage: any;
+  };
   onVerified: () => void;
   onLoginRequested?: () => void;
 }) {
   const { ready, authenticated, login, logout, user } = hooks.usePrivy();
   const { wallets } = hooks.useWallets();
   const { createWallet } = hooks.useCreateWallet();
+  const { signMessage } = hooks.useSignMessage();
   const verifyFn = useServerFn(verifyPrivyOwnership);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
