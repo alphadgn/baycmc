@@ -20,9 +20,10 @@ export function AppHeader() {
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
           <Link
             to="/"
-            className="font-lifer text-2xl font-bold tracking-tight text-gradient-gold"
+            className="font-lifer text-3xl leading-none tracking-tight text-gradient-gold"
+            aria-label="BAYC lifer est '26"
           >
-            BAYCMC
+            BAYC lifer <span className="text-base align-middle">est '26</span>
           </Link>
 
           <nav className="hidden items-center gap-5 text-sm md:flex font-sans-display">

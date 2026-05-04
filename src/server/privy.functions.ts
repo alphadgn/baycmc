@@ -164,6 +164,80 @@ export const getPrivyPublicConfig = createServerFn({ method: "GET" }).handler(as
   return { appId, configured: appId.length > 0 };
 });
 
+// Simple in-memory token-bucket rate limiter, keyed by wallet address.
+// Protects against verification spam / DDoS / re-entry attacks. Best-effort
+// only — production deployments should layer a CDN / WAF on top.
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX = 6; // 6 verification attempts per wallet per minute
+const INSPECT_RATE_LIMIT_MAX = 30;
+type Bucket = { count: number; resetAt: number };
+const verifyBuckets = new Map<string, Bucket>();
+const inspectBuckets = new Map<string, Bucket>();
+
+function rateLimit(map: Map<string, Bucket>, key: string, max: number) {
+  const now = Date.now();
+  const b = map.get(key);
+  if (!b || b.resetAt < now) {
+    map.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return { ok: true as const, retryAfterMs: 0 };
+  }
+  if (b.count >= max) {
+    return { ok: false as const, retryAfterMs: b.resetAt - now };
+  }
+  b.count += 1;
+  return { ok: true as const, retryAfterMs: 0 };
+}
+
+/**
+ * Inspect a single embedded-wallet address: returns BAYC/MAYC balances for
+ * the address itself plus any delegate.cash v2 vault that has delegated to
+ * it (so the UI can show "direct" vs "delegated from <vault>" per address).
+ */
+export const inspectWalletHoldings = createServerFn({ method: "POST" })
+  .inputValidator((input: { address: string }) =>
+    z.object({ address: z.string().min(10).max(64) }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    if (!isAddress(data.address)) {
+      return { ok: false as const, reason: "invalid-address" };
+    }
+    const address = getAddress(data.address) as `0x${string}`;
+    const rl = rateLimit(inspectBuckets, address.toLowerCase(), INSPECT_RATE_LIMIT_MAX);
+    if (!rl.ok) {
+      return { ok: false as const, reason: "rate-limited", retryAfterMs: rl.retryAfterMs };
+    }
+    const c = client();
+    const [own, vaults] = await Promise.all([
+      balancesFor(c, address).catch(() => ({ bayc: 0n, mayc: 0n })),
+      resolveDelegatedVaults(c, address).catch(() => [] as `0x${string}`[]),
+    ]);
+
+    const delegatedSources: Array<{
+      vault: string;
+      bayc: string;
+      mayc: string;
+      detailsUrl: string;
+    }> = [];
+    for (const v of vaults) {
+      const b = await balancesFor(c, v).catch(() => ({ bayc: 0n, mayc: 0n }));
+      if (b.bayc > 0n || b.mayc > 0n) {
+        delegatedSources.push({
+          vault: v,
+          bayc: b.bayc.toString(),
+          mayc: b.mayc.toString(),
+          detailsUrl: `https://delegate.cash/registry?delegate=${address}&vault=${v}`,
+        });
+      }
+    }
+
+    return {
+      ok: true as const,
+      address,
+      direct: { bayc: own.bayc.toString(), mayc: own.mayc.toString() },
+      delegated: delegatedSources,
+    };
+  });
+
 export const verifyPrivyOwnership = createServerFn({ method: "POST" })
   .inputValidator((input: { message: string; signature: string }) =>
     z
@@ -192,6 +266,15 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
       throw new Error("Invalid wallet address returned from signature.");
     }
     const wallet = getAddress(address);
+
+    const rl = rateLimit(verifyBuckets, wallet.toLowerCase(), RATE_LIMIT_MAX);
+    if (!rl.ok) {
+      return {
+        verified: false as const,
+        reason: `Too many verification attempts. Try again in ${Math.ceil(rl.retryAfterMs / 1000)}s.`,
+        wallet,
+      };
+    }
 
     // 2) Check BAYC + MAYC balances on-chain. The signer wallet is the
     //    Privy embedded/connected wallet for the user's email. They may not

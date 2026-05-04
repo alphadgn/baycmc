@@ -3,7 +3,11 @@ import { useServerFn } from "@tanstack/react-start";
 import { CheckCircle2, ExternalLink, Wallet } from "lucide-react";
 import { SiweMessage } from "siwe";
 import { supabase } from "@/integrations/supabase/client";
-import { verifyPrivyOwnership, getPrivyPublicConfig } from "@/server/privy.functions";
+import {
+  verifyPrivyOwnership,
+  getPrivyPublicConfig,
+  inspectWalletHoldings,
+} from "@/server/privy.functions";
 import { toast } from "sonner";
 
 type EthereumProviderLike = {
@@ -80,9 +84,11 @@ type PrivyHooks = {
 export function PrivyVerifyCard({
   onVerified,
   onLoginRequested,
+  onNoQualifyingAssets,
 }: {
   onVerified: () => void;
   onLoginRequested?: () => void;
+  onNoQualifyingAssets?: (reason: string) => void;
 }) {
   const [hooks, setHooks] = useState<PrivyHooks | null>(null);
   type ConfigState =
@@ -169,6 +175,7 @@ export function PrivyVerifyCard({
       hooks={hooks}
       onVerified={onVerified}
       onLoginRequested={onLoginRequested}
+      onNoQualifyingAssets={onNoQualifyingAssets}
     />
   );
 }
@@ -177,10 +184,12 @@ function PrivyVerifyCardInner({
   hooks,
   onVerified,
   onLoginRequested,
+  onNoQualifyingAssets,
 }: {
   hooks: PrivyHooks;
   onVerified: () => void;
   onLoginRequested?: () => void;
+  onNoQualifyingAssets?: (reason: string) => void;
 }) {
   const { ready, authenticated, login, logout, user } = hooks.usePrivy();
   const { wallets, ready: walletsReady } = hooks.useWallets();
@@ -273,7 +282,9 @@ function PrivyVerifyCardInner({
         })) as PrivyOwnershipResult;
 
         if (!result.verified) {
-          setError(result.reason ?? "Verification failed.");
+          const reason = result.reason ?? "No qualifying BAYC/MAYC assets found.";
+          setError(reason);
+          onNoQualifyingAssets?.(reason);
           return;
         }
 
@@ -619,6 +630,41 @@ function WalletStateInspector({
     }
   }
 
+  type Holdings = {
+    direct: { bayc: string; mayc: string };
+    delegated: Array<{ vault: string; bayc: string; mayc: string; detailsUrl: string }>;
+  };
+  const inspectFn = useServerFn(inspectWalletHoldings);
+  const [holdings, setHoldings] = useState<Record<string, Holdings | "loading" | "error">>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    for (const e of entries) {
+      const key = e.address.toLowerCase();
+      if (holdings[key]) continue;
+      setHoldings((h) => ({ ...h, [key]: "loading" }));
+      void inspectFn({ data: { address: e.address } })
+        .then((res) => {
+          if (cancelled) return;
+          if (res.ok) {
+            setHoldings((h) => ({
+              ...h,
+              [key]: { direct: res.direct, delegated: res.delegated },
+            }));
+          } else {
+            setHoldings((h) => ({ ...h, [key]: "error" }));
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setHoldings((h) => ({ ...h, [key]: "error" }));
+        });
+    }
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entries.map((e) => e.address.toLowerCase()).join(",")]);
+
   return (
     <div
       data-testid="wallet-state-inspector"
@@ -635,30 +681,104 @@ function WalletStateInspector({
         <div className="italic">No embedded wallets found in Privy user metadata.</div>
       ) : (
         <ul className="space-y-2">
-          {entries.map((e) => (
-            <li
-              key={`${e.source}-${e.address}`}
-              className="rounded border border-border/60 bg-secondary/20 p-2"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-mono text-foreground">{shortAddress(e.address)}</span>
-                <span
-                  className={
-                    e.chainOk
-                      ? "rounded bg-success/20 px-1.5 py-0.5 text-[10px] font-semibold text-success"
-                      : "rounded bg-destructive/20 px-1.5 py-0.5 text-[10px] font-semibold text-destructive"
-                  }
-                >
-                  {e.chainOk ? "chain ✓" : "chain ✗"}
-                </span>
-              </div>
-              <div className="mt-1 text-[10px]">
-                source: <span className="font-mono">{e.source}</span>
-                {e.walletClientType && <> · client: <span className="font-mono">{e.walletClientType}</span></>}
-                {e.chainType && <> · chain: <span className="font-mono">{e.chainType}</span></>}
-              </div>
-            </li>
-          ))}
+          {entries.map((e) => {
+            const h = holdings[e.address.toLowerCase()];
+            const loaded = h && h !== "loading" && h !== "error" ? h : null;
+            const directBayc = loaded ? BigInt(loaded.direct.bayc) > 0n : false;
+            const directMayc = loaded ? BigInt(loaded.direct.mayc) > 0n : false;
+            const delegatedBayc =
+              loaded?.delegated.find((d) => BigInt(d.bayc) > 0n) ?? null;
+            const delegatedMayc =
+              loaded?.delegated.find((d) => BigInt(d.mayc) > 0n) ?? null;
+            const ownsAny =
+              directBayc || directMayc || !!delegatedBayc || !!delegatedMayc;
+            return (
+              <li
+                key={`${e.source}-${e.address}`}
+                className="rounded border border-border/60 bg-secondary/20 p-2"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-mono text-foreground">{shortAddress(e.address)}</span>
+                  <div className="flex items-center gap-1">
+                    <span
+                      className={
+                        e.chainOk
+                          ? "rounded bg-success/20 px-1.5 py-0.5 text-[10px] font-semibold text-success"
+                          : "rounded bg-destructive/20 px-1.5 py-0.5 text-[10px] font-semibold text-destructive"
+                      }
+                    >
+                      {e.chainOk ? "chain ✓" : "chain ✗"}
+                    </span>
+                    {loaded && (
+                      <span
+                        className={
+                          ownsAny
+                            ? "rounded bg-success/20 px-1.5 py-0.5 text-[10px] font-semibold text-success"
+                            : "rounded bg-muted/30 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground"
+                        }
+                      >
+                        {ownsAny ? "owns ✓" : "owns ✗"}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-1 text-[10px]">
+                  source: <span className="font-mono">{e.source}</span>
+                  {e.walletClientType && <> · client: <span className="font-mono">{e.walletClientType}</span></>}
+                </div>
+                {h === "loading" && (
+                  <div className="mt-1 italic text-[10px]">checking BAYC/MAYC…</div>
+                )}
+                {h === "error" && (
+                  <div className="mt-1 italic text-[10px] text-destructive">
+                    couldn't reach RPC
+                  </div>
+                )}
+                {loaded && (
+                  <div className="mt-1 space-y-0.5 text-[10px]">
+                    {COLLECTIONS.map((c) => {
+                      const isBayc = c.name === "BAYC";
+                      const direct = isBayc ? directBayc : directMayc;
+                      const deleg = isBayc ? delegatedBayc : delegatedMayc;
+                      const status = direct
+                        ? "direct"
+                        : deleg
+                          ? "delegated"
+                          : "none";
+                      return (
+                        <div key={c.address} className="flex items-center justify-between gap-2">
+                          <span className="font-semibold text-gold">{c.name}</span>
+                          {status === "direct" && (
+                            <span className="text-success">direct ownership ✓</span>
+                          )}
+                          {status === "delegated" && deleg && (
+                            <span className="flex items-center gap-1 text-success">
+                              delegated from{" "}
+                              <span className="font-mono text-foreground">
+                                {shortAddress(deleg.vault)}
+                              </span>
+                              <a
+                                href={deleg.detailsUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-gold underline hover:opacity-80"
+                              >
+                                details
+                                <ExternalLink className="inline h-2.5 w-2.5" />
+                              </a>
+                            </span>
+                          )}
+                          {status === "none" && (
+                            <span className="text-muted-foreground">no match</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
 

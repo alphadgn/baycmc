@@ -442,6 +442,16 @@ function EntranceBody({
           // verification status can run, while `modal={false}` prevents a
           // focus trap from blocking Privy's mobile email input.
         }}
+        onNoQualifyingAssets={(reason) => {
+          // Show error for 3 seconds then dismiss + return user to landing.
+          const id = toast.error(reason || "No qualifying BAYC/MAYC assets found.", {
+            duration: 3000,
+          });
+          window.setTimeout(() => {
+            toast.dismiss(id);
+            onOpenChange(false);
+          }, 3000);
+        }}
       />
 
       <PrivyTroubleshootPanel />
