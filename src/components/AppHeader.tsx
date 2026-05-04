@@ -24,6 +24,7 @@ export function AppHeader() {
               variant="baycmc"
               size="lg"
               alt="BAYCmc"
+              clamp="clamp(1.67rem, 6vw, 3.33rem)"
             />
           </Link>
 

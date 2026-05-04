@@ -36,7 +36,8 @@ function Index() {
                 variant="bored-apes"
                 size="xl"
                 alt="Bored Apes"
-                className="mx-auto mt-1 sm:mt-2"
+                clamp="clamp(5rem, 22vw, 11rem)"
+                className="mx-auto mt-1 w-full sm:mt-2"
               />
             </h1>
             <p className="mt-6 text-lg leading-relaxed text-muted-foreground sm:text-xl">
@@ -47,21 +48,21 @@ function Index() {
               {isAuthenticated ? (
                 <Link
                   to="/profile"
-                  className="rounded-md bg-gradient-gold px-6 py-3 text-base font-semibold text-gold-foreground shadow-gold transition hover:opacity-90"
+                  className="rounded-md bg-gradient-gold px-3 py-1.5 text-sm font-semibold text-gold-foreground shadow-gold transition hover:opacity-90"
                 >
                   Enter BAYCMC →
                 </Link>
               ) : (
                 <a
                   href="#verify"
-                  className="rounded-md bg-gradient-gold px-6 py-3 text-base font-semibold text-gold-foreground shadow-gold transition hover:opacity-90"
+                  className="rounded-md bg-gradient-gold px-3 py-1.5 text-sm font-semibold text-gold-foreground shadow-gold transition hover:opacity-90"
                 >
                   Verify Access
                 </a>
               )}
               <a
                 href="#features"
-                className="rounded-md border border-border bg-secondary/30 px-6 py-3 text-base font-medium hover:bg-secondary"
+                className="rounded-md border border-border bg-secondary/30 px-3 py-1.5 text-sm font-medium hover:bg-secondary"
               >
                 What's inside
               </a>
