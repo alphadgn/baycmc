@@ -383,6 +383,27 @@ function PrivyVerifyCardInner({
     void verifyWallet(wallet);
   }
 
+  function handleRetryWalletCreation() {
+    if (walletCreateTimeoutRef.current) window.clearTimeout(walletCreateTimeoutRef.current);
+    walletCreateStartedRef.current = false;
+    walletCreateAttemptRef.current += 1;
+    setCreatedWallet(null);
+    setVerificationResult(null);
+    setError(null);
+    setWalletCreateState("idle");
+  }
+
+  function handleDisconnect() {
+    if (walletCreateTimeoutRef.current) window.clearTimeout(walletCreateTimeoutRef.current);
+    walletCreateStartedRef.current = false;
+    walletCreateAttemptRef.current += 1;
+    setCreatedWallet(null);
+    setVerificationResult(null);
+    setError(null);
+    setWalletCreateState("idle");
+    logout();
+  }
+
   return (
     <div className="rounded-xl border border-border bg-secondary/20 p-5">
       <div className="flex items-center gap-2">
@@ -491,11 +512,19 @@ function PrivyVerifyCardInner({
                 ? "Verifying ownership…"
                 : "Sign & verify holdings"}
           </button>
+          {walletCreateState === "failed" && !wallet && (
+            <button
+              onClick={handleRetryWalletCreation}
+              className="w-full rounded-md border border-gold/40 bg-gold/10 px-3 py-2 text-xs font-semibold text-gold hover:bg-gold/20"
+            >
+              Retry wallet creation
+            </button>
+          )}
           {!wallet && !isCreatingWallet && user?.wallet?.address && (
             <div className="text-[11px] text-muted-foreground font-mono">{user.wallet.address}</div>
           )}
           <button
-            onClick={() => logout()}
+            onClick={handleDisconnect}
             className="w-full rounded-md border border-border bg-secondary/30 px-3 py-1.5 text-[11px] text-muted-foreground hover:bg-secondary"
           >
             Disconnect
