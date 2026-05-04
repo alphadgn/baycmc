@@ -36,7 +36,8 @@ function Index() {
                 variant="bored-apes"
                 size="xl"
                 alt="Bored Apes"
-                className="mx-auto mt-1 sm:mt-2"
+                clamp="clamp(5rem, 22vw, 11rem)"
+                className="mx-auto mt-1 w-full sm:mt-2"
               />
             </h1>
             <p className="mt-6 text-lg leading-relaxed text-muted-foreground sm:text-xl">
