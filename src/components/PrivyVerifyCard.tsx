@@ -317,16 +317,35 @@ function PrivyVerifyCardInner({
   );
 
   useEffect(() => {
-    if (!authenticated || wallet || hasKnownWallet || walletCreateState !== "idle") {
+    if (!mountedRef.current) mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (walletCreateTimeoutRef.current) {
+        window.clearTimeout(walletCreateTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (
+      !authenticated ||
+      !walletsReady ||
+      wallet ||
+      hasKnownWallet ||
+      walletCreateState !== "idle" ||
+      walletCreateStartedRef.current
+    ) {
       return;
     }
 
-    let cancelled = false;
-    const timeout = window.setTimeout(() => {
-      if (cancelled) return;
+    walletCreateStartedRef.current = true;
+    const attempt = walletCreateAttemptRef.current + 1;
+    walletCreateAttemptRef.current = attempt;
+    walletCreateTimeoutRef.current = window.setTimeout(() => {
+      if (!mountedRef.current || walletCreateAttemptRef.current !== attempt) return;
       setWalletCreateState("failed");
       setError(
-        "Privy wallet creation is taking too long. Disconnect and sign in again to start a fresh wallet session.",
+        "Privy authenticated your email, but wallet creation did not confirm. Tap Retry wallet creation instead of waiting on the Privy loading screen.",
       );
     }, 25_000);
 
@@ -335,14 +354,14 @@ function PrivyVerifyCardInner({
 
     void createWallet({ createAdditional: false })
       .then((newWallet: WalletLike) => {
-        window.clearTimeout(timeout);
-        if (cancelled) return;
+        if (walletCreateTimeoutRef.current) window.clearTimeout(walletCreateTimeoutRef.current);
+        if (!mountedRef.current || walletCreateAttemptRef.current !== attempt) return;
         setCreatedWallet(newWallet);
         setWalletCreateState("created");
       })
       .catch((e: unknown) => {
-        window.clearTimeout(timeout);
-        if (cancelled) return;
+        if (walletCreateTimeoutRef.current) window.clearTimeout(walletCreateTimeoutRef.current);
+        if (!mountedRef.current || walletCreateAttemptRef.current !== attempt) return;
         console.error("Privy embedded wallet creation failed", e);
         const msg = e instanceof Error ? e.message : "";
         setWalletCreateState("failed");
@@ -351,11 +370,7 @@ function PrivyVerifyCardInner({
         );
       });
 
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timeout);
-    };
-  }, [authenticated, createWallet, hasKnownWallet, wallet, walletCreateState]);
+  }, [authenticated, createWallet, hasKnownWallet, wallet, walletCreateState, walletsReady]);
 
   useEffect(() => {
     if (walletCreateState !== "created" || !createdWallet?.address || busy) return;
