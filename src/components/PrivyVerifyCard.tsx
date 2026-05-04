@@ -390,7 +390,6 @@ function PrivyVerifyCardInner({
     authenticated,
     createWallet,
     hasKnownWallet,
-    loginStartedHere,
     wallet,
     walletCreateState,
     walletsReady,
