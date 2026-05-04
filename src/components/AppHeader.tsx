@@ -20,7 +20,7 @@ export function AppHeader() {
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
           <Link
             to="/"
-            className="font-display text-lg font-bold tracking-tight text-gradient-gold"
+            className="font-lifer text-2xl font-bold tracking-tight text-gradient-gold"
           >
             BAYCMC
           </Link>

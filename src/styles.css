@@ -37,6 +37,7 @@
   --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
   --font-logo: "Allura", "Pinyon Script", "Great Vibes", cursive;
+  --font-lifer: "Allura", "Pinyon Script", "Great Vibes", cursive;
 }
 
 :root {
@@ -122,6 +123,11 @@
   }
   .font-logo {
     font-family: var(--font-logo);
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+  .font-lifer {
+    font-family: var(--font-lifer);
     font-weight: 400;
     letter-spacing: 0;
   }

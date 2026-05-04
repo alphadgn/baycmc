@@ -30,11 +30,11 @@ function Index() {
             </div>
             <h1 className="mt-6 font-display text-5xl font-bold leading-[1.05] tracking-tight sm:text-6xl lg:text-7xl">
               The private clubhouse for{" "}
-              <span className="text-gradient-gold">Bored Apes</span>
+              <span className="font-lifer text-gradient-gold">Bored Apes</span>
             </h1>
             <p className="mt-6 text-lg leading-relaxed text-muted-foreground sm:text-xl">
-              A token-gated social network, live audio rooms, conference bookings, and chapter
-              communities — all behind a single signature from your wallet.
+              Yacht Club social network, live audio rooms, conference bookings, and local chapter
+              sub communities — all behind a single signature from your wallet.
             </p>
             <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
               {isAuthenticated ? (
@@ -62,11 +62,10 @@ function Index() {
           </div>
 
           {/* Trust strip */}
-          <div className="mx-auto mt-16 grid max-w-3xl grid-cols-3 gap-4 text-center">
+          <div className="mx-auto mt-16 grid max-w-2xl grid-cols-2 gap-4 text-center">
             {[
               { k: "10,000", v: "BAYC supply" },
               { k: "24/7", v: "Live rooms" },
-              { k: "0", v: "Email required" },
             ].map((s) => (
               <div key={s.v} className="glass rounded-xl px-4 py-5">
                 <div className="font-display text-2xl font-bold text-gradient-gold sm:text-3xl">{s.k}</div>
@@ -88,9 +87,9 @@ function Index() {
           </div>
           <div className="mx-auto mt-12 grid max-w-5xl gap-6 sm:grid-cols-3">
             {[
-              { n: "01", t: "Open Tokenproof", d: "Tap Entrance to launch the Tokenproof verification flow — no wallet connection in-browser." },
-              { n: "02", t: "Scan & Approve", d: "Scan the QR with your Tokenproof app and approve the request from your wallet on your phone." },
-              { n: "03", t: "You're In", d: "Tokenproof confirms your BAYC/MAYC ownership and we sign you in instantly." },
+              { n: "01", t: "Open Verification", d: "Tap Entrance to launch the verification." },
+              { n: "02", t: "Verify and Approve", d: "Verify with your Tokenproof app and approve the request to gain access inside the mobile clubhouse." },
+              { n: "03", t: "You're In", d: "Confirm ownership through Tokenproof, Privy or Wallet delegation of your BAYC/MAYC and have instant access." },
             ].map((s) => (
               <div key={s.n} className="glass rounded-2xl p-6 shadow-card">
                 <div className="font-display text-xs text-gold tracking-widest">{s.n}</div>

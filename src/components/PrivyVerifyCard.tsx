@@ -541,8 +541,138 @@ function PrivyVerifyCardInner({
           >
             Disconnect
           </button>
+          <WalletStateInspector user={user} wallets={wallets} createdWallet={createdWallet} />
         </div>
       )}
+    </div>
+  );
+}
+
+const EXPECTED_CHAIN_ID = 1;
+const EXPECTED_CHAIN_NAME = "Ethereum Mainnet";
+const COLLECTIONS = [
+  { name: "BAYC", address: "0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D" },
+  { name: "MAYC", address: "0x60E4d786628Fea6478F785A6d7e704777c86a7c6" },
+] as const;
+
+function WalletStateInspector({
+  user,
+  wallets,
+  createdWallet,
+}: {
+  user: PrivyUserLike | null | undefined;
+  wallets: WalletLike[];
+  createdWallet: WalletLike | null;
+}) {
+  type Entry = {
+    address: string;
+    source: string;
+    chainType?: string;
+    walletClientType?: string;
+    chainOk: boolean;
+  };
+  const entries: Entry[] = [];
+  const seen = new Set<string>();
+  const push = (e: Entry) => {
+    const key = e.address.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    entries.push(e);
+  };
+
+  for (const w of wallets) {
+    push({
+      address: w.address,
+      source: "useWallets()",
+      chainType: "ethereum",
+      walletClientType: "privy",
+      chainOk: true,
+    });
+  }
+  if (createdWallet) {
+    push({
+      address: createdWallet.address,
+      source: "createWallet()",
+      chainType: "ethereum",
+      walletClientType: "privy",
+      chainOk: true,
+    });
+  }
+  if (user?.wallet?.address) {
+    push({
+      address: user.wallet.address,
+      source: "user.wallet",
+      chainType: user.wallet.chainType,
+      walletClientType: user.wallet.walletClientType,
+      chainOk: (user.wallet.chainType ?? "ethereum") === "ethereum",
+    });
+  }
+  for (const acc of user?.linkedAccounts ?? []) {
+    if (acc.type === "wallet" && acc.address) {
+      push({
+        address: acc.address,
+        source: "linkedAccounts",
+        chainType: acc.chainType,
+        walletClientType: acc.walletClientType,
+        chainOk: (acc.chainType ?? "ethereum") === "ethereum",
+      });
+    }
+  }
+
+  return (
+    <div
+      data-testid="wallet-state-inspector"
+      className="mt-3 rounded-md border border-border bg-background/40 px-3 py-3 text-[11px] text-muted-foreground"
+    >
+      <div className="mb-2 flex items-center justify-between">
+        <div className="font-semibold text-foreground">Wallet state inspector</div>
+        <div className="text-[10px] uppercase tracking-wider text-gold">
+          {EXPECTED_CHAIN_NAME} · chainId {EXPECTED_CHAIN_ID}
+        </div>
+      </div>
+
+      {entries.length === 0 ? (
+        <div className="italic">No embedded wallets found in Privy user metadata.</div>
+      ) : (
+        <ul className="space-y-2">
+          {entries.map((e) => (
+            <li
+              key={`${e.source}-${e.address}`}
+              className="rounded border border-border/60 bg-secondary/20 p-2"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-mono text-foreground">{shortAddress(e.address)}</span>
+                <span
+                  className={
+                    e.chainOk
+                      ? "rounded bg-success/20 px-1.5 py-0.5 text-[10px] font-semibold text-success"
+                      : "rounded bg-destructive/20 px-1.5 py-0.5 text-[10px] font-semibold text-destructive"
+                  }
+                >
+                  {e.chainOk ? "chain ✓" : "chain ✗"}
+                </span>
+              </div>
+              <div className="mt-1 text-[10px]">
+                source: <span className="font-mono">{e.source}</span>
+                {e.walletClientType && <> · client: <span className="font-mono">{e.walletClientType}</span></>}
+                {e.chainType && <> · chain: <span className="font-mono">{e.chainType}</span></>}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="mt-3 border-t border-border/60 pt-2">
+        <div className="mb-1 font-semibold text-foreground">Required collections</div>
+        <ul className="space-y-1">
+          {COLLECTIONS.map((c) => (
+            <li key={c.address} className="flex items-center justify-between gap-2">
+              <span className="font-semibold text-gold">{c.name}</span>
+              <span className="font-mono text-[10px]">{c.address}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }
