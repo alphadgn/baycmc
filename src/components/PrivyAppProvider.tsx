@@ -95,10 +95,6 @@ export function PrivyAppProvider({ children }: { children: ReactNode }) {
             theme: "dark",
             accentColor: "#F5B100",
             logo: undefined,
-            // v3: surface the embedded-wallet creation UI so the modal can
-            // actually progress past the spinner instead of hanging waiting
-            // for a UI step that was never rendered.
-            showWalletUIs: true,
             walletChainType: "ethereum-only",
           },
           // v3 requires an explicit chain context for embedded wallet
@@ -115,10 +111,13 @@ export function PrivyAppProvider({ children }: { children: ReactNode }) {
             ethereum: {
               createOnLogin: "off",
             },
-            // Skip the "secure your wallet" prompt that otherwise blocks
-            // the post-creation flow on mobile.
+            // Keep embedded wallet creation and signing headless. The video
+            // showed Privy's mobile wallet UI stuck on "Creating your wallet";
+            // with app-managed recovery and hidden wallet UIs, createWallet()
+            // resolves without opening that blocking sheet.
+            requireUserOwnedRecoveryOnCreate: false,
             requireUserPasswordOnCreate: false,
-            showWalletUIs: true,
+            showWalletUIs: false,
           },
         }}
       >
