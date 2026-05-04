@@ -27,6 +27,8 @@ type PrivyLinkedWalletLike = WalletLike & {
 };
 
 type PrivyUserLike = {
+  id?: string;
+  email?: { address?: string } | null;
   wallet?: Partial<PrivyLinkedWalletLike> | null;
   linkedAccounts?: Array<Partial<PrivyLinkedWalletLike> & { type?: string }>;
 };
