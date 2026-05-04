@@ -282,7 +282,9 @@ function PrivyVerifyCardInner({
         })) as PrivyOwnershipResult;
 
         if (!result.verified) {
-          setError(result.reason ?? "Verification failed.");
+          const reason = result.reason ?? "No qualifying BAYC/MAYC assets found.";
+          setError(reason);
+          onNoQualifyingAssets?.(reason);
           return;
         }
 
