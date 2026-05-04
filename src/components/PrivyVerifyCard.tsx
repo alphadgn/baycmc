@@ -41,7 +41,7 @@ type PrivyHooks = {
   };
   useWallets: () => { wallets: WalletLike[] };
   useCreateWallet: () => {
-    createWallet: (options?: unknown) => Promise<WalletLike>;
+    createWallet: (options?: { createAdditional?: boolean }) => Promise<WalletLike>;
   };
   useSignMessage: () => {
     signMessage: (
