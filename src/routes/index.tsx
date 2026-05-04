@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth/useAuth";
-import boredApesImg from "@/assets/bored-apes-embroidered.png";
+import { EmbroideredImage } from "@/components/EmbroideredImage";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -31,13 +31,12 @@ function Index() {
             </div>
             <h1 className="mt-6 font-display text-5xl font-bold leading-[1.05] tracking-tight sm:text-6xl lg:text-7xl">
               <span className="block">The private clubhouse for</span>
-              {/* Image height ≈ 1.4× the surrounding font size so the
-                  embroidered letters match the cap-height of the text line. */}
-              <img
-                src={boredApesImg}
+              {/* Responsive clamp scales smoothly with viewport without overflow. */}
+              <EmbroideredImage
+                variant="bored-apes"
+                size="xl"
                 alt="Bored Apes"
-                className="mx-auto mt-2 block h-[25.2rem] w-auto select-none sm:mt-3 sm:h-[31.5rem] lg:h-[37.8rem]"
-                draggable={false}
+                className="mx-auto mt-2 sm:mt-3"
               />
             </h1>
             <p className="mt-6 text-lg leading-relaxed text-muted-foreground sm:text-xl">
