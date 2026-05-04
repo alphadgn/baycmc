@@ -427,6 +427,7 @@ function PrivyVerifyCardInner({
       ) : !authenticated ? (
         <button
           onClick={() => {
+            setLoginStartedHere(true);
             // Close any wrapping Radix Dialog first — its focus trap
             // prevents Privy's email input (rendered in a separate portal)
             // from receiving focus, which blocks the iOS/Android keyboard.
