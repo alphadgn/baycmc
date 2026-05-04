@@ -25,7 +25,7 @@ export function AppHeader() {
             <img
               src={baycmcLogo}
               alt="BAYCmc"
-              className="h-10 w-auto select-none sm:h-12"
+              className="h-60 w-auto select-none sm:h-72"
               draggable={false}
             />
           </Link>

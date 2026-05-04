@@ -36,7 +36,7 @@ function Index() {
               <img
                 src={boredApesImg}
                 alt="Bored Apes"
-                className="mx-auto mt-2 block h-[4.2rem] w-auto select-none sm:mt-3 sm:h-[5.25rem] lg:h-[6.3rem]"
+                className="mx-auto mt-2 block h-[25.2rem] w-auto select-none sm:mt-3 sm:h-[31.5rem] lg:h-[37.8rem]"
                 draggable={false}
               />
             </h1>
