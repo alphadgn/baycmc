@@ -5,8 +5,8 @@ import { useAuth, signOut } from "@/lib/auth/useAuth";
 import { useWeb3Ready } from "@/components/Web3Provider";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import { EntranceDialog } from "@/components/EntranceDialog";
+import { EmbroideredImage } from "@/components/EmbroideredImage";
 import { toast } from "sonner";
-import baycmcLogo from "@/assets/baycmc-embroidered.png";
 
 
 export function AppHeader() {
