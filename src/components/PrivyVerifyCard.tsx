@@ -199,6 +199,7 @@ function PrivyVerifyCardInner({
   const { createWallet } = hooks.useCreateWallet();
   const { signMessage } = hooks.useSignMessage();
   const verifyFn = useServerFn(verifyPrivyOwnership);
+  const auditProvisionFn = useServerFn(logEmbeddedWalletProvisioned);
   type VerificationResult = {
     collection: "BAYC" | "MAYC";
     verificationBasis: "direct" | "delegated";
@@ -219,6 +220,7 @@ function PrivyVerifyCardInner({
   const walletCreateStartedRef = useRef(false);
   const walletCreateAttemptRef = useRef(0);
   const walletCreateTimeoutRef = useRef<number | null>(null);
+  const lastAuthUserIdRef = useRef<string | null>(null);
 
   const userWallet = getUserWallet(user);
   const wallet = wallets[0] ?? createdWallet ?? userWallet;
