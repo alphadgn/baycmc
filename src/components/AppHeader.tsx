@@ -6,6 +6,7 @@ import { useWeb3Ready } from "@/components/Web3Provider";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import { EntranceDialog } from "@/components/EntranceDialog";
 import { toast } from "sonner";
+import baycmcLogo from "@/assets/baycmc-embroidered.png";
 
 
 export function AppHeader() {
@@ -18,12 +19,13 @@ export function AppHeader() {
     <>
       <header className="sticky top-0 z-50 glass">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
-          <Link
-            to="/"
-            className="text-embroidered-gold text-3xl leading-none tracking-tight"
-            aria-label="BAYCMC"
-          >
-            BAYCMC
+          <Link to="/" aria-label="BAYCMC" className="inline-flex items-center">
+            <img
+              src={baycmcLogo}
+              alt="BAYCmc"
+              className="h-9 w-auto select-none"
+              draggable={false}
+            />
           </Link>
 
           <nav className="hidden items-center gap-5 text-sm md:flex font-sans-display">
