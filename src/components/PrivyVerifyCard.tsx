@@ -21,6 +21,11 @@ type PrivyLinkedWalletLike = WalletLike & {
   walletClientType?: string;
 };
 
+type PrivyUserLike = {
+  wallet?: Partial<PrivyLinkedWalletLike> | null;
+  linkedAccounts?: Array<Partial<PrivyLinkedWalletLike> & { type?: string }>;
+};
+
 type PrivyOwnershipResult =
   | {
       verified: false;
@@ -43,10 +48,7 @@ type PrivyHooks = {
     authenticated: boolean;
     login: () => void;
     logout: () => void;
-    user?: {
-      wallet?: PrivyLinkedWalletLike;
-      linkedAccounts?: PrivyLinkedWalletLike[];
-    } | null;
+    user?: PrivyUserLike | null;
   };
   useWallets: () => { wallets: WalletLike[]; ready: boolean };
   useCreateWallet: () => {
