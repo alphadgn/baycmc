@@ -12,8 +12,24 @@ type EthereumProviderLike = {
 
 type WalletLike = {
   address: string;
-  getEthereumProvider: () => Promise<EthereumProviderLike>;
+  getEthereumProvider?: () => Promise<EthereumProviderLike>;
 };
+
+type PrivyOwnershipResult =
+  | {
+      verified: false;
+      reason?: string;
+      wallet: string;
+    }
+  | {
+      verified: true;
+      collection: "BAYC" | "MAYC";
+      wallet: string;
+      verificationBasis?: "direct" | "delegated";
+      delegatedFrom?: string | null;
+      delegationDetailsUrl?: string | null;
+      session: { access_token: string; refresh_token: string };
+    };
 
 type PrivyHooks = {
   usePrivy: () => {
@@ -21,11 +37,11 @@ type PrivyHooks = {
     authenticated: boolean;
     login: () => void;
     logout: () => void;
-    user?: { wallet?: { address?: string } };
+    user?: { wallet?: { address?: string } } | null;
   };
   useWallets: () => { wallets: WalletLike[] };
   useCreateWallet: () => {
-    createWallet: (options?: { createAdditional?: boolean }) => Promise<WalletLike>;
+    createWallet: (options?: unknown) => Promise<WalletLike>;
   };
   useSignMessage: () => {
     signMessage: (
@@ -226,7 +242,8 @@ function PrivyVerifyCardInner({
             },
           );
           signature = signed.signature;
-        } catch {
+        } catch (signError) {
+          if (!targetWallet.getEthereumProvider) throw signError;
           const provider = await targetWallet.getEthereumProvider();
           signature = (await provider.request({
             method: "personal_sign",
@@ -234,7 +251,9 @@ function PrivyVerifyCardInner({
           })) as string;
         }
 
-        const result = await verifyFn({ data: { message, signature } });
+        const result = (await verifyFn({
+          data: { message, signature },
+        })) as PrivyOwnershipResult;
 
         if (!result.verified) {
           setError(result.reason ?? "Verification failed.");
