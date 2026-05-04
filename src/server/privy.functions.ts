@@ -164,6 +164,67 @@ export const getPrivyPublicConfig = createServerFn({ method: "GET" }).handler(as
   return { appId, configured: appId.length > 0 };
 });
 
+/**
+ * Audit log for Privy embedded EVM wallet auto-provisioning.
+ *
+ * Safeguard against double-provisioning across concurrent sessions / rapid
+ * re-auth: we look up any prior `privy.embedded_wallet.provisioned` event
+ * for the same Privy user id BEFORE inserting. If one exists we return
+ * `{ deduped: true }` and the client should treat the existing wallet as
+ * canonical instead of attempting another createWallet().
+ */
+export const logEmbeddedWalletProvisioned = createServerFn({ method: "POST" })
+  .inputValidator((input: { privyUserId: string; walletAddress: string; email?: string | null }) =>
+    z
+      .object({
+        privyUserId: z.string().min(1).max(200),
+        walletAddress: z.string().min(10).max(64),
+        email: z.string().email().max(200).nullable().optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    if (!isAddress(data.walletAddress)) {
+      return { ok: false as const, reason: "invalid-address" };
+    }
+    const wallet = getAddress(data.walletAddress);
+    const eventType = "privy.embedded_wallet.provisioned";
+
+    // Dedupe: any prior provisioning event for this Privy user id wins.
+    const { data: prior } = await supabaseAdmin
+      .from("audit_logs")
+      .select("id, metadata")
+      .eq("event_type", eventType)
+      .contains("metadata", { privy_user_id: data.privyUserId })
+      .limit(1);
+
+    if (prior && prior.length > 0) {
+      const existing = prior[0].metadata as { wallet_address?: string } | null;
+      return {
+        ok: true as const,
+        deduped: true as const,
+        existingWallet: existing?.wallet_address ?? null,
+      };
+    }
+
+    const { error } = await supabaseAdmin.from("audit_logs").insert({
+      event_type: eventType,
+      actor_id: null,
+      target_id: null,
+      metadata: {
+        privy_user_id: data.privyUserId,
+        wallet_address: wallet,
+        email: data.email ?? null,
+        provisioned_at: new Date().toISOString(),
+      },
+    });
+    if (error) {
+      console.error("audit log insert failed", error);
+      return { ok: false as const, reason: "insert-failed" };
+    }
+    return { ok: true as const, deduped: false as const, existingWallet: null };
+  });
+
 // Simple in-memory token-bucket rate limiter, keyed by wallet address.
 // Protects against verification spam / DDoS / re-entry attacks. Best-effort
 // only — production deployments should layer a CDN / WAF on top.
