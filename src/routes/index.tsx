@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth/useAuth";
-import boredApesImg from "@/assets/bored-apes-embroidered.png";
+import { EmbroideredImage } from "@/components/EmbroideredImage";
 
 export const Route = createFileRoute("/")({
   head: () => ({
