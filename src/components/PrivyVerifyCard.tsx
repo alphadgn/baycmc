@@ -343,7 +343,6 @@ function PrivyVerifyCardInner({
     };
   }, []);
 
-  useEffect(() => {
   // Real-time check on EVERY sign-in: when the authenticated Privy user id
   // changes (including a fresh login after logout), reset the create-attempt
   // ref so we re-evaluate whether a wallet exists for this account.
