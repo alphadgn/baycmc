@@ -84,9 +84,11 @@ type PrivyHooks = {
 export function PrivyVerifyCard({
   onVerified,
   onLoginRequested,
+  onNoQualifyingAssets,
 }: {
   onVerified: () => void;
   onLoginRequested?: () => void;
+  onNoQualifyingAssets?: (reason: string) => void;
 }) {
   const [hooks, setHooks] = useState<PrivyHooks | null>(null);
   type ConfigState =
