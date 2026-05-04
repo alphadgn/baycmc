@@ -15,6 +15,12 @@ type WalletLike = {
   getEthereumProvider?: () => Promise<EthereumProviderLike>;
 };
 
+type PrivyLinkedWalletLike = WalletLike & {
+  type?: string;
+  chainType?: string;
+  walletClientType?: string;
+};
+
 type PrivyOwnershipResult =
   | {
       verified: false;
@@ -37,9 +43,12 @@ type PrivyHooks = {
     authenticated: boolean;
     login: () => void;
     logout: () => void;
-    user?: { wallet?: { address?: string } } | null;
+    user?: {
+      wallet?: PrivyLinkedWalletLike;
+      linkedAccounts?: PrivyLinkedWalletLike[];
+    } | null;
   };
-  useWallets: () => { wallets: WalletLike[] };
+  useWallets: () => { wallets: WalletLike[]; ready: boolean };
   useCreateWallet: () => {
     createWallet: (options?: { createAdditional?: boolean }) => Promise<WalletLike>;
   };
@@ -172,7 +181,7 @@ function PrivyVerifyCardInner({
   onLoginRequested?: () => void;
 }) {
   const { ready, authenticated, login, logout, user } = hooks.usePrivy();
-  const { wallets } = hooks.useWallets();
+  const { wallets, ready: walletsReady } = hooks.useWallets();
   const { createWallet } = hooks.useCreateWallet();
   const { signMessage } = hooks.useSignMessage();
   const verifyFn = useServerFn(verifyPrivyOwnership);
@@ -191,9 +200,14 @@ function PrivyVerifyCardInner({
   >("idle");
   const [createdWallet, setCreatedWallet] = useState<WalletLike | null>(null);
   const autoVerifiedWalletRef = useRef<string | null>(null);
+  const mountedRef = useRef(true);
+  const walletCreateStartedRef = useRef(false);
+  const walletCreateAttemptRef = useRef(0);
+  const walletCreateTimeoutRef = useRef<number | null>(null);
 
-  const wallet = wallets[0] ?? createdWallet;
-  const hasKnownWallet = Boolean(wallets.length > 0 || createdWallet);
+  const userWallet = getUserWallet(user);
+  const wallet = wallets[0] ?? createdWallet ?? userWallet;
+  const hasKnownWallet = Boolean(wallets.length > 0 || createdWallet || userWallet);
   // First-time sign-in state: user is authenticated but the embedded
   // wallet hasn't been provisioned by Privy yet. We surface this as an
   // explicit status step so the modal flow doesn't look frozen.
