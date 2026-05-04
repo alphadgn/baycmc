@@ -373,11 +373,11 @@ function PrivyVerifyCardInner({
   }, [authenticated, createWallet, hasKnownWallet, wallet, walletCreateState, walletsReady]);
 
   useEffect(() => {
-    if (walletCreateState !== "created" || !createdWallet?.address || busy) return;
-    if (autoVerifiedWalletRef.current === createdWallet.address) return;
-    autoVerifiedWalletRef.current = createdWallet.address;
-    void verifyWallet(createdWallet);
-  }, [busy, createdWallet, verifyWallet, walletCreateState]);
+    if (!authenticated || !wallet?.address || busy) return;
+    if (autoVerifiedWalletRef.current === wallet.address) return;
+    autoVerifiedWalletRef.current = wallet.address;
+    void verifyWallet(wallet);
+  }, [authenticated, busy, verifyWallet, wallet]);
 
   function handleSignAndVerify() {
     void verifyWallet(wallet);
