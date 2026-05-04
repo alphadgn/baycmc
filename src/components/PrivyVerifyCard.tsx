@@ -257,17 +257,17 @@ function PrivyVerifyCardInner({
         );
         onVerified();
       } catch (e) {
-      const msg = e instanceof Error ? e.message : "";
-      if (msg.toLowerCase().includes("user rejected")) {
-        setError("You declined the signature. Try again to enter.");
-      } else if (
-        msg.toLowerCase().includes("network") ||
-        msg.toLowerCase().includes("fetch")
-      ) {
-        setError("Network error reaching Ethereum. Try again in a moment.");
-      } else {
-        setError(msg || "Something went wrong. Try again.");
-      }
+        const msg = e instanceof Error ? e.message : "";
+        if (msg.toLowerCase().includes("user rejected")) {
+          setError("You declined the signature. Try again to enter.");
+        } else if (
+          msg.toLowerCase().includes("network") ||
+          msg.toLowerCase().includes("fetch")
+        ) {
+          setError("Network error reaching Ethereum. Try again in a moment.");
+        } else {
+          setError(msg || "Something went wrong. Try again.");
+        }
       } finally {
         setBusy(false);
       }
@@ -376,10 +376,11 @@ function PrivyVerifyCardInner({
           {wallet && (
             <div
               data-testid="privy-status-wallet-ready"
-              className="rounded-md border border-border bg-background/40 px-3 py-2 text-[11px] font-mono text-muted-foreground"
+              className="rounded-md border border-border bg-background/40 px-3 py-2 text-[11px] text-muted-foreground"
               data-wallet-address={wallet.address}
             >
-              {`${wallet.address.slice(0, 6)}…${wallet.address.slice(-4)}`}
+              <div className="font-semibold text-foreground">Embedded wallet ready</div>
+              <div className="font-mono">{shortAddress(wallet.address)}</div>
             </div>
           )}
           {wallet && isVerifying && (
@@ -389,7 +390,45 @@ function PrivyVerifyCardInner({
             >
               <span className="font-semibold text-gold">Step 2 / 2 ·</span>{" "}
               Checking BAYC / MAYC ownership and delegate.cash vaults for{" "}
-              {`${wallet.address.slice(0, 6)}…${wallet.address.slice(-4)}`}…
+              {shortAddress(wallet.address)}…
+            </div>
+          )}
+          {verificationResult && (
+            <div
+              data-testid="privy-verification-basis"
+              className="rounded-md border border-gold/30 bg-gold/5 px-3 py-3 text-xs text-muted-foreground"
+            >
+              <div className="flex items-center gap-2 font-semibold text-gold">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Verified · {verificationResult.collection}
+              </div>
+              {verificationResult.verificationBasis === "delegated" &&
+              verificationResult.delegatedFrom ? (
+                <div className="mt-2 space-y-1">
+                  <div>
+                    Access granted by delegated vault: delegated from{" "}
+                    <span className="font-mono text-foreground">
+                      {shortAddress(verificationResult.delegatedFrom)}
+                    </span>{" "}
+                    to this Privy wallet.
+                  </div>
+                  {verificationResult.delegationDetailsUrl && (
+                    <a
+                      href={verificationResult.delegationDetailsUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-gold underline hover:opacity-80"
+                    >
+                      View delegation details
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                </div>
+              ) : (
+                <div className="mt-2">
+                  Access granted by direct ownership in the Privy wallet.
+                </div>
+              )}
             </div>
           )}
           <button
@@ -418,4 +457,9 @@ function PrivyVerifyCardInner({
       )}
     </div>
   );
+}
+
+
+function shortAddress(address: string) {
+  return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }
