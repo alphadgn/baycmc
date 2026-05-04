@@ -32,15 +32,17 @@ function Index() {
             <h1 className="mt-6 font-display text-5xl font-bold leading-[1.05] tracking-tight sm:text-6xl lg:text-7xl">
               <span className="block">The private clubhouse for</span>
               {/* Responsive clamp scales smoothly with viewport without overflow. */}
+              {/* Sized so the visual gap above (to "clubhouse for") matches
+                  the gap below (to the paragraph) — see reference IMG_2587. */}
               <EmbroideredImage
                 variant="bored-apes"
                 size="xl"
                 alt="Bored Apes"
-                clamp="clamp(5rem, 22vw, 11rem)"
-                className="mx-auto mt-1 w-full sm:mt-2"
+                clamp="clamp(6.5rem, 30vw, 15rem)"
+                className="mx-auto -mt-2 w-full sm:-mt-3"
               />
             </h1>
-            <p className="mt-6 text-lg leading-relaxed text-muted-foreground sm:text-xl">
+            <p className="mt-2 text-lg leading-relaxed text-muted-foreground sm:mt-3 sm:text-xl">
               Yacht Club social network, live audio rooms, conference bookings, and local chapter
               sub communities — all behind a single signature from your wallet.
             </p>
