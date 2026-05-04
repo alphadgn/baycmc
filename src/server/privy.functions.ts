@@ -267,6 +267,15 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
     }
     const wallet = getAddress(address);
 
+    const rl = rateLimit(verifyBuckets, wallet.toLowerCase(), RATE_LIMIT_MAX);
+    if (!rl.ok) {
+      return {
+        verified: false as const,
+        reason: `Too many verification attempts. Try again in ${Math.ceil(rl.retryAfterMs / 1000)}s.`,
+        wallet,
+      };
+    }
+
     // 2) Check BAYC + MAYC balances on-chain. The signer wallet is the
     //    Privy embedded/connected wallet for the user's email. They may not
     //    hold the apes directly — instead they may be a "hot" wallet that a
