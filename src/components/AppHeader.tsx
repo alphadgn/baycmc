@@ -19,14 +19,11 @@ export function AppHeader() {
     <>
       <header className="sticky top-0 z-50 glass">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
-          <Link to="/" aria-label="BAYCMC" className="inline-flex items-center">
-            {/* Image height tuned so the embroidered letters render at the
-                same optical size as a text-2xl/sm:text-3xl logo would. */}
-            <img
-              src={baycmcLogo}
+          <Link to="/" aria-label="BAYCMC" className="inline-flex min-w-0 items-center">
+            <EmbroideredImage
+              variant="baycmc"
+              size="lg"
               alt="BAYCmc"
-              className="h-60 w-auto select-none sm:h-72"
-              draggable={false}
             />
           </Link>
 
