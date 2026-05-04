@@ -175,6 +175,7 @@ export function PrivyVerifyCard({
       hooks={hooks}
       onVerified={onVerified}
       onLoginRequested={onLoginRequested}
+      onNoQualifyingAssets={onNoQualifyingAssets}
     />
   );
 }
@@ -183,10 +184,12 @@ function PrivyVerifyCardInner({
   hooks,
   onVerified,
   onLoginRequested,
+  onNoQualifyingAssets,
 }: {
   hooks: PrivyHooks;
   onVerified: () => void;
   onLoginRequested?: () => void;
+  onNoQualifyingAssets?: (reason: string) => void;
 }) {
   const { ready, authenticated, login, logout, user } = hooks.usePrivy();
   const { wallets, ready: walletsReady } = hooks.useWallets();
