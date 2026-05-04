@@ -36,7 +36,7 @@ function Index() {
                 variant="bored-apes"
                 size="xl"
                 alt="Bored Apes"
-                className="mx-auto mt-2 sm:mt-3"
+                className="mx-auto mt-1 sm:mt-2"
               />
             </h1>
             <p className="mt-6 text-lg leading-relaxed text-muted-foreground sm:text-xl">
