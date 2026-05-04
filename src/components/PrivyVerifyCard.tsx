@@ -538,3 +538,18 @@ function PrivyVerifyCardInner({
 function shortAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }
+
+function getUserWallet(user: PrivyUserLike | null | undefined): WalletLike | null {
+  const linkedWallet = user?.linkedAccounts?.find(
+    (account) =>
+      account.type === "wallet" &&
+      account.chainType === "ethereum" &&
+      typeof account.address === "string" &&
+      account.address.length > 0 &&
+      (account.walletClientType === "privy" || account.walletClientType === "privy-v2"),
+  );
+
+  const candidate = linkedWallet ?? user?.wallet;
+  if (!candidate?.address) return null;
+  return { address: candidate.address };
+}
