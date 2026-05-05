@@ -496,6 +496,33 @@ function PrivyVerifyCardInner({
     walletsReady,
   ]);
 
+  // Real-time wallet inspector: as soon as the embedded wallet appears in
+  // the Privy session (via useWallets / refreshUser / linkedAccounts) flip
+  // the create state to "created" and cancel the pending failure timeout.
+  // This unsticks the "Creating wallet…" screen the moment Privy confirms
+  // provisioning, instead of waiting on the createWallet() promise.
+  useEffect(() => {
+    if (!authenticated) return;
+    if (!embeddedDefault) return;
+    if (walletCreateState === "created") return;
+    if (walletCreateTimeoutRef.current) {
+      window.clearTimeout(walletCreateTimeoutRef.current);
+      walletCreateTimeoutRef.current = null;
+    }
+    setWalletCreateState("created");
+  }, [authenticated, embeddedDefault, walletCreateState]);
+
+  // Periodically re-check Privy's wallet state while we're waiting on
+  // wallet creation, so we don't depend solely on Privy's createWallet
+  // promise resolving.
+  useEffect(() => {
+    if (walletCreateState !== "creating") return;
+    const interval = window.setInterval(() => {
+      void refreshUser().catch(() => {});
+    }, 1500);
+    return () => window.clearInterval(interval);
+  }, [walletCreateState, refreshUser]);
+
   useEffect(() => {
     if (!authenticated || !wallet?.address || busy) return;
     if (autoVerifiedWalletRef.current === wallet.address) return;
