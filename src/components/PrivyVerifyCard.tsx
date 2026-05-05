@@ -884,6 +884,66 @@ function shortAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }
 
+function ResolutionDiagnostics({
+  authenticated,
+  walletsReady,
+  walletCreateState,
+  resolvedWallet,
+  entryCount,
+  hasExternalOnly,
+}: {
+  authenticated: boolean;
+  walletsReady: boolean;
+  walletCreateState: "idle" | "creating" | "created" | "failed";
+  resolvedWallet: WalletLike | null;
+  entryCount: number;
+  hasExternalOnly: boolean;
+}) {
+  const reasons: string[] = [];
+  if (!authenticated) reasons.push("Not authenticated with Privy yet.");
+  if (authenticated && !walletsReady) reasons.push("Waiting for useWallets() to become ready.");
+  if (authenticated && walletsReady && entryCount === 0)
+    reasons.push("Privy returned zero wallets for this user — no embedded wallet on record.");
+  if (authenticated && walletsReady && entryCount > 0 && hasExternalOnly && !resolvedWallet)
+    reasons.push(
+      "Only external (non-embedded) wallets were returned. Auto-creation will run for an embedded EVM wallet.",
+    );
+
+  const triggered =
+    walletCreateState === "creating" ||
+    walletCreateState === "created" ||
+    walletCreateState === "failed";
+
+  return (
+    <div
+      data-testid="wallet-resolution-diagnostics"
+      className="mb-2 rounded border border-border/60 bg-secondary/20 px-2 py-1.5 text-[10px]"
+    >
+      <div>
+        <span className="font-semibold text-foreground">Resolved wallet:</span>{" "}
+        {resolvedWallet ? (
+          <span className="font-mono text-success">{shortAddress(resolvedWallet.address)}</span>
+        ) : (
+          <span className="text-destructive">none</span>
+        )}
+      </div>
+      <div>
+        <span className="font-semibold text-foreground">createWallet():</span>{" "}
+        <span className={triggered ? "text-gold" : "text-muted-foreground"}>
+          {triggered ? `triggered · ${walletCreateState}` : "not triggered"}
+        </span>
+      </div>
+      {!resolvedWallet && reasons.length > 0 && (
+        <ul className="mt-1 list-disc pl-4">
+          {reasons.map((r) => (
+            <li key={r}>{r}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function isEmbeddedEthereumWallet(wallet: Partial<PrivyLinkedWalletLike> | null | undefined) {
   const chainType = wallet?.chainType ?? wallet?.chain_type;
   const walletClientType = wallet?.walletClientType ?? wallet?.wallet_client_type;
