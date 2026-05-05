@@ -343,11 +343,17 @@ function PrivyVerifyCardInner({
           signature = signed.signature;
         } catch (signError) {
           if (!targetWallet.getEthereumProvider) throw signError;
+          logEvent("wallet", "warn", "signMessage failed, falling back to provider", {
+            address,
+          });
           const provider = await targetWallet.getEthereumProvider();
-          signature = (await provider.request({
-            method: "personal_sign",
-            params: [message, address],
-          })) as string;
+          // Serialize through the queue to prevent concurrent-sign races.
+          signature = (await enqueueSign(
+            provider,
+            "personal_sign",
+            [message, address],
+            { label: "verify:personal_sign" },
+          )) as string;
         }
 
         const result = (await verifyFn({
