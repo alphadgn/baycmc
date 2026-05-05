@@ -608,7 +608,15 @@ function PrivyVerifyCardInner({
           >
             Disconnect
           </button>
-          <WalletStateInspector user={user} wallets={wallets} createdWallet={createdWallet} />
+          <WalletStateInspector
+            user={user}
+            wallets={wallets}
+            createdWallet={createdWallet}
+            walletCreateState={walletCreateState}
+            walletsReady={walletsReady}
+            authenticated={authenticated}
+            resolvedWallet={wallet}
+          />
         </div>
       )}
     </div>
@@ -626,10 +634,18 @@ function WalletStateInspector({
   user,
   wallets,
   createdWallet,
+  walletCreateState,
+  walletsReady,
+  authenticated,
+  resolvedWallet,
 }: {
   user: PrivyUserLike | null | undefined;
   wallets: WalletLike[];
   createdWallet: WalletLike | null;
+  walletCreateState: "idle" | "creating" | "created" | "failed";
+  walletsReady: boolean;
+  authenticated: boolean;
+  resolvedWallet: WalletLike | null;
 }) {
   type Entry = {
     address: string;
@@ -732,6 +748,17 @@ function WalletStateInspector({
           {EXPECTED_CHAIN_NAME} · chainId {EXPECTED_CHAIN_ID}
         </div>
       </div>
+
+      <ResolutionDiagnostics
+        authenticated={authenticated}
+        walletsReady={walletsReady}
+        walletCreateState={walletCreateState}
+        resolvedWallet={resolvedWallet}
+        entryCount={entries.length}
+        hasExternalOnly={
+          entries.length > 0 && entries.every((e) => !e.chainOk || e.walletClientType !== "privy")
+        }
+      />
 
       {entries.length === 0 ? (
         <div className="italic">No embedded wallets found in Privy user metadata.</div>
@@ -855,6 +882,66 @@ function WalletStateInspector({
 
 function shortAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
+}
+
+function ResolutionDiagnostics({
+  authenticated,
+  walletsReady,
+  walletCreateState,
+  resolvedWallet,
+  entryCount,
+  hasExternalOnly,
+}: {
+  authenticated: boolean;
+  walletsReady: boolean;
+  walletCreateState: "idle" | "creating" | "created" | "failed";
+  resolvedWallet: WalletLike | null;
+  entryCount: number;
+  hasExternalOnly: boolean;
+}) {
+  const reasons: string[] = [];
+  if (!authenticated) reasons.push("Not authenticated with Privy yet.");
+  if (authenticated && !walletsReady) reasons.push("Waiting for useWallets() to become ready.");
+  if (authenticated && walletsReady && entryCount === 0)
+    reasons.push("Privy returned zero wallets for this user — no embedded wallet on record.");
+  if (authenticated && walletsReady && entryCount > 0 && hasExternalOnly && !resolvedWallet)
+    reasons.push(
+      "Only external (non-embedded) wallets were returned. Auto-creation will run for an embedded EVM wallet.",
+    );
+
+  const triggered =
+    walletCreateState === "creating" ||
+    walletCreateState === "created" ||
+    walletCreateState === "failed";
+
+  return (
+    <div
+      data-testid="wallet-resolution-diagnostics"
+      className="mb-2 rounded border border-border/60 bg-secondary/20 px-2 py-1.5 text-[10px]"
+    >
+      <div>
+        <span className="font-semibold text-foreground">Resolved wallet:</span>{" "}
+        {resolvedWallet ? (
+          <span className="font-mono text-success">{shortAddress(resolvedWallet.address)}</span>
+        ) : (
+          <span className="text-destructive">none</span>
+        )}
+      </div>
+      <div>
+        <span className="font-semibold text-foreground">createWallet():</span>{" "}
+        <span className={triggered ? "text-gold" : "text-muted-foreground"}>
+          {triggered ? `triggered · ${walletCreateState}` : "not triggered"}
+        </span>
+      </div>
+      {!resolvedWallet && reasons.length > 0 && (
+        <ul className="mt-1 list-disc pl-4">
+          {reasons.map((r) => (
+            <li key={r}>{r}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 function isEmbeddedEthereumWallet(wallet: Partial<PrivyLinkedWalletLike> | null | undefined) {

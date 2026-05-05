@@ -295,4 +295,60 @@ describe("Privy embedded wallet auto-provisioning", () => {
     await waitFor(() => expect(result.current.state).toBe("created"));
     expect(createWallet).toHaveBeenCalledTimes(1);
   });
+
+  it("re-resolves to a newly linked embedded wallet when it appears across rerenders", async () => {
+    const { result, rerender } = renderHook(
+      (props: {
+        userWallet: WalletLike | null;
+        wallets: WalletLike[];
+        createdWallet: WalletLike | null;
+      }) =>
+        resolvePrivyEmbeddedWallet({
+          user: { wallet: props.userWallet, linkedAccounts: [] },
+          wallets: props.wallets,
+          createdWallet: props.createdWallet,
+        }),
+      {
+        initialProps: {
+          userWallet: null,
+          wallets: [],
+          createdWallet: { address: "0xCREATED" } as WalletLike,
+        },
+      },
+    );
+    expect(result.current?.address).toBe("0xCREATED");
+
+    // Privy then surfaces an embedded wallet through useWallets()
+    rerender({
+      userWallet: null,
+      wallets: [{ address: "0xCONNECTED", chainType: "ethereum", walletClientType: "privy" }],
+      createdWallet: { address: "0xCREATED" },
+    });
+    expect(result.current?.address).toBe("0xCONNECTED");
+
+    // Then the user.wallet field gets populated with an embedded wallet
+    rerender({
+      userWallet: { address: "0xUSER", chainType: "ethereum", walletClientType: "privy" },
+      wallets: [{ address: "0xCONNECTED", chainType: "ethereum", walletClientType: "privy" }],
+      createdWallet: { address: "0xCREATED" },
+    });
+    expect(result.current?.address).toBe("0xUSER");
+  });
+
+  it("falls back to createdWallet only when no other embedded source exists", () => {
+    expect(
+      resolvePrivyEmbeddedWallet({
+        user: { wallet: null, linkedAccounts: [] },
+        wallets: [],
+        createdWallet: { address: "0xCREATED" },
+      })?.address,
+    ).toBe("0xCREATED");
+    expect(
+      resolvePrivyEmbeddedWallet({
+        user: { wallet: null, linkedAccounts: [] },
+        wallets: [],
+        createdWallet: null,
+      }),
+    ).toBeNull();
+  });
 });
