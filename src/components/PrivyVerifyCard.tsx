@@ -417,6 +417,7 @@ function PrivyVerifyCardInner({
         } catch (e) {
           console.warn("[PrivyVerifyCard] refreshUser after wallet creation failed", e);
         }
+        if (!mountedRef.current || walletCreateAttemptRef.current !== attempt) return;
         const refreshedWallet = resolvePrivyEmbeddedWallet({
           user: refreshedUser,
           wallets: [],
