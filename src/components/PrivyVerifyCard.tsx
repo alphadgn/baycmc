@@ -229,6 +229,7 @@ function PrivyVerifyCardInner({
   >("idle");
   const [createdWallet, setCreatedWallet] = useState<WalletLike | null>(null);
   const [loginStartedHere, setLoginStartedHere] = useState(false);
+  const [preferredAddress, setPreferredAddress] = useState<string | null>(null);
   const autoVerifiedWalletRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
   const walletCreateStartedRef = useRef(false);
@@ -236,7 +237,34 @@ function PrivyVerifyCardInner({
   const walletCreateTimeoutRef = useRef<number | null>(null);
   const lastAuthUserIdRef = useRef<string | null>(null);
 
-  const wallet = resolvePrivyEmbeddedWallet({ user, wallets, createdWallet }) as WalletLike | null;
+  // Build the list of EVM wallets available in this Privy session — includes
+  // the embedded wallet plus any external EVM wallet the user connected.
+  const sessionEvmWallets: WalletLike[] = (() => {
+    const seen = new Map<string, WalletLike>();
+    const add = (w: WalletLike | null | undefined) => {
+      if (!w?.address) return;
+      const key = w.address.toLowerCase();
+      const chain = w.chainType ?? w.chain_type ?? "ethereum";
+      if (chain !== "ethereum") return;
+      if (!seen.has(key)) seen.set(key, w);
+    };
+    for (const w of wallets) add(w);
+    add(user?.wallet as WalletLike | null);
+    for (const acc of user?.linkedAccounts ?? []) {
+      if (acc.type === "wallet") add(acc as WalletLike);
+    }
+    if (createdWallet) add(createdWallet);
+    return [...seen.values()];
+  })();
+
+  const embeddedDefault = resolvePrivyEmbeddedWallet({ user, wallets, createdWallet }) as
+    | WalletLike
+    | null;
+  const preferredWallet = preferredAddress
+    ? sessionEvmWallets.find((w) => w.address.toLowerCase() === preferredAddress.toLowerCase()) ??
+      null
+    : null;
+  const wallet: WalletLike | null = preferredWallet ?? embeddedDefault ?? sessionEvmWallets[0] ?? null;
   const hasKnownWallet = Boolean(wallet);
   // First-time sign-in state: user is authenticated but the embedded
   // wallet hasn't been provisioned by Privy yet. We surface this as an
