@@ -749,6 +749,17 @@ function WalletStateInspector({
         </div>
       </div>
 
+      <ResolutionDiagnostics
+        authenticated={authenticated}
+        walletsReady={walletsReady}
+        walletCreateState={walletCreateState}
+        resolvedWallet={resolvedWallet}
+        entryCount={entries.length}
+        hasExternalOnly={
+          entries.length > 0 && entries.every((e) => !e.chainOk || e.walletClientType !== "privy")
+        }
+      />
+
       {entries.length === 0 ? (
         <div className="italic">No embedded wallets found in Privy user metadata.</div>
       ) : (
