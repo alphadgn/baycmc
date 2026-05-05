@@ -144,6 +144,16 @@ export const respondApeRideRequest = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
+    // Host must still be Token-Proof verified to accept/decline.
+    const { data: ver } = await supabase
+      .from("user_verifications")
+      .select("bayc_verified")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (!ver?.bayc_verified) {
+      return { ok: false as const, error: "Token Proof verification required." };
+    }
+
     // Verify caller is the host of the ride
     const { data: req } = await supabase
       .from("ape_ride_requests")
