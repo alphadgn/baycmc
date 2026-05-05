@@ -1,8 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { useDisconnect } from "wagmi";
 import { useAuth, signOut } from "@/lib/auth/useAuth";
-import { useWeb3Ready } from "@/components/Web3Provider";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import { EntranceDialog } from "@/components/EntranceDialog";
 import { EmbroideredImage } from "@/components/EmbroideredImage";
@@ -11,7 +9,6 @@ import { toast } from "sonner";
 
 export function AppHeader() {
   const { isAuthenticated } = useAuth();
-  const ready = useWeb3Ready();
   const [entranceOpen, setEntranceOpen] = useState(false);
   const { isLifer } = useVerificationStatus();
 
@@ -71,13 +68,7 @@ export function AppHeader() {
           </nav>
 
           <div className="flex items-center gap-2">
-            {ready ? (
-              <EntranceControls
-                onOpen={() => setEntranceOpen(true)}
-              />
-            ) : (
-              <div className="h-9 w-32 animate-pulse rounded-md bg-secondary/40" aria-hidden />
-            )}
+            <EntranceControls onOpen={() => setEntranceOpen(true)} />
           </div>
         </div>
       </header>
@@ -89,11 +80,9 @@ export function AppHeader() {
 
 function EntranceControls({ onOpen }: { onOpen: () => void }) {
   const { isAuthenticated, user } = useAuth();
-  const { disconnectAsync } = useDisconnect();
 
   async function handleSignOut() {
     await signOut();
-    await disconnectAsync().catch(() => {});
     toast.success("Signed out");
   }
 
