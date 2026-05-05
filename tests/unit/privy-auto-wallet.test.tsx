@@ -15,12 +15,19 @@ import { resolvePrivyEmbeddedWallet } from "@/lib/privyWallets";
  * shape and exercise the same state machine the component uses.
  */
 
-type WalletLike = { address: string; chainType?: string; walletClientType?: string };
+type WalletLike = {
+  address: string;
+  type?: string;
+  chainType?: string;
+  walletClientType?: string;
+  connectorType?: string;
+};
 type Hook = (args: {
   authenticated: boolean;
   walletsReady: boolean;
   wallets: WalletLike[];
   userWallet: WalletLike | null;
+  linkedAccounts?: WalletLike[];
   userId: string | null;
   createWallet: () => Promise<WalletLike>;
 }) => { state: string; createdWallet: WalletLike | null };
@@ -30,6 +37,7 @@ const useAutoProvision: Hook = ({
   walletsReady,
   wallets,
   userWallet,
+  linkedAccounts = [],
   userId,
   createWallet,
 }) => {
@@ -51,7 +59,7 @@ const useAutoProvision: Hook = ({
   }, [authenticated, userId]);
 
   const wallet = resolvePrivyEmbeddedWallet({
-    user: { wallet: userWallet, linkedAccounts: [] },
+    user: { wallet: userWallet, linkedAccounts },
     wallets,
     createdWallet,
   }) as WalletLike | null;
@@ -351,4 +359,61 @@ describe("Privy embedded wallet auto-provisioning", () => {
       }),
     ).toBeNull();
   });
+
+  it.each([
+    { provider: "MetaMask", connectorType: "injected", walletClientType: "metamask" },
+    { provider: "WalletConnect", connectorType: "wallet_connect", walletClientType: "rainbow" },
+  ])(
+    "treats $provider sign-in external wallets identically and creates an embedded wallet when missing",
+    async ({ connectorType, walletClientType }) => {
+      const { result } = renderHook(() =>
+        useAutoProvision({
+          authenticated: true,
+          walletsReady: true,
+          wallets: [{ address: "0xEXTERNAL", chainType: "ethereum", connectorType, walletClientType }],
+          userWallet: { address: "0xEXTERNAL", chainType: "ethereum", connectorType, walletClientType },
+          linkedAccounts: [
+            { type: "wallet", address: "0xEXTERNAL", chainType: "ethereum", connectorType, walletClientType },
+          ],
+          userId: `did:privy:${walletClientType}`,
+          createWallet,
+        }),
+      );
+
+      await waitFor(() => expect(result.current.state).toBe("created"));
+      expect(createWallet).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each([
+    { provider: "MetaMask", connectorType: "injected", walletClientType: "metamask" },
+    { provider: "WalletConnect", connectorType: "wallet_connect", walletClientType: "rainbow" },
+  ])(
+    "prioritizes linked embedded wallets over $provider external wallets across rerenders",
+    ({ connectorType, walletClientType }) => {
+      const { result, rerender } = renderHook(
+        (props: { linkedAccounts: WalletLike[]; wallets: WalletLike[]; createdWallet: WalletLike | null }) =>
+          resolvePrivyEmbeddedWallet({ user: { wallet: null, linkedAccounts: props.linkedAccounts }, wallets: props.wallets, createdWallet: props.createdWallet }),
+        {
+          initialProps: {
+            linkedAccounts: [{ type: "wallet", address: "0xEXTERNAL", chainType: "ethereum", connectorType, walletClientType }],
+            wallets: [{ address: "0xEXTERNAL", chainType: "ethereum", connectorType, walletClientType }],
+            createdWallet: null,
+          },
+        },
+      );
+      expect(result.current).toBeNull();
+
+      rerender({
+        linkedAccounts: [
+          { type: "wallet", address: "0xEXTERNAL", chainType: "ethereum", connectorType, walletClientType },
+          { type: "wallet", address: "0xEMBEDDED", chainType: "ethereum", walletClientType: "privy" },
+        ],
+        wallets: [{ address: "0xEXTERNAL", chainType: "ethereum", connectorType, walletClientType }],
+        createdWallet: { address: "0xCREATED" },
+      });
+
+      expect(result.current?.address).toBe("0xEMBEDDED");
+    },
+  );
 });

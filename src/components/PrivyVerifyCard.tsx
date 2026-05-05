@@ -18,6 +18,12 @@ type EthereumProviderLike = {
 
 type WalletLike = {
   address: string;
+  chainType?: string;
+  chain_type?: string;
+  walletClientType?: string;
+  wallet_client_type?: string;
+  connectorType?: string;
+  connector_type?: string;
   getEthereumProvider?: () => Promise<EthereumProviderLike>;
 };
 
@@ -66,6 +72,7 @@ type PrivyHooks = {
   useCreateWallet: () => {
     createWallet: (options?: { createAdditional?: boolean }) => Promise<WalletLike>;
   };
+  useUser: () => { user: PrivyUserLike | null; refreshUser: () => Promise<PrivyUserLike> };
   useSignMessage: () => {
     signMessage: (
       input: { message: string },
@@ -136,6 +143,7 @@ export function PrivyVerifyCard({
           usePrivy: mod.usePrivy,
           useWallets: mod.useWallets,
           useCreateWallet: mod.useCreateWallet,
+          useUser: mod.useUser,
           useSignMessage: mod.useSignMessage,
         });
       } catch {
@@ -202,6 +210,7 @@ function PrivyVerifyCardInner({
   const { ready, authenticated, login, logout, user } = hooks.usePrivy();
   const { wallets, ready: walletsReady } = hooks.useWallets();
   const { createWallet } = hooks.useCreateWallet();
+  const { refreshUser } = hooks.useUser();
   const { signMessage } = hooks.useSignMessage();
   const verifyFn = useServerFn(verifyPrivyOwnership);
   const auditProvisionFn = useServerFn(logEmbeddedWalletProvisioned);
@@ -402,7 +411,19 @@ function PrivyVerifyCardInner({
       .then(async (newWallet: WalletLike) => {
         if (walletCreateTimeoutRef.current) window.clearTimeout(walletCreateTimeoutRef.current);
         if (!mountedRef.current || walletCreateAttemptRef.current !== attempt) return;
-        setCreatedWallet(newWallet);
+        let refreshedUser: PrivyUserLike | null = null;
+        try {
+          refreshedUser = await refreshUser();
+        } catch (e) {
+          console.warn("[PrivyVerifyCard] refreshUser after wallet creation failed", e);
+        }
+        if (!mountedRef.current || walletCreateAttemptRef.current !== attempt) return;
+        const refreshedWallet = resolvePrivyEmbeddedWallet({
+          user: refreshedUser,
+          wallets: [],
+          createdWallet: null,
+        }) as WalletLike | null;
+        setCreatedWallet(refreshedWallet ?? newWallet);
         setWalletCreateState("created");
         // Best-effort audit log + dedupe check. If the server reports a
         // prior provisioning record for this Privy user, we surface it
@@ -441,6 +462,7 @@ function PrivyVerifyCardInner({
     authenticated,
     createWallet,
     hasKnownWallet,
+    refreshUser,
     user?.email?.address,
     user?.id,
     wallet,
