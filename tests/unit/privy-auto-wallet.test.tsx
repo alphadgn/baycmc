@@ -14,7 +14,7 @@ import { resolvePrivyEmbeddedWallet } from "@/lib/privyWallets";
  * shape and exercise the same state machine the component uses.
  */
 
-type WalletLike = { address: string };
+type WalletLike = { address: string; chainType?: string; walletClientType?: string };
 type Hook = (args: {
   authenticated: boolean;
   walletsReady: boolean;
@@ -110,7 +110,7 @@ describe("Privy embedded wallet auto-provisioning", () => {
         authenticated: true,
         walletsReady: true,
         wallets: [],
-        userWallet: { address: "0xEXISTING" },
+        userWallet: { address: "0xEXISTING", chainType: "ethereum", walletClientType: "privy" },
         userId: "did:privy:user-2",
         createWallet,
       }),
@@ -245,7 +245,7 @@ describe("Privy embedded wallet auto-provisioning", () => {
         authenticated: true,
         walletsReady: false,
         wallets: [],
-        userWallet: { address: "0xEXISTING" },
+        userWallet: { address: "0xEXISTING", chainType: "ethereum", walletClientType: "privy" },
         userId: "did:privy:user-existing-toggle",
         createWallet,
       },
@@ -255,7 +255,7 @@ describe("Privy embedded wallet auto-provisioning", () => {
       authenticated: true,
       walletsReady: true,
       wallets: [],
-      userWallet: { address: "0xEXISTING" },
+      userWallet: { address: "0xEXISTING", chainType: "ethereum", walletClientType: "privy" },
       userId: "did:privy:user-existing-toggle",
       createWallet,
     });
