@@ -15,12 +15,19 @@ import { resolvePrivyEmbeddedWallet } from "@/lib/privyWallets";
  * shape and exercise the same state machine the component uses.
  */
 
-type WalletLike = { address: string; chainType?: string; walletClientType?: string };
+type WalletLike = {
+  address: string;
+  type?: string;
+  chainType?: string;
+  walletClientType?: string;
+  connectorType?: string;
+};
 type Hook = (args: {
   authenticated: boolean;
   walletsReady: boolean;
   wallets: WalletLike[];
   userWallet: WalletLike | null;
+  linkedAccounts?: WalletLike[];
   userId: string | null;
   createWallet: () => Promise<WalletLike>;
 }) => { state: string; createdWallet: WalletLike | null };
@@ -30,6 +37,7 @@ const useAutoProvision: Hook = ({
   walletsReady,
   wallets,
   userWallet,
+  linkedAccounts = [],
   userId,
   createWallet,
 }) => {
@@ -51,7 +59,7 @@ const useAutoProvision: Hook = ({
   }, [authenticated, userId]);
 
   const wallet = resolvePrivyEmbeddedWallet({
-    user: { wallet: userWallet, linkedAccounts: [] },
+    user: { wallet: userWallet, linkedAccounts },
     wallets,
     createdWallet,
   }) as WalletLike | null;
