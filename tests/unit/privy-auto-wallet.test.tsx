@@ -1,6 +1,8 @@
+// @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { useEffect, useRef, useState } from "react";
+import { resolvePrivyEmbeddedWallet } from "@/lib/privyWallets";
 
 /**
  * These tests pin down the rule the user asked us to enforce:
@@ -13,7 +15,7 @@ import { useEffect, useRef, useState } from "react";
  * shape and exercise the same state machine the component uses.
  */
 
-type WalletLike = { address: string };
+type WalletLike = { address: string; chainType?: string; walletClientType?: string };
 type Hook = (args: {
   authenticated: boolean;
   walletsReady: boolean;
@@ -48,8 +50,12 @@ const useAutoProvision: Hook = ({
     }
   }, [authenticated, userId]);
 
-  const wallet = wallets[0] ?? createdWallet ?? userWallet;
-  const hasKnownWallet = Boolean(wallets.length > 0 || createdWallet || userWallet);
+  const wallet = resolvePrivyEmbeddedWallet({
+    user: { wallet: userWallet, linkedAccounts: [] },
+    wallets,
+    createdWallet,
+  }) as WalletLike | null;
+  const hasKnownWallet = Boolean(wallet);
 
   useEffect(() => {
     if (
@@ -105,7 +111,7 @@ describe("Privy embedded wallet auto-provisioning", () => {
         authenticated: true,
         walletsReady: true,
         wallets: [],
-        userWallet: { address: "0xEXISTING" },
+        userWallet: { address: "0xEXISTING", chainType: "ethereum", walletClientType: "privy" },
         userId: "did:privy:user-2",
         createWallet,
       }),
@@ -120,7 +126,7 @@ describe("Privy embedded wallet auto-provisioning", () => {
       useAutoProvision({
         authenticated: true,
         walletsReady: true,
-        wallets: [{ address: "0xCONNECTED" }],
+        wallets: [{ address: "0xCONNECTED", chainType: "ethereum", walletClientType: "privy" }],
         userWallet: null,
         userId: "did:privy:user-3",
         createWallet,
@@ -201,5 +207,92 @@ describe("Privy embedded wallet auto-provisioning", () => {
     });
 
     await waitFor(() => expect(createWallet).toHaveBeenCalledTimes(2));
+  });
+
+  it("waits for walletsReady to become true before creating a missing wallet", async () => {
+    const { result, rerender } = renderHook(
+      (props: Parameters<Hook>[0]) => useAutoProvision(props),
+      {
+        initialProps: {
+          authenticated: true,
+          walletsReady: false,
+          wallets: [],
+          userWallet: null,
+          userId: "did:privy:user-ready-toggle",
+          createWallet,
+        },
+      },
+    );
+
+    await new Promise((r) => setTimeout(r, 10));
+    expect(createWallet).not.toHaveBeenCalled();
+
+    rerender({
+      authenticated: true,
+      walletsReady: true,
+      wallets: [],
+      userWallet: null,
+      userId: "did:privy:user-ready-toggle",
+      createWallet,
+    });
+
+    await waitFor(() => expect(result.current.state).toBe("created"));
+    expect(createWallet).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not create when walletsReady toggles true with an existing linked embedded wallet", async () => {
+    const { rerender } = renderHook((props: Parameters<Hook>[0]) => useAutoProvision(props), {
+      initialProps: {
+        authenticated: true,
+        walletsReady: false,
+        wallets: [],
+        userWallet: { address: "0xEXISTING", chainType: "ethereum", walletClientType: "privy" },
+        userId: "did:privy:user-existing-toggle",
+        createWallet,
+      },
+    });
+
+    rerender({
+      authenticated: true,
+      walletsReady: true,
+      wallets: [],
+      userWallet: { address: "0xEXISTING", chainType: "ethereum", walletClientType: "privy" },
+      userId: "did:privy:user-existing-toggle",
+      createWallet,
+    });
+
+    await new Promise((r) => setTimeout(r, 10));
+    expect(createWallet).not.toHaveBeenCalled();
+  });
+
+  it("prioritizes linked embedded wallets over connected and newly created wallets", () => {
+    const wallet = resolvePrivyEmbeddedWallet({
+      user: {
+        wallet: { address: "0xUSER", chainType: "ethereum", walletClientType: "privy" },
+        linkedAccounts: [
+          { type: "wallet", address: "0xLINKED", chainType: "ethereum", walletClientType: "privy" },
+        ],
+      },
+      wallets: [{ address: "0xCONNECTED", chainType: "ethereum", walletClientType: "privy" }],
+      createdWallet: { address: "0xCREATED" },
+    });
+
+    expect(wallet?.address).toBe("0xLINKED");
+  });
+
+  it("ignores external user.wallet entries so email users still get an embedded wallet", async () => {
+    const { result } = renderHook(() =>
+      useAutoProvision({
+        authenticated: true,
+        walletsReady: true,
+        wallets: [],
+        userWallet: { address: "0xMETAMASK" },
+        userId: "did:privy:user-external-wallet",
+        createWallet,
+      }),
+    );
+
+    await waitFor(() => expect(result.current.state).toBe("created"));
+    expect(createWallet).toHaveBeenCalledTimes(1);
   });
 });

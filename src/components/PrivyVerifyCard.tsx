@@ -9,6 +9,7 @@ import {
   inspectWalletHoldings,
   logEmbeddedWalletProvisioned,
 } from "@/server/privy.functions";
+import { resolvePrivyEmbeddedWallet } from "@/lib/privyWallets";
 import { toast } from "sonner";
 
 type EthereumProviderLike = {
@@ -23,7 +24,11 @@ type WalletLike = {
 type PrivyLinkedWalletLike = WalletLike & {
   type?: string;
   chainType?: string;
+  chain_type?: string;
   walletClientType?: string;
+  wallet_client_type?: string;
+  connectorType?: string;
+  connector_type?: string;
 };
 
 type PrivyUserLike = {
@@ -222,9 +227,8 @@ function PrivyVerifyCardInner({
   const walletCreateTimeoutRef = useRef<number | null>(null);
   const lastAuthUserIdRef = useRef<string | null>(null);
 
-  const userWallet = getUserWallet(user);
-  const wallet = wallets[0] ?? createdWallet ?? userWallet;
-  const hasKnownWallet = Boolean(wallets.length > 0 || createdWallet || userWallet);
+  const wallet = resolvePrivyEmbeddedWallet({ user, wallets, createdWallet }) as WalletLike | null;
+  const hasKnownWallet = Boolean(wallet);
   // First-time sign-in state: user is authenticated but the embedded
   // wallet hasn't been provisioned by Privy yet. We surface this as an
   // explicit status step so the modal flow doesn't look frozen.
@@ -853,17 +857,27 @@ function shortAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }
 
+function isEmbeddedEthereumWallet(wallet: Partial<PrivyLinkedWalletLike> | null | undefined) {
+  const chainType = wallet?.chainType ?? wallet?.chain_type;
+  const walletClientType = wallet?.walletClientType ?? wallet?.wallet_client_type;
+  const connectorType = wallet?.connectorType ?? wallet?.connector_type;
+
+  return (
+    typeof wallet?.address === "string" &&
+    wallet.address.length > 0 &&
+    (chainType ?? "ethereum") === "ethereum" &&
+    (walletClientType === "privy" ||
+      walletClientType === "privy-v2" ||
+      connectorType === "embedded")
+  );
+}
+
 function getUserWallet(user: PrivyUserLike | null | undefined): WalletLike | null {
   const linkedWallet = user?.linkedAccounts?.find(
-    (account) =>
-      account.type === "wallet" &&
-      account.chainType === "ethereum" &&
-      typeof account.address === "string" &&
-      account.address.length > 0 &&
-      (account.walletClientType === "privy" || account.walletClientType === "privy-v2"),
+    (account) => account.type === "wallet" && isEmbeddedEthereumWallet(account),
   );
 
-  const candidate = linkedWallet ?? user?.wallet;
+  const candidate = linkedWallet ?? (isEmbeddedEthereumWallet(user?.wallet) ? user?.wallet : null);
   if (!candidate?.address) return null;
   return { address: candidate.address };
 }
