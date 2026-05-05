@@ -608,7 +608,15 @@ function PrivyVerifyCardInner({
           >
             Disconnect
           </button>
-          <WalletStateInspector user={user} wallets={wallets} createdWallet={createdWallet} />
+          <WalletStateInspector
+            user={user}
+            wallets={wallets}
+            createdWallet={createdWallet}
+            walletCreateState={walletCreateState}
+            walletsReady={walletsReady}
+            authenticated={authenticated}
+            resolvedWallet={wallet}
+          />
         </div>
       )}
     </div>
