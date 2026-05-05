@@ -23,7 +23,9 @@ type WalletLike = {
 type PrivyLinkedWalletLike = WalletLike & {
   type?: string;
   chainType?: string;
+  chain_type?: string;
   walletClientType?: string;
+  wallet_client_type?: string;
 };
 
 type PrivyUserLike = {
@@ -222,9 +224,11 @@ function PrivyVerifyCardInner({
   const walletCreateTimeoutRef = useRef<number | null>(null);
   const lastAuthUserIdRef = useRef<string | null>(null);
 
-  const userWallet = getUserWallet(user);
-  const wallet = wallets[0] ?? createdWallet ?? userWallet;
-  const hasKnownWallet = Boolean(wallets.length > 0 || createdWallet || userWallet);
+  const linkedEmbeddedWallet = getUserWallet(user);
+  const connectedEmbeddedWallet = wallets.find(isEmbeddedEthereumWallet) ?? null;
+  const resolvedWallet = linkedEmbeddedWallet ?? connectedEmbeddedWallet ?? createdWallet;
+  const wallet = resolvedWallet;
+  const hasKnownWallet = Boolean(linkedEmbeddedWallet || connectedEmbeddedWallet || createdWallet);
   // First-time sign-in state: user is authenticated but the embedded
   // wallet hasn't been provisioned by Privy yet. We surface this as an
   // explicit status step so the modal flow doesn't look frozen.
