@@ -234,6 +234,9 @@ function ProfilePage() {
               }
             />
           </ul>
+          <div className="mt-6">
+            <VerificationStatusPanel />
+          </div>
         </section>
       </div>
     </main>
