@@ -194,7 +194,6 @@ export function useWallet(input: UseWalletInput): UseWalletResult {
     const timeout = window.setTimeout(
       () => {
         if (!mountedRef.current) return;
-        if (walletState === "ready") return;
         logEvent("wallet", "warn", "createWallet timeout", { attempt: next });
         inflightRef.current = false;
         if (next >= MAX_ATTEMPTS) {
