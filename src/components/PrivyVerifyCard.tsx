@@ -409,8 +409,7 @@ function PrivyVerifyCardInner({
     if (
       !authenticated ||
       !walletsReady ||
-      wallet ||
-      hasKnownWallet ||
+      embeddedDefault ||
       walletCreateState !== "idle" ||
       walletCreateStartedRef.current ||
       !user?.id
