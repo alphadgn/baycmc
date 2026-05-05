@@ -590,8 +590,38 @@ function PrivyVerifyCardInner({
     logout();
   }
 
+  // Derived wallet readiness — single source of truth for wallet-dependent UI.
+  const walletReady =
+    isSecureContext &&
+    ready &&
+    authenticated &&
+    walletsReady &&
+    !!wallet &&
+    walletCreateState !== "creating" &&
+    walletCreateState !== "failed";
+
+  if (!isSecureContext) {
+    return (
+      <div
+        data-testid="privy-status-insecure-context"
+        className="rounded-xl border border-destructive/40 bg-destructive/10 p-5"
+      >
+        <div className="flex items-center gap-2 text-destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <div className="text-lg font-semibold">Insecure connection</div>
+        </div>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Wallet sign-in requires HTTPS. Open this site over a secure connection to continue.
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <div className="rounded-xl border border-border bg-secondary/20 p-5">
+    <div
+      className="rounded-xl border border-border bg-secondary/20 p-5"
+      data-wallet-ready={walletReady ? "true" : "false"}
+    >
       <div className="flex items-center gap-2">
         <Wallet className="h-4 w-4 text-gold" />
         <div className="text-lg font-semibold">Privy</div>
