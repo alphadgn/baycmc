@@ -100,6 +100,9 @@ export function SocialFeed({ liferOnly = false }: SocialFeedProps) {
       .on("postgres_changes", { event: "*", schema: "public", table: "post_likes" }, () => {
         void loadAll();
       })
+      .on("postgres_changes", { event: "*", schema: "public", table: "post_comments" }, () => {
+        void loadAll();
+      })
       .subscribe();
     return () => {
       void supabase.removeChannel(channel);
