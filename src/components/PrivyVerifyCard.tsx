@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { CheckCircle2, ExternalLink, Wallet } from "lucide-react";
+import { CheckCircle2, ExternalLink, Wallet, AlertTriangle } from "lucide-react";
 import { SiweMessage } from "siwe";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -10,10 +10,12 @@ import {
   logEmbeddedWalletProvisioned,
 } from "@/server/privy.functions";
 import { resolvePrivyEmbeddedWallet } from "@/lib/privyWallets";
+import { logEvent } from "@/lib/diagnostics";
+import { enqueueSign } from "@/lib/wallet/txQueue";
 import { toast } from "sonner";
 
 type EthereumProviderLike = {
-  request: (args: { method: string; params: unknown[] }) => Promise<unknown>;
+  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
 };
 
 type WalletLike = {
@@ -214,6 +216,14 @@ function PrivyVerifyCardInner({
   const { signMessage } = hooks.useSignMessage();
   const verifyFn = useServerFn(verifyPrivyOwnership);
   const auditProvisionFn = useServerFn(logEmbeddedWalletProvisioned);
+
+  // Embedded wallets need a secure context for the browser crypto APIs Privy
+  // depends on. Block all wallet UI on insecure origins with a visible error.
+  const isSecureContext = useMemo(
+    () => (typeof window === "undefined" ? true : window.isSecureContext === true),
+    [],
+  );
+
   type VerificationResult = {
     collection: "BAYC" | "MAYC";
     verificationBasis: "direct" | "delegated";
@@ -235,7 +245,24 @@ function PrivyVerifyCardInner({
   const walletCreateStartedRef = useRef(false);
   const walletCreateAttemptRef = useRef(0);
   const walletCreateTimeoutRef = useRef<number | null>(null);
+  const walletCreateBackoffRef = useRef<number | null>(null);
   const lastAuthUserIdRef = useRef<string | null>(null);
+
+  // Log auth state transitions for observability.
+  useEffect(() => {
+    logEvent("auth", "info", "auth state", {
+      ready,
+      authenticated,
+      walletsReady,
+      userId: user?.id ?? null,
+    });
+  }, [ready, authenticated, walletsReady, user?.id]);
+
+  useEffect(() => {
+    if (!isSecureContext) {
+      logEvent("env", "error", "insecure context — wallet flow blocked");
+    }
+  }, [isSecureContext]);
 
   // Build the list of EVM wallets available in this Privy session — includes
   // the embedded wallet plus any external EVM wallet the user connected.
@@ -316,11 +343,17 @@ function PrivyVerifyCardInner({
           signature = signed.signature;
         } catch (signError) {
           if (!targetWallet.getEthereumProvider) throw signError;
+          logEvent("wallet", "warn", "signMessage failed, falling back to provider", {
+            address,
+          });
           const provider = await targetWallet.getEthereumProvider();
-          signature = (await provider.request({
-            method: "personal_sign",
-            params: [message, address],
-          })) as string;
+          // Serialize through the queue to prevent concurrent-sign races.
+          signature = (await enqueueSign(
+            provider,
+            "personal_sign",
+            [message, address],
+            { label: "verify:personal_sign" },
+          )) as string;
         }
 
         const result = (await verifyFn({
@@ -477,12 +510,26 @@ function PrivyVerifyCardInner({
       .catch((e: unknown) => {
         if (walletCreateTimeoutRef.current) window.clearTimeout(walletCreateTimeoutRef.current);
         if (!mountedRef.current || walletCreateAttemptRef.current !== attempt) return;
-        console.error("Privy embedded wallet creation failed", e);
         const msg = e instanceof Error ? e.message : "";
-        setWalletCreateState("failed");
-        setError(
-          msg || "We couldn't create your embedded wallet. Disconnect and try signing in again.",
-        );
+        logEvent("wallet", "error", "createWallet failed", { attempt, error: msg });
+        // Exponential backoff (max 3 attempts: 1.5s, 3s, 6s)
+        const MAX_ATTEMPTS = 3;
+        if (attempt < MAX_ATTEMPTS) {
+          const delay = 1500 * Math.pow(2, attempt - 1);
+          logEvent("wallet", "info", "createWallet backoff", { attempt, delay });
+          if (walletCreateBackoffRef.current) window.clearTimeout(walletCreateBackoffRef.current);
+          walletCreateBackoffRef.current = window.setTimeout(() => {
+            if (!mountedRef.current) return;
+            walletCreateStartedRef.current = false;
+            setWalletCreateState("idle");
+          }, delay);
+        } else {
+          setWalletCreateState("failed");
+          setError(
+            msg ||
+              "We couldn't create your embedded wallet after 3 attempts. Disconnect and try signing in again.",
+          );
+        }
       });
   }, [
     auditProvisionFn,
@@ -557,8 +604,38 @@ function PrivyVerifyCardInner({
     logout();
   }
 
+  // Derived wallet readiness — single source of truth for wallet-dependent UI.
+  const walletReady =
+    isSecureContext &&
+    ready &&
+    authenticated &&
+    walletsReady &&
+    !!wallet &&
+    walletCreateState !== "creating" &&
+    walletCreateState !== "failed";
+
+  if (!isSecureContext) {
+    return (
+      <div
+        data-testid="privy-status-insecure-context"
+        className="rounded-xl border border-destructive/40 bg-destructive/10 p-5"
+      >
+        <div className="flex items-center gap-2 text-destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <div className="text-lg font-semibold">Insecure connection</div>
+        </div>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Wallet sign-in requires HTTPS. Open this site over a secure connection to continue.
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <div className="rounded-xl border border-border bg-secondary/20 p-5">
+    <div
+      className="rounded-xl border border-border bg-secondary/20 p-5"
+      data-wallet-ready={walletReady ? "true" : "false"}
+    >
       <div className="flex items-center gap-2">
         <Wallet className="h-4 w-4 text-gold" />
         <div className="text-lg font-semibold">Privy</div>

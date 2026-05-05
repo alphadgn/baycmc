@@ -1,12 +1,19 @@
 /**
- * Tiny in-app crash recorder. We catch unhandled errors + promise rejections,
- * snapshot route + UA, and persist to localStorage so the user can open
- * /diagnostics after a refresh-induced crash and copy the details back to us.
+ * Tiny in-app crash recorder + structured event log. We catch unhandled errors
+ * and promise rejections, snapshot route + UA, and persist to localStorage so
+ * the user can open /diagnostics after a refresh-induced crash and copy the
+ * details back to us.
+ *
+ * The event log is an in-memory + localStorage ring buffer used by the wallet
+ * hook, transaction queue, and other observability points to surface structured
+ * events on the /diagnostics page without leaking secrets.
  *
  * SSR-safe: every browser API access is guarded.
  */
 const KEY = "baycmc:lastError";
+const EVT_KEY = "baycmc:events";
 const MAX = 5;
+const EVT_MAX = 200;
 
 export type DiagEntry = {
   ts: string;
@@ -19,6 +26,17 @@ export type DiagEntry = {
   column?: number;
   userAgent: string;
   type: "error" | "unhandledrejection";
+};
+
+export type DiagEventCategory = "auth" | "wallet" | "tx" | "rpc" | "env" | "ui";
+export type DiagEventLevel = "debug" | "info" | "warn" | "error";
+
+export type DiagEvent = {
+  ts: string;
+  category: DiagEventCategory;
+  level: DiagEventLevel;
+  message: string;
+  data?: Record<string, unknown>;
 };
 
 function safeWindow(): Window | null {
@@ -98,4 +116,93 @@ export function installDiagnostics(): void {
       type: "unhandledrejection",
     });
   });
+}
+
+// ===== Structured event log =====
+
+let memEvents: DiagEvent[] = [];
+const subscribers = new Set<(events: DiagEvent[]) => void>();
+
+function persistEvents() {
+  const w = safeWindow();
+  if (!w) return;
+  try {
+    w.localStorage.setItem(EVT_KEY, JSON.stringify(memEvents.slice(0, EVT_MAX)));
+  } catch {
+    /* noop */
+  }
+}
+
+function loadEventsOnce() {
+  const w = safeWindow();
+  if (!w || memEvents.length > 0) return;
+  try {
+    const raw = w.localStorage.getItem(EVT_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) memEvents = parsed.slice(0, EVT_MAX);
+  } catch {
+    /* noop */
+  }
+}
+
+export function logEvent(
+  category: DiagEventCategory,
+  level: DiagEventLevel,
+  message: string,
+  data?: Record<string, unknown>,
+): void {
+  loadEventsOnce();
+  const evt: DiagEvent = {
+    ts: new Date().toISOString(),
+    category,
+    level,
+    message,
+    data,
+  };
+  memEvents = [evt, ...memEvents].slice(0, EVT_MAX);
+  persistEvents();
+  // Mirror to console so devs see structured logs without opening /diagnostics.
+  const tag = `[${category}:${level}]`;
+  if (level === "error") console.error(tag, message, data ?? "");
+  else if (level === "warn") console.warn(tag, message, data ?? "");
+  else console.log(tag, message, data ?? "");
+  for (const s of subscribers) {
+    try {
+      s(memEvents);
+    } catch {
+      /* noop */
+    }
+  }
+}
+
+export function readEvents(): DiagEvent[] {
+  loadEventsOnce();
+  return memEvents.slice();
+}
+
+export function clearEvents(): void {
+  memEvents = [];
+  const w = safeWindow();
+  if (w) {
+    try {
+      w.localStorage.removeItem(EVT_KEY);
+    } catch {
+      /* noop */
+    }
+  }
+  for (const s of subscribers) {
+    try {
+      s(memEvents);
+    } catch {
+      /* noop */
+    }
+  }
+}
+
+export function subscribeEvents(cb: (events: DiagEvent[]) => void): () => void {
+  subscribers.add(cb);
+  return () => {
+    subscribers.delete(cb);
+  };
 }

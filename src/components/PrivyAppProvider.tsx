@@ -104,12 +104,12 @@ export function PrivyAppProvider({ children }: { children: ReactNode }) {
           defaultChain: mainnetChain,
           supportedChains: [mainnetChain],
           embeddedWallets: {
-            // Provision an embedded EVM wallet automatically for any user
-            // that signs in without one. The manual createWallet() fallback
-            // in PrivyVerifyCard handles the rare case where Privy doesn't
-            // emit the wallet within the post-login window.
+            // Provision an embedded EVM wallet for ALL users on login. The
+            // manual createWallet() retry chain in useWallet covers the rare
+            // case where Privy fails to emit the wallet within the post-login
+            // window.
             ethereum: {
-              createOnLogin: "users-without-wallets",
+              createOnLogin: "all-users",
             },
             requireUserOwnedRecoveryOnCreate: false,
             requireUserPasswordOnCreate: false,
