@@ -15,7 +15,7 @@ import { enqueueSign } from "@/lib/wallet/txQueue";
 import { toast } from "sonner";
 
 type EthereumProviderLike = {
-  request: (args: { method: string; params: unknown[] }) => Promise<unknown>;
+  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
 };
 
 type WalletLike = {
