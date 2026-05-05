@@ -229,6 +229,7 @@ function PrivyVerifyCardInner({
   >("idle");
   const [createdWallet, setCreatedWallet] = useState<WalletLike | null>(null);
   const [loginStartedHere, setLoginStartedHere] = useState(false);
+  const [preferredAddress, setPreferredAddress] = useState<string | null>(null);
   const autoVerifiedWalletRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
   const walletCreateStartedRef = useRef(false);
@@ -236,7 +237,34 @@ function PrivyVerifyCardInner({
   const walletCreateTimeoutRef = useRef<number | null>(null);
   const lastAuthUserIdRef = useRef<string | null>(null);
 
-  const wallet = resolvePrivyEmbeddedWallet({ user, wallets, createdWallet }) as WalletLike | null;
+  // Build the list of EVM wallets available in this Privy session — includes
+  // the embedded wallet plus any external EVM wallet the user connected.
+  const sessionEvmWallets: WalletLike[] = (() => {
+    const seen = new Map<string, WalletLike>();
+    const add = (w: WalletLike | null | undefined) => {
+      if (!w?.address) return;
+      const key = w.address.toLowerCase();
+      const chain = w.chainType ?? w.chain_type ?? "ethereum";
+      if (chain !== "ethereum") return;
+      if (!seen.has(key)) seen.set(key, w);
+    };
+    for (const w of wallets) add(w);
+    add(user?.wallet as WalletLike | null);
+    for (const acc of user?.linkedAccounts ?? []) {
+      if (acc.type === "wallet") add(acc as WalletLike);
+    }
+    if (createdWallet) add(createdWallet);
+    return [...seen.values()];
+  })();
+
+  const embeddedDefault = resolvePrivyEmbeddedWallet({ user, wallets, createdWallet }) as
+    | WalletLike
+    | null;
+  const preferredWallet = preferredAddress
+    ? sessionEvmWallets.find((w) => w.address.toLowerCase() === preferredAddress.toLowerCase()) ??
+      null
+    : null;
+  const wallet: WalletLike | null = preferredWallet ?? embeddedDefault ?? sessionEvmWallets[0] ?? null;
   const hasKnownWallet = Boolean(wallet);
   // First-time sign-in state: user is authenticated but the embedded
   // wallet hasn't been provisioned by Privy yet. We surface this as an
@@ -381,8 +409,7 @@ function PrivyVerifyCardInner({
     if (
       !authenticated ||
       !walletsReady ||
-      wallet ||
-      hasKnownWallet ||
+      embeddedDefault ||
       walletCreateState !== "idle" ||
       walletCreateStartedRef.current ||
       !user?.id
@@ -461,11 +488,10 @@ function PrivyVerifyCardInner({
     auditProvisionFn,
     authenticated,
     createWallet,
-    hasKnownWallet,
+    embeddedDefault,
     refreshUser,
     user?.email?.address,
     user?.id,
-    wallet,
     walletCreateState,
     walletsReady,
   ]);
@@ -538,6 +564,34 @@ function PrivyVerifyCardInner({
         </button>
       ) : (
         <div className="mt-4 space-y-2" data-testid="privy-post-login">
+          {!walletsReady && (
+            <div
+              data-testid="privy-status-wallets-loading"
+              className="rounded-md border border-border/60 bg-secondary/20 px-3 py-2 text-xs text-muted-foreground"
+            >
+              Loading your wallet session…
+            </div>
+          )}
+          {walletsReady && sessionEvmWallets.length === 0 && walletCreateState === "idle" && (
+            <div
+              data-testid="privy-status-no-wallets"
+              className="rounded-md border border-gold/30 bg-gold/5 px-3 py-2 text-xs text-muted-foreground"
+            >
+              No EVM wallet found yet — provisioning a fresh embedded wallet for this account…
+            </div>
+          )}
+          {walletsReady &&
+            sessionEvmWallets.length > 0 &&
+            !embeddedDefault &&
+            walletCreateState === "idle" && (
+              <div
+                data-testid="privy-status-external-only"
+                className="rounded-md border border-gold/30 bg-gold/5 px-3 py-2 text-xs text-muted-foreground"
+              >
+                Only external wallets are connected. We&rsquo;re creating a Privy embedded wallet
+                so you can sign in headlessly.
+              </div>
+            )}
           {isCreatingWallet && (
             <div
               data-testid="privy-status-creating-wallet"
@@ -547,13 +601,45 @@ function PrivyVerifyCardInner({
               wallet… this is a one-time setup for new emails.
             </div>
           )}
+          {sessionEvmWallets.length > 1 && (
+            <div className="rounded-md border border-border bg-background/40 px-3 py-2 text-[11px] text-muted-foreground">
+              <label className="mb-1 block font-semibold text-foreground">
+                Preferred wallet for this session
+              </label>
+              <select
+                value={(preferredAddress ?? wallet?.address ?? "").toLowerCase()}
+                onChange={(e) => {
+                  setPreferredAddress(e.target.value);
+                  autoVerifiedWalletRef.current = null;
+                }}
+                className="w-full rounded-md border border-border bg-input px-2 py-1.5 text-xs text-foreground"
+              >
+                {sessionEvmWallets.map((w) => {
+                  const isEmbedded =
+                    (w.walletClientType ?? w.wallet_client_type) === "privy" ||
+                    (w.walletClientType ?? w.wallet_client_type) === "privy-v2" ||
+                    (w.connectorType ?? w.connector_type) === "embedded";
+                  return (
+                    <option key={w.address} value={w.address.toLowerCase()}>
+                      {shortAddress(w.address)} · {isEmbedded ? "embedded" : (w.walletClientType ?? "external")}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          )}
           {wallet && (
             <div
               data-testid="privy-status-wallet-ready"
               className="rounded-md border border-border bg-background/40 px-3 py-2 text-[11px] text-muted-foreground"
               data-wallet-address={wallet.address}
             >
-              <div className="font-semibold text-foreground">Embedded wallet ready</div>
+              <div className="font-semibold text-foreground">
+                {(wallet.walletClientType ?? wallet.wallet_client_type) === "privy" ||
+                (wallet.walletClientType ?? wallet.wallet_client_type) === "privy-v2"
+                  ? "Embedded wallet ready"
+                  : "External wallet selected"}
+              </div>
               <div className="font-mono">{shortAddress(wallet.address)}</div>
             </div>
           )}

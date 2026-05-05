@@ -30,6 +30,28 @@ export const createBooking = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
+    // Re-check tier gating server-side. RLS already enforces this on insert,
+    // but we want a clean error message instead of an opaque RLS denial.
+    const { data: room } = await supabase
+      .from("rooms")
+      .select("tier, active")
+      .eq("id", data.roomId)
+      .maybeSingle();
+    if (!room || !room.active) {
+      return { ok: false as const, error: "Room not found or inactive" };
+    }
+    const { data: ver } = await supabase
+      .from("user_verifications")
+      .select("bayc_verified, otherpage_verified")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (!ver?.bayc_verified) {
+      return { ok: false as const, error: "Token Proof verification required to book." };
+    }
+    if (room.tier === "lifer" && !ver.otherpage_verified) {
+      return { ok: false as const, error: "Lifer badge required for this room." };
+    }
+
     let overrideBy: string | null = null;
     if (data.override) {
       const { data: roles } = await supabase

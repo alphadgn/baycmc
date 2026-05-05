@@ -100,6 +100,15 @@ export const requestApeRide = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
+    const { data: ver } = await supabase
+      .from("user_verifications")
+      .select("bayc_verified")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (!ver?.bayc_verified) {
+      return { ok: false as const, error: "Token Proof verification required." };
+    }
+
     const { data: ride } = await supabase
       .from("ape_rides")
       .select("id,status")
@@ -135,6 +144,16 @@ export const respondApeRideRequest = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
+    // Host must still be Token-Proof verified to accept/decline.
+    const { data: ver } = await supabase
+      .from("user_verifications")
+      .select("bayc_verified")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (!ver?.bayc_verified) {
+      return { ok: false as const, error: "Token Proof verification required." };
+    }
+
     // Verify caller is the host of the ride
     const { data: req } = await supabase
       .from("ape_ride_requests")
@@ -169,6 +188,17 @@ export const getApeRideToken = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+
+    // Re-verify Token Proof on every token mint. is_lifer is intentionally
+    // NOT required here — Ape Rides are not lifer-gated, only BAYC-gated.
+    const { data: ver } = await supabase
+      .from("user_verifications")
+      .select("bayc_verified")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (!ver?.bayc_verified) {
+      return { ok: false as const, error: "Token Proof verification required." };
+    }
 
     const { data: ride } = await supabase
       .from("ape_rides")

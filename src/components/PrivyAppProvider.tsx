@@ -104,17 +104,13 @@ export function PrivyAppProvider({ children }: { children: ReactNode }) {
           defaultChain: mainnetChain,
           supportedChains: [mainnetChain],
           embeddedWallets: {
-            // Do NOT use Privy's create-on-login modal here: on mobile it can
-            // stay forever on "Creating your wallet". We create the embedded
-            // wallet from our post-login card instead, then continue directly
-            // into the BAYC/MAYC check.
+            // Provision an embedded EVM wallet automatically for any user
+            // that signs in without one. The manual createWallet() fallback
+            // in PrivyVerifyCard handles the rare case where Privy doesn't
+            // emit the wallet within the post-login window.
             ethereum: {
-              createOnLogin: "off",
+              createOnLogin: "users-without-wallets",
             },
-            // Keep embedded wallet creation and signing headless. The video
-            // showed Privy's mobile wallet UI stuck on "Creating your wallet";
-            // with app-managed recovery and hidden wallet UIs, createWallet()
-            // resolves without opening that blocking sheet.
             requireUserOwnedRecoveryOnCreate: false,
             requireUserPasswordOnCreate: false,
             showWalletUIs: false,
