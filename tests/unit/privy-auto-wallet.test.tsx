@@ -125,7 +125,7 @@ describe("Privy embedded wallet auto-provisioning", () => {
       useAutoProvision({
         authenticated: true,
         walletsReady: true,
-        wallets: [{ address: "0xCONNECTED" }],
+        wallets: [{ address: "0xCONNECTED", chainType: "ethereum", walletClientType: "privy" }],
         userWallet: null,
         userId: "did:privy:user-3",
         createWallet,
