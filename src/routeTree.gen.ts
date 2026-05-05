@@ -25,6 +25,7 @@ import { Route as AuthenticatedLifersRoomRouteImport } from './routes/_authentic
 import { Route as AuthenticatedLifersMessagesRouteImport } from './routes/_authenticated/lifers/messages'
 import { Route as AuthenticatedApeRidesRideIdRouteImport } from './routes/_authenticated/ape-rides.$rideId'
 import { Route as AuthenticatedAdminOtherpageRouteImport } from './routes/_authenticated/admin.otherpage'
+import { Route as AuthenticatedAdminLuminaRouteImport } from './routes/_authenticated/admin.lumina'
 
 const DiagnosticsRoute = DiagnosticsRouteImport.update({
   id: '/diagnostics',
@@ -110,6 +111,12 @@ const AuthenticatedAdminOtherpageRoute =
     path: '/otherpage',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminLuminaRoute =
+  AuthenticatedAdminLuminaRouteImport.update({
+    id: '/lumina',
+    path: '/lumina',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -121,6 +128,7 @@ export interface FileRoutesByFullPath {
   '/messages': typeof AuthenticatedMessagesRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/rooms': typeof AuthenticatedRoomsRouteWithChildren
+  '/admin/lumina': typeof AuthenticatedAdminLuminaRoute
   '/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
   '/ape-rides/$rideId': typeof AuthenticatedApeRidesRideIdRoute
   '/lifers/messages': typeof AuthenticatedLifersMessagesRoute
@@ -137,6 +145,7 @@ export interface FileRoutesByTo {
   '/messages': typeof AuthenticatedMessagesRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/rooms': typeof AuthenticatedRoomsRouteWithChildren
+  '/admin/lumina': typeof AuthenticatedAdminLuminaRoute
   '/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
   '/ape-rides/$rideId': typeof AuthenticatedApeRidesRideIdRoute
   '/lifers/messages': typeof AuthenticatedLifersMessagesRoute
@@ -156,6 +165,7 @@ export interface FileRoutesById {
   '/_authenticated/messages': typeof AuthenticatedMessagesRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/rooms': typeof AuthenticatedRoomsRouteWithChildren
+  '/_authenticated/admin/lumina': typeof AuthenticatedAdminLuminaRoute
   '/_authenticated/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
   '/_authenticated/ape-rides/$rideId': typeof AuthenticatedApeRidesRideIdRoute
   '/_authenticated/lifers/messages': typeof AuthenticatedLifersMessagesRoute
@@ -175,6 +185,7 @@ export interface FileRouteTypes {
     | '/messages'
     | '/profile'
     | '/rooms'
+    | '/admin/lumina'
     | '/admin/otherpage'
     | '/ape-rides/$rideId'
     | '/lifers/messages'
@@ -191,6 +202,7 @@ export interface FileRouteTypes {
     | '/messages'
     | '/profile'
     | '/rooms'
+    | '/admin/lumina'
     | '/admin/otherpage'
     | '/ape-rides/$rideId'
     | '/lifers/messages'
@@ -209,6 +221,7 @@ export interface FileRouteTypes {
     | '/_authenticated/messages'
     | '/_authenticated/profile'
     | '/_authenticated/rooms'
+    | '/_authenticated/admin/lumina'
     | '/_authenticated/admin/otherpage'
     | '/_authenticated/ape-rides/$rideId'
     | '/_authenticated/lifers/messages'
@@ -337,14 +350,23 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminOtherpageRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/lumina': {
+      id: '/_authenticated/admin/lumina'
+      path: '/lumina'
+      fullPath: '/admin/lumina'
+      preLoaderRoute: typeof AuthenticatedAdminLuminaRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
   }
 }
 
 interface AuthenticatedAdminRouteChildren {
+  AuthenticatedAdminLuminaRoute: typeof AuthenticatedAdminLuminaRoute
   AuthenticatedAdminOtherpageRoute: typeof AuthenticatedAdminOtherpageRoute
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
+  AuthenticatedAdminLuminaRoute: AuthenticatedAdminLuminaRoute,
   AuthenticatedAdminOtherpageRoute: AuthenticatedAdminOtherpageRoute,
 }
 
