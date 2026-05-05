@@ -100,6 +100,15 @@ export const requestApeRide = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
+    const { data: ver } = await supabase
+      .from("user_verifications")
+      .select("bayc_verified")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (!ver?.bayc_verified) {
+      return { ok: false as const, error: "Token Proof verification required." };
+    }
+
     const { data: ride } = await supabase
       .from("ape_rides")
       .select("id,status")
