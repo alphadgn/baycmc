@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { CheckCircle2, ExternalLink, Wallet } from "lucide-react";
+import { CheckCircle2, ExternalLink, Wallet, AlertTriangle } from "lucide-react";
 import { SiweMessage } from "siwe";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -10,6 +10,8 @@ import {
   logEmbeddedWalletProvisioned,
 } from "@/server/privy.functions";
 import { resolvePrivyEmbeddedWallet } from "@/lib/privyWallets";
+import { logEvent } from "@/lib/diagnostics";
+import { enqueueSign } from "@/lib/wallet/txQueue";
 import { toast } from "sonner";
 
 type EthereumProviderLike = {
