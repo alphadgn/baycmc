@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
 import { toast } from "sonner";
+import { VerificationStatusPanel } from "@/components/VerificationStatusPanel";
 
 export const Route = createFileRoute("/_authenticated/profile")({
   head: () => ({
