@@ -510,12 +510,26 @@ function PrivyVerifyCardInner({
       .catch((e: unknown) => {
         if (walletCreateTimeoutRef.current) window.clearTimeout(walletCreateTimeoutRef.current);
         if (!mountedRef.current || walletCreateAttemptRef.current !== attempt) return;
-        console.error("Privy embedded wallet creation failed", e);
         const msg = e instanceof Error ? e.message : "";
-        setWalletCreateState("failed");
-        setError(
-          msg || "We couldn't create your embedded wallet. Disconnect and try signing in again.",
-        );
+        logEvent("wallet", "error", "createWallet failed", { attempt, error: msg });
+        // Exponential backoff (max 3 attempts: 1.5s, 3s, 6s)
+        const MAX_ATTEMPTS = 3;
+        if (attempt < MAX_ATTEMPTS) {
+          const delay = 1500 * Math.pow(2, attempt - 1);
+          logEvent("wallet", "info", "createWallet backoff", { attempt, delay });
+          if (walletCreateBackoffRef.current) window.clearTimeout(walletCreateBackoffRef.current);
+          walletCreateBackoffRef.current = window.setTimeout(() => {
+            if (!mountedRef.current) return;
+            walletCreateStartedRef.current = false;
+            setWalletCreateState("idle");
+          }, delay);
+        } else {
+          setWalletCreateState("failed");
+          setError(
+            msg ||
+              "We couldn't create your embedded wallet after 3 attempts. Disconnect and try signing in again.",
+          );
+        }
       });
   }, [
     auditProvisionFn,
