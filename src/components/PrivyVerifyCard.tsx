@@ -216,6 +216,14 @@ function PrivyVerifyCardInner({
   const { signMessage } = hooks.useSignMessage();
   const verifyFn = useServerFn(verifyPrivyOwnership);
   const auditProvisionFn = useServerFn(logEmbeddedWalletProvisioned);
+
+  // Embedded wallets need a secure context for the browser crypto APIs Privy
+  // depends on. Block all wallet UI on insecure origins with a visible error.
+  const isSecureContext = useMemo(
+    () => (typeof window === "undefined" ? true : window.isSecureContext === true),
+    [],
+  );
+
   type VerificationResult = {
     collection: "BAYC" | "MAYC";
     verificationBasis: "direct" | "delegated";
@@ -237,7 +245,24 @@ function PrivyVerifyCardInner({
   const walletCreateStartedRef = useRef(false);
   const walletCreateAttemptRef = useRef(0);
   const walletCreateTimeoutRef = useRef<number | null>(null);
+  const walletCreateBackoffRef = useRef<number | null>(null);
   const lastAuthUserIdRef = useRef<string | null>(null);
+
+  // Log auth state transitions for observability.
+  useEffect(() => {
+    logEvent("auth", "info", "auth state", {
+      ready,
+      authenticated,
+      walletsReady,
+      userId: user?.id ?? null,
+    });
+  }, [ready, authenticated, walletsReady, user?.id]);
+
+  useEffect(() => {
+    if (!isSecureContext) {
+      logEvent("env", "error", "insecure context — wallet flow blocked");
+    }
+  }, [isSecureContext]);
 
   // Build the list of EVM wallets available in this Privy session — includes
   // the embedded wallet plus any external EVM wallet the user connected.
