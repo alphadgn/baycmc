@@ -189,6 +189,17 @@ export const getApeRideToken = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
+    // Re-verify Token Proof on every token mint. is_lifer is intentionally
+    // NOT required here — Ape Rides are not lifer-gated, only BAYC-gated.
+    const { data: ver } = await supabase
+      .from("user_verifications")
+      .select("bayc_verified")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (!ver?.bayc_verified) {
+      return { ok: false as const, error: "Token Proof verification required." };
+    }
+
     const { data: ride } = await supabase
       .from("ape_rides")
       .select("id, host_id, livekit_room, status")
