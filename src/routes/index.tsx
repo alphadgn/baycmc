@@ -30,7 +30,7 @@ function Index() {
               Members only · BAYC/MAYC
             </div>
             <h1 className="mt-6 font-display text-5xl font-bold leading-[1.05] tracking-tight sm:text-6xl lg:text-7xl">
-              <span className="block">The private clubhouse for</span>
+              <span className="block">The mobile clubhouse for</span>
               {/* Responsive clamp scales smoothly with viewport without overflow. */}
               {/* Sized so the visual gap above (to "clubhouse for") matches
                   the gap below (to the paragraph) — see reference IMG_2587. */}
