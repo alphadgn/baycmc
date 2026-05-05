@@ -634,10 +634,18 @@ function WalletStateInspector({
   user,
   wallets,
   createdWallet,
+  walletCreateState,
+  walletsReady,
+  authenticated,
+  resolvedWallet,
 }: {
   user: PrivyUserLike | null | undefined;
   wallets: WalletLike[];
   createdWallet: WalletLike | null;
+  walletCreateState: "idle" | "creating" | "created" | "failed";
+  walletsReady: boolean;
+  authenticated: boolean;
+  resolvedWallet: WalletLike | null;
 }) {
   type Entry = {
     address: string;
