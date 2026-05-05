@@ -488,11 +488,10 @@ function PrivyVerifyCardInner({
     auditProvisionFn,
     authenticated,
     createWallet,
-    hasKnownWallet,
+    embeddedDefault,
     refreshUser,
     user?.email?.address,
     user?.id,
-    wallet,
     walletCreateState,
     walletsReady,
   ]);
