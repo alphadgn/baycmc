@@ -210,6 +210,7 @@ function PrivyVerifyCardInner({
   const { ready, authenticated, login, logout, user } = hooks.usePrivy();
   const { wallets, ready: walletsReady } = hooks.useWallets();
   const { createWallet } = hooks.useCreateWallet();
+  const { refreshUser } = hooks.useUser();
   const { signMessage } = hooks.useSignMessage();
   const verifyFn = useServerFn(verifyPrivyOwnership);
   const auditProvisionFn = useServerFn(logEmbeddedWalletProvisioned);
@@ -410,7 +411,18 @@ function PrivyVerifyCardInner({
       .then(async (newWallet: WalletLike) => {
         if (walletCreateTimeoutRef.current) window.clearTimeout(walletCreateTimeoutRef.current);
         if (!mountedRef.current || walletCreateAttemptRef.current !== attempt) return;
-        setCreatedWallet(newWallet);
+        let refreshedUser: PrivyUserLike | null = null;
+        try {
+          refreshedUser = await refreshUser();
+        } catch (e) {
+          console.warn("[PrivyVerifyCard] refreshUser after wallet creation failed", e);
+        }
+        const refreshedWallet = resolvePrivyEmbeddedWallet({
+          user: refreshedUser,
+          wallets: [],
+          createdWallet: null,
+        }) as WalletLike | null;
+        setCreatedWallet(refreshedWallet ?? newWallet);
         setWalletCreateState("created");
         // Best-effort audit log + dedupe check. If the server reports a
         // prior provisioning record for this Privy user, we surface it
@@ -449,6 +461,7 @@ function PrivyVerifyCardInner({
     authenticated,
     createWallet,
     hasKnownWallet,
+    refreshUser,
     user?.email?.address,
     user?.id,
     wallet,
