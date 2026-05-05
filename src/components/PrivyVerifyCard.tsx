@@ -18,6 +18,12 @@ type EthereumProviderLike = {
 
 type WalletLike = {
   address: string;
+  chainType?: string;
+  chain_type?: string;
+  walletClientType?: string;
+  wallet_client_type?: string;
+  connectorType?: string;
+  connector_type?: string;
   getEthereumProvider?: () => Promise<EthereumProviderLike>;
 };
 
@@ -66,6 +72,7 @@ type PrivyHooks = {
   useCreateWallet: () => {
     createWallet: (options?: { createAdditional?: boolean }) => Promise<WalletLike>;
   };
+  useUser: () => { user: PrivyUserLike | null; refreshUser: () => Promise<PrivyUserLike> };
   useSignMessage: () => {
     signMessage: (
       input: { message: string },
@@ -136,6 +143,7 @@ export function PrivyVerifyCard({
           usePrivy: mod.usePrivy,
           useWallets: mod.useWallets,
           useCreateWallet: mod.useCreateWallet,
+          useUser: mod.useUser,
           useSignMessage: mod.useSignMessage,
         });
       } catch {
