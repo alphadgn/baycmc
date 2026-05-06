@@ -176,7 +176,6 @@ export const getPrivyPublicConfig = createServerFn({ method: "GET" }).handler(as
  * canonical instead of attempting another createWallet().
  */
 export const logEmbeddedWalletProvisioned = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((input: { privyUserId: string; walletAddress: string; email?: string | null }) =>
     z
       .object({
