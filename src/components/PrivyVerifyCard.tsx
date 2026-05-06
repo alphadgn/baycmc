@@ -323,6 +323,7 @@ function PrivyVerifyCardInner({
           chainId: 1,
           nonce,
           issuedAt: new Date().toISOString(),
+          expirationTime: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
         });
         const message = siwe.prepareMessage();
 
