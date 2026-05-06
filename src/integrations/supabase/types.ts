@@ -14,6 +14,38 @@ export type Database = {
   }
   public: {
     Tables: {
+      ape_ride_locations: {
+        Row: {
+          host_id: string
+          lat: number
+          lng: number
+          ride_id: string
+          updated_at: string
+        }
+        Insert: {
+          host_id: string
+          lat: number
+          lng: number
+          ride_id: string
+          updated_at?: string
+        }
+        Update: {
+          host_id?: string
+          lat?: number
+          lng?: number
+          ride_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ape_ride_locations_ride_id_fkey"
+            columns: ["ride_id"]
+            isOneToOne: true
+            referencedRelation: "ape_rides"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ape_ride_requests: {
         Row: {
           created_at: string
@@ -57,8 +89,6 @@ export type Database = {
           created_at: string
           ended_at: string | null
           host_id: string
-          host_lat: number
-          host_lng: number
           id: string
           livekit_room: string
           started_at: string
@@ -70,8 +100,6 @@ export type Database = {
           created_at?: string
           ended_at?: string | null
           host_id: string
-          host_lat: number
-          host_lng: number
           id?: string
           livekit_room: string
           started_at?: string
@@ -83,8 +111,6 @@ export type Database = {
           created_at?: string
           ended_at?: string | null
           host_id?: string
-          host_lat?: number
-          host_lng?: number
           id?: string
           livekit_room?: string
           started_at?: string
