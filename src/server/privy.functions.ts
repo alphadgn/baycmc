@@ -211,7 +211,7 @@ export const logEmbeddedWalletProvisioned = createServerFn({ method: "POST" })
 
     const { error } = await supabaseAdmin.from("audit_logs").insert({
       event_type: eventType,
-      actor_id: actorId,
+      actor_id: null,
       target_id: null,
       metadata: {
         privy_user_id: data.privyUserId,
