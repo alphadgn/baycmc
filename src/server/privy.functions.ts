@@ -186,12 +186,13 @@ export const logEmbeddedWalletProvisioned = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     if (!isAddress(data.walletAddress)) {
       return { ok: false as const, reason: "invalid-address" };
     }
     const wallet = getAddress(data.walletAddress);
     const eventType = "privy.embedded_wallet.provisioned";
+    const actorId = (context as { userId?: string }).userId ?? null;
 
     // Dedupe: any prior provisioning event for this Privy user id wins.
     const { data: prior } = await supabaseAdmin
@@ -212,7 +213,7 @@ export const logEmbeddedWalletProvisioned = createServerFn({ method: "POST" })
 
     const { error } = await supabaseAdmin.from("audit_logs").insert({
       event_type: eventType,
-      actor_id: null,
+      actor_id: actorId,
       target_id: null,
       metadata: {
         privy_user_id: data.privyUserId,
