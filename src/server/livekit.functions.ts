@@ -77,7 +77,7 @@ export const getLivekitToken = createServerFn({ method: "POST" })
 
     const token = await at.toJwt();
 
-    await supabase.from("audit_logs").insert({
+    await supabaseAdmin.from("audit_logs").insert({
       event_type: "room.join",
       actor_id: userId,
       target_id: room.id,
