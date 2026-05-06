@@ -84,7 +84,7 @@ export const createBooking = createServerFn({ method: "POST" })
       return { ok: false as const, error: error.message };
     }
 
-    await supabase.from("audit_logs").insert({
+    await supabaseAdmin.from("audit_logs").insert({
       event_type: "booking.create",
       actor_id: userId,
       target_id: booking.id,
