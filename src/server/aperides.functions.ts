@@ -53,8 +53,6 @@ export const startApeRide = createServerFn({ method: "POST" })
         host_id: userId,
         title: data.title ?? "Ape Ride",
         livekit_room: livekitRoom,
-        host_lat: data.lat,
-        host_lng: data.lng,
       })
       .select()
       .single();
@@ -62,7 +60,15 @@ export const startApeRide = createServerFn({ method: "POST" })
       return { ok: false as const, error: error?.message ?? "Failed to start ride" };
     }
 
-    await supabase.from("audit_logs").insert({
+    // Store precise GPS in private locations table (server-only writes).
+    await supabaseAdmin.from("ape_ride_locations").insert({
+      ride_id: ride.id,
+      host_id: userId,
+      lat: data.lat,
+      lng: data.lng,
+    });
+
+    await supabaseAdmin.from("audit_logs").insert({
       event_type: "ape_ride.start",
       actor_id: userId,
       target_id: ride.id,
