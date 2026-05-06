@@ -116,7 +116,7 @@ export const cancelBooking = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const { error } = await supabase.from("room_bookings").delete().eq("id", data.bookingId);
     if (error) return { ok: false as const, error: error.message };
-    await supabase.from("audit_logs").insert({
+    await supabaseAdmin.from("audit_logs").insert({
       event_type: "booking.cancel",
       actor_id: userId,
       target_id: data.bookingId,
