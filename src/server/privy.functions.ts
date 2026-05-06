@@ -1,9 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequestHost } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { SiweMessage } from "siwe";
 import { createPublicClient, http, getAddress, parseAbi, isAddress } from "viem";
 import { mainnet } from "viem/chains";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { ETH_RPC_URL, DELEGATE_REGISTRY_V2 } from "@/lib/web3/constants";
 
 /**
