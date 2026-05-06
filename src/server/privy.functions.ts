@@ -313,10 +313,47 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data }) => {
-    // 1) Verify SIWE signature
+    // 1) Verify SIWE signature + domain + expiration to prevent replay
+    //    attacks from signatures issued for other sites.
     let address: string;
     try {
       const siwe = new SiweMessage(data.message);
+
+      // Domain check: the SIWE message must be bound to this server's host.
+      // Allow a configured override (SITE_DOMAIN) for environments behind
+      // proxies; otherwise fall back to the request host.
+      const requestHost = (() => {
+        try {
+          return getRequestHost();
+        } catch {
+          return null;
+        }
+      })();
+      const expectedDomain = (process.env.SITE_DOMAIN ?? requestHost ?? "").toLowerCase();
+      if (!expectedDomain) {
+        throw new Error("Server domain not configured");
+      }
+      const messageDomain = (siwe.domain ?? "").toLowerCase();
+      if (messageDomain !== expectedDomain) {
+        console.warn("SIWE domain mismatch", { messageDomain, expectedDomain });
+        throw new Error("Signature was not issued for this site.");
+      }
+
+      // Expiration check: reject expired/future-dated messages.
+      if (siwe.expirationTime) {
+        const exp = new Date(siwe.expirationTime).getTime();
+        if (Number.isFinite(exp) && exp < Date.now()) {
+          throw new Error("Signature has expired. Please sign again.");
+        }
+      }
+      if (siwe.issuedAt) {
+        const iat = new Date(siwe.issuedAt).getTime();
+        // Reject signatures older than 10 minutes — short window prevents replays.
+        if (Number.isFinite(iat) && Date.now() - iat > 10 * 60 * 1000) {
+          throw new Error("Signature is too old. Please sign again.");
+        }
+      }
+
       const result = await siwe.verify({ signature: data.signature });
       if (!result.success || !result.data?.address) {
         throw new Error("Signature verification failed");
@@ -324,7 +361,12 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
       address = result.data.address;
     } catch (e) {
       console.error("SIWE verify failed", e);
-      throw new Error("We couldn't verify your wallet signature. Please try again.");
+      const msg = e instanceof Error ? e.message : "";
+      throw new Error(
+        msg && (msg.includes("expired") || msg.includes("too old") || msg.includes("this site"))
+          ? msg
+          : "We couldn't verify your wallet signature. Please try again.",
+      );
     }
 
     if (!isAddress(address)) {
