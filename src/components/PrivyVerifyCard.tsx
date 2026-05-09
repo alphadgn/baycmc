@@ -296,7 +296,7 @@ function PrivyVerifyCardInner({
     return [...seen.values()];
   })();
 
-  const embeddedDefault = resolvePrivyEmbeddedWallet({ user, wallets, createdWallet }) as
+  const embeddedDefault = resolvePrivyProvisionedWallet({ user, wallets, createdWallet }) as
     | WalletLike
     | null;
   const preferredWallet = preferredAddress
@@ -491,7 +491,7 @@ function PrivyVerifyCardInner({
           console.warn("[PrivyVerifyCard] refreshUser after wallet creation failed", e);
         }
         if (!mountedRef.current || walletCreateAttemptRef.current !== attempt) return;
-        const refreshedWallet = resolvePrivyEmbeddedWallet({
+        const refreshedWallet = resolvePrivyProvisionedWallet({
           user: refreshedUser,
           wallets: [],
           createdWallet: null,
