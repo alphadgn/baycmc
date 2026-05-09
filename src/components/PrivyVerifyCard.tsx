@@ -610,7 +610,16 @@ function PrivyVerifyCardInner({
       walletCreateTimeoutRef.current = null;
     }
     setWalletCreateState("created");
+    logEvent("wallet", "info", "wallet provisioning success", {
+      source: "privy-state",
+      address: embeddedDefault.address,
+    });
   }, [authenticated, embeddedDefault, walletCreateState]);
+
+  useEffect(() => {
+    if (!wallet?.address) return;
+    logEvent("auth", "info", "WALLET_READY", { address: wallet.address });
+  }, [wallet?.address]);
 
   // Periodically re-check Privy's wallet state while we're waiting on
   // wallet creation, so we don't depend solely on Privy's createWallet
@@ -662,7 +671,7 @@ function PrivyVerifyCardInner({
     isSecureContext &&
     ready &&
     authenticated &&
-    walletsReady &&
+    walletSessionReady &&
     !!wallet &&
     walletCreateState !== "creating" &&
     walletCreateState !== "failed";
