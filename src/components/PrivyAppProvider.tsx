@@ -113,7 +113,12 @@ export function PrivyAppProvider({ children }: { children: ReactNode }) {
             },
             requireUserOwnedRecoveryOnCreate: false,
             requireUserPasswordOnCreate: false,
-            showWalletUIs: false,
+            // Privy dashboard has `enforce_wallet_uis: true` +
+            // `mode: user-controlled-server-wallets-only` with
+            // `user-passcode` recovery. With showWalletUIs:false the
+            // passcode modal never renders, so embedded-wallet creation
+            // spins forever after email login. Must be true.
+            showWalletUIs: true,
           },
         }}
       >
