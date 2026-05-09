@@ -303,8 +303,10 @@ function PrivyVerifyCardInner({
     ? sessionEvmWallets.find((w) => w.address.toLowerCase() === preferredAddress.toLowerCase()) ??
       null
     : null;
-  const wallet: WalletLike | null = preferredWallet ?? embeddedDefault ?? sessionEvmWallets[0] ?? null;
-  const hasKnownWallet = Boolean(wallet);
+  const wallet: WalletLike | null =
+    (preferredWallet && isProvisionedPrivyWallet(preferredWallet) ? preferredWallet : null) ??
+    embeddedDefault;
+  const walletSessionReady = walletsReady || walletsReadyTimedOut;
   // First-time sign-in state: user is authenticated but the embedded
   // wallet hasn't been provisioned by Privy yet. We surface this as an
   // explicit status step so the modal flow doesn't look frozen.
@@ -346,7 +348,7 @@ function PrivyVerifyCardInner({
             {
               address,
               uiOptions: {
-                showWalletUIs: false,
+                showWalletUIs: true,
                 title: "Verify ownership",
                 description: "Sign to check BAYC / MAYC ownership.",
                 buttonText: "Sign and verify",
