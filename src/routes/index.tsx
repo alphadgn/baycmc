@@ -143,7 +143,7 @@ function Index() {
 
       <footer className="border-t border-border/50">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-4 py-10 text-sm text-muted-foreground sm:flex-row sm:px-6">
-          <p>© BAYCMC. Independent and unaffiliated with Yuga Labs.</p>
+          <p>© BAYCMC. Not affiliated with Yuga Labs.</p>
           <p className="font-mono text-xs">v0.1 · foundation</p>
         </div>
       </footer>
