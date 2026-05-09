@@ -9,7 +9,10 @@ import {
   inspectWalletHoldings,
   logEmbeddedWalletProvisioned,
 } from "@/server/privy.functions";
-import { resolvePrivyEmbeddedWallet } from "@/lib/privyWallets";
+import {
+  isProvisionedPrivyWallet,
+  resolvePrivyProvisionedWallet,
+} from "@/lib/privyWallets";
 import { logEvent } from "@/lib/diagnostics";
 import { enqueueSign } from "@/lib/wallet/txQueue";
 import { toast } from "sonner";
@@ -240,12 +243,14 @@ function PrivyVerifyCardInner({
   const [createdWallet, setCreatedWallet] = useState<WalletLike | null>(null);
   const [loginStartedHere, setLoginStartedHere] = useState(false);
   const [preferredAddress, setPreferredAddress] = useState<string | null>(null);
+  const [walletsReadyTimedOut, setWalletsReadyTimedOut] = useState(false);
   const autoVerifiedWalletRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
   const walletCreateStartedRef = useRef(false);
   const walletCreateAttemptRef = useRef(0);
   const walletCreateTimeoutRef = useRef<number | null>(null);
   const walletCreateBackoffRef = useRef<number | null>(null);
+  const walletsReadyTimeoutRef = useRef<number | null>(null);
   const lastAuthUserIdRef = useRef<string | null>(null);
 
   // Log auth state transitions for observability.
@@ -255,8 +260,15 @@ function PrivyVerifyCardInner({
       authenticated,
       walletsReady,
       userId: user?.id ?? null,
+      userWalletAddress: user?.wallet?.address ?? null,
+      walletCount: wallets.length,
     });
-  }, [ready, authenticated, walletsReady, user?.id]);
+  }, [ready, authenticated, walletsReady, user?.id, user?.wallet?.address, wallets.length]);
+
+  useEffect(() => {
+    if (!ready || !authenticated || !user?.id) return;
+    logEvent("auth", "info", "authentication completion", { userId: user.id });
+  }, [ready, authenticated, user?.id]);
 
   useEffect(() => {
     if (!isSecureContext) {
