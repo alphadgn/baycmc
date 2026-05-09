@@ -16,7 +16,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { logEvent } from "@/lib/diagnostics";
 import {
-  resolvePrivyEmbeddedWallet,
   resolvePrivyProvisionedWallet,
   type PrivyWalletLike,
 } from "@/lib/privyWallets";
@@ -291,6 +290,14 @@ export function useWallet(input: UseWalletInput): UseWalletResult {
     wallet !== null &&
     walletState !== "creating" &&
     walletState !== "failed";
+
+  const authState: AuthState = !ready
+    ? "loading"
+    : !authenticated
+      ? "unauthenticated"
+      : walletReady
+        ? "WALLET_READY"
+        : "authenticated";
 
   return {
     authState,
