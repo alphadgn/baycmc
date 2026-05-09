@@ -15,7 +15,10 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { logEvent } from "@/lib/diagnostics";
-import { resolvePrivyEmbeddedWallet, type PrivyWalletLike } from "@/lib/privyWallets";
+import {
+  resolvePrivyProvisionedWallet,
+  type PrivyWalletLike,
+} from "@/lib/privyWallets";
 
 export type EthereumProviderLike = {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
@@ -40,7 +43,7 @@ export type PrivyUserLike = {
 };
 
 export type WalletState = "idle" | "creating" | "ready" | "failed";
-export type AuthState = "loading" | "unauthenticated" | "authenticated";
+export type AuthState = "loading" | "unauthenticated" | "authenticated" | "WALLET_READY";
 
 export interface UseWalletInput {
   ready: boolean;
@@ -123,16 +126,10 @@ export function useWallet(input: UseWalletInput): UseWalletResult {
   }, [wallets, user, createdWallet]);
 
   const embedded = useMemo(
-    () => resolvePrivyEmbeddedWallet({ user, wallets, createdWallet }) as WalletLike | null,
+    () => resolvePrivyProvisionedWallet({ user, wallets, createdWallet }) as WalletLike | null,
     [user, wallets, createdWallet],
   );
-  const wallet: WalletLike | null = embedded ?? sessionWallets[0] ?? null;
-
-  const authState: AuthState = !ready
-    ? "loading"
-    : authenticated
-      ? "authenticated"
-      : "unauthenticated";
+  const wallet: WalletLike | null = embedded;
 
   // Reset on user change (logout, re-auth as different user)
   useEffect(() => {
@@ -293,6 +290,14 @@ export function useWallet(input: UseWalletInput): UseWalletResult {
     wallet !== null &&
     walletState !== "creating" &&
     walletState !== "failed";
+
+  const authState: AuthState = !ready
+    ? "loading"
+    : !authenticated
+      ? "unauthenticated"
+      : walletReady
+        ? "WALLET_READY"
+        : "authenticated";
 
   return {
     authState,

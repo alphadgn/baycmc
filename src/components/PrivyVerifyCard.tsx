@@ -9,7 +9,10 @@ import {
   inspectWalletHoldings,
   logEmbeddedWalletProvisioned,
 } from "@/server/privy.functions";
-import { resolvePrivyEmbeddedWallet } from "@/lib/privyWallets";
+import {
+  isProvisionedPrivyWallet,
+  resolvePrivyProvisionedWallet,
+} from "@/lib/privyWallets";
 import { logEvent } from "@/lib/diagnostics";
 import { enqueueSign } from "@/lib/wallet/txQueue";
 import { toast } from "sonner";
@@ -240,12 +243,14 @@ function PrivyVerifyCardInner({
   const [createdWallet, setCreatedWallet] = useState<WalletLike | null>(null);
   const [loginStartedHere, setLoginStartedHere] = useState(false);
   const [preferredAddress, setPreferredAddress] = useState<string | null>(null);
+  const [walletsReadyTimedOut, setWalletsReadyTimedOut] = useState(false);
   const autoVerifiedWalletRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
   const walletCreateStartedRef = useRef(false);
   const walletCreateAttemptRef = useRef(0);
   const walletCreateTimeoutRef = useRef<number | null>(null);
   const walletCreateBackoffRef = useRef<number | null>(null);
+  const walletsReadyTimeoutRef = useRef<number | null>(null);
   const lastAuthUserIdRef = useRef<string | null>(null);
 
   // Log auth state transitions for observability.
@@ -255,8 +260,15 @@ function PrivyVerifyCardInner({
       authenticated,
       walletsReady,
       userId: user?.id ?? null,
+      userWalletAddress: user?.wallet?.address ?? null,
+      walletCount: wallets.length,
     });
-  }, [ready, authenticated, walletsReady, user?.id]);
+  }, [ready, authenticated, walletsReady, user?.id, user?.wallet?.address, wallets.length]);
+
+  useEffect(() => {
+    if (!ready || !authenticated || !user?.id) return;
+    logEvent("auth", "info", "authentication completion", { userId: user.id });
+  }, [ready, authenticated, user?.id]);
 
   useEffect(() => {
     if (!isSecureContext) {
@@ -284,15 +296,17 @@ function PrivyVerifyCardInner({
     return [...seen.values()];
   })();
 
-  const embeddedDefault = resolvePrivyEmbeddedWallet({ user, wallets, createdWallet }) as
+  const embeddedDefault = resolvePrivyProvisionedWallet({ user, wallets, createdWallet }) as
     | WalletLike
     | null;
   const preferredWallet = preferredAddress
     ? sessionEvmWallets.find((w) => w.address.toLowerCase() === preferredAddress.toLowerCase()) ??
       null
     : null;
-  const wallet: WalletLike | null = preferredWallet ?? embeddedDefault ?? sessionEvmWallets[0] ?? null;
-  const hasKnownWallet = Boolean(wallet);
+  const wallet: WalletLike | null =
+    (preferredWallet && isProvisionedPrivyWallet(preferredWallet) ? preferredWallet : null) ??
+    embeddedDefault;
+  const walletSessionReady = walletsReady || walletsReadyTimedOut;
   // First-time sign-in state: user is authenticated but the embedded
   // wallet hasn't been provisioned by Privy yet. We surface this as an
   // explicit status step so the modal flow doesn't look frozen.
@@ -334,7 +348,7 @@ function PrivyVerifyCardInner({
             {
               address,
               uiOptions: {
-                showWalletUIs: false,
+                showWalletUIs: true,
                 title: "Verify ownership",
                 description: "Sign to check BAYC / MAYC ownership.",
                 buttonText: "Sign and verify",
@@ -415,6 +429,12 @@ function PrivyVerifyCardInner({
       if (walletCreateTimeoutRef.current) {
         window.clearTimeout(walletCreateTimeoutRef.current);
       }
+      if (walletCreateBackoffRef.current) {
+        window.clearTimeout(walletCreateBackoffRef.current);
+      }
+      if (walletsReadyTimeoutRef.current) {
+        window.clearTimeout(walletsReadyTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -426,12 +446,37 @@ function PrivyVerifyCardInner({
     if (lastAuthUserIdRef.current !== currentId) {
       lastAuthUserIdRef.current = currentId;
       walletCreateStartedRef.current = false;
+      setWalletsReadyTimedOut(false);
       if (!authenticated) {
         setCreatedWallet(null);
         setWalletCreateState("idle");
       }
     }
   }, [authenticated, user?.id]);
+
+  useEffect(() => {
+    if (!authenticated || walletsReady || !user?.id) {
+      if (walletsReadyTimeoutRef.current) {
+        window.clearTimeout(walletsReadyTimeoutRef.current);
+        walletsReadyTimeoutRef.current = null;
+      }
+      if (walletsReady) setWalletsReadyTimedOut(false);
+      return;
+    }
+
+    if (walletsReadyTimeoutRef.current) return;
+    walletsReadyTimeoutRef.current = window.setTimeout(() => {
+      walletsReadyTimeoutRef.current = null;
+      if (!mountedRef.current || walletsReady) return;
+      logEvent("wallet", "warn", "useWallets ready timeout recovery", { userId: user.id });
+      setWalletsReadyTimedOut(true);
+      void refreshUser().catch((e) => {
+        logEvent("wallet", "warn", "refreshUser during walletsReady timeout failed", {
+          error: e instanceof Error ? e.message : String(e),
+        });
+      });
+    }, 12_000);
+  }, [authenticated, refreshUser, user?.id, walletsReady]);
 
   useEffect(() => {
     // Auto-provision an embedded EVM wallet for ANY authenticated Privy user
@@ -442,7 +487,7 @@ function PrivyVerifyCardInner({
     // rapid re-auth or concurrent tabs.
     if (
       !authenticated ||
-      !walletsReady ||
+      !walletSessionReady ||
       embeddedDefault ||
       walletCreateState !== "idle" ||
       walletCreateStartedRef.current ||
@@ -456,6 +501,7 @@ function PrivyVerifyCardInner({
     walletCreateAttemptRef.current = attempt;
     walletCreateTimeoutRef.current = window.setTimeout(() => {
       if (!mountedRef.current || walletCreateAttemptRef.current !== attempt) return;
+      logEvent("wallet", "warn", "wallet provisioning timeout recovery", { attempt, userId: user.id });
       setWalletCreateState("failed");
       setError(
         "Privy authenticated your email, but wallet creation did not confirm. Tap Retry wallet creation instead of waiting on the Privy loading screen.",
@@ -464,6 +510,7 @@ function PrivyVerifyCardInner({
 
     setWalletCreateState("creating");
     setError(null);
+    logEvent("wallet", "info", "wallet provisioning start", { attempt, userId: user.id });
 
     const privyUserId = user.id;
     const email = user.email?.address ?? null;
@@ -479,13 +526,18 @@ function PrivyVerifyCardInner({
           console.warn("[PrivyVerifyCard] refreshUser after wallet creation failed", e);
         }
         if (!mountedRef.current || walletCreateAttemptRef.current !== attempt) return;
-        const refreshedWallet = resolvePrivyEmbeddedWallet({
+        const refreshedWallet = resolvePrivyProvisionedWallet({
           user: refreshedUser,
           wallets: [],
           createdWallet: null,
         }) as WalletLike | null;
-        setCreatedWallet(refreshedWallet ?? newWallet);
+        const resolvedNewWallet = refreshedWallet ?? newWallet;
+        setCreatedWallet(resolvedNewWallet);
         setWalletCreateState("created");
+        logEvent("wallet", "info", "wallet provisioning success", {
+          attempt,
+          address: resolvedNewWallet.address,
+        });
         // Best-effort audit log + dedupe check. If the server reports a
         // prior provisioning record for this Privy user, we surface it
         // as a console warning so duplicate-creation regressions are
@@ -541,7 +593,7 @@ function PrivyVerifyCardInner({
     user?.email?.address,
     user?.id,
     walletCreateState,
-    walletsReady,
+    walletSessionReady,
   ]);
 
   // Real-time wallet inspector: as soon as the embedded wallet appears in
@@ -558,7 +610,16 @@ function PrivyVerifyCardInner({
       walletCreateTimeoutRef.current = null;
     }
     setWalletCreateState("created");
+    logEvent("wallet", "info", "wallet provisioning success", {
+      source: "privy-state",
+      address: embeddedDefault.address,
+    });
   }, [authenticated, embeddedDefault, walletCreateState]);
+
+  useEffect(() => {
+    if (!wallet?.address) return;
+    logEvent("auth", "info", "WALLET_READY", { address: wallet.address });
+  }, [wallet?.address]);
 
   // Periodically re-check Privy's wallet state while we're waiting on
   // wallet creation, so we don't depend solely on Privy's createWallet
@@ -610,7 +671,7 @@ function PrivyVerifyCardInner({
     isSecureContext &&
     ready &&
     authenticated &&
-    walletsReady &&
+    walletSessionReady &&
     !!wallet &&
     walletCreateState !== "creating" &&
     walletCreateState !== "failed";
