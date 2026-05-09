@@ -129,7 +129,7 @@ export function useWallet(input: UseWalletInput): UseWalletResult {
     () => resolvePrivyProvisionedWallet({ user, wallets, createdWallet }) as WalletLike | null,
     [user, wallets, createdWallet],
   );
-  const wallet: WalletLike | null = embedded ?? sessionWallets[0] ?? null;
+  const wallet: WalletLike | null = embedded;
 
   // Reset on user change (logout, re-auth as different user)
   useEffect(() => {
