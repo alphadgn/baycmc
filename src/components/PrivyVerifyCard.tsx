@@ -429,6 +429,12 @@ function PrivyVerifyCardInner({
       if (walletCreateTimeoutRef.current) {
         window.clearTimeout(walletCreateTimeoutRef.current);
       }
+      if (walletCreateBackoffRef.current) {
+        window.clearTimeout(walletCreateBackoffRef.current);
+      }
+      if (walletsReadyTimeoutRef.current) {
+        window.clearTimeout(walletsReadyTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -440,12 +446,37 @@ function PrivyVerifyCardInner({
     if (lastAuthUserIdRef.current !== currentId) {
       lastAuthUserIdRef.current = currentId;
       walletCreateStartedRef.current = false;
+      setWalletsReadyTimedOut(false);
       if (!authenticated) {
         setCreatedWallet(null);
         setWalletCreateState("idle");
       }
     }
   }, [authenticated, user?.id]);
+
+  useEffect(() => {
+    if (!authenticated || walletsReady || !user?.id) {
+      if (walletsReadyTimeoutRef.current) {
+        window.clearTimeout(walletsReadyTimeoutRef.current);
+        walletsReadyTimeoutRef.current = null;
+      }
+      if (walletsReady) setWalletsReadyTimedOut(false);
+      return;
+    }
+
+    if (walletsReadyTimeoutRef.current) return;
+    walletsReadyTimeoutRef.current = window.setTimeout(() => {
+      walletsReadyTimeoutRef.current = null;
+      if (!mountedRef.current || walletsReady) return;
+      logEvent("wallet", "warn", "useWallets ready timeout recovery", { userId: user.id });
+      setWalletsReadyTimedOut(true);
+      void refreshUser().catch((e) => {
+        logEvent("wallet", "warn", "refreshUser during walletsReady timeout failed", {
+          error: e instanceof Error ? e.message : String(e),
+        });
+      });
+    }, 12_000);
+  }, [authenticated, refreshUser, user?.id, walletsReady]);
 
   useEffect(() => {
     // Auto-provision an embedded EVM wallet for ANY authenticated Privy user
@@ -456,7 +487,7 @@ function PrivyVerifyCardInner({
     // rapid re-auth or concurrent tabs.
     if (
       !authenticated ||
-      !walletsReady ||
+      !walletSessionReady ||
       embeddedDefault ||
       walletCreateState !== "idle" ||
       walletCreateStartedRef.current ||
@@ -470,6 +501,7 @@ function PrivyVerifyCardInner({
     walletCreateAttemptRef.current = attempt;
     walletCreateTimeoutRef.current = window.setTimeout(() => {
       if (!mountedRef.current || walletCreateAttemptRef.current !== attempt) return;
+      logEvent("wallet", "warn", "wallet provisioning timeout recovery", { attempt, userId: user.id });
       setWalletCreateState("failed");
       setError(
         "Privy authenticated your email, but wallet creation did not confirm. Tap Retry wallet creation instead of waiting on the Privy loading screen.",
@@ -478,6 +510,7 @@ function PrivyVerifyCardInner({
 
     setWalletCreateState("creating");
     setError(null);
+    logEvent("wallet", "info", "wallet provisioning start", { attempt, userId: user.id });
 
     const privyUserId = user.id;
     const email = user.email?.address ?? null;
@@ -498,8 +531,13 @@ function PrivyVerifyCardInner({
           wallets: [],
           createdWallet: null,
         }) as WalletLike | null;
-        setCreatedWallet(refreshedWallet ?? newWallet);
+        const resolvedNewWallet = refreshedWallet ?? newWallet;
+        setCreatedWallet(resolvedNewWallet);
         setWalletCreateState("created");
+        logEvent("wallet", "info", "wallet provisioning success", {
+          attempt,
+          address: resolvedNewWallet.address,
+        });
         // Best-effort audit log + dedupe check. If the server reports a
         // prior provisioning record for this Privy user, we surface it
         // as a console warning so duplicate-creation regressions are
@@ -555,7 +593,7 @@ function PrivyVerifyCardInner({
     user?.email?.address,
     user?.id,
     walletCreateState,
-    walletsReady,
+    walletSessionReady,
   ]);
 
   // Real-time wallet inspector: as soon as the embedded wallet appears in
