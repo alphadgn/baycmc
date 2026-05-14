@@ -6,6 +6,7 @@ import { createPublicClient, http, getAddress, parseAbi, isAddress } from "viem"
 import { mainnet } from "viem/chains";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { ETH_RPC_URL, DELEGATE_REGISTRY_V2 } from "@/lib/web3/constants";
+import { runLuminaCheckAndPersist } from "@/server/lumina.server";
 
 /**
  * Privy / SIWE entrance verification.
@@ -475,9 +476,19 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
         user_id: userId,
         bayc_verified: true,
         bayc_collection: collection,
+        delegation_verified: verificationBasis === "delegated",
+        delegation_vault: delegatedFrom,
         verified_at: new Date().toISOString(),
       },
       { onConflict: "user_id" },
+    );
+
+    // Lumina authenticity check on the wallet that actually holds the ape
+    // (vault when delegated, signer otherwise). Pass-through when the
+    // Lumina gate has not been configured by an admin yet.
+    const apeHolder = delegatedFrom ?? wallet;
+    await runLuminaCheckAndPersist({ userId, wallet: apeHolder }).catch((e) =>
+      console.error("Lumina post-privy check failed", e),
     );
 
     const { data: signIn, error: signInErr } = await supabaseAdmin.auth.signInWithPassword({

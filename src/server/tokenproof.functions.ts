@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { runLuminaCheckAndPersist } from "@/server/lumina.server";
 
 /**
  * Tokenproof partner-API integration — the ONLY entrance verification path.
@@ -248,6 +249,12 @@ export const pollTokenproofSession = createServerFn({ method: "POST" })
         verified_at: new Date().toISOString(),
       },
       { onConflict: "user_id" },
+    );
+
+    // Lumina authenticity check — confirms the BAYC is real before any
+    // gated content unlocks. Pass-through when no gate is configured.
+    await runLuminaCheckAndPersist({ userId, wallet }).catch((e) =>
+      console.error("Lumina post-tokenproof check failed", e),
     );
 
     const { data: signIn, error: signInErr } =

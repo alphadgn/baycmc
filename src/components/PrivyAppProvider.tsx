@@ -85,6 +85,17 @@ export function PrivyAppProvider({ children }: { children: ReactNode }) {
 
   if (!appId || !PrivyProviderCmp) return <>{children}</>;
 
+  // Optional override for OAuth/email magic-link redirects. When unset,
+  // Privy uses window.location.href, which works for standard web origins
+  // (dev preview + production). Set VITE_PRIVY_REDIRECT_URL only for
+  // mobile/Capacitor custom URL schemes. Whichever value is in use must be
+  // added to the Privy dashboard's allowed redirect URLs.
+  const customOAuthRedirectUrl =
+    (typeof import.meta !== "undefined" &&
+      (import.meta as unknown as { env?: Record<string, string> }).env
+        ?.VITE_PRIVY_REDIRECT_URL) ||
+    undefined;
+
   return (
     <PrivyMountBoundary fallback={children}>
       <PrivyProviderCmp
@@ -120,6 +131,7 @@ export function PrivyAppProvider({ children }: { children: ReactNode }) {
             // spins forever after email login. Must be true.
             showWalletUIs: true,
           },
+          ...(customOAuthRedirectUrl ? { customOAuthRedirectUrl } : {}),
         }}
       >
         {children}

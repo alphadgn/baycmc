@@ -2,6 +2,7 @@ import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/r
 import { useEffect } from "react";
 import { PrivyAppProvider } from "@/components/PrivyAppProvider";
 import { AppHeader } from "@/components/AppHeader";
+import { InactivityWatcher } from "@/components/InactivityWatcher";
 import { Toaster } from "@/components/ui/sonner";
 import { installDiagnostics } from "@/lib/diagnostics";
 
@@ -84,6 +85,7 @@ function RootComponent() {
         <AppHeader />
         <Outlet />
         <Toaster />
+        <InactivityWatcher />
       </div>
     </PrivyAppProvider>
   );
