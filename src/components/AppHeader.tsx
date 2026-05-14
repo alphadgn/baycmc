@@ -1,11 +1,15 @@
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
-import { useAuth, signOut } from "@/lib/auth/useAuth";
+import { useEffect, useState } from "react";
+import { useAuth } from "@/lib/auth/useAuth";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
+import { supabase } from "@/integrations/supabase/client";
 import { EntranceDialog } from "@/components/EntranceDialog";
 import { EmbroideredImage } from "@/components/EmbroideredImage";
-import { toast } from "sonner";
-
+import { WalletPill } from "@/components/WalletPill";
+import {
+  readVerifiedSession,
+  writeVerifiedSession,
+} from "@/lib/baycmc/verifiedSession";
 
 export function AppHeader() {
   const { isAuthenticated } = useAuth();
@@ -16,7 +20,7 @@ export function AppHeader() {
     <>
       <header className="sticky top-0 z-50 glass">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
-          <Link to="/" aria-label="BAYCMC" className="inline-flex min-w-0 items-center">
+          <Link to="/" aria-label="BAYCMC" className="inline-flex min-w-0 cursor-pointer items-center">
             <EmbroideredImage
               variant="baycmc"
               size="lg"
@@ -26,40 +30,39 @@ export function AppHeader() {
           </Link>
 
           <nav className="hidden items-center gap-5 text-sm md:flex font-sans-display">
-            <Link to="/" className="text-muted-foreground hover:text-foreground transition">
+            <Link to="/" className="cursor-pointer text-muted-foreground hover:text-foreground transition">
               Home
             </Link>
             {isAuthenticated && (
               <>
-                <Link to="/feed" className="text-muted-foreground hover:text-foreground transition">
+                <Link to="/feed" className="cursor-pointer text-muted-foreground hover:text-foreground transition">
                   Feed
                 </Link>
-                <Link to="/messages" className="text-muted-foreground hover:text-foreground transition">
+                <Link to="/messages" className="cursor-pointer text-muted-foreground hover:text-foreground transition">
                   Messages
                 </Link>
-                <Link to="/rooms" className="text-muted-foreground hover:text-foreground transition">
+                <Link to="/rooms" className="cursor-pointer text-muted-foreground hover:text-foreground transition">
                   Rooms
                 </Link>
-                <Link to="/ape-rides" className="text-muted-foreground hover:text-foreground transition">
+                <Link to="/ape-rides" className="cursor-pointer text-muted-foreground hover:text-foreground transition">
                   Ape Rides
                 </Link>
-                <Link to="/profile" className="text-muted-foreground hover:text-foreground transition">
+                <Link to="/profile" className="cursor-pointer text-muted-foreground hover:text-foreground transition">
                   Profile
                 </Link>
               </>
             )}
-            {/* Lifer-only links — completely invisible to non-Lifers. */}
             {isLifer && (
               <>
                 <Link
                   to="/lifers"
-                  className="text-gold hover:text-gold/80 transition font-semibold"
+                  className="cursor-pointer text-gold hover:text-gold/80 transition font-semibold"
                 >
                   Lifers
                 </Link>
                 <Link
                   to="/lifers/messages"
-                  className="text-gold hover:text-gold/80 transition font-semibold"
+                  className="cursor-pointer text-gold hover:text-gold/80 transition font-semibold"
                 >
                   Lifer Chat
                 </Link>
@@ -79,41 +82,79 @@ export function AppHeader() {
 }
 
 function EntranceControls({ onOpen }: { onOpen: () => void }) {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, loading: authLoading } = useAuth();
+  const { tokenProof, collection, loading: verifLoading } = useVerificationStatus();
+  const [walletAddress, setWalletAddress] = useState<string | null>(() => {
+    const cached = readVerifiedSession();
+    return cached?.address ?? null;
+  });
+  const [cachedCollection, setCachedCollection] = useState<"BAYC" | "MAYC" | null>(
+    () => readVerifiedSession()?.collection ?? null,
+  );
 
-  async function handleSignOut() {
-    await signOut();
-    toast.success("Signed out");
-  }
+  // Load wallet address from profile once authenticated.
+  useEffect(() => {
+    if (!isAuthenticated || !user) {
+      setWalletAddress(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("wallet_address")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (cancelled) return;
+      if (data?.wallet_address) setWalletAddress(data.wallet_address);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, user]);
 
-  if (!isAuthenticated) {
+  // Persist verified session to localStorage when DB confirms verification.
+  useEffect(() => {
+    if (tokenProof && walletAddress) {
+      writeVerifiedSession({
+        address: walletAddress,
+        collection: collection ?? null,
+        verifiedAt: Date.now(),
+      });
+      setCachedCollection(collection ?? null);
+    }
+  }, [tokenProof, walletAddress, collection]);
+
+  const cached = readVerifiedSession();
+  // Show the pill if either the live state is verified, OR the cached
+  // session is fresh and matches the connected wallet (avoids button flash).
+  const showPill =
+    isAuthenticated &&
+    walletAddress &&
+    (tokenProof ||
+      (cached &&
+        cached.address.toLowerCase() === walletAddress.toLowerCase()));
+
+  if (showPill && walletAddress) {
     return (
-      <button
-        onClick={onOpen}
-        className="rounded-md bg-gradient-gold px-4 py-2 text-sm font-semibold text-gold-foreground shadow-gold transition hover:opacity-90"
-      >
-        Entrance
-      </button>
+      <WalletPill
+        address={walletAddress}
+        collection={collection ?? cachedCollection}
+      />
     );
   }
 
+  // Hide button briefly while still loading auth/verification to avoid flash.
+  if (authLoading || (isAuthenticated && verifLoading)) {
+    return <div className="h-9 w-24" aria-hidden />;
+  }
+
   return (
-    <div className="flex items-center gap-2">
-      <button
-        onClick={onOpen}
-        className="hidden rounded-md border border-gold/40 bg-gold/10 px-3 py-2 text-xs font-semibold text-gold hover:bg-gold/20 sm:inline-block"
-      >
-        Verify
-      </button>
-      <span className="hidden font-mono text-xs text-muted-foreground sm:inline">
-        {user?.email ?? "member"}
-      </span>
-      <button
-        onClick={handleSignOut}
-        className="rounded-md border border-border bg-secondary/50 px-3 py-2 text-sm hover:bg-secondary"
-      >
-        Sign out
-      </button>
-    </div>
+    <button
+      onClick={onOpen}
+      className="cursor-pointer rounded-md bg-gradient-gold px-4 py-2 text-sm font-semibold text-gold-foreground shadow-gold transition hover:opacity-90"
+    >
+      Entrance
+    </button>
   );
 }
