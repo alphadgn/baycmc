@@ -3,6 +3,7 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { runLuminaCheckAndPersist } from "@/server/lumina.server";
 import { runOtherpageCheckAndPersist } from "@/server/otherpage.server";
+import { deriveWalletPassword } from "@/server/wallet-password";
 
 /**
  * Tokenproof partner-API integration — the ONLY entrance verification path.
