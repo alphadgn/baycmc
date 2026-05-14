@@ -1,5 +1,6 @@
 import { getAddress, isAddress } from "viem";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { assertSafeHttpsUrl } from "@/server/url-guard";
 
 /**
  * Run a Lumina authenticity check for the given wallet and persist the
