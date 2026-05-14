@@ -89,7 +89,12 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
   const [walletAddress, setWalletAddress] = useState<string | null>(() => cachedSession?.address ?? null);
 
   useEffect(
-    () => onVerifiedSessionChange(() => setCachedSession(readVerifiedSession())),
+    () =>
+      onVerifiedSessionChange(() => {
+        const next = readVerifiedSession();
+        setCachedSession(next);
+        if (next?.address) setWalletAddress(next.address);
+      }),
     [],
   );
 
