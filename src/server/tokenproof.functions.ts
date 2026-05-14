@@ -116,6 +116,7 @@ type PollResult =
   | {
       status: "verified";
       collection: "BAYC" | "MAYC";
+      wallet: string;
       session: { access_token: string; refresh_token: string };
     };
 
@@ -279,6 +280,7 @@ export const pollTokenproofSession = createServerFn({ method: "POST" })
     return {
       status: "verified",
       collection,
+      wallet,
       session: {
         access_token: signIn.session.access_token,
         refresh_token: signIn.session.refresh_token,
