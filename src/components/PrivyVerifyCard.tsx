@@ -803,21 +803,6 @@ function PrivyVerifyCardInner({
               </select>
             </div>
           )}
-          {wallet && (
-            <div
-              data-testid="privy-status-wallet-ready"
-              className="rounded-md border border-border bg-background/40 px-3 py-2 text-[11px] text-muted-foreground"
-              data-wallet-address={wallet.address}
-            >
-              <div className="font-semibold text-foreground">
-                {(wallet.walletClientType ?? wallet.wallet_client_type) === "privy" ||
-                (wallet.walletClientType ?? wallet.wallet_client_type) === "privy-v2"
-                  ? "Embedded wallet ready"
-                  : "External wallet selected"}
-              </div>
-              <div className="font-mono">{shortAddress(wallet.address)}</div>
-            </div>
-          )}
           {wallet && isVerifying && (
             <div
               data-testid="privy-status-verifying"
