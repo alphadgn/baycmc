@@ -37,6 +37,7 @@ export function readVerifiedSession(): VerifiedSession | null {
 }
 
 export function writeVerifiedSession(session: VerifiedSession): void {
+  console.log("[verifiedSession] writeVerifiedSession entry", session);
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(KEY, JSON.stringify(session));

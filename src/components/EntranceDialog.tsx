@@ -271,6 +271,7 @@ function EntranceBody({
         }
 
         if (res.status === "verified") {
+          console.log("[verify:tokenproof] success branch reached", { wallet: res.wallet, collection: res.collection });
           clearTimers();
           setPhase("verifying");
           const { error } = await supabase.auth.setSession({
@@ -287,6 +288,7 @@ function EntranceBody({
             verifiedAt: Date.now(),
             signature: `tokenproof:${sessionId}`,
           });
+          console.log("[verify:tokenproof] writeVerifiedSession called");
           setVerifiedAs(res.collection);
           toast.success(`Verified — ${res.collection} ownership confirmed`);
           setPhase("done");
@@ -441,12 +443,14 @@ function EntranceBody({
 
       <PrivyVerifyCard
         onVerified={({ address, collection, signature }) => {
+          console.log("[verify:privy] onVerified fired", { address, collection });
           writeVerifiedSession({
             address,
             collection,
             verifiedAt: Date.now(),
             signature,
           });
+          console.log("[verify:privy] writeVerifiedSession called");
           onOpenChange(false);
         }}
         onLoginRequested={() => {
