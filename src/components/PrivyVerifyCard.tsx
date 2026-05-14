@@ -65,6 +65,12 @@ type PrivyOwnershipResult =
       session: { access_token: string; refresh_token: string };
     };
 
+type VerifiedWalletPayload = {
+  address: string;
+  collection: "BAYC" | "MAYC";
+  signature: string;
+};
+
 type PrivyHooks = {
   usePrivy: () => {
     ready: boolean;
@@ -106,7 +112,7 @@ export function PrivyVerifyCard({
   onLoginRequested,
   onNoQualifyingAssets,
 }: {
-  onVerified: () => void;
+  onVerified: (payload: VerifiedWalletPayload) => void;
   onLoginRequested?: () => void;
   onNoQualifyingAssets?: (reason: string) => void;
 }) {
@@ -208,7 +214,7 @@ function PrivyVerifyCardInner({
   onNoQualifyingAssets,
 }: {
   hooks: PrivyHooks;
-  onVerified: () => void;
+  onVerified: (payload: VerifiedWalletPayload) => void;
   onLoginRequested?: () => void;
   onNoQualifyingAssets?: (reason: string) => void;
 }) {
@@ -405,7 +411,11 @@ function PrivyVerifyCardInner({
             ? `Verified — ${result.collection} delegated from ${shortAddress(result.delegatedFrom)}`
             : `Verified — ${result.collection} direct ownership confirmed`,
         );
-        onVerified();
+        onVerified({
+          address: result.wallet,
+          collection: result.collection,
+          signature,
+        });
       } catch (e) {
         const msg = e instanceof Error ? e.message : "";
         if (msg.toLowerCase().includes("user rejected")) {
