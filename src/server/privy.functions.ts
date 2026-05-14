@@ -8,6 +8,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { ETH_RPC_URL, DELEGATE_REGISTRY_V2 } from "@/lib/web3/constants";
 import { runLuminaCheckAndPersist } from "@/server/lumina.server";
 import { runOtherpageCheckAndPersist } from "@/server/otherpage.server";
+import { deriveWalletPassword } from "@/server/wallet-password";
 
 /**
  * Privy / SIWE entrance verification.
