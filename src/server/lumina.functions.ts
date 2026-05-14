@@ -54,6 +54,13 @@ export const verifyLuminaOwnership = createServerFn({ method: "POST" })
       .replace("{wallet}", encodeURIComponent(checksummed))
       .replace("{contract}", encodeURIComponent(cfg.contract ?? ""));
 
+    try {
+      assertSafeHttpsUrl(url);
+    } catch (e) {
+      console.error("Lumina URL rejected by SSRF guard", e);
+      return { ok: false as const, verified: false, error: "Configured Lumina URL is not allowed." };
+    }
+
     let verified = false;
     try {
       const res = await fetch(url, { headers: { accept: "application/json" } });
