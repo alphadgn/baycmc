@@ -221,7 +221,9 @@ export const pollTokenproofSession = createServerFn({ method: "POST" })
     const collection = detectCollection(body);
 
     const email = `${wallet}@wallet.baycmc.local`;
-    const password = `tp:${wallet}:${process.env.SUPABASE_SERVICE_ROLE_KEY?.slice(0, 16) ?? ""}`;
+    // Strong server-derived password (SHA-256 over full service key + wallet),
+    // rotated on every sign-in so legacy short-prefix accounts are migrated.
+    const password = await deriveWalletPassword(wallet);
 
     const { data: existing } =
       await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
@@ -237,6 +239,8 @@ export const pollTokenproofSession = createServerFn({ method: "POST" })
       });
       if (error) throw error;
       userId = created.user!.id;
+    } else {
+      await supabaseAdmin.auth.admin.updateUserById(userId, { password });
     }
 
     await supabaseAdmin.from("profiles").upsert(
