@@ -443,12 +443,14 @@ function EntranceBody({
 
       <PrivyVerifyCard
         onVerified={({ address, collection, signature }) => {
+          console.log("[verify:privy] onVerified fired", { address, collection });
           writeVerifiedSession({
             address,
             collection,
             verifiedAt: Date.now(),
             signature,
           });
+          console.log("[verify:privy] writeVerifiedSession called");
           onOpenChange(false);
         }}
         onLoginRequested={() => {
