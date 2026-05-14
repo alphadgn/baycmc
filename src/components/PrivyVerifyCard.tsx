@@ -6,7 +6,6 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   verifyPrivyOwnership,
   getPrivyPublicConfig,
-  inspectWalletHoldings,
   logEmbeddedWalletProvisioned,
 } from "@/server/privy.functions";
 import {
@@ -65,6 +64,12 @@ type PrivyOwnershipResult =
       session: { access_token: string; refresh_token: string };
     };
 
+type VerifiedWalletPayload = {
+  address: string;
+  collection: "BAYC" | "MAYC";
+  signature: string;
+};
+
 type PrivyHooks = {
   usePrivy: () => {
     ready: boolean;
@@ -106,7 +111,7 @@ export function PrivyVerifyCard({
   onLoginRequested,
   onNoQualifyingAssets,
 }: {
-  onVerified: () => void;
+  onVerified: (payload: VerifiedWalletPayload) => void;
   onLoginRequested?: () => void;
   onNoQualifyingAssets?: (reason: string) => void;
 }) {
@@ -208,7 +213,7 @@ function PrivyVerifyCardInner({
   onNoQualifyingAssets,
 }: {
   hooks: PrivyHooks;
-  onVerified: () => void;
+  onVerified: (payload: VerifiedWalletPayload) => void;
   onLoginRequested?: () => void;
   onNoQualifyingAssets?: (reason: string) => void;
 }) {
@@ -405,11 +410,15 @@ function PrivyVerifyCardInner({
             ? `Verified — ${result.collection} delegated from ${shortAddress(result.delegatedFrom)}`
             : `Verified — ${result.collection} direct ownership confirmed`,
         );
-        onVerified();
+        onVerified({
+          address: result.wallet,
+          collection: result.collection,
+          signature,
+        });
       } catch (e) {
         const msg = e instanceof Error ? e.message : "";
         if (msg.toLowerCase().includes("user rejected")) {
-          setError("You declined the signature. Try again to enter.");
+          setError("Signature request was cancelled. Try again when ready.");
         } else if (msg.toLowerCase().includes("network") || msg.toLowerCase().includes("fetch")) {
           setError("Network error reaching Ethereum. Try again in a moment.");
         } else {
@@ -794,21 +803,6 @@ function PrivyVerifyCardInner({
               </select>
             </div>
           )}
-          {wallet && (
-            <div
-              data-testid="privy-status-wallet-ready"
-              className="rounded-md border border-border bg-background/40 px-3 py-2 text-[11px] text-muted-foreground"
-              data-wallet-address={wallet.address}
-            >
-              <div className="font-semibold text-foreground">
-                {(wallet.walletClientType ?? wallet.wallet_client_type) === "privy" ||
-                (wallet.walletClientType ?? wallet.wallet_client_type) === "privy-v2"
-                  ? "Embedded wallet ready"
-                  : "External wallet selected"}
-              </div>
-              <div className="font-mono">{shortAddress(wallet.address)}</div>
-            </div>
-          )}
           {wallet && isVerifying && (
             <div
               data-testid="privy-status-verifying"
@@ -882,340 +876,14 @@ function PrivyVerifyCardInner({
           >
             Disconnect
           </button>
-          <WalletStateInspector
-            user={user}
-            wallets={wallets}
-            createdWallet={createdWallet}
-            walletCreateState={walletCreateState}
-            walletsReady={walletsReady}
-            authenticated={authenticated}
-            resolvedWallet={wallet}
-          />
         </div>
       )}
-    </div>
-  );
-}
-
-const EXPECTED_CHAIN_ID = 1;
-const EXPECTED_CHAIN_NAME = "Ethereum Mainnet";
-const COLLECTIONS = [
-  { name: "BAYC", address: "0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D" },
-  { name: "MAYC", address: "0x60E4d786628Fea6478F785A6d7e704777c86a7c6" },
-] as const;
-
-function WalletStateInspector({
-  user,
-  wallets,
-  createdWallet,
-  walletCreateState,
-  walletsReady,
-  authenticated,
-  resolvedWallet,
-}: {
-  user: PrivyUserLike | null | undefined;
-  wallets: WalletLike[];
-  createdWallet: WalletLike | null;
-  walletCreateState: "idle" | "creating" | "created" | "failed";
-  walletsReady: boolean;
-  authenticated: boolean;
-  resolvedWallet: WalletLike | null;
-}) {
-  type Entry = {
-    address: string;
-    source: string;
-    chainType?: string;
-    walletClientType?: string;
-    chainOk: boolean;
-  };
-  const entries: Entry[] = [];
-  const seen = new Set<string>();
-  const push = (e: Entry) => {
-    const key = e.address.toLowerCase();
-    if (seen.has(key)) return;
-    seen.add(key);
-    entries.push(e);
-  };
-
-  for (const w of wallets) {
-    push({
-      address: w.address,
-      source: "useWallets()",
-      chainType: "ethereum",
-      walletClientType: "privy",
-      chainOk: true,
-    });
-  }
-  if (createdWallet) {
-    push({
-      address: createdWallet.address,
-      source: "createWallet()",
-      chainType: "ethereum",
-      walletClientType: "privy",
-      chainOk: true,
-    });
-  }
-  if (user?.wallet?.address) {
-    push({
-      address: user.wallet.address,
-      source: "user.wallet",
-      chainType: user.wallet.chainType,
-      walletClientType: user.wallet.walletClientType,
-      chainOk: (user.wallet.chainType ?? "ethereum") === "ethereum",
-    });
-  }
-  for (const acc of user?.linkedAccounts ?? []) {
-    if (acc.type === "wallet" && acc.address) {
-      push({
-        address: acc.address,
-        source: "linkedAccounts",
-        chainType: acc.chainType,
-        walletClientType: acc.walletClientType,
-        chainOk: (acc.chainType ?? "ethereum") === "ethereum",
-      });
-    }
-  }
-
-  type Holdings = {
-    direct: { bayc: string; mayc: string };
-    delegated: Array<{ vault: string; bayc: string; mayc: string; detailsUrl: string }>;
-  };
-  const inspectFn = useServerFn(inspectWalletHoldings);
-  const [holdings, setHoldings] = useState<Record<string, Holdings | "loading" | "error">>({});
-
-  useEffect(() => {
-    let cancelled = false;
-    for (const e of entries) {
-      const key = e.address.toLowerCase();
-      if (holdings[key]) continue;
-      setHoldings((h) => ({ ...h, [key]: "loading" }));
-      void inspectFn({ data: { address: e.address } })
-        .then((res) => {
-          if (cancelled) return;
-          if (res.ok) {
-            setHoldings((h) => ({
-              ...h,
-              [key]: { direct: res.direct, delegated: res.delegated },
-            }));
-          } else {
-            setHoldings((h) => ({ ...h, [key]: "error" }));
-          }
-        })
-        .catch(() => {
-          if (!cancelled) setHoldings((h) => ({ ...h, [key]: "error" }));
-        });
-    }
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entries.map((e) => e.address.toLowerCase()).join(",")]);
-
-  return (
-    <div
-      data-testid="wallet-state-inspector"
-      className="mt-3 rounded-md border border-border bg-background/40 px-3 py-3 text-[11px] text-muted-foreground"
-    >
-      <div className="mb-2 flex items-center justify-between">
-        <div className="font-semibold text-foreground">Wallet state inspector</div>
-        <div className="text-[10px] uppercase tracking-wider text-gold">
-          {EXPECTED_CHAIN_NAME} · chainId {EXPECTED_CHAIN_ID}
-        </div>
-      </div>
-
-      <ResolutionDiagnostics
-        authenticated={authenticated}
-        walletsReady={walletsReady}
-        walletCreateState={walletCreateState}
-        resolvedWallet={resolvedWallet}
-        entryCount={entries.length}
-        hasExternalOnly={
-          entries.length > 0 && entries.every((e) => !e.chainOk || e.walletClientType !== "privy")
-        }
-      />
-
-      {entries.length === 0 ? (
-        <div className="italic">No embedded wallets found in Privy user metadata.</div>
-      ) : (
-        <ul className="space-y-2">
-          {entries.map((e) => {
-            const h = holdings[e.address.toLowerCase()];
-            const loaded = h && h !== "loading" && h !== "error" ? h : null;
-            const directBayc = loaded ? BigInt(loaded.direct.bayc) > 0n : false;
-            const directMayc = loaded ? BigInt(loaded.direct.mayc) > 0n : false;
-            const delegatedBayc =
-              loaded?.delegated.find((d) => BigInt(d.bayc) > 0n) ?? null;
-            const delegatedMayc =
-              loaded?.delegated.find((d) => BigInt(d.mayc) > 0n) ?? null;
-            const ownsAny =
-              directBayc || directMayc || !!delegatedBayc || !!delegatedMayc;
-            return (
-              <li
-                key={`${e.source}-${e.address}`}
-                className="rounded border border-border/60 bg-secondary/20 p-2"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-mono text-foreground">{shortAddress(e.address)}</span>
-                  <div className="flex items-center gap-1">
-                    <span
-                      className={
-                        e.chainOk
-                          ? "rounded bg-success/20 px-1.5 py-0.5 text-[10px] font-semibold text-success"
-                          : "rounded bg-destructive/20 px-1.5 py-0.5 text-[10px] font-semibold text-destructive"
-                      }
-                    >
-                      {e.chainOk ? "chain ✓" : "chain ✗"}
-                    </span>
-                    {loaded && (
-                      <span
-                        className={
-                          ownsAny
-                            ? "rounded bg-success/20 px-1.5 py-0.5 text-[10px] font-semibold text-success"
-                            : "rounded bg-muted/30 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground"
-                        }
-                      >
-                        {ownsAny ? "owns ✓" : "owns ✗"}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="mt-1 text-[10px]">
-                  source: <span className="font-mono">{e.source}</span>
-                  {e.walletClientType && <> · client: <span className="font-mono">{e.walletClientType}</span></>}
-                </div>
-                {h === "loading" && (
-                  <div className="mt-1 italic text-[10px]">checking BAYC/MAYC…</div>
-                )}
-                {h === "error" && (
-                  <div className="mt-1 italic text-[10px] text-destructive">
-                    couldn't reach RPC
-                  </div>
-                )}
-                {loaded && (
-                  <div className="mt-1 space-y-0.5 text-[10px]">
-                    {COLLECTIONS.map((c) => {
-                      const isBayc = c.name === "BAYC";
-                      const direct = isBayc ? directBayc : directMayc;
-                      const deleg = isBayc ? delegatedBayc : delegatedMayc;
-                      const status = direct
-                        ? "direct"
-                        : deleg
-                          ? "delegated"
-                          : "none";
-                      return (
-                        <div key={c.address} className="flex items-center justify-between gap-2">
-                          <span className="font-semibold text-gold">{c.name}</span>
-                          {status === "direct" && (
-                            <span className="text-success">direct ownership ✓</span>
-                          )}
-                          {status === "delegated" && deleg && (
-                            <span className="flex items-center gap-1 text-success">
-                              delegated from{" "}
-                              <span className="font-mono text-foreground">
-                                {shortAddress(deleg.vault)}
-                              </span>
-                              <a
-                                href={deleg.detailsUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-gold underline hover:opacity-80"
-                              >
-                                details
-                                <ExternalLink className="inline h-2.5 w-2.5" />
-                              </a>
-                            </span>
-                          )}
-                          {status === "none" && (
-                            <span className="text-muted-foreground">no match</span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-
-      <div className="mt-3 border-t border-border/60 pt-2">
-        <div className="mb-1 font-semibold text-foreground">Required collections</div>
-        <ul className="space-y-1">
-          {COLLECTIONS.map((c) => (
-            <li key={c.address} className="flex items-center justify-between gap-2">
-              <span className="font-semibold text-gold">{c.name}</span>
-              <span className="font-mono text-[10px]">{c.address}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
     </div>
   );
 }
 
 function shortAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
-}
-
-function ResolutionDiagnostics({
-  authenticated,
-  walletsReady,
-  walletCreateState,
-  resolvedWallet,
-  entryCount,
-  hasExternalOnly,
-}: {
-  authenticated: boolean;
-  walletsReady: boolean;
-  walletCreateState: "idle" | "creating" | "created" | "failed";
-  resolvedWallet: WalletLike | null;
-  entryCount: number;
-  hasExternalOnly: boolean;
-}) {
-  const reasons: string[] = [];
-  if (!authenticated) reasons.push("Not authenticated with Privy yet.");
-  if (authenticated && !walletsReady) reasons.push("Waiting for useWallets() to become ready.");
-  if (authenticated && walletsReady && entryCount === 0)
-    reasons.push("Privy returned zero wallets for this user — no embedded wallet on record.");
-  if (authenticated && walletsReady && entryCount > 0 && hasExternalOnly && !resolvedWallet)
-    reasons.push(
-      "Only external (non-embedded) wallets were returned. Auto-creation will run for an embedded EVM wallet.",
-    );
-
-  const triggered =
-    walletCreateState === "creating" ||
-    walletCreateState === "created" ||
-    walletCreateState === "failed";
-
-  return (
-    <div
-      data-testid="wallet-resolution-diagnostics"
-      className="mb-2 rounded border border-border/60 bg-secondary/20 px-2 py-1.5 text-[10px]"
-    >
-      <div>
-        <span className="font-semibold text-foreground">Resolved wallet:</span>{" "}
-        {resolvedWallet ? (
-          <span className="font-mono text-success">{shortAddress(resolvedWallet.address)}</span>
-        ) : (
-          <span className="text-destructive">none</span>
-        )}
-      </div>
-      <div>
-        <span className="font-semibold text-foreground">createWallet():</span>{" "}
-        <span className={triggered ? "text-gold" : "text-muted-foreground"}>
-          {triggered ? `triggered · ${walletCreateState}` : "not triggered"}
-        </span>
-      </div>
-      {!resolvedWallet && reasons.length > 0 && (
-        <ul className="mt-1 list-disc pl-4">
-          {reasons.map((r) => (
-            <li key={r}>{r}</li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
 }
 
 function isEmbeddedEthereumWallet(wallet: Partial<PrivyLinkedWalletLike> | null | undefined) {

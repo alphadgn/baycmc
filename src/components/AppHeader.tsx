@@ -7,6 +7,7 @@ import { EntranceDialog } from "@/components/EntranceDialog";
 import { EmbroideredImage } from "@/components/EmbroideredImage";
 import { WalletPill } from "@/components/WalletPill";
 import {
+  onVerifiedSessionChange,
   readVerifiedSession,
   writeVerifiedSession,
 } from "@/lib/baycmc/verifiedSession";
@@ -84,18 +85,23 @@ export function AppHeader() {
 function EntranceControls({ onOpen }: { onOpen: () => void }) {
   const { isAuthenticated, user, loading: authLoading } = useAuth();
   const { tokenProof, collection, loading: verifLoading } = useVerificationStatus();
-  const [walletAddress, setWalletAddress] = useState<string | null>(() => {
-    const cached = readVerifiedSession();
-    return cached?.address ?? null;
-  });
-  const [cachedCollection, setCachedCollection] = useState<"BAYC" | "MAYC" | null>(
-    () => readVerifiedSession()?.collection ?? null,
+  const [cachedSession, setCachedSession] = useState(() => readVerifiedSession());
+  const [walletAddress, setWalletAddress] = useState<string | null>(() => cachedSession?.address ?? null);
+
+  useEffect(
+    () =>
+      onVerifiedSessionChange(() => {
+        const next = readVerifiedSession();
+        setCachedSession(next);
+        setWalletAddress(next?.address ?? null);
+      }),
+    [],
   );
 
   // Load wallet address from profile once authenticated.
   useEffect(() => {
     if (!isAuthenticated || !user) {
-      setWalletAddress(null);
+      setWalletAddress(readVerifiedSession()?.address ?? null);
       return;
     }
     let cancelled = false;
@@ -106,7 +112,7 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
         .eq("id", user.id)
         .maybeSingle();
       if (cancelled) return;
-      if (data?.wallet_address) setWalletAddress(data.wallet_address);
+      setWalletAddress(data?.wallet_address ?? readVerifiedSession()?.address ?? null);
     })();
     return () => {
       cancelled = true;
@@ -120,26 +126,24 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
         address: walletAddress,
         collection: collection ?? null,
         verifiedAt: Date.now(),
+        signature: readVerifiedSession()?.signature ?? "server-verified",
       });
-      setCachedCollection(collection ?? null);
     }
   }, [tokenProof, walletAddress, collection]);
 
-  const cached = readVerifiedSession();
   // Show the pill if either the live state is verified, OR the cached
   // session is fresh and matches the connected wallet (avoids button flash).
   const showPill =
-    isAuthenticated &&
     walletAddress &&
     (tokenProof ||
-      (cached &&
-        cached.address.toLowerCase() === walletAddress.toLowerCase()));
+      (cachedSession &&
+        cachedSession.address.toLowerCase() === walletAddress.toLowerCase()));
 
   if (showPill && walletAddress) {
     return (
       <WalletPill
         address={walletAddress}
-        collection={collection ?? cachedCollection}
+        collection={collection ?? cachedSession?.collection ?? null}
       />
     );
   }
