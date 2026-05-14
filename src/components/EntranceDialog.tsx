@@ -4,6 +4,7 @@ import { Copy, QrCode, RefreshCw, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
+import { writeVerifiedSession } from "@/lib/baycmc/verifiedSession";
 import {
   startTokenproofSession,
   pollTokenproofSession,
@@ -280,11 +281,16 @@ function EntranceBody({
             failWith(classifyError(error.message));
             return;
           }
+          writeVerifiedSession({
+            address: res.wallet,
+            collection: res.collection,
+            verifiedAt: Date.now(),
+            signature: `tokenproof:${sessionId}`,
+          });
           setVerifiedAs(res.collection);
           toast.success(`Verified — ${res.collection} ownership confirmed`);
           setPhase("done");
-          // Brief delay so the user sees the badge before close.
-          window.setTimeout(() => onOpenChange(false), 1500);
+          onOpenChange(false);
         }
       } catch (e) {
         transientErrorsRef.current += 1;
@@ -434,8 +440,14 @@ function EntranceBody({
       </div>
 
       <PrivyVerifyCard
-        onVerified={() => {
-          window.setTimeout(() => onOpenChange(false), 1200);
+        onVerified={({ address, collection, signature }) => {
+          writeVerifiedSession({
+            address,
+            collection,
+            verifiedAt: Date.now(),
+            signature,
+          });
+          onOpenChange(false);
         }}
         onLoginRequested={() => {
           // Keep this dialog mounted so the post-login wallet creation and
