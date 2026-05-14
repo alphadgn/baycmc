@@ -6,7 +6,6 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   verifyPrivyOwnership,
   getPrivyPublicConfig,
-  inspectWalletHoldings,
   logEmbeddedWalletProvisioned,
 } from "@/server/privy.functions";
 import {
@@ -419,7 +418,7 @@ function PrivyVerifyCardInner({
       } catch (e) {
         const msg = e instanceof Error ? e.message : "";
         if (msg.toLowerCase().includes("user rejected")) {
-          setError("You declined the signature. Try again to enter.");
+          setError("Signature request was cancelled. Try again when ready.");
         } else if (msg.toLowerCase().includes("network") || msg.toLowerCase().includes("fetch")) {
           setError("Network error reaching Ethereum. Try again in a moment.");
         } else {
@@ -892,15 +891,6 @@ function PrivyVerifyCardInner({
           >
             Disconnect
           </button>
-          <WalletStateInspector
-            user={user}
-            wallets={wallets}
-            createdWallet={createdWallet}
-            walletCreateState={walletCreateState}
-            walletsReady={walletsReady}
-            authenticated={authenticated}
-            resolvedWallet={wallet}
-          />
         </div>
       )}
     </div>
