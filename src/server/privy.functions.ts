@@ -8,6 +8,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { ETH_RPC_URL, DELEGATE_REGISTRY_V2 } from "@/lib/web3/constants";
 import { runLuminaCheckAndPersist } from "@/server/lumina.server";
 import { runOtherpageCheckAndPersist } from "@/server/otherpage.server";
+import { deriveWalletPassword } from "@/server/wallet-password";
 
 /**
  * Privy / SIWE entrance verification.
@@ -448,7 +449,10 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
     //    account, regardless of which vault delegated this session.
     const lower = wallet.toLowerCase();
     const email = `${lower}@wallet.baycmc.local`;
-    const password = `pv:${lower}:${process.env.SUPABASE_SERVICE_ROLE_KEY?.slice(0, 16) ?? ""}`;
+    // Strong server-derived password (SHA-256 over full service key + wallet).
+    // Always rotated on every sign-in so existing accounts that were created
+    // with the legacy short-prefix password get migrated transparently.
+    const password = await deriveWalletPassword(lower);
 
     const { data: existing } = await supabaseAdmin.auth.admin.listUsers({
       page: 1,
@@ -466,6 +470,9 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
       });
       if (error) throw error;
       userId = created.user!.id;
+    } else {
+      // Rotate to current derived password so legacy accounts can sign in.
+      await supabaseAdmin.auth.admin.updateUserById(userId, { password });
     }
 
     await supabaseAdmin

@@ -49,6 +49,30 @@ function AdminLuminaPage() {
   }, []);
 
   async function handleSave() {
+    // Client-side SSRF guard — server re-validates before fetch.
+    if (url.trim()) {
+      try {
+        const u = new URL(url);
+        if (u.protocol !== "https:") {
+          toast.error("URL must use https://");
+          return;
+        }
+        const host = u.hostname.toLowerCase();
+        if (
+          host === "localhost" ||
+          host.endsWith(".local") ||
+          host.endsWith(".internal") ||
+          /^(127|10|192\.168|169\.254)\./.test(host) ||
+          /^172\.(1[6-9]|2\d|3[01])\./.test(host)
+        ) {
+          toast.error("URL points to a private or internal address.");
+          return;
+        }
+      } catch {
+        toast.error("Invalid URL.");
+        return;
+      }
+    }
     setSaving(true);
     const { error } = await supabase
       .from("app_settings")

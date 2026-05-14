@@ -1,5 +1,6 @@
 import { getAddress, isAddress } from "viem";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { assertSafeHttpsUrl } from "@/server/url-guard";
 
 /**
  * Run a Lumina authenticity check for the given wallet and persist the
@@ -42,6 +43,20 @@ export async function runLuminaCheckAndPersist(args: {
   const url = cfg.url
     .replace("{wallet}", encodeURIComponent(checksummed))
     .replace("{contract}", encodeURIComponent(cfg.contract ?? ""));
+
+  // SSRF guard — admins could (intentionally or via account compromise)
+  // point this at internal services. Reject anything that isn't a public
+  // HTTPS endpoint before we issue the request.
+  try {
+    assertSafeHttpsUrl(url);
+  } catch (e) {
+    console.error("Lumina URL rejected by SSRF guard", e);
+    await supabaseAdmin.from("user_verifications").upsert(
+      { user_id: args.userId, lumina_verified: false },
+      { onConflict: "user_id" },
+    );
+    return { verified: false, configured: true, reason: "unsafe-url" };
+  }
 
   let verified = false;
   try {
