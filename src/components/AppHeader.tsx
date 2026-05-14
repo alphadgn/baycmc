@@ -93,7 +93,7 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
       onVerifiedSessionChange(() => {
         const next = readVerifiedSession();
         setCachedSession(next);
-        if (next?.address) setWalletAddress(next.address);
+        setWalletAddress(next?.address ?? null);
       }),
     [],
   );
