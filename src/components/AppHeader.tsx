@@ -101,7 +101,7 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
   // Load wallet address from profile once authenticated.
   useEffect(() => {
     if (!isAuthenticated || !user) {
-      setWalletAddress(null);
+      setWalletAddress(readVerifiedSession()?.address ?? null);
       return;
     }
     let cancelled = false;
