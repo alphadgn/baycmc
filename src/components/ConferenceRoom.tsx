@@ -39,7 +39,10 @@ export function ConferenceRoom({ roomId, roomName }: ConferenceRoomProps) {
       const res = await getToken({ data: { roomId } });
       if (!res.ok) {
         setError(res.error);
-        if (res.code === "bayc_revoked" || res.code === "otherpage_revoked") {
+        if (
+          "code" in res &&
+          (res.code === "bayc_revoked" || res.code === "otherpage_revoked")
+        ) {
           setAccessLossMessage(res.error);
         }
         toast.error(res.error);
