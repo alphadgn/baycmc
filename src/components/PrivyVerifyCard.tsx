@@ -8,10 +8,6 @@ import {
   getPrivyPublicConfig,
   logEmbeddedWalletProvisioned,
 } from "@/server/privy.functions";
-import {
-  isProvisionedPrivyWallet,
-  resolvePrivyProvisionedWallet,
-} from "@/lib/privyWallets";
 import { logEvent } from "@/lib/diagnostics";
 import { enqueueSign } from "@/lib/wallet/txQueue";
 import { toast } from "sonner";
