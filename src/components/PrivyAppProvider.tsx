@@ -95,7 +95,9 @@ export function PrivyAppProvider({ children }: { children: ReactNode }) {
     };
   }, [fetchConfig]);
 
-  if (!appId || !PrivyProviderCmp) return <>{children}</>;
+  if (!appId || !PrivyProviderCmp) {
+    return <PrivyReadyContext.Provider value={false}>{children}</PrivyReadyContext.Provider>;
+  }
 
   // Optional override for OAuth/email magic-link redirects. When unset,
   // Privy uses window.location.href, which works for standard web origins
@@ -109,7 +111,9 @@ export function PrivyAppProvider({ children }: { children: ReactNode }) {
     undefined;
 
   return (
-    <PrivyMountBoundary fallback={children}>
+    <PrivyMountBoundary
+      fallback={<PrivyReadyContext.Provider value={false}>{children}</PrivyReadyContext.Provider>}
+    >
       <PrivyProviderCmp
         appId={appId}
         config={{
@@ -120,31 +124,20 @@ export function PrivyAppProvider({ children }: { children: ReactNode }) {
             logo: undefined,
             walletChainType: "ethereum-only",
           },
-          // v3 requires an explicit chain context for embedded wallet
-          // provisioning. Without `defaultChain` + `supportedChains`, the
-          // "Creating wallet…" modal spins forever because the SDK can't
-          // pick an EVM chain to bind the new key to.
           defaultChain: mainnetChain,
           supportedChains: [mainnetChain],
           embeddedWallets: {
-            // Provision an embedded EVM wallet for ALL users on login.
-            // Privy handles hydration internally — no manual createWallet().
             ethereum: {
               createOnLogin: "all-users",
             },
             requireUserOwnedRecoveryOnCreate: false,
             requireUserPasswordOnCreate: false,
-            // Privy dashboard has `enforce_wallet_uis: true` +
-            // `mode: user-controlled-server-wallets-only` with
-            // `user-passcode` recovery. With showWalletUIs:false the
-            // passcode modal never renders, so embedded-wallet creation
-            // spins forever after email login. Must be true.
             showWalletUIs: true,
           },
           ...(customOAuthRedirectUrl ? { customOAuthRedirectUrl } : {}),
         }}
       >
-        {children}
+        <PrivyReadyContext.Provider value={true}>{children}</PrivyReadyContext.Provider>
       </PrivyProviderCmp>
     </PrivyMountBoundary>
   );
