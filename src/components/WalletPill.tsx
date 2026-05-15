@@ -3,7 +3,6 @@ import { Link } from "@tanstack/react-router";
 import { ChevronDown, Copy, LogOut, User as UserIcon, Activity } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { signOut } from "@/lib/auth/useAuth";
-import { clearVerifiedSession } from "@/lib/baycmc/verifiedSession";
 import { toast } from "sonner";
 
 interface WalletPillProps {
@@ -65,7 +64,6 @@ export function WalletPill({ address, collection }: WalletPillProps) {
   }
 
   async function handleDisconnect() {
-    clearVerifiedSession();
     await signOut();
     setOpen(false);
     toast.success("Disconnected");
