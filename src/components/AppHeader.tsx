@@ -97,6 +97,12 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
   const privy = usePrivyAuthState();
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(false);
+  const [clicked, setClicked] = useState(false);
+  const isBooting = clicked && !privy.ready;
+
+  useEffect(() => {
+    if (privy.ready) setClicked(false);
+  }, [privy.ready]);
 
   useEffect(() => {
     if (!isAuthenticated || !user) {
