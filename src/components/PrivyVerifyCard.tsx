@@ -269,8 +269,11 @@ function PrivyVerifyCardInner({
   }, [wallets]);
 
   // Strict application gate per Privy embedded wallet docs:
-  //   ready (privy) + authenticated + walletsReady + embeddedWallet present.
-  const isWalletReady = ready && authenticated && walletsReady && !!embeddedWallet;
+  //   ready (privy) + authenticated + walletsReady + embeddedWallet present
+  //   AND embeddedWallet.ready (when surfaced by the SDK).
+  const embeddedWalletReady =
+    !!embeddedWallet && (embeddedWallet.ready === undefined || embeddedWallet.ready === true);
+  const isWalletReady = ready && authenticated && walletsReady && embeddedWalletReady;
 
   // Single, bounded auth-state log — no reactive cascade.
   useEffect(() => {
