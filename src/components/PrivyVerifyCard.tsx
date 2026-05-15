@@ -24,6 +24,7 @@ type WalletLike = {
   wallet_client_type?: string;
   connectorType?: string;
   connector_type?: string;
+  ready?: boolean;
   getEthereumProvider?: () => Promise<EthereumProviderLike>;
 };
 
@@ -74,10 +75,7 @@ type PrivyHooks = {
     logout: () => void;
     user?: PrivyUserLike | null;
   };
-  useWallets: () => { wallets: WalletLike[]; ready: boolean };
-  useCreateWallet: () => {
-    createWallet: (options?: { createAdditional?: boolean }) => Promise<WalletLike>;
-  };
+  useWallets: () => { wallets: (WalletLike & { ready?: boolean })[]; ready: boolean };
   useUser: () => { user: PrivyUserLike | null; refreshUser: () => Promise<PrivyUserLike> };
   useSignMessage: () => {
     signMessage: (
@@ -148,7 +146,6 @@ export function PrivyVerifyCard({
         setHooks({
           usePrivy: mod.usePrivy,
           useWallets: mod.useWallets,
-          useCreateWallet: mod.useCreateWallet,
           useUser: mod.useUser,
           useSignMessage: mod.useSignMessage,
         });
@@ -273,8 +270,11 @@ function PrivyVerifyCardInner({
   }, [wallets]);
 
   // Strict application gate per Privy embedded wallet docs:
-  //   ready (privy) + authenticated + walletsReady + embeddedWallet present.
-  const isWalletReady = ready && authenticated && walletsReady && !!embeddedWallet;
+  //   ready (privy) + authenticated + walletsReady + embeddedWallet present
+  //   AND embeddedWallet.ready (when surfaced by the SDK).
+  const embeddedWalletReady =
+    !!embeddedWallet && (embeddedWallet.ready === undefined || embeddedWallet.ready === true);
+  const isWalletReady = ready && authenticated && walletsReady && embeddedWalletReady;
 
   // Single, bounded auth-state log — no reactive cascade.
   useEffect(() => {
