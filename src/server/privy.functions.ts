@@ -36,7 +36,31 @@ const delegateRegistryAbi = parseAbi([
 ]);
 
 function client() {
-  return createPublicClient({ chain: mainnet, transport: http(ETH_RPC_URL) });
+  return createPublicClient({
+    chain: mainnet,
+    transport: http(ETH_RPC_URL, { timeout: 8_000, retryCount: 1 }),
+  });
+}
+
+/**
+ * Reject after `ms` milliseconds with a descriptive error so a hung
+ * upstream RPC can never wedge the verify flow. Successful resolves /
+ * rejections from `p` are passed through unchanged.
+ */
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`Timeout: ${label} after ${ms}ms`)), ms);
+    p.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      },
+    );
+  });
 }
 
 const POSITIVE_BALANCE_TTL_MS = 60_000;
