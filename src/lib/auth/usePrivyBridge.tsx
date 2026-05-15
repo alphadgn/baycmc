@@ -20,13 +20,56 @@
  *   5. supabase.auth.setSession(...) → onAuthStateChange fires →
  *      RLS-protected reads work app-wide.
  */
-import { useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { SiweMessage } from "siwe";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { verifyPrivyOwnership } from "@/server/privy.functions";
 import { usePrivyReady } from "@/components/PrivyAppProvider";
+
+/**
+ * Lightweight, app-wide view of Privy state. Lets the header render
+ * "Click to verify" when the user has a connected Privy wallet but has
+ * not yet completed SIWE → Supabase verification. Default value is the
+ * "no Privy mounted" state.
+ */
+export interface PrivyAuthSnapshot {
+  ready: boolean;
+  authenticated: boolean;
+  address: string | null;
+}
+const PrivyAuthStateContext = createContext<PrivyAuthSnapshot>({
+  ready: false,
+  authenticated: false,
+  address: null,
+});
+export function usePrivyAuthState(): PrivyAuthSnapshot {
+  return useContext(PrivyAuthStateContext);
+}
+
+const VERIFIED_TTL_MS = 24 * 60 * 60 * 1000;
+function verifiedKey(addr: string) {
+  return `baycmc:verified:${addr.toLowerCase()}`;
+}
+function isVerifiedFresh(addr: string): boolean {
+  try {
+    const raw = window.localStorage.getItem(verifiedKey(addr));
+    if (!raw) return false;
+    const ts = Number.parseInt(raw, 10);
+    if (!Number.isFinite(ts)) return false;
+    return Date.now() - ts < VERIFIED_TTL_MS;
+  } catch {
+    return false;
+  }
+}
+function markVerified(addr: string) {
+  try {
+    window.localStorage.setItem(verifiedKey(addr), String(Date.now()));
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
 
 type EthereumProviderLike = {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
