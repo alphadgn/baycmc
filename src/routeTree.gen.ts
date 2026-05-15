@@ -12,20 +12,21 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as DiagnosticsRouteImport } from './routes/diagnostics'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AuthenticatedRoomsRouteImport } from './routes/_authenticated/rooms'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
-import { Route as AuthenticatedMessagesRouteImport } from './routes/_authenticated/messages'
 import { Route as AuthenticatedLifersRouteImport } from './routes/_authenticated/lifers'
-import { Route as AuthenticatedFeedRouteImport } from './routes/_authenticated/feed'
-import { Route as AuthenticatedApeRidesRouteImport } from './routes/_authenticated/ape-rides'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AuthenticatedVerifiedRouteImport } from './routes/_authenticated/_verified'
 import { Route as AuthenticatedLifersIndexRouteImport } from './routes/_authenticated/lifers/index'
-import { Route as AuthenticatedRoomsRoomIdRouteImport } from './routes/_authenticated/rooms.$roomId'
 import { Route as AuthenticatedLifersRoomRouteImport } from './routes/_authenticated/lifers/room'
 import { Route as AuthenticatedLifersMessagesRouteImport } from './routes/_authenticated/lifers/messages'
-import { Route as AuthenticatedApeRidesRideIdRouteImport } from './routes/_authenticated/ape-rides.$rideId'
 import { Route as AuthenticatedAdminOtherpageRouteImport } from './routes/_authenticated/admin.otherpage'
 import { Route as AuthenticatedAdminLuminaRouteImport } from './routes/_authenticated/admin.lumina'
+import { Route as AuthenticatedVerifiedRoomsRouteImport } from './routes/_authenticated/_verified/rooms'
+import { Route as AuthenticatedVerifiedMessagesRouteImport } from './routes/_authenticated/_verified/messages'
+import { Route as AuthenticatedVerifiedFeedRouteImport } from './routes/_authenticated/_verified/feed'
+import { Route as AuthenticatedVerifiedApeRidesRouteImport } from './routes/_authenticated/_verified/ape-rides'
+import { Route as AuthenticatedVerifiedRoomsRoomIdRouteImport } from './routes/_authenticated/_verified/rooms.$roomId'
+import { Route as AuthenticatedVerifiedApeRidesRideIdRouteImport } from './routes/_authenticated/_verified/ape-rides.$rideId'
 
 const DiagnosticsRoute = DiagnosticsRouteImport.update({
   id: '/diagnostics',
@@ -41,19 +42,9 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedRoomsRoute = AuthenticatedRoomsRouteImport.update({
-  id: '/rooms',
-  path: '/rooms',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
 const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedMessagesRoute = AuthenticatedMessagesRouteImport.update({
-  id: '/messages',
-  path: '/messages',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedLifersRoute = AuthenticatedLifersRouteImport.update({
@@ -61,19 +52,13 @@ const AuthenticatedLifersRoute = AuthenticatedLifersRouteImport.update({
   path: '/lifers',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedFeedRoute = AuthenticatedFeedRouteImport.update({
-  id: '/feed',
-  path: '/feed',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedApeRidesRoute = AuthenticatedApeRidesRouteImport.update({
-  id: '/ape-rides',
-  path: '/ape-rides',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
 const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   id: '/admin',
   path: '/admin',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedVerifiedRoute = AuthenticatedVerifiedRouteImport.update({
+  id: '/_verified',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedLifersIndexRoute =
@@ -81,12 +66,6 @@ const AuthenticatedLifersIndexRoute =
     id: '/',
     path: '/',
     getParentRoute: () => AuthenticatedLifersRoute,
-  } as any)
-const AuthenticatedRoomsRoomIdRoute =
-  AuthenticatedRoomsRoomIdRouteImport.update({
-    id: '/$roomId',
-    path: '/$roomId',
-    getParentRoute: () => AuthenticatedRoomsRoute,
   } as any)
 const AuthenticatedLifersRoomRoute = AuthenticatedLifersRoomRouteImport.update({
   id: '/room',
@@ -98,12 +77,6 @@ const AuthenticatedLifersMessagesRoute =
     id: '/messages',
     path: '/messages',
     getParentRoute: () => AuthenticatedLifersRoute,
-  } as any)
-const AuthenticatedApeRidesRideIdRoute =
-  AuthenticatedApeRidesRideIdRouteImport.update({
-    id: '/$rideId',
-    path: '/$rideId',
-    getParentRoute: () => AuthenticatedApeRidesRoute,
   } as any)
 const AuthenticatedAdminOtherpageRoute =
   AuthenticatedAdminOtherpageRouteImport.update({
@@ -117,61 +90,98 @@ const AuthenticatedAdminLuminaRoute =
     path: '/lumina',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedVerifiedRoomsRoute =
+  AuthenticatedVerifiedRoomsRouteImport.update({
+    id: '/rooms',
+    path: '/rooms',
+    getParentRoute: () => AuthenticatedVerifiedRoute,
+  } as any)
+const AuthenticatedVerifiedMessagesRoute =
+  AuthenticatedVerifiedMessagesRouteImport.update({
+    id: '/messages',
+    path: '/messages',
+    getParentRoute: () => AuthenticatedVerifiedRoute,
+  } as any)
+const AuthenticatedVerifiedFeedRoute =
+  AuthenticatedVerifiedFeedRouteImport.update({
+    id: '/feed',
+    path: '/feed',
+    getParentRoute: () => AuthenticatedVerifiedRoute,
+  } as any)
+const AuthenticatedVerifiedApeRidesRoute =
+  AuthenticatedVerifiedApeRidesRouteImport.update({
+    id: '/ape-rides',
+    path: '/ape-rides',
+    getParentRoute: () => AuthenticatedVerifiedRoute,
+  } as any)
+const AuthenticatedVerifiedRoomsRoomIdRoute =
+  AuthenticatedVerifiedRoomsRoomIdRouteImport.update({
+    id: '/$roomId',
+    path: '/$roomId',
+    getParentRoute: () => AuthenticatedVerifiedRoomsRoute,
+  } as any)
+const AuthenticatedVerifiedApeRidesRideIdRoute =
+  AuthenticatedVerifiedApeRidesRideIdRouteImport.update({
+    id: '/$rideId',
+    path: '/$rideId',
+    getParentRoute: () => AuthenticatedVerifiedApeRidesRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/diagnostics': typeof DiagnosticsRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
-  '/ape-rides': typeof AuthenticatedApeRidesRouteWithChildren
-  '/feed': typeof AuthenticatedFeedRoute
   '/lifers': typeof AuthenticatedLifersRouteWithChildren
-  '/messages': typeof AuthenticatedMessagesRoute
   '/profile': typeof AuthenticatedProfileRoute
-  '/rooms': typeof AuthenticatedRoomsRouteWithChildren
+  '/ape-rides': typeof AuthenticatedVerifiedApeRidesRouteWithChildren
+  '/feed': typeof AuthenticatedVerifiedFeedRoute
+  '/messages': typeof AuthenticatedVerifiedMessagesRoute
+  '/rooms': typeof AuthenticatedVerifiedRoomsRouteWithChildren
   '/admin/lumina': typeof AuthenticatedAdminLuminaRoute
   '/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
-  '/ape-rides/$rideId': typeof AuthenticatedApeRidesRideIdRoute
   '/lifers/messages': typeof AuthenticatedLifersMessagesRoute
   '/lifers/room': typeof AuthenticatedLifersRoomRoute
-  '/rooms/$roomId': typeof AuthenticatedRoomsRoomIdRoute
   '/lifers/': typeof AuthenticatedLifersIndexRoute
+  '/ape-rides/$rideId': typeof AuthenticatedVerifiedApeRidesRideIdRoute
+  '/rooms/$roomId': typeof AuthenticatedVerifiedRoomsRoomIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/diagnostics': typeof DiagnosticsRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
-  '/ape-rides': typeof AuthenticatedApeRidesRouteWithChildren
-  '/feed': typeof AuthenticatedFeedRoute
-  '/messages': typeof AuthenticatedMessagesRoute
   '/profile': typeof AuthenticatedProfileRoute
-  '/rooms': typeof AuthenticatedRoomsRouteWithChildren
+  '/ape-rides': typeof AuthenticatedVerifiedApeRidesRouteWithChildren
+  '/feed': typeof AuthenticatedVerifiedFeedRoute
+  '/messages': typeof AuthenticatedVerifiedMessagesRoute
+  '/rooms': typeof AuthenticatedVerifiedRoomsRouteWithChildren
   '/admin/lumina': typeof AuthenticatedAdminLuminaRoute
   '/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
-  '/ape-rides/$rideId': typeof AuthenticatedApeRidesRideIdRoute
   '/lifers/messages': typeof AuthenticatedLifersMessagesRoute
   '/lifers/room': typeof AuthenticatedLifersRoomRoute
-  '/rooms/$roomId': typeof AuthenticatedRoomsRoomIdRoute
   '/lifers': typeof AuthenticatedLifersIndexRoute
+  '/ape-rides/$rideId': typeof AuthenticatedVerifiedApeRidesRideIdRoute
+  '/rooms/$roomId': typeof AuthenticatedVerifiedRoomsRoomIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/diagnostics': typeof DiagnosticsRoute
+  '/_authenticated/_verified': typeof AuthenticatedVerifiedRouteWithChildren
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
-  '/_authenticated/ape-rides': typeof AuthenticatedApeRidesRouteWithChildren
-  '/_authenticated/feed': typeof AuthenticatedFeedRoute
   '/_authenticated/lifers': typeof AuthenticatedLifersRouteWithChildren
-  '/_authenticated/messages': typeof AuthenticatedMessagesRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
-  '/_authenticated/rooms': typeof AuthenticatedRoomsRouteWithChildren
+  '/_authenticated/_verified/ape-rides': typeof AuthenticatedVerifiedApeRidesRouteWithChildren
+  '/_authenticated/_verified/feed': typeof AuthenticatedVerifiedFeedRoute
+  '/_authenticated/_verified/messages': typeof AuthenticatedVerifiedMessagesRoute
+  '/_authenticated/_verified/rooms': typeof AuthenticatedVerifiedRoomsRouteWithChildren
   '/_authenticated/admin/lumina': typeof AuthenticatedAdminLuminaRoute
   '/_authenticated/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
-  '/_authenticated/ape-rides/$rideId': typeof AuthenticatedApeRidesRideIdRoute
   '/_authenticated/lifers/messages': typeof AuthenticatedLifersMessagesRoute
   '/_authenticated/lifers/room': typeof AuthenticatedLifersRoomRoute
-  '/_authenticated/rooms/$roomId': typeof AuthenticatedRoomsRoomIdRoute
   '/_authenticated/lifers/': typeof AuthenticatedLifersIndexRoute
+  '/_authenticated/_verified/ape-rides/$rideId': typeof AuthenticatedVerifiedApeRidesRideIdRoute
+  '/_authenticated/_verified/rooms/$roomId': typeof AuthenticatedVerifiedRoomsRoomIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -179,55 +189,56 @@ export interface FileRouteTypes {
     | '/'
     | '/diagnostics'
     | '/admin'
+    | '/lifers'
+    | '/profile'
     | '/ape-rides'
     | '/feed'
-    | '/lifers'
     | '/messages'
-    | '/profile'
     | '/rooms'
     | '/admin/lumina'
     | '/admin/otherpage'
-    | '/ape-rides/$rideId'
     | '/lifers/messages'
     | '/lifers/room'
-    | '/rooms/$roomId'
     | '/lifers/'
+    | '/ape-rides/$rideId'
+    | '/rooms/$roomId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/diagnostics'
     | '/admin'
+    | '/profile'
     | '/ape-rides'
     | '/feed'
     | '/messages'
-    | '/profile'
     | '/rooms'
     | '/admin/lumina'
     | '/admin/otherpage'
-    | '/ape-rides/$rideId'
     | '/lifers/messages'
     | '/lifers/room'
-    | '/rooms/$roomId'
     | '/lifers'
+    | '/ape-rides/$rideId'
+    | '/rooms/$roomId'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/diagnostics'
+    | '/_authenticated/_verified'
     | '/_authenticated/admin'
-    | '/_authenticated/ape-rides'
-    | '/_authenticated/feed'
     | '/_authenticated/lifers'
-    | '/_authenticated/messages'
     | '/_authenticated/profile'
-    | '/_authenticated/rooms'
+    | '/_authenticated/_verified/ape-rides'
+    | '/_authenticated/_verified/feed'
+    | '/_authenticated/_verified/messages'
+    | '/_authenticated/_verified/rooms'
     | '/_authenticated/admin/lumina'
     | '/_authenticated/admin/otherpage'
-    | '/_authenticated/ape-rides/$rideId'
     | '/_authenticated/lifers/messages'
     | '/_authenticated/lifers/room'
-    | '/_authenticated/rooms/$roomId'
     | '/_authenticated/lifers/'
+    | '/_authenticated/_verified/ape-rides/$rideId'
+    | '/_authenticated/_verified/rooms/$roomId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -259,25 +270,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/rooms': {
-      id: '/_authenticated/rooms'
-      path: '/rooms'
-      fullPath: '/rooms'
-      preLoaderRoute: typeof AuthenticatedRoomsRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
     '/_authenticated/profile': {
       id: '/_authenticated/profile'
       path: '/profile'
       fullPath: '/profile'
       preLoaderRoute: typeof AuthenticatedProfileRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/messages': {
-      id: '/_authenticated/messages'
-      path: '/messages'
-      fullPath: '/messages'
-      preLoaderRoute: typeof AuthenticatedMessagesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/lifers': {
@@ -287,25 +284,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLifersRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/feed': {
-      id: '/_authenticated/feed'
-      path: '/feed'
-      fullPath: '/feed'
-      preLoaderRoute: typeof AuthenticatedFeedRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/ape-rides': {
-      id: '/_authenticated/ape-rides'
-      path: '/ape-rides'
-      fullPath: '/ape-rides'
-      preLoaderRoute: typeof AuthenticatedApeRidesRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
     '/_authenticated/admin': {
       id: '/_authenticated/admin'
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/_verified': {
+      id: '/_authenticated/_verified'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedVerifiedRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/lifers/': {
@@ -314,13 +304,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/lifers/'
       preLoaderRoute: typeof AuthenticatedLifersIndexRouteImport
       parentRoute: typeof AuthenticatedLifersRoute
-    }
-    '/_authenticated/rooms/$roomId': {
-      id: '/_authenticated/rooms/$roomId'
-      path: '/$roomId'
-      fullPath: '/rooms/$roomId'
-      preLoaderRoute: typeof AuthenticatedRoomsRoomIdRouteImport
-      parentRoute: typeof AuthenticatedRoomsRoute
     }
     '/_authenticated/lifers/room': {
       id: '/_authenticated/lifers/room'
@@ -336,13 +319,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLifersMessagesRouteImport
       parentRoute: typeof AuthenticatedLifersRoute
     }
-    '/_authenticated/ape-rides/$rideId': {
-      id: '/_authenticated/ape-rides/$rideId'
-      path: '/$rideId'
-      fullPath: '/ape-rides/$rideId'
-      preLoaderRoute: typeof AuthenticatedApeRidesRideIdRouteImport
-      parentRoute: typeof AuthenticatedApeRidesRoute
-    }
     '/_authenticated/admin/otherpage': {
       id: '/_authenticated/admin/otherpage'
       path: '/otherpage'
@@ -357,8 +333,100 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminLuminaRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/_verified/rooms': {
+      id: '/_authenticated/_verified/rooms'
+      path: '/rooms'
+      fullPath: '/rooms'
+      preLoaderRoute: typeof AuthenticatedVerifiedRoomsRouteImport
+      parentRoute: typeof AuthenticatedVerifiedRoute
+    }
+    '/_authenticated/_verified/messages': {
+      id: '/_authenticated/_verified/messages'
+      path: '/messages'
+      fullPath: '/messages'
+      preLoaderRoute: typeof AuthenticatedVerifiedMessagesRouteImport
+      parentRoute: typeof AuthenticatedVerifiedRoute
+    }
+    '/_authenticated/_verified/feed': {
+      id: '/_authenticated/_verified/feed'
+      path: '/feed'
+      fullPath: '/feed'
+      preLoaderRoute: typeof AuthenticatedVerifiedFeedRouteImport
+      parentRoute: typeof AuthenticatedVerifiedRoute
+    }
+    '/_authenticated/_verified/ape-rides': {
+      id: '/_authenticated/_verified/ape-rides'
+      path: '/ape-rides'
+      fullPath: '/ape-rides'
+      preLoaderRoute: typeof AuthenticatedVerifiedApeRidesRouteImport
+      parentRoute: typeof AuthenticatedVerifiedRoute
+    }
+    '/_authenticated/_verified/rooms/$roomId': {
+      id: '/_authenticated/_verified/rooms/$roomId'
+      path: '/$roomId'
+      fullPath: '/rooms/$roomId'
+      preLoaderRoute: typeof AuthenticatedVerifiedRoomsRoomIdRouteImport
+      parentRoute: typeof AuthenticatedVerifiedRoomsRoute
+    }
+    '/_authenticated/_verified/ape-rides/$rideId': {
+      id: '/_authenticated/_verified/ape-rides/$rideId'
+      path: '/$rideId'
+      fullPath: '/ape-rides/$rideId'
+      preLoaderRoute: typeof AuthenticatedVerifiedApeRidesRideIdRouteImport
+      parentRoute: typeof AuthenticatedVerifiedApeRidesRoute
+    }
   }
 }
+
+interface AuthenticatedVerifiedApeRidesRouteChildren {
+  AuthenticatedVerifiedApeRidesRideIdRoute: typeof AuthenticatedVerifiedApeRidesRideIdRoute
+}
+
+const AuthenticatedVerifiedApeRidesRouteChildren: AuthenticatedVerifiedApeRidesRouteChildren =
+  {
+    AuthenticatedVerifiedApeRidesRideIdRoute:
+      AuthenticatedVerifiedApeRidesRideIdRoute,
+  }
+
+const AuthenticatedVerifiedApeRidesRouteWithChildren =
+  AuthenticatedVerifiedApeRidesRoute._addFileChildren(
+    AuthenticatedVerifiedApeRidesRouteChildren,
+  )
+
+interface AuthenticatedVerifiedRoomsRouteChildren {
+  AuthenticatedVerifiedRoomsRoomIdRoute: typeof AuthenticatedVerifiedRoomsRoomIdRoute
+}
+
+const AuthenticatedVerifiedRoomsRouteChildren: AuthenticatedVerifiedRoomsRouteChildren =
+  {
+    AuthenticatedVerifiedRoomsRoomIdRoute:
+      AuthenticatedVerifiedRoomsRoomIdRoute,
+  }
+
+const AuthenticatedVerifiedRoomsRouteWithChildren =
+  AuthenticatedVerifiedRoomsRoute._addFileChildren(
+    AuthenticatedVerifiedRoomsRouteChildren,
+  )
+
+interface AuthenticatedVerifiedRouteChildren {
+  AuthenticatedVerifiedApeRidesRoute: typeof AuthenticatedVerifiedApeRidesRouteWithChildren
+  AuthenticatedVerifiedFeedRoute: typeof AuthenticatedVerifiedFeedRoute
+  AuthenticatedVerifiedMessagesRoute: typeof AuthenticatedVerifiedMessagesRoute
+  AuthenticatedVerifiedRoomsRoute: typeof AuthenticatedVerifiedRoomsRouteWithChildren
+}
+
+const AuthenticatedVerifiedRouteChildren: AuthenticatedVerifiedRouteChildren = {
+  AuthenticatedVerifiedApeRidesRoute:
+    AuthenticatedVerifiedApeRidesRouteWithChildren,
+  AuthenticatedVerifiedFeedRoute: AuthenticatedVerifiedFeedRoute,
+  AuthenticatedVerifiedMessagesRoute: AuthenticatedVerifiedMessagesRoute,
+  AuthenticatedVerifiedRoomsRoute: AuthenticatedVerifiedRoomsRouteWithChildren,
+}
+
+const AuthenticatedVerifiedRouteWithChildren =
+  AuthenticatedVerifiedRoute._addFileChildren(
+    AuthenticatedVerifiedRouteChildren,
+  )
 
 interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminLuminaRoute: typeof AuthenticatedAdminLuminaRoute
@@ -372,19 +440,6 @@ const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
 
 const AuthenticatedAdminRouteWithChildren =
   AuthenticatedAdminRoute._addFileChildren(AuthenticatedAdminRouteChildren)
-
-interface AuthenticatedApeRidesRouteChildren {
-  AuthenticatedApeRidesRideIdRoute: typeof AuthenticatedApeRidesRideIdRoute
-}
-
-const AuthenticatedApeRidesRouteChildren: AuthenticatedApeRidesRouteChildren = {
-  AuthenticatedApeRidesRideIdRoute: AuthenticatedApeRidesRideIdRoute,
-}
-
-const AuthenticatedApeRidesRouteWithChildren =
-  AuthenticatedApeRidesRoute._addFileChildren(
-    AuthenticatedApeRidesRouteChildren,
-  )
 
 interface AuthenticatedLifersRouteChildren {
   AuthenticatedLifersMessagesRoute: typeof AuthenticatedLifersMessagesRoute
@@ -401,35 +456,18 @@ const AuthenticatedLifersRouteChildren: AuthenticatedLifersRouteChildren = {
 const AuthenticatedLifersRouteWithChildren =
   AuthenticatedLifersRoute._addFileChildren(AuthenticatedLifersRouteChildren)
 
-interface AuthenticatedRoomsRouteChildren {
-  AuthenticatedRoomsRoomIdRoute: typeof AuthenticatedRoomsRoomIdRoute
-}
-
-const AuthenticatedRoomsRouteChildren: AuthenticatedRoomsRouteChildren = {
-  AuthenticatedRoomsRoomIdRoute: AuthenticatedRoomsRoomIdRoute,
-}
-
-const AuthenticatedRoomsRouteWithChildren =
-  AuthenticatedRoomsRoute._addFileChildren(AuthenticatedRoomsRouteChildren)
-
 interface AuthenticatedRouteChildren {
+  AuthenticatedVerifiedRoute: typeof AuthenticatedVerifiedRouteWithChildren
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
-  AuthenticatedApeRidesRoute: typeof AuthenticatedApeRidesRouteWithChildren
-  AuthenticatedFeedRoute: typeof AuthenticatedFeedRoute
   AuthenticatedLifersRoute: typeof AuthenticatedLifersRouteWithChildren
-  AuthenticatedMessagesRoute: typeof AuthenticatedMessagesRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
-  AuthenticatedRoomsRoute: typeof AuthenticatedRoomsRouteWithChildren
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedVerifiedRoute: AuthenticatedVerifiedRouteWithChildren,
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
-  AuthenticatedApeRidesRoute: AuthenticatedApeRidesRouteWithChildren,
-  AuthenticatedFeedRoute: AuthenticatedFeedRoute,
   AuthenticatedLifersRoute: AuthenticatedLifersRouteWithChildren,
-  AuthenticatedMessagesRoute: AuthenticatedMessagesRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
-  AuthenticatedRoomsRoute: AuthenticatedRoomsRouteWithChildren,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
@@ -444,3 +482,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
