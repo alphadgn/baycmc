@@ -55,7 +55,7 @@ function RoomDetail() {
       <header className="my-4">
         <h1 className="font-display text-5xl text-gradient-gold">{name}</h1>
         <p className="text-xs uppercase tracking-widest text-muted-foreground">
-          {tier === "lifer" ? "Lifer-only" : "Token Proof"}
+          {tier === "lifer" ? "Lifer-only" : "Verified"}
         </p>
       </header>
       <ConferenceRoom roomId={roomId} roomName={name} />

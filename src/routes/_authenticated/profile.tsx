@@ -105,7 +105,7 @@ function ProfilePage() {
     else toast.success("Profile saved");
   }
 
-  // Verification is handled at Entrance via Tokenproof; profile only shows
+  // Verification is handled at Entrance via Privy + on-chain check; profile only shows
   // current status. (Otherpage premium check is performed server-side at
   // gated routes.)
 
@@ -207,12 +207,12 @@ function ProfilePage() {
         <section className="glass rounded-2xl p-6 shadow-card lg:col-span-2">
           <h2 className="font-display text-xl font-semibold">Verification</h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Status from your last Tokenproof entrance. Re-verify any time by
+            Status from your last on-chain ownership check. Re-verify any time by
             tapping <span className="font-semibold text-foreground">Entrance</span> in the header.
           </p>
           <ul className="mt-5 space-y-3">
             <VerifyRow
-              label="BAYC/MAYC (Tokenproof)"
+              label="BAYC/MAYC ownership"
               ok={!!verif?.bayc_verified}
               action={
                 <span className="text-xs text-muted-foreground">

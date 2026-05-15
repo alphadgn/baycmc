@@ -17,7 +17,7 @@ function FeedPage() {
       <header className="mb-6">
         <h1 className="font-display text-5xl text-gradient-gold">Feed</h1>
         <p className="mt-1 text-sm text-muted-foreground font-sans-display">
-          Realtime · Token Proof gated
+          Realtime · Verified holders only
         </p>
       </header>
       <SocialFeed />

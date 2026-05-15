@@ -110,7 +110,7 @@ export function ConferenceRoom({ roomId, roomName }: ConferenceRoomProps) {
         )}
         <h2 className="font-display text-4xl text-gradient-gold">{roomName}</h2>
         <p className="mt-3 text-sm text-muted-foreground font-sans-display">
-          Live audio + video conference room. Token Proof verified members only.
+          Live audio + video conference room. Verified BAYC/MAYC holders only.
         </p>
         {error && (
           <p className="mt-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
