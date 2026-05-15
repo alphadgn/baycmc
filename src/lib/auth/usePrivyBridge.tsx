@@ -133,7 +133,7 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
           return;
         }
 
-        toast.loading("Checking delegate.cash and on-chain ownership…", { id: toastId });
+        toast.loading("Preparing wallet sign-in…", { id: toastId });
 
         const domain = window.location.host;
         const origin = window.location.origin;
