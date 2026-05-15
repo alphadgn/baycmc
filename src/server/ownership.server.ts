@@ -181,7 +181,14 @@ export async function recomputeOwnership(userId: string): Promise<OwnershipSnaps
   // entirely (directOk=false AND no vaults checked successfully), preserve
   // the prior row to avoid false negatives during outages.
   const confirmedZero = directOk && !holds;
-  const updates: Record<string, unknown> = {
+  const updates: {
+    user_id: string;
+    delegation_verified: boolean;
+    delegation_vault: string | null;
+    bayc_verified?: boolean;
+    bayc_collection?: string | null;
+    verified_at?: string | null;
+  } = {
     user_id: userId,
     delegation_verified: basisDelegated,
     delegation_vault: delegatedFrom,
