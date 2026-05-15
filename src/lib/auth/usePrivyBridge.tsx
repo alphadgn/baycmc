@@ -27,6 +27,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { verifyPrivyOwnership } from "@/server/privy.functions";
 import { usePrivyReady } from "@/components/PrivyAppProvider";
+import { logEvent } from "@/lib/diagnostics";
 
 /**
  * Lightweight, app-wide view of Privy state. Lets the header render
@@ -41,23 +42,30 @@ export interface PrivyAuthSnapshot {
   ready: boolean;
   authenticated: boolean;
   address: string | null;
+  /** A SIWE + ownership verification is currently running. */
+  verifying: boolean;
 }
 let privySnapshot: PrivyAuthSnapshot = {
   ready: false,
   authenticated: false,
   address: null,
+  verifying: false,
 };
 const privyListeners = new Set<() => void>();
 function setPrivySnapshot(next: PrivyAuthSnapshot) {
   if (
     privySnapshot.ready === next.ready &&
     privySnapshot.authenticated === next.authenticated &&
-    privySnapshot.address === next.address
+    privySnapshot.address === next.address &&
+    privySnapshot.verifying === next.verifying
   ) {
     return;
   }
   privySnapshot = next;
   for (const l of privyListeners) l();
+}
+function patchPrivySnapshot(patch: Partial<PrivyAuthSnapshot>) {
+  setPrivySnapshot({ ...privySnapshot, ...patch });
 }
 export function usePrivyAuthState(): PrivyAuthSnapshot {
   return useSyncExternalStore(
@@ -172,7 +180,17 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
 
   useEffect(() => {
     const retry = () => {
-      inFlightRef.current = null;
+      // Single-flight: ignore retries while a verify is already running.
+      // This is what stops the "Preparing wallet sign-in…" loop — without
+      // it, every click was clearing the guard and spawning a second
+      // signMessage() in parallel with the first.
+      if (inFlightRef.current) {
+        logEvent("auth", "info", "retry ignored — verify already in-flight", {
+          inFlight: inFlightRef.current,
+        });
+        return;
+      }
+      logEvent("auth", "info", "retry accepted — kicking verify");
       completedRef.current.clear();
       verifyRequestedRef.current = true;
       setRetryNonce((n) => n + 1);
@@ -182,15 +200,37 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
   }, []);
 
   useEffect(() => {
-    if (!ready || !authenticated || !walletsReady || !walletReady || !embeddedWallet) return;
+    if (!ready || !authenticated || !walletsReady || !walletReady || !embeddedWallet) {
+      logEvent("auth", "debug", "bridge gate: not ready", {
+        ready,
+        authenticated,
+        walletsReady,
+        walletReady,
+        hasEmbedded: !!embeddedWallet,
+      });
+      return;
+    }
     const address = embeddedWallet.address;
-    if (!address) return;
-    if (inFlightRef.current === address) return;
-    if (completedRef.current.has(address.toLowerCase())) return;
+    if (!address) {
+      logEvent("auth", "warn", "bridge gate: embedded wallet has no address");
+      return;
+    }
+    if (inFlightRef.current === address) {
+      logEvent("auth", "debug", "bridge gate: already in-flight for address");
+      return;
+    }
+    if (completedRef.current.has(address.toLowerCase())) {
+      logEvent("auth", "debug", "bridge gate: already completed for address");
+      return;
+    }
 
     let cancelled = false;
     inFlightRef.current = address;
     const toastId = `privy-bridge-${address.toLowerCase()}`;
+    logEvent("auth", "info", "bridge: entering verify path", {
+      address: address.slice(0, 6) + "…" + address.slice(-4),
+      verifyRequested: verifyRequestedRef.current,
+    });
 
     void (async () => {
       try {
@@ -199,6 +239,7 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
         const { data: sess } = await supabase.auth.getSession();
         const existingEmail = sess.session?.user.email ?? "";
         if (existingEmail === `${address.toLowerCase()}@wallet.baycmc.local`) {
+          logEvent("auth", "info", "bridge: existing Supabase session matches wallet — short-circuit");
           completedRef.current.add(address.toLowerCase());
           // Backfill the freshness marker so future loads stay quiet.
           if (!isVerifiedFresh(address)) markVerified(address);
@@ -212,9 +253,18 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
         if (!verifyRequestedRef.current) {
           // No explicit user click → bail. The header will render a
           // "Click to verify" CTA that dispatches the retry event.
+          logEvent("auth", "debug", "bridge: no explicit verify request — waiting on user click");
           return;
         }
 
+        // Consume the explicit-request flag immediately so a thrown error
+        // below doesn't leave us re-firing the loading toast on every
+        // re-render of the bridge (which is what produced the stuck
+        // "Preparing wallet sign-in…" loop).
+        verifyRequestedRef.current = false;
+        patchPrivySnapshot({ verifying: true });
+
+        logEvent("auth", "info", "bridge: building SIWE + calling signMessage");
         toast.loading("Preparing wallet sign-in…", { id: toastId });
 
         const domain = window.location.host;
@@ -251,6 +301,7 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
           "Signature request timed out. Please try signing in again.",
         );
         if (cancelled) return;
+        logEvent("auth", "info", "bridge: signature obtained — calling verifyFn");
 
         toast.loading("Checking BAYC / MAYC ownership…", { id: toastId });
         const result = await withTimeout(
@@ -259,8 +310,15 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
           "The verification check is taking longer than expected. Please try again.",
         );
         if (cancelled) return;
+        logEvent("auth", "info", "bridge: verifyFn returned", {
+          verified: result.verified,
+          hasSession: !!result.session,
+          collection: result.collection,
+          reason: result.reason ?? null,
+        });
 
         if (!result.session) {
+          logEvent("auth", "error", "bridge: server returned no session", { reason: result.reason });
           toast.error(result.reason ?? "Sign-in failed.", { id: toastId });
           return;
         }
@@ -269,13 +327,14 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
           refresh_token: result.session.refresh_token,
         });
         if (error) {
+          logEvent("auth", "error", "bridge: setSession failed", { message: error.message });
           toast.error(error.message, { id: toastId });
           return;
         }
+        logEvent("auth", "info", "bridge: Supabase session set — redirect should follow");
 
         completedRef.current.add(address.toLowerCase());
         markVerified(address);
-        verifyRequestedRef.current = false;
 
         // Surface deterministic UI states for the delegation/direct check:
         if (result.verified) {
@@ -302,14 +361,15 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         if (!msg.toLowerCase().includes("user rejected")) {
-          console.warn("[PrivyBridge] verify failed:", msg);
+          logEvent("auth", "error", "bridge: verify threw", { message: msg });
           toast.error(msg || "Sign-in failed. Please try again.", { id: toastId });
         } else {
+          logEvent("auth", "info", "bridge: user rejected signature");
           toast.dismiss(toastId);
         }
-        verifyRequestedRef.current = false;
       } finally {
         if (inFlightRef.current === address) inFlightRef.current = null;
+        patchPrivySnapshot({ verifying: false });
       }
     })();
 
@@ -331,8 +391,9 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
 
   // Publish the latest snapshot to the module-level store so the header
   // (and any other component) can react without being a child of this node.
+  // `verifying` is owned by the verify effect — patch the other fields only.
   useEffect(() => {
-    setPrivySnapshot({
+    patchPrivySnapshot({
       ready: !!ready && !!walletsReady,
       authenticated: !!authenticated,
       address: walletReady && embeddedWallet ? embeddedWallet.address : null,

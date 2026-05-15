@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Lock } from "lucide-react";
+import { toast } from "sonner";
 import { useAuth } from "@/lib/auth/useAuth";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import { usePrivyAuthState } from "@/lib/auth/usePrivyBridge";
@@ -104,6 +105,23 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
     if (privy.ready) setClicked(false);
   }, [privy.ready]);
 
+  // If Privy never finishes booting within 8s of a click, surface the
+  // problem instead of spinning the button forever. Most common cause is
+  // a missing/invalid PRIVY_APP_ID in .env.
+  useEffect(() => {
+    if (!clicked) return;
+    if (privy.ready) return;
+    const t = window.setTimeout(() => {
+      toast.error("Wallet sign-in didn't load.", {
+        description:
+          "Check that PRIVY_APP_ID is set in .env and the dev server was restarted.",
+        duration: 8000,
+      });
+      setClicked(false);
+    }, 8000);
+    return () => window.clearTimeout(t);
+  }, [clicked, privy.ready]);
+
   useEffect(() => {
     if (!isAuthenticated || !user) {
       setWalletAddress(null);
@@ -127,6 +145,8 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
     };
   }, [isAuthenticated, user]);
 
+  const verifying = privy.verifying;
+
   // Authenticated to Supabase: show wallet pill (and optional verify CTA
   // for Tier-1 lobby users).
   if (isAuthenticated) {
@@ -136,13 +156,14 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
           {!verifLoading && !isVerifiedHolder && (
             <button
               type="button"
+              disabled={verifying}
               onClick={() => {
                 window.dispatchEvent(new Event("baycmc:privy-bridge-retry"));
               }}
-              className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-gold/40 bg-gold/10 px-3 py-2 text-xs font-semibold text-gold transition hover:bg-gold/20"
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-gold/40 bg-gold/10 px-3 py-2 text-xs font-semibold text-gold transition hover:bg-gold/20 disabled:cursor-wait disabled:opacity-70"
             >
               <Lock className="h-3 w-3" />
-              Verify holder access
+              {verifying ? "Verifying…" : "Verify holder access"}
             </button>
           )}
           <WalletPill
@@ -156,13 +177,14 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
     return (
       <button
         type="button"
+        disabled={verifying}
         onClick={() => {
           window.dispatchEvent(new Event("baycmc:privy-bridge-retry"));
           onOpen();
         }}
-        className="cursor-pointer rounded-md border border-gold/40 bg-gold/10 px-4 py-2 text-sm font-semibold text-gold transition hover:bg-gold/20"
+        className="cursor-pointer rounded-md border border-gold/40 bg-gold/10 px-4 py-2 text-sm font-semibold text-gold transition hover:bg-gold/20 disabled:cursor-wait disabled:opacity-70"
       >
-        Finish sign-in
+        {verifying ? "Verifying…" : "Finish sign-in"}
       </button>
     );
   }
@@ -176,14 +198,15 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
     return (
       <button
         type="button"
+        disabled={verifying}
         onClick={() => {
           window.dispatchEvent(new Event("baycmc:privy-bridge-retry"));
         }}
-        className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-gold/40 bg-gold/10 px-4 py-2 text-sm font-semibold text-gold transition hover:bg-gold/20"
+        className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-gold/40 bg-gold/10 px-4 py-2 text-sm font-semibold text-gold transition hover:bg-gold/20 disabled:cursor-wait disabled:opacity-70"
         title={privy.address}
       >
         <Lock className="h-3.5 w-3.5" />
-        Click to verify
+        {verifying ? "Verifying…" : "Click to verify"}
         <span className="font-mono text-xs text-gold/70">
           {sliceAddress(privy.address)}
         </span>

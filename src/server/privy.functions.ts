@@ -43,9 +43,12 @@ function client() {
 }
 
 function ethRpcUrl() {
-  const url = process.env.ETH_RPC_URL;
+  const url = process.env.ETH_RPC_URL?.trim();
   if (!url) {
-    throw new Error("Ethereum RPC is not configured. Please try again later.");
+    console.error("[privy.functions] ETH_RPC_URL is not set");
+    throw new Error(
+      "Server isn't configured for on-chain checks yet (missing ETH_RPC_URL). Ask an admin to finish setup.",
+    );
   }
   return url;
 }
