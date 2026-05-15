@@ -31,13 +31,16 @@ type PrivyHooks = {
 };
 
 export function EntranceDialog({ open, onOpenChange }: EntranceDialogProps) {
+  const privyReady = usePrivyReady();
   const [hooks, setHooks] = useState<PrivyHooks | null>(null);
   const [configured, setConfigured] = useState<boolean | null>(null);
   const fetchConfig = useServerFn(getPrivyPublicConfig);
   const triggeredRef = useRef(false);
 
-  // Lazy-load Privy hooks (SSR-unsafe SDK).
+  // Lazy-load Privy hooks (SSR-unsafe SDK). Only after the PrivyProvider
+  // has actually mounted — calling usePrivy outside it throws.
   useEffect(() => {
+    if (!privyReady) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -58,13 +61,13 @@ export function EntranceDialog({ open, onOpenChange }: EntranceDialogProps) {
     return () => {
       cancelled = true;
     };
-  }, [fetchConfig]);
+  }, [fetchConfig, privyReady]);
 
   return (
     <PrivyLoginTrigger
       open={open}
       onOpenChange={onOpenChange}
-      hooks={hooks}
+      hooks={privyReady ? hooks : null}
       configured={configured}
       triggeredRef={triggeredRef}
     />
