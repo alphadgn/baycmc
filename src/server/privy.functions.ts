@@ -5,7 +5,7 @@ import { SiweMessage } from "siwe";
 import { createPublicClient, http, getAddress, parseAbi, isAddress } from "viem";
 import { mainnet } from "viem/chains";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { ETH_RPC_URL, DELEGATE_REGISTRY_V2 } from "@/lib/web3/constants";
+import { DELEGATE_REGISTRY_V2 } from "@/lib/web3/constants";
 import { runLuminaCheckAndPersist } from "@/server/lumina.server";
 import { runOtherpageCheckAndPersist } from "@/server/otherpage.server";
 import { deriveWalletPassword } from "@/server/wallet-password";
@@ -38,8 +38,16 @@ const delegateRegistryAbi = parseAbi([
 function client() {
   return createPublicClient({
     chain: mainnet,
-    transport: http(ETH_RPC_URL, { timeout: 8_000, retryCount: 1 }),
+    transport: http(ethRpcUrl(), { timeout: 8_000, retryCount: 1 }),
   });
+}
+
+function ethRpcUrl() {
+  const url = process.env.ETH_RPC_URL;
+  if (!url) {
+    throw new Error("Ethereum RPC is not configured. Please try again later.");
+  }
+  return url;
 }
 
 /**
@@ -93,20 +101,24 @@ async function balancesFor(
     return { bayc: hit.bayc, mayc: hit.mayc };
   }
 
-  const [bayc, mayc] = await Promise.all([
-    c.readContract({
-      address: BAYC,
-      abi: erc721Abi,
-      functionName: "balanceOf",
-      args: [owner],
-    }) as Promise<bigint>,
-    c.readContract({
-      address: MAYC,
-      abi: erc721Abi,
-      functionName: "balanceOf",
-      args: [owner],
-    }) as Promise<bigint>,
-  ]);
+  const [bayc, mayc] = await withTimeout(
+    Promise.all([
+      c.readContract({
+        address: BAYC,
+        abi: erc721Abi,
+        functionName: "balanceOf",
+        args: [owner],
+      }) as Promise<bigint>,
+      c.readContract({
+        address: MAYC,
+        abi: erc721Abi,
+        functionName: "balanceOf",
+        args: [owner],
+      }) as Promise<bigint>,
+    ]),
+    8_000,
+    `balanceOf BAYC/MAYC for ${owner}`,
+  );
 
   const hasBalance = bayc > 0n || mayc > 0n;
   balanceCache.set(key, {
