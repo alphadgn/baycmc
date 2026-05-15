@@ -3,6 +3,7 @@ import { z } from "zod";
 import { AccessToken } from "livekit-server-sdk";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { recomputeOwnership } from "@/server/ownership.server";
 
 /**
  * Mint a LiveKit access token after enforcing tier-based access.
