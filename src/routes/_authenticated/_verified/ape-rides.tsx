@@ -16,7 +16,7 @@ import type { Database } from "@/integrations/supabase/types";
 type Ride = Database["public"]["Tables"]["ape_rides"]["Row"];
 type RideRequest = Database["public"]["Tables"]["ape_ride_requests"]["Row"];
 
-export const Route = createFileRoute("/_authenticated/ape-rides")({
+export const Route = createFileRoute("/_authenticated/_verified/ape-rides")({
   head: () => ({
     meta: [
       { title: "Ape Rides — BAYC/MAYC Clubhouse" },

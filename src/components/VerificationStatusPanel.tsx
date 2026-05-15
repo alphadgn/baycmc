@@ -12,9 +12,9 @@ interface VerifRow {
 }
 
 /**
- * User-facing verification status: shows BAYC (Token Proof) and Lumina
+ * User-facing verification status: shows BAYC ownership and Lumina
  * verification with explicit error states. Lumina re-check is manual per
- * product decision (no automatic call after Token Proof).
+ * product decision (no automatic call after on-chain check).
  */
 export function VerificationStatusPanel() {
   const { user, loading: authLoading } = useAuth();
@@ -88,8 +88,8 @@ export function VerificationStatusPanel() {
           ok={!!row?.bayc_verified}
           hint={
             row?.bayc_verified
-              ? "Token Proof confirmed BAYC/MAYC ownership."
-              : "Not yet verified. Use the Token Proof or Privy flow to verify."
+              ? "On-chain BAYC/MAYC ownership confirmed."
+              : "Not yet verified. Sign in and approve a wallet signature to verify ownership."
           }
         />
         <StatusRow

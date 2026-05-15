@@ -7,39 +7,41 @@ export type BaycCollection = "BAYC" | "MAYC" | null;
 
 export interface VerificationStatus {
   loading: boolean;
-  tokenProof: boolean; // BAYC or MAYC verified
-  collection: BaycCollection; // which collection Tokenproof attested
+  /** Tier 2 — owns BAYC/MAYC (or has a delegate.cash vault that does). */
+  isVerifiedHolder: boolean;
+  /** Tier 1 — signed in but not a verified holder. */
+  isLobby: boolean;
+  /** @deprecated use `isVerifiedHolder` — kept as alias while callers migrate. */
+  tokenProof: boolean;
+  collection: BaycCollection;
   otherpage: boolean;
-  isLifer: boolean; // both
+  /** Tier 3 — verified holder + Otherpage / Lifer token. */
+  isLifer: boolean;
   refresh: () => Promise<void>;
 }
 
 /**
  * Verification status for the current user. Drives access to gated UI.
  *
- * Note: this is a UI hint only. All actual access control is enforced
- * server-side via RLS (see `is_token_proof_verified` and `is_lifer` SQL
- * helpers) and per-request Token Proof checks.
+ * UI hint only — actual access control is enforced server-side by RLS
+ * (`is_verified_holder`, `is_lifer`) and per-request server fns.
  */
 export function useVerificationStatus(): VerificationStatus {
-  const { user, loading: authLoading } = useAuth();
-  const [tokenProof, setTokenProof] = useState(false);
+  const { user, loading: authLoading, isAuthenticated } = useAuth();
+  const [isVerifiedHolder, setIsVerifiedHolder] = useState(false);
   const [collection, setCollection] = useState<BaycCollection>(null);
   const [otherpage, setOtherpage] = useState(false);
   const [loading, setLoading] = useState(true);
 
   async function load() {
     if (!user) {
-      setTokenProof(false);
+      setIsVerifiedHolder(false);
       setCollection(null);
       setOtherpage(false);
       setLoading(false);
       return;
     }
     setLoading(true);
-    // Force a fresh on-chain + delegate.cash recompute so revoked
-    // delegations or transferred apes flip the row immediately. Falls back
-    // to the stored row on error.
     try {
       await revalidateOwnership();
     } catch (e) {
@@ -50,11 +52,9 @@ export function useVerificationStatus(): VerificationStatus {
       .select("bayc_verified, otherpage_verified, bayc_collection")
       .eq("user_id", user.id)
       .maybeSingle();
-    setTokenProof(!!data?.bayc_verified);
+    setIsVerifiedHolder(!!data?.bayc_verified);
     setOtherpage(!!data?.otherpage_verified);
-    setCollection(
-      (data?.bayc_collection as BaycCollection | undefined) ?? null,
-    );
+    setCollection((data?.bayc_collection as BaycCollection | undefined) ?? null);
     setLoading(false);
   }
 
@@ -66,11 +66,12 @@ export function useVerificationStatus(): VerificationStatus {
 
   return {
     loading: authLoading || loading,
-    tokenProof,
+    isVerifiedHolder,
+    isLobby: isAuthenticated && !isVerifiedHolder,
+    tokenProof: isVerifiedHolder,
     collection,
     otherpage,
-    isLifer: tokenProof && otherpage,
+    isLifer: isVerifiedHolder && otherpage,
     refresh: load,
   };
 }
-

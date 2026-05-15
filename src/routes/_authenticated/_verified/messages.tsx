@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { MessageThread } from "@/components/MessageThread";
 
-export const Route = createFileRoute("/_authenticated/messages")({
+export const Route = createFileRoute("/_authenticated/_verified/messages")({
   head: () => ({
     meta: [{ title: "Messages — BAYCMC" }],
   }),

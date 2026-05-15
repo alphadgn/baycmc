@@ -1,13 +1,18 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useAuth } from "@/lib/auth/useAuth";
+import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import { EmbroideredImage } from "@/components/EmbroideredImage";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "BAYCMC — token-gated for verified BAYC holders" },
-      { name: "description", content: "An exclusive social and real-time platform for verified Bored Ape Yacht Club holders. Verify your BAYC, then drop in." },
+      { title: "BAYCMC — the BAYC/MAYC mobile clubhouse" },
+      {
+        name: "description",
+        content:
+          "Sign in with any wallet or email to enter the lobby. Verify your BAYC or MAYC to unlock conference rooms, the social feed, and live events.",
+      },
     ],
   }),
   component: Index,
@@ -15,17 +20,16 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   const { isAuthenticated, loading } = useAuth();
+  const { isVerifiedHolder, loading: verifLoading } = useVerificationStatus();
   const navigate = useNavigate();
 
-  // Once a Supabase session exists, drop the user straight into the lobby.
-  // Non-BAYC users still get the lobby; gated areas (rooms, rides) are
-  // hidden by RLS + nav gating.
+  // After sign-in: verified holders go straight to the social feed,
+  // everyone else lands in the lobby (Tier 1).
   useEffect(() => {
-    if (loading) return;
-    if (isAuthenticated) {
-      void navigate({ to: "/feed", replace: true });
-    }
-  }, [isAuthenticated, loading, navigate]);
+    if (loading || verifLoading) return;
+    if (!isAuthenticated) return;
+    void navigate({ to: isVerifiedHolder ? "/feed" : "/lobby", replace: true });
+  }, [isAuthenticated, isVerifiedHolder, loading, verifLoading, navigate]);
 
   return (
     <main>
@@ -107,9 +111,9 @@ function Index() {
           </div>
           <div className="mx-auto mt-12 grid max-w-5xl gap-6 sm:grid-cols-3">
             {[
-              { n: "01", t: "Open Verification", d: "Tap Entrance to launch the verification." },
-              { n: "02", t: "Verify and Approve", d: "Verify with your Tokenproof app and approve the request to gain access inside the mobile clubhouse." },
-              { n: "03", t: "You're In", d: "Confirm ownership through Tokenproof, Privy or Wallet delegation of your BAYC/MAYC and have instant access." },
+              { n: "01", t: "Sign in", d: "Connect any wallet or email through Privy. You're instantly inside the lobby — no waiting, no extra app." },
+              { n: "02", t: "Verify your ape", d: "Verify a BAYC or MAYC in your wallet (or a vault delegated to you on delegate.cash) to unlock the feed, conference rooms, messages, and Ape Rides." },
+              { n: "03", t: "Unlock the Lifer clubhouse", d: "Hold a Lifer token on top of your ape to enter the secret Lifer rooms and chat." },
             ].map((s) => (
               <div key={s.n} className="glass rounded-2xl p-6 shadow-card">
                 <div className="font-display text-xs text-gold tracking-widest">{s.n}</div>

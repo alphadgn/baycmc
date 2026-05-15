@@ -47,7 +47,7 @@ export const createBooking = createServerFn({ method: "POST" })
       .eq("user_id", userId)
       .maybeSingle();
     if (!ver?.bayc_verified) {
-      return { ok: false as const, error: "Token Proof verification required to book." };
+      return { ok: false as const, error: "Verified BAYC/MAYC holder access required to book." };
     }
     if (room.tier === "lifer" && !ver.otherpage_verified) {
       return { ok: false as const, error: "Lifer badge required for this room." };

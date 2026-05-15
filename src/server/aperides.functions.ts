@@ -36,7 +36,7 @@ export const startApeRide = createServerFn({ method: "POST" })
       .eq("user_id", userId)
       .maybeSingle();
     if (!ver?.bayc_verified) {
-      return { ok: false as const, error: "Token Proof verification required." };
+      return { ok: false as const, error: "Verified BAYC/MAYC holder access required." };
     }
 
     // End any prior live ride from the same host
@@ -113,7 +113,7 @@ export const requestApeRide = createServerFn({ method: "POST" })
       .eq("user_id", userId)
       .maybeSingle();
     if (!ver?.bayc_verified) {
-      return { ok: false as const, error: "Token Proof verification required." };
+      return { ok: false as const, error: "Verified BAYC/MAYC holder access required." };
     }
 
     const { data: ride } = await supabase
@@ -158,7 +158,7 @@ export const respondApeRideRequest = createServerFn({ method: "POST" })
       .eq("user_id", userId)
       .maybeSingle();
     if (!ver?.bayc_verified) {
-      return { ok: false as const, error: "Token Proof verification required." };
+      return { ok: false as const, error: "Verified BAYC/MAYC holder access required." };
     }
 
     // Verify caller is the host of the ride
@@ -204,7 +204,7 @@ export const getApeRideToken = createServerFn({ method: "POST" })
       .eq("user_id", userId)
       .maybeSingle();
     if (!ver?.bayc_verified) {
-      return { ok: false as const, error: "Token Proof verification required." };
+      return { ok: false as const, error: "Verified BAYC/MAYC holder access required." };
     }
 
     const { data: ride } = await supabase

@@ -25,7 +25,7 @@ interface Booking {
   override_by: string | null;
 }
 
-export const Route = createFileRoute("/_authenticated/rooms")({
+export const Route = createFileRoute("/_authenticated/_verified/rooms")({
   head: () => ({
     meta: [
       { title: "Rooms — BAYCMC" },

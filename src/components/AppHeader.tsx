@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { Lock } from "lucide-react";
 import { useAuth } from "@/lib/auth/useAuth";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,7 +11,7 @@ import { WalletPill } from "@/components/WalletPill";
 export function AppHeader() {
   const { isAuthenticated } = useAuth();
   const [entranceOpen, setEntranceOpen] = useState(false);
-  const { tokenProof, isLifer } = useVerificationStatus();
+  const { isVerifiedHolder, isLifer } = useVerificationStatus();
 
   return (
     <>
@@ -29,29 +30,31 @@ export function AppHeader() {
             <Link to="/" className="cursor-pointer text-muted-foreground hover:text-foreground transition">
               Home
             </Link>
-            {isAuthenticated && (
+            {isAuthenticated && !isVerifiedHolder && (
+              <Link to="/lobby" className="cursor-pointer text-muted-foreground hover:text-foreground transition">
+                Lobby
+              </Link>
+            )}
+            {isAuthenticated && isVerifiedHolder && (
               <>
-                {/* Main lobby — open to every signed-in user. */}
                 <Link to="/feed" className="cursor-pointer text-muted-foreground hover:text-foreground transition">
-                  Lobby
+                  Feed
                 </Link>
                 <Link to="/messages" className="cursor-pointer text-muted-foreground hover:text-foreground transition">
                   Messages
                 </Link>
-                <Link to="/profile" className="cursor-pointer text-muted-foreground hover:text-foreground transition">
-                  Profile
+                <Link to="/rooms" className="cursor-pointer text-muted-foreground hover:text-foreground transition">
+                  Rooms
                 </Link>
-                {tokenProof && (
-                  <>
-                    <Link to="/rooms" className="cursor-pointer text-muted-foreground hover:text-foreground transition">
-                      Rooms
-                    </Link>
-                    <Link to="/ape-rides" className="cursor-pointer text-muted-foreground hover:text-foreground transition">
-                      Ape Rides
-                    </Link>
-                  </>
-                )}
+                <Link to="/ape-rides" className="cursor-pointer text-muted-foreground hover:text-foreground transition">
+                  Ape Rides
+                </Link>
               </>
+            )}
+            {isAuthenticated && (
+              <Link to="/profile" className="cursor-pointer text-muted-foreground hover:text-foreground transition">
+                Profile
+              </Link>
             )}
             {isLifer && (
               <>
@@ -84,11 +87,10 @@ export function AppHeader() {
 
 function EntranceControls({ onOpen }: { onOpen: () => void }) {
   const { isAuthenticated, user, loading: authLoading } = useAuth();
-  const { tokenProof, collection, loading: verifLoading } = useVerificationStatus();
+  const { isVerifiedHolder, collection, loading: verifLoading } = useVerificationStatus();
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(false);
 
-  // Source of truth: profiles.wallet_address (set by the SIWE bridge).
   useEffect(() => {
     if (!isAuthenticated || !user) {
       setWalletAddress(null);
@@ -112,15 +114,31 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
     };
   }, [isAuthenticated, user]);
 
-  // Once a Supabase session exists, the Entrance button is permanently
-  // replaced with the WalletPill (which contains Disconnect). This kills
-  // the "click once, then inoperable" failure mode: there is no second
-  // click, because the button is gone the moment auth completes.
+  // Tier 1 (Lobby): show "Verify holder access" CTA next to the wallet pill.
+  // Tier 2/3: WalletPill alone (with verified collection badge).
   if (isAuthenticated) {
     if (walletAddress) {
-      return <WalletPill address={walletAddress} collection={tokenProof ? collection ?? null : null} />;
+      return (
+        <div className="flex items-center gap-2">
+          {!verifLoading && !isVerifiedHolder && (
+            <button
+              type="button"
+              onClick={() => {
+                window.dispatchEvent(new Event("baycmc:privy-bridge-retry"));
+              }}
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-gold/40 bg-gold/10 px-3 py-2 text-xs font-semibold text-gold transition hover:bg-gold/20"
+            >
+              <Lock className="h-3 w-3" />
+              Verify holder access
+            </button>
+          )}
+          <WalletPill
+            address={walletAddress}
+            collection={isVerifiedHolder ? collection ?? null : null}
+          />
+        </div>
+      );
     }
-    // Session exists but profile row hasn't propagated yet (rare race).
     if (!profileLoaded || verifLoading) return <div className="h-9 w-24" aria-hidden />;
     return (
       <button
@@ -136,10 +154,7 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
     );
   }
 
-  // Hide button briefly while loading auth to avoid flash.
-  if (authLoading) {
-    return <div className="h-9 w-24" aria-hidden />;
-  }
+  if (authLoading) return <div className="h-9 w-24" aria-hidden />;
 
   return (
     <button
