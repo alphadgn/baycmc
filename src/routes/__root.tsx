@@ -1,6 +1,7 @@
 import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { PrivyAppProvider } from "@/components/PrivyAppProvider";
+import { PrivyBridgeMount } from "@/lib/auth/usePrivyBridge";
 import { AppHeader } from "@/components/AppHeader";
 import { InactivityWatcher } from "@/components/InactivityWatcher";
 import { Toaster } from "@/components/ui/sonner";
@@ -81,6 +82,7 @@ function RootComponent() {
   }, []);
   return (
     <PrivyAppProvider>
+      <PrivyBridgeMount />
       <div className="min-h-screen grain">
         <AppHeader />
         <Outlet />
