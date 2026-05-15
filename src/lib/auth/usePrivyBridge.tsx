@@ -20,13 +20,78 @@
  *   5. supabase.auth.setSession(...) → onAuthStateChange fires →
  *      RLS-protected reads work app-wide.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { SiweMessage } from "siwe";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { verifyPrivyOwnership } from "@/server/privy.functions";
 import { usePrivyReady } from "@/components/PrivyAppProvider";
+
+/**
+ * Lightweight, app-wide view of Privy state. Lets the header render
+ * "Click to verify" when the user has a connected Privy wallet but has
+ * not yet completed SIWE → Supabase verification.
+ *
+ * Implemented as a module-level store + useSyncExternalStore so any
+ * component (e.g. AppHeader) can read the bridge's view of Privy without
+ * being wrapped by the bridge component itself.
+ */
+export interface PrivyAuthSnapshot {
+  ready: boolean;
+  authenticated: boolean;
+  address: string | null;
+}
+let privySnapshot: PrivyAuthSnapshot = {
+  ready: false,
+  authenticated: false,
+  address: null,
+};
+const privyListeners = new Set<() => void>();
+function setPrivySnapshot(next: PrivyAuthSnapshot) {
+  if (
+    privySnapshot.ready === next.ready &&
+    privySnapshot.authenticated === next.authenticated &&
+    privySnapshot.address === next.address
+  ) {
+    return;
+  }
+  privySnapshot = next;
+  for (const l of privyListeners) l();
+}
+export function usePrivyAuthState(): PrivyAuthSnapshot {
+  return useSyncExternalStore(
+    (cb) => {
+      privyListeners.add(cb);
+      return () => privyListeners.delete(cb);
+    },
+    () => privySnapshot,
+    () => privySnapshot,
+  );
+}
+
+const VERIFIED_TTL_MS = 24 * 60 * 60 * 1000;
+function verifiedKey(addr: string) {
+  return `baycmc:verified:${addr.toLowerCase()}`;
+}
+function isVerifiedFresh(addr: string): boolean {
+  try {
+    const raw = window.localStorage.getItem(verifiedKey(addr));
+    if (!raw) return false;
+    const ts = Number.parseInt(raw, 10);
+    if (!Number.isFinite(ts)) return false;
+    return Date.now() - ts < VERIFIED_TTL_MS;
+  } catch {
+    return false;
+  }
+}
+function markVerified(addr: string) {
+  try {
+    window.localStorage.setItem(verifiedKey(addr), String(Date.now()));
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
 
 type EthereumProviderLike = {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
@@ -90,6 +155,10 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
   // is unchanged — this is what kills the historic verify loop.
   const inFlightRef = useRef<string | null>(null);
   const completedRef = useRef<Set<string>>(new Set());
+  // Did the user explicitly request verification (button click → event)?
+  // We never auto-prompt the SIWE signature on wallet connect anymore —
+  // it was distorting the rest of the UI on first sign-in.
+  const verifyRequestedRef = useRef(false);
 
   // Only the embedded Privy wallet counts. External wallets are ignored.
   const embeddedWallet =
@@ -105,6 +174,7 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
     const retry = () => {
       inFlightRef.current = null;
       completedRef.current.clear();
+      verifyRequestedRef.current = true;
       setRetryNonce((n) => n + 1);
     };
     window.addEventListener("baycmc:privy-bridge-retry", retry);
@@ -130,6 +200,18 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
         const existingEmail = sess.session?.user.email ?? "";
         if (existingEmail === `${address.toLowerCase()}@wallet.baycmc.local`) {
           completedRef.current.add(address.toLowerCase());
+          // Backfill the freshness marker so future loads stay quiet.
+          if (!isVerifiedFresh(address)) markVerified(address);
+          return;
+        }
+
+        // 24h cache: a fresh marker means we already verified recently.
+        // We can't restore a Supabase session from localStorage alone, so
+        // the user still has to click "Click to verify" if their session
+        // ever expires — but we won't auto-pop the signature modal.
+        if (!verifyRequestedRef.current) {
+          // No explicit user click → bail. The header will render a
+          // "Click to verify" CTA that dispatches the retry event.
           return;
         }
 
@@ -192,6 +274,8 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
         }
 
         completedRef.current.add(address.toLowerCase());
+        markVerified(address);
+        verifyRequestedRef.current = false;
 
         // Surface deterministic UI states for the delegation/direct check:
         if (result.verified) {
@@ -223,6 +307,7 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
         } else {
           toast.dismiss(toastId);
         }
+        verifyRequestedRef.current = false;
       } finally {
         if (inFlightRef.current === address) inFlightRef.current = null;
       }
@@ -243,6 +328,16 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
     user?.id,
     retryNonce,
   ]);
+
+  // Publish the latest snapshot to the module-level store so the header
+  // (and any other component) can react without being a child of this node.
+  useEffect(() => {
+    setPrivySnapshot({
+      ready: !!ready && !!walletsReady,
+      authenticated: !!authenticated,
+      address: walletReady && embeddedWallet ? embeddedWallet.address : null,
+    });
+  }, [ready, walletsReady, authenticated, walletReady, embeddedWallet]);
 
   return null;
 }
