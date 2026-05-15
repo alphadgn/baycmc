@@ -137,6 +137,10 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
         const result = await verifyFn({ data: { message, signature } });
         if (cancelled) return;
 
+        if (!result.session) {
+          toast.error(result.reason ?? "Sign-in failed.", { id: toastId });
+          return;
+        }
         const { error } = await supabase.auth.setSession({
           access_token: result.session.access_token,
           refresh_token: result.session.refresh_token,
