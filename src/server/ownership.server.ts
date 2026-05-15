@@ -1,7 +1,7 @@
 import { createPublicClient, http, getAddress, parseAbi, isAddress } from "viem";
 import { mainnet } from "viem/chains";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { ETH_RPC_URL, DELEGATE_REGISTRY_V2 } from "@/lib/web3/constants";
+import { DELEGATE_REGISTRY_V2 } from "@/lib/web3/constants";
 import { runOtherpageCheckAndPersist } from "@/server/otherpage.server";
 import { runLuminaCheckAndPersist } from "@/server/lumina.server";
 
@@ -31,24 +31,52 @@ const delegateRegistryAbi = parseAbi([
 ]);
 
 function publicClient() {
-  return createPublicClient({ chain: mainnet, transport: http(ETH_RPC_URL) });
+  return createPublicClient({ chain: mainnet, transport: http(ethRpcUrl(), { timeout: 8_000, retryCount: 1 }) });
+}
+
+function ethRpcUrl() {
+  const url = process.env.ETH_RPC_URL;
+  if (!url) {
+    throw new Error("Ethereum RPC is not configured.");
+  }
+  return url;
+}
+
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`Timeout: ${label} after ${ms}ms`)), ms);
+    p.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      },
+    );
+  });
 }
 
 async function balancesFor(c: ReturnType<typeof publicClient>, owner: `0x${string}`) {
-  const [bayc, mayc] = await Promise.all([
-    c.readContract({
-      address: BAYC,
-      abi: erc721Abi,
-      functionName: "balanceOf",
-      args: [owner],
-    }) as Promise<bigint>,
-    c.readContract({
-      address: MAYC,
-      abi: erc721Abi,
-      functionName: "balanceOf",
-      args: [owner],
-    }) as Promise<bigint>,
-  ]);
+  const [bayc, mayc] = await withTimeout(
+    Promise.all([
+      c.readContract({
+        address: BAYC,
+        abi: erc721Abi,
+        functionName: "balanceOf",
+        args: [owner],
+      }) as Promise<bigint>,
+      c.readContract({
+        address: MAYC,
+        abi: erc721Abi,
+        functionName: "balanceOf",
+        args: [owner],
+      }) as Promise<bigint>,
+    ]),
+    8_000,
+    `balanceOf BAYC/MAYC for ${owner}`,
+  );
   return { bayc, mayc };
 }
 
@@ -57,12 +85,16 @@ async function resolveDelegatedVaults(
   signer: `0x${string}`,
 ): Promise<`0x${string}`[]> {
   try {
-    const delegations = (await c.readContract({
-      address: DELEGATE_REGISTRY_V2,
-      abi: delegateRegistryAbi,
-      functionName: "getIncomingDelegations",
-      args: [signer],
-    })) as ReadonlyArray<{
+    const delegations = (await withTimeout(
+      c.readContract({
+        address: DELEGATE_REGISTRY_V2,
+        abi: delegateRegistryAbi,
+        functionName: "getIncomingDelegations",
+        args: [signer],
+      }),
+      6_000,
+      "getIncomingDelegations",
+    )) as ReadonlyArray<{
       type_: number;
       from: `0x${string}`;
       rights: `0x${string}`;
