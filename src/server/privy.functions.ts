@@ -136,12 +136,16 @@ async function resolveDelegatedVaults(
   }
 
   try {
-    const delegations = (await c.readContract({
-      address: DELEGATE_REGISTRY_V2,
-      abi: delegateRegistryAbi,
-      functionName: "getIncomingDelegations",
-      args: [signer],
-    })) as ReadonlyArray<{
+    const delegations = (await withTimeout(
+      c.readContract({
+        address: DELEGATE_REGISTRY_V2,
+        abi: delegateRegistryAbi,
+        functionName: "getIncomingDelegations",
+        args: [signer],
+      }),
+      6_000,
+      "getIncomingDelegations",
+    )) as ReadonlyArray<{
       type_: number;
       to: `0x${string}`;
       from: `0x${string}`;
