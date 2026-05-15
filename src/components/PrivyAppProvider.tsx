@@ -1,7 +1,19 @@
-import { Component, useEffect, useState, type ReactNode } from "react";
+import { Component, createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { mainnet as mainnetChain } from "viem/chains";
 import { getPrivyPublicConfig } from "@/server/privy.functions";
+
+/**
+ * `true` only when <PrivyProvider> from @privy-io/react-auth is actually
+ * mounted above this subtree. Children that call usePrivy/useWallets MUST
+ * gate on this — calling those hooks before the provider mounts throws
+ * "called outside the PrivyProvider component" and kills the calling
+ * component (e.g. the Entrance button click handler).
+ */
+const PrivyReadyContext = createContext(false);
+export function usePrivyReady(): boolean {
+  return useContext(PrivyReadyContext);
+}
 
 /**
  * Privy App IDs are ~25-char base32-ish strings (e.g. "clpispdty00ycl80fpueukbhl").
@@ -83,7 +95,9 @@ export function PrivyAppProvider({ children }: { children: ReactNode }) {
     };
   }, [fetchConfig]);
 
-  if (!appId || !PrivyProviderCmp) return <>{children}</>;
+  if (!appId || !PrivyProviderCmp) {
+    return <PrivyReadyContext.Provider value={false}>{children}</PrivyReadyContext.Provider>;
+  }
 
   // Optional override for OAuth/email magic-link redirects. When unset,
   // Privy uses window.location.href, which works for standard web origins
@@ -97,7 +111,9 @@ export function PrivyAppProvider({ children }: { children: ReactNode }) {
     undefined;
 
   return (
-    <PrivyMountBoundary fallback={children}>
+    <PrivyMountBoundary
+      fallback={<PrivyReadyContext.Provider value={false}>{children}</PrivyReadyContext.Provider>}
+    >
       <PrivyProviderCmp
         appId={appId}
         config={{
@@ -108,31 +124,20 @@ export function PrivyAppProvider({ children }: { children: ReactNode }) {
             logo: undefined,
             walletChainType: "ethereum-only",
           },
-          // v3 requires an explicit chain context for embedded wallet
-          // provisioning. Without `defaultChain` + `supportedChains`, the
-          // "Creating wallet…" modal spins forever because the SDK can't
-          // pick an EVM chain to bind the new key to.
           defaultChain: mainnetChain,
           supportedChains: [mainnetChain],
           embeddedWallets: {
-            // Provision an embedded EVM wallet for ALL users on login.
-            // Privy handles hydration internally — no manual createWallet().
             ethereum: {
               createOnLogin: "all-users",
             },
             requireUserOwnedRecoveryOnCreate: false,
             requireUserPasswordOnCreate: false,
-            // Privy dashboard has `enforce_wallet_uis: true` +
-            // `mode: user-controlled-server-wallets-only` with
-            // `user-passcode` recovery. With showWalletUIs:false the
-            // passcode modal never renders, so embedded-wallet creation
-            // spins forever after email login. Must be true.
             showWalletUIs: true,
           },
           ...(customOAuthRedirectUrl ? { customOAuthRedirectUrl } : {}),
         }}
       >
-        {children}
+        <PrivyReadyContext.Provider value={true}>{children}</PrivyReadyContext.Provider>
       </PrivyProviderCmp>
     </PrivyMountBoundary>
   );

@@ -26,6 +26,7 @@ import { SiweMessage } from "siwe";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { verifyPrivyOwnership } from "@/server/privy.functions";
+import { usePrivyReady } from "@/components/PrivyAppProvider";
 
 type EthereumProviderLike = {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
@@ -178,9 +179,11 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
  * mounts <PrivyBridge> once Privy hooks are available.
  */
 export function PrivyBridgeMount() {
+  const privyReady = usePrivyReady();
   const [hooks, setHooks] = useState<PrivyHooks | null>(null);
 
   useEffect(() => {
+    if (!privyReady) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -198,8 +201,8 @@ export function PrivyBridgeMount() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [privyReady]);
 
-  if (!hooks) return null;
+  if (!privyReady || !hooks) return null;
   return <PrivyBridge hooks={hooks} />;
 }
