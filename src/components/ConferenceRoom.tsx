@@ -95,6 +95,7 @@ export function ConferenceRoom({ roomId, roomName }: ConferenceRoomProps) {
         {accessLossMessage && (
           <div
             role="alertdialog"
+            data-testid="exclusive-access-loss"
             aria-labelledby="access-loss-title"
             className="mb-6 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-left"
           >
@@ -117,6 +118,7 @@ export function ConferenceRoom({ roomId, roomName }: ConferenceRoomProps) {
           </p>
         )}
         <button
+          data-testid="enter-exclusive-room"
           onClick={join}
           disabled={connecting}
           className="mt-6 rounded-md bg-gradient-gold px-6 py-3 text-sm font-semibold text-gold-foreground shadow-gold disabled:opacity-50 font-sans-display"
