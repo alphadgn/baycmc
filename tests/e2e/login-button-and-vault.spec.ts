@@ -17,6 +17,7 @@ import { test, expect, devices } from "@playwright/test";
  *   VAULT_HOT_WALLET_PK           — private key for SIWE signing
  *   VAULT_ADDRESS                 — cold vault holding the BAYC/MAYC
  *   DELEGATION_REVOKED            — "1" to assert revoked-delegation path
+ *   EXCLUSIVE_ROOM_ID             — token-proof/lifer room id for revoked-access gate test
  */
 
 const BASE_URL = process.env.BASE_URL ?? "http://localhost:3000";
@@ -91,6 +92,7 @@ test.describe("Vault-to-hot wallet authentication via delegate.cash", () => {
   const HOT_PK = process.env.VAULT_HOT_WALLET_PK;
   const VAULT = process.env.VAULT_ADDRESS;
   const REVOKED = process.env.DELEGATION_REVOKED === "1";
+  const EXCLUSIVE_ROOM_ID = process.env.EXCLUSIVE_ROOM_ID;
 
   test.skip(
     !HOT || !HOT_PK || !VAULT,
@@ -166,6 +168,75 @@ test.describe("Vault-to-hot wallet authentication via delegate.cash", () => {
       expect(result.body).toMatch(/"verificationBasis":\s*"delegated"/);
       expect(result.body.toLowerCase()).toContain(VAULT!.toLowerCase());
     }
+
+    await context.close();
+  });
+
+  test("revoked delegation/BAYC is blocked from exclusive room entry and LiveKit tokens", async ({
+    browser,
+  }) => {
+    test.skip(!REVOKED || !EXCLUSIVE_ROOM_ID, "Set DELEGATION_REVOKED=1 and EXCLUSIVE_ROOM_ID");
+
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await page.goto(BASE_URL);
+
+    const result = await page.evaluate(
+      async ({ hotPk, roomId }) => {
+        const { privateKeyToAccount } = await import(
+          /* @vite-ignore */ "https://esm.sh/viem@2/accounts?bundle"
+        );
+        const { SiweMessage } = await import(
+          /* @vite-ignore */ "https://esm.sh/siwe@2?bundle"
+        );
+
+        const account = privateKeyToAccount(hotPk as `0x${string}`);
+        const siwe = new SiweMessage({
+          domain: location.host,
+          address: account.address,
+          statement: "Sign in to BAYCMC.",
+          uri: location.origin,
+          version: "1",
+          chainId: 1,
+          nonce: Math.random().toString(36).slice(2, 10),
+          issuedAt: new Date().toISOString(),
+          expirationTime: new Date(Date.now() + 5 * 60_000).toISOString(),
+        });
+        const message = siwe.prepareMessage();
+        const signature = await account.signMessage({ message });
+        const verifyRes = await fetch("/_serverFn/verifyPrivyOwnership", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ data: { message, signature } }),
+        });
+        const verifyText = await verifyRes.text();
+        const accessToken = verifyText.match(/"access_token"\s*:\s*"([^"]+)"/)?.[1] ?? null;
+        const tokenRes = accessToken
+          ? await fetch("/_serverFn/getLivekitToken", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${accessToken}`,
+              },
+              body: JSON.stringify({ data: { roomId } }),
+            })
+          : null;
+        return {
+          verifyText,
+          tokenStatus: tokenRes?.status ?? 0,
+          tokenText: tokenRes ? await tokenRes.text() : "missing session",
+        };
+      },
+      { hotPk: HOT_PK, roomId: EXCLUSIVE_ROOM_ID },
+    );
+
+    expect(result.verifyText).toMatch(/"verified":\s*false/);
+    expect(result.tokenStatus).toBeLessThan(500);
+    expect(result.tokenText).toMatch(/"ok":\s*false|BAYC|revoked|access is no longer active/i);
+
+    await page.goto(`${BASE_URL}/rooms/${EXCLUSIVE_ROOM_ID}`);
+    await page.getByTestId("enter-exclusive-room").click();
+    await expect(page.getByTestId("exclusive-access-loss")).toBeVisible({ timeout: 15_000 });
 
     await context.close();
   });
