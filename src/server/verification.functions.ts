@@ -8,6 +8,19 @@ import {
   requireTokenProof,
   invalidateTokenProof,
 } from "@/server/token-proof.server";
+import { recomputeOwnership } from "@/server/ownership.server";
+
+/**
+ * Force-recompute ownership for the authenticated user. Updates
+ * user_verifications based on a fresh on-chain balanceOf + delegate.cash
+ * lookup. Used by the client `useVerificationStatus` hook so a revoked
+ * delegation propagates without requiring sign-out / sign-in.
+ */
+export const revalidateOwnership = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    return recomputeOwnership(context.userId);
+  });
 
 /**
  * Server-side verification helpers.

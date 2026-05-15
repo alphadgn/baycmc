@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
+import { revalidateOwnership } from "@/server/verification.functions";
 
 export type BaycCollection = "BAYC" | "MAYC" | null;
 
@@ -36,6 +37,14 @@ export function useVerificationStatus(): VerificationStatus {
       return;
     }
     setLoading(true);
+    // Force a fresh on-chain + delegate.cash recompute so revoked
+    // delegations or transferred apes flip the row immediately. Falls back
+    // to the stored row on error.
+    try {
+      await revalidateOwnership();
+    } catch (e) {
+      console.warn("revalidateOwnership failed, using cached row", e);
+    }
     const { data } = await supabase
       .from("user_verifications")
       .select("bayc_verified, otherpage_verified, bayc_collection")

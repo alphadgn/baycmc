@@ -3,6 +3,7 @@ import { z } from "zod";
 import { AccessToken } from "livekit-server-sdk";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { recomputeOwnership } from "@/server/ownership.server";
 
 /**
  * Mint a LiveKit access token after enforcing tier-based access.
@@ -31,15 +32,29 @@ export const getLivekitToken = createServerFn({ method: "POST" })
       return { ok: false as const, error: "Room is inactive" };
     }
 
-    // Belt-and-suspenders verification check (RLS already filters but be explicit)
-    const { data: ver } = await supabase
-      .from("user_verifications")
-      .select("bayc_verified, otherpage_verified")
-      .eq("user_id", userId)
-      .maybeSingle();
+    // Real-time access validation: re-run on-chain BAYC/MAYC + delegate.cash
+    // lookup at the moment of room entry so revoked delegations or sold
+    // tokens immediately lock the user out.
+    const fresh = await recomputeOwnership(userId).catch((e) => {
+      console.error("recomputeOwnership at room entry failed", e);
+      return null;
+    });
+
+    const ver = fresh
+      ? {
+          bayc_verified: fresh.tokenProof,
+          otherpage_verified: fresh.otherpageVerified,
+        }
+      : (
+          await supabase
+            .from("user_verifications")
+            .select("bayc_verified, otherpage_verified")
+            .eq("user_id", userId)
+            .maybeSingle()
+        ).data;
 
     if (!ver?.bayc_verified) {
-      return { ok: false as const, error: "Token Proof required" };
+      return { ok: false as const, error: "BAYC/MAYC ownership required (or revoked)" };
     }
     if (room.tier === "lifer" && !ver.otherpage_verified) {
       return { ok: false as const, error: "Lifer badge required" };
