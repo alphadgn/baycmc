@@ -20,7 +20,7 @@
  *   5. supabase.auth.setSession(...) → onAuthStateChange fires →
  *      RLS-protected reads work app-wide.
  */
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { SiweMessage } from "siwe";
 import { toast } from "sonner";
@@ -31,21 +31,43 @@ import { usePrivyReady } from "@/components/PrivyAppProvider";
 /**
  * Lightweight, app-wide view of Privy state. Lets the header render
  * "Click to verify" when the user has a connected Privy wallet but has
- * not yet completed SIWE → Supabase verification. Default value is the
- * "no Privy mounted" state.
+ * not yet completed SIWE → Supabase verification.
+ *
+ * Implemented as a module-level store + useSyncExternalStore so any
+ * component (e.g. AppHeader) can read the bridge's view of Privy without
+ * being wrapped by the bridge component itself.
  */
 export interface PrivyAuthSnapshot {
   ready: boolean;
   authenticated: boolean;
   address: string | null;
 }
-const PrivyAuthStateContext = createContext<PrivyAuthSnapshot>({
+let privySnapshot: PrivyAuthSnapshot = {
   ready: false,
   authenticated: false,
   address: null,
-});
+};
+const privyListeners = new Set<() => void>();
+function setPrivySnapshot(next: PrivyAuthSnapshot) {
+  if (
+    privySnapshot.ready === next.ready &&
+    privySnapshot.authenticated === next.authenticated &&
+    privySnapshot.address === next.address
+  ) {
+    return;
+  }
+  privySnapshot = next;
+  for (const l of privyListeners) l();
+}
 export function usePrivyAuthState(): PrivyAuthSnapshot {
-  return useContext(PrivyAuthStateContext);
+  return useSyncExternalStore(
+    (cb) => {
+      privyListeners.add(cb);
+      return () => privyListeners.delete(cb);
+    },
+    () => privySnapshot,
+    () => privySnapshot,
+  );
 }
 
 const VERIFIED_TTL_MS = 24 * 60 * 60 * 1000;
