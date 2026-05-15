@@ -111,9 +111,9 @@ function Index() {
           </div>
           <div className="mx-auto mt-12 grid max-w-5xl gap-6 sm:grid-cols-3">
             {[
-              { n: "01", t: "Open Verification", d: "Tap Entrance to launch the verification." },
-              { n: "02", t: "Verify and Approve", d: "Verify with your Tokenproof app and approve the request to gain access inside the mobile clubhouse." },
-              { n: "03", t: "You're In", d: "Confirm ownership through Tokenproof, Privy or Wallet delegation of your BAYC/MAYC and have instant access." },
+              { n: "01", t: "Sign in", d: "Connect any wallet or email through Privy. You're instantly inside the lobby — no waiting, no extra app." },
+              { n: "02", t: "Verify your ape", d: "Verify a BAYC or MAYC in your wallet (or a vault delegated to you on delegate.cash) to unlock the feed, conference rooms, messages, and Ape Rides." },
+              { n: "03", t: "Unlock the Lifer clubhouse", d: "Hold a Lifer token on top of your ape to enter the secret Lifer rooms and chat." },
             ].map((s) => (
               <div key={s.n} className="glass rounded-2xl p-6 shadow-card">
                 <div className="font-display text-xs text-gold tracking-widest">{s.n}</div>
