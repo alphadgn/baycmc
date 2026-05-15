@@ -1,7 +1,19 @@
-import { Component, useEffect, useState, type ReactNode } from "react";
+import { Component, createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { mainnet as mainnetChain } from "viem/chains";
 import { getPrivyPublicConfig } from "@/server/privy.functions";
+
+/**
+ * `true` only when <PrivyProvider> from @privy-io/react-auth is actually
+ * mounted above this subtree. Children that call usePrivy/useWallets MUST
+ * gate on this — calling those hooks before the provider mounts throws
+ * "called outside the PrivyProvider component" and kills the calling
+ * component (e.g. the Entrance button click handler).
+ */
+const PrivyReadyContext = createContext(false);
+export function usePrivyReady(): boolean {
+  return useContext(PrivyReadyContext);
+}
 
 /**
  * Privy App IDs are ~25-char base32-ish strings (e.g. "clpispdty00ycl80fpueukbhl").
