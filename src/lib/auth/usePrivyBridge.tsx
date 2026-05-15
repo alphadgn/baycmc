@@ -58,6 +58,22 @@ type PrivyHooks = {
   };
 };
 
+function withTimeout<T>(p: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = window.setTimeout(() => reject(new Error(message)), ms);
+    p.then(
+      (value) => {
+        window.clearTimeout(t);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(t);
+        reject(error);
+      },
+    );
+  });
+}
+
 export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
   const { ready, authenticated, user } = hooks.usePrivy();
   const { wallets, ready: walletsReady } = hooks.useWallets();
@@ -130,35 +146,31 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
         });
         const message = siwe.prepareMessage();
 
-        const { signature } = await signMessage(
-          { message },
-          {
-            address,
-            uiOptions: {
-              showWalletUIs: true,
-              title: "Sign in to BAYCMC",
-              description:
-                "Signing in checks BAYC/MAYC ownership directly and via delegate.cash vaults.",
-              buttonText: "Sign and continue",
+        const { signature } = await withTimeout(
+          signMessage(
+            { message },
+            {
+              address,
+              uiOptions: {
+                showWalletUIs: true,
+                title: "Sign in to BAYCMC",
+                description:
+                  "Signing in checks BAYC/MAYC ownership directly and via delegate.cash vaults.",
+                buttonText: "Sign and continue",
+              },
             },
-          },
+          ),
+          45_000,
+          "Signature request timed out. Please try signing in again.",
         );
         if (cancelled) return;
 
-        const result = await Promise.race([
+        toast.loading("Checking BAYC / MAYC ownership and delegate.cash vaults…", { id: toastId });
+        const result = await withTimeout(
           verifyFn({ data: { message, signature } }),
-          new Promise<never>((_, reject) =>
-            setTimeout(
-              () =>
-                reject(
-                  new Error(
-                    "The verification check is taking longer than expected. Please try again.",
-                  ),
-                ),
-              20_000,
-            ),
-          ),
-        ]);
+          20_000,
+          "The verification check is taking longer than expected. Please try again.",
+        );
         if (cancelled) return;
 
         if (!result.session) {
