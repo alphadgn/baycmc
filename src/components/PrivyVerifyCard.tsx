@@ -217,16 +217,25 @@ function PrivyVerifyCardInner({
   onLoginRequested?: () => void;
   onNoQualifyingAssets?: (reason: string) => void;
 }) {
+  // ────────────────────────────────────────────────────────────────────
+  // Privy embedded wallet lifecycle — strict, official pattern.
+  //
+  // PrivyProvider is configured with embeddedWallets.ethereum.createOnLogin
+  // = 'all-users'. That means Privy provisions the embedded wallet itself
+  // after login. We MUST NOT call createWallet() manually here — doing so
+  // races Privy's internal provisioning and produces an infinite rerender
+  // loop (authenticated → createWallet → state churn → effect refires).
+  //
+  // Readiness is derived ONLY from useWallets():
+  //   ready === true  AND  embeddedWallet exists  →  app may proceed.
+  // ────────────────────────────────────────────────────────────────────
   const { ready, authenticated, login, logout, user } = hooks.usePrivy();
   const { wallets, ready: walletsReady } = hooks.useWallets();
-  const { createWallet } = hooks.useCreateWallet();
   const { refreshUser } = hooks.useUser();
   const { signMessage } = hooks.useSignMessage();
   const verifyFn = useServerFn(verifyPrivyOwnership);
   const auditProvisionFn = useServerFn(logEmbeddedWalletProvisioned);
 
-  // Embedded wallets need a secure context for the browser crypto APIs Privy
-  // depends on. Block all wallet UI on insecure origins with a visible error.
   const isSecureContext = useMemo(
     () => (typeof window === "undefined" ? true : window.isSecureContext === true),
     [],
@@ -242,81 +251,73 @@ function PrivyVerifyCardInner({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
-  const [walletCreateState, setWalletCreateState] = useState<
-    "idle" | "creating" | "created" | "failed"
-  >("idle");
-  const [createdWallet, setCreatedWallet] = useState<WalletLike | null>(null);
+  const [initError, setInitError] = useState<string | null>(null);
   const [loginStartedHere, setLoginStartedHere] = useState(false);
-  const [preferredAddress, setPreferredAddress] = useState<string | null>(null);
-  const [walletsReadyTimedOut, setWalletsReadyTimedOut] = useState(false);
   const autoVerifiedWalletRef = useRef<string | null>(null);
+  const auditedWalletRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
-  const walletCreateStartedRef = useRef(false);
-  const walletCreateAttemptRef = useRef(0);
-  const walletCreateTimeoutRef = useRef<number | null>(null);
-  const walletCreateBackoffRef = useRef<number | null>(null);
-  const walletsReadyTimeoutRef = useRef<number | null>(null);
-  const lastAuthUserIdRef = useRef<string | null>(null);
 
-  // Log auth state transitions for observability.
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  // The single source of truth: the embedded Privy wallet, found via the
+  // useWallets() collection that Privy itself hydrates.
+  const embeddedWallet: WalletLike | null = useMemo(() => {
+    return (
+      wallets.find(
+        (w) =>
+          (w.walletClientType ?? w.wallet_client_type) === "privy" ||
+          (w.walletClientType ?? w.wallet_client_type) === "privy-v2",
+      ) ?? null
+    );
+  }, [wallets]);
+
+  // Strict application gate per Privy embedded wallet docs:
+  //   ready (privy) + authenticated + walletsReady + embeddedWallet present.
+  const isWalletReady = ready && authenticated && walletsReady && !!embeddedWallet;
+
+  // Single, bounded auth-state log — no reactive cascade.
   useEffect(() => {
     logEvent("auth", "info", "auth state", {
       ready,
       authenticated,
       walletsReady,
       userId: user?.id ?? null,
-      userWalletAddress: user?.wallet?.address ?? null,
       walletCount: wallets.length,
+      embeddedWalletAddress: embeddedWallet?.address ?? null,
     });
-  }, [ready, authenticated, walletsReady, user?.id, user?.wallet?.address, wallets.length]);
+  }, [ready, authenticated, walletsReady, user?.id, wallets.length, embeddedWallet?.address]);
 
+  // Reset transient state on logout / user change.
   useEffect(() => {
-    if (!ready || !authenticated || !user?.id) return;
-    logEvent("auth", "info", "authentication completion", { userId: user.id });
-  }, [ready, authenticated, user?.id]);
+    if (!authenticated) {
+      autoVerifiedWalletRef.current = null;
+      auditedWalletRef.current = null;
+      setVerificationResult(null);
+      setError(null);
+      setInitError(null);
+    }
+  }, [authenticated]);
 
+  // Best-effort one-shot audit log when the embedded wallet first appears.
   useEffect(() => {
-    if (!isSecureContext) {
-      logEvent("env", "error", "insecure context — wallet flow blocked");
-    }
-  }, [isSecureContext]);
-
-  // Build the list of EVM wallets available in this Privy session — includes
-  // the embedded wallet plus any external EVM wallet the user connected.
-  const sessionEvmWallets: WalletLike[] = (() => {
-    const seen = new Map<string, WalletLike>();
-    const add = (w: WalletLike | null | undefined) => {
-      if (!w?.address) return;
-      const key = w.address.toLowerCase();
-      const chain = w.chainType ?? w.chain_type ?? "ethereum";
-      if (chain !== "ethereum") return;
-      if (!seen.has(key)) seen.set(key, w);
-    };
-    for (const w of wallets) add(w);
-    add(user?.wallet as WalletLike | null);
-    for (const acc of user?.linkedAccounts ?? []) {
-      if (acc.type === "wallet") add(acc as WalletLike);
-    }
-    if (createdWallet) add(createdWallet);
-    return [...seen.values()];
-  })();
-
-  const embeddedDefault = resolvePrivyProvisionedWallet({ user, wallets, createdWallet }) as
-    | WalletLike
-    | null;
-  const preferredWallet = preferredAddress
-    ? sessionEvmWallets.find((w) => w.address.toLowerCase() === preferredAddress.toLowerCase()) ??
-      null
-    : null;
-  const wallet: WalletLike | null =
-    (preferredWallet && isProvisionedPrivyWallet(preferredWallet) ? preferredWallet : null) ??
-    embeddedDefault;
-  const walletSessionReady = walletsReady || walletsReadyTimedOut;
-  // First-time sign-in state: user is authenticated but the embedded
-  // wallet hasn't been provisioned by Privy yet. We surface this as an
-  // explicit status step so the modal flow doesn't look frozen.
-  const isCreatingWallet = authenticated && !wallet && walletCreateState === "creating";
-  const isVerifying = busy;
+    if (!isWalletReady || !user?.id || !embeddedWallet?.address) return;
+    if (auditedWalletRef.current === embeddedWallet.address) return;
+    auditedWalletRef.current = embeddedWallet.address;
+    void auditProvisionFn({
+      data: {
+        privyUserId: user.id,
+        walletAddress: embeddedWallet.address,
+        email: user.email?.address ?? null,
+      },
+    }).catch((e) => {
+      console.warn("[PrivyVerifyCard] audit log call failed", e);
+    });
+  }, [isWalletReady, embeddedWallet?.address, user?.id, user?.email?.address, auditProvisionFn]);
 
   const verifyWallet = useCallback(
     async (targetWallet: WalletLike | null) => {
@@ -363,11 +364,7 @@ function PrivyVerifyCardInner({
           signature = signed.signature;
         } catch (signError) {
           if (!targetWallet.getEthereumProvider) throw signError;
-          logEvent("wallet", "warn", "signMessage failed, falling back to provider", {
-            address,
-          });
           const provider = await targetWallet.getEthereumProvider();
-          // Serialize through the queue to prevent concurrent-sign races.
           signature = (await enqueueSign(
             provider,
             "personal_sign",
@@ -428,262 +425,39 @@ function PrivyVerifyCardInner({
         setBusy(false);
       }
     },
-    [onVerified, signMessage, verifyFn],
+    [onVerified, onNoQualifyingAssets, signMessage, verifyFn],
   );
 
+  // Auto-verify once per wallet — no loop, just a single one-shot per address.
   useEffect(() => {
-    if (!mountedRef.current) mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-      if (walletCreateTimeoutRef.current) {
-        window.clearTimeout(walletCreateTimeoutRef.current);
-      }
-      if (walletCreateBackoffRef.current) {
-        window.clearTimeout(walletCreateBackoffRef.current);
-      }
-      if (walletsReadyTimeoutRef.current) {
-        window.clearTimeout(walletsReadyTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  // Real-time check on EVERY sign-in: when the authenticated Privy user id
-  // changes (including a fresh login after logout), reset the create-attempt
-  // ref so we re-evaluate whether a wallet exists for this account.
-  useEffect(() => {
-    const currentId = authenticated ? (user?.id ?? null) : null;
-    if (lastAuthUserIdRef.current !== currentId) {
-      lastAuthUserIdRef.current = currentId;
-      walletCreateStartedRef.current = false;
-      setWalletsReadyTimedOut(false);
-      if (!authenticated) {
-        setCreatedWallet(null);
-        setWalletCreateState("idle");
-      }
-    }
-  }, [authenticated, user?.id]);
-
-  useEffect(() => {
-    if (!authenticated || walletsReady || !user?.id) {
-      if (walletsReadyTimeoutRef.current) {
-        window.clearTimeout(walletsReadyTimeoutRef.current);
-        walletsReadyTimeoutRef.current = null;
-      }
-      if (walletsReady) setWalletsReadyTimedOut(false);
-      return;
-    }
-
-    if (walletsReadyTimeoutRef.current) return;
-    walletsReadyTimeoutRef.current = window.setTimeout(() => {
-      walletsReadyTimeoutRef.current = null;
-      if (!mountedRef.current || walletsReady) return;
-      logEvent("wallet", "warn", "useWallets ready timeout recovery", { userId: user.id });
-      setWalletsReadyTimedOut(true);
-      void refreshUser().catch((e) => {
-        logEvent("wallet", "warn", "refreshUser during walletsReady timeout failed", {
-          error: e instanceof Error ? e.message : String(e),
-        });
-      });
-    }, 12_000);
-  }, [authenticated, refreshUser, user?.id, walletsReady]);
-
-  useEffect(() => {
-    // Auto-provision an embedded EVM wallet for ANY authenticated Privy user
-    // who doesn't already have a wallet linked. Existing wallets short-circuit
-    // via `hasKnownWallet`. We additionally consult the server-side audit log
-    // (keyed by Privy user id) before calling createWallet to guarantee we
-    // never provision a second wallet for the same Privy account, even under
-    // rapid re-auth or concurrent tabs.
-    if (
-      !authenticated ||
-      !walletSessionReady ||
-      embeddedDefault ||
-      walletCreateState !== "idle" ||
-      walletCreateStartedRef.current ||
-      !user?.id
-    ) {
-      return;
-    }
-
-    walletCreateStartedRef.current = true;
-    const attempt = walletCreateAttemptRef.current + 1;
-    walletCreateAttemptRef.current = attempt;
-    walletCreateTimeoutRef.current = window.setTimeout(() => {
-      if (!mountedRef.current || walletCreateAttemptRef.current !== attempt) return;
-      logEvent("wallet", "warn", "wallet provisioning timeout recovery", { attempt, userId: user.id });
-      setWalletCreateState("failed");
-      setError(
-        "Privy authenticated your email, but wallet creation did not confirm. Tap Retry wallet creation instead of waiting on the Privy loading screen.",
-      );
-    }, 25_000);
-
-    setWalletCreateState("creating");
-    setError(null);
-    logEvent("wallet", "info", "wallet provisioning start", { attempt, userId: user.id });
-
-    const privyUserId = user.id;
-    const email = user.email?.address ?? null;
-
-    void createWallet({ createAdditional: false })
-      .then(async (newWallet: WalletLike) => {
-        if (walletCreateTimeoutRef.current) window.clearTimeout(walletCreateTimeoutRef.current);
-        if (!mountedRef.current || walletCreateAttemptRef.current !== attempt) return;
-        let refreshedUser: PrivyUserLike | null = null;
-        try {
-          refreshedUser = await refreshUser();
-        } catch (e) {
-          console.warn("[PrivyVerifyCard] refreshUser after wallet creation failed", e);
-        }
-        if (!mountedRef.current || walletCreateAttemptRef.current !== attempt) return;
-        const refreshedWallet = resolvePrivyProvisionedWallet({
-          user: refreshedUser,
-          wallets: [],
-          createdWallet: null,
-        }) as WalletLike | null;
-        const resolvedNewWallet = refreshedWallet ?? newWallet;
-        setCreatedWallet(resolvedNewWallet);
-        setWalletCreateState("created");
-        logEvent("wallet", "info", "wallet provisioning success", {
-          attempt,
-          address: resolvedNewWallet.address,
-        });
-        // Best-effort audit log + dedupe check. If the server reports a
-        // prior provisioning record for this Privy user, we surface it
-        // as a console warning so duplicate-creation regressions are
-        // visible to operators.
-        try {
-          const res = await auditProvisionFn({
-            data: {
-              privyUserId,
-              walletAddress: newWallet.address,
-              email,
-            },
-          });
-          if (res.ok && res.deduped) {
-            console.warn(
-              "[PrivyVerifyCard] Existing embedded wallet already on record for this Privy user",
-              { privyUserId, existingWallet: res.existingWallet, newWallet: newWallet.address },
-            );
-          }
-        } catch (e) {
-          console.warn("[PrivyVerifyCard] audit log call failed", e);
-        }
-      })
-      .catch((e: unknown) => {
-        if (walletCreateTimeoutRef.current) window.clearTimeout(walletCreateTimeoutRef.current);
-        if (!mountedRef.current || walletCreateAttemptRef.current !== attempt) return;
-        const msg = e instanceof Error ? e.message : "";
-        logEvent("wallet", "error", "createWallet failed", { attempt, error: msg });
-        // Exponential backoff (max 3 attempts: 1.5s, 3s, 6s)
-        const MAX_ATTEMPTS = 3;
-        if (attempt < MAX_ATTEMPTS) {
-          const delay = 1500 * Math.pow(2, attempt - 1);
-          logEvent("wallet", "info", "createWallet backoff", { attempt, delay });
-          if (walletCreateBackoffRef.current) window.clearTimeout(walletCreateBackoffRef.current);
-          walletCreateBackoffRef.current = window.setTimeout(() => {
-            if (!mountedRef.current) return;
-            walletCreateStartedRef.current = false;
-            setWalletCreateState("idle");
-          }, delay);
-        } else {
-          setWalletCreateState("failed");
-          setError(
-            msg ||
-              "We couldn't create your embedded wallet after 3 attempts. Disconnect and try signing in again.",
-          );
-        }
-      });
-  }, [
-    auditProvisionFn,
-    authenticated,
-    createWallet,
-    embeddedDefault,
-    refreshUser,
-    user?.email?.address,
-    user?.id,
-    walletCreateState,
-    walletSessionReady,
-  ]);
-
-  // Real-time wallet inspector: as soon as the embedded wallet appears in
-  // the Privy session (via useWallets / refreshUser / linkedAccounts) flip
-  // the create state to "created" and cancel the pending failure timeout.
-  // This unsticks the "Creating wallet…" screen the moment Privy confirms
-  // provisioning, instead of waiting on the createWallet() promise.
-  useEffect(() => {
-    if (!authenticated) return;
-    if (!embeddedDefault) return;
-    if (walletCreateState === "created") return;
-    if (walletCreateTimeoutRef.current) {
-      window.clearTimeout(walletCreateTimeoutRef.current);
-      walletCreateTimeoutRef.current = null;
-    }
-    setWalletCreateState("created");
-    logEvent("wallet", "info", "wallet provisioning success", {
-      source: "privy-state",
-      address: embeddedDefault.address,
-    });
-  }, [authenticated, embeddedDefault, walletCreateState]);
-
-  useEffect(() => {
-    if (!wallet?.address) return;
-    logEvent("auth", "info", "WALLET_READY", { address: wallet.address });
-  }, [wallet?.address]);
-
-  // Periodically re-check Privy's wallet state while we're waiting on
-  // wallet creation, so we don't depend solely on Privy's createWallet
-  // promise resolving.
-  useEffect(() => {
-    if (walletCreateState !== "creating") return;
-    const interval = window.setInterval(() => {
-      void refreshUser().catch(() => {});
-    }, 1500);
-    return () => window.clearInterval(interval);
-  }, [walletCreateState, refreshUser]);
-
-  useEffect(() => {
-    if (!authenticated || !wallet?.address || busy) return;
-    if (autoVerifiedWalletRef.current === wallet.address) return;
-    autoVerifiedWalletRef.current = wallet.address;
-    void verifyWallet(wallet);
-  }, [authenticated, busy, verifyWallet, wallet]);
+    if (!isWalletReady || !embeddedWallet || busy) return;
+    if (autoVerifiedWalletRef.current === embeddedWallet.address) return;
+    autoVerifiedWalletRef.current = embeddedWallet.address;
+    void verifyWallet(embeddedWallet);
+  }, [isWalletReady, embeddedWallet, busy, verifyWallet]);
 
   function handleSignAndVerify() {
-    void verifyWallet(wallet);
-  }
-
-  function handleRetryWalletCreation() {
-    if (walletCreateTimeoutRef.current) window.clearTimeout(walletCreateTimeoutRef.current);
-    walletCreateStartedRef.current = false;
-    walletCreateAttemptRef.current += 1;
-    setLoginStartedHere(true);
-    setCreatedWallet(null);
-    setVerificationResult(null);
-    setError(null);
-    setWalletCreateState("idle");
+    void verifyWallet(embeddedWallet);
   }
 
   function handleDisconnect() {
-    if (walletCreateTimeoutRef.current) window.clearTimeout(walletCreateTimeoutRef.current);
-    walletCreateStartedRef.current = false;
-    walletCreateAttemptRef.current += 1;
+    autoVerifiedWalletRef.current = null;
+    auditedWalletRef.current = null;
     setLoginStartedHere(false);
-    setCreatedWallet(null);
     setVerificationResult(null);
     setError(null);
-    setWalletCreateState("idle");
+    setInitError(null);
     logout();
   }
 
-  // Derived wallet readiness — single source of truth for wallet-dependent UI.
-  const walletReady =
-    isSecureContext &&
-    ready &&
-    authenticated &&
-    walletSessionReady &&
-    !!wallet &&
-    walletCreateState !== "creating" &&
-    walletCreateState !== "failed";
+  // Bounded one-shot retry path: refresh the Privy session ONCE if init
+  // appears stuck. We never recursively retry.
+  function handleRetryInit() {
+    setInitError(null);
+    void refreshUser().catch((e) => {
+      setInitError(e instanceof Error ? e.message : String(e));
+    });
+  }
 
   if (!isSecureContext) {
     return (
@@ -705,7 +479,7 @@ function PrivyVerifyCardInner({
   return (
     <div
       className="rounded-xl border border-border bg-secondary/20 p-5"
-      data-wallet-ready={walletReady ? "true" : "false"}
+      data-wallet-ready={isWalletReady ? "true" : "false"}
     >
       <div className="flex items-center gap-2">
         <Wallet className="h-4 w-4 text-gold" />
@@ -725,91 +499,44 @@ function PrivyVerifyCardInner({
         <button
           onClick={() => {
             setLoginStartedHere(true);
-            // Close any wrapping Radix Dialog first — its focus trap
-            // prevents Privy's email input (rendered in a separate portal)
-            // from receiving focus, which blocks the iOS/Android keyboard.
             onLoginRequested?.();
-            // Defer login one tick so the parent dialog can unmount its
-            // focus guard before Privy's modal opens.
             setTimeout(() => login(), 0);
           }}
-          className="mt-4 w-full rounded-md border border-gold/40 bg-gold/10 px-4 py-2.5 text-sm font-semibold text-gold hover:bg-gold/20"
+          className="mt-4 w-full rounded-md border border-gold/40 bg-gold/10 px-4 py-2.5 text-sm font-semibold text-gold cursor-pointer hover:bg-gold/20"
         >
           Connect wallet
         </button>
+      ) : !isWalletReady ? (
+        <div className="mt-4 space-y-2" data-testid="privy-status-initializing">
+          <div className="rounded-md border border-gold/30 bg-gold/5 px-3 py-2 text-xs text-muted-foreground">
+            Initializing secure wallet…
+          </div>
+          {initError && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              {initError}
+            </div>
+          )}
+          <button
+            onClick={handleRetryInit}
+            className="w-full rounded-md border border-border bg-secondary/30 px-3 py-1.5 text-[11px] text-muted-foreground cursor-pointer hover:bg-secondary"
+          >
+            Retry
+          </button>
+          <button
+            onClick={handleDisconnect}
+            className="w-full rounded-md border border-border bg-secondary/30 px-3 py-1.5 text-[11px] text-muted-foreground cursor-pointer hover:bg-secondary"
+          >
+            Disconnect
+          </button>
+        </div>
       ) : (
         <div className="mt-4 space-y-2" data-testid="privy-post-login">
-          {!walletsReady && (
-            <div
-              data-testid="privy-status-wallets-loading"
-              className="rounded-md border border-border/60 bg-secondary/20 px-3 py-2 text-xs text-muted-foreground"
-            >
-              Loading your wallet session…
-            </div>
-          )}
-          {walletsReady && sessionEvmWallets.length === 0 && walletCreateState === "idle" && (
-            <div
-              data-testid="privy-status-no-wallets"
-              className="rounded-md border border-gold/30 bg-gold/5 px-3 py-2 text-xs text-muted-foreground"
-            >
-              No EVM wallet found yet — provisioning a fresh embedded wallet for this account…
-            </div>
-          )}
-          {walletsReady &&
-            sessionEvmWallets.length > 0 &&
-            !embeddedDefault &&
-            walletCreateState === "idle" && (
-              <div
-                data-testid="privy-status-external-only"
-                className="rounded-md border border-gold/30 bg-gold/5 px-3 py-2 text-xs text-muted-foreground"
-              >
-                Only external wallets are connected. We&rsquo;re creating a Privy embedded wallet
-                so you can sign in headlessly.
-              </div>
-            )}
-          {isCreatingWallet && (
-            <div
-              data-testid="privy-status-creating-wallet"
-              className="rounded-md border border-gold/30 bg-gold/5 px-3 py-2 text-xs text-muted-foreground"
-            >
-              <span className="font-semibold text-gold">Step 1 / 2 ·</span> Creating your embedded
-              wallet… this is a one-time setup for new emails.
-            </div>
-          )}
-          {sessionEvmWallets.length > 1 && (
-            <div className="rounded-md border border-border bg-background/40 px-3 py-2 text-[11px] text-muted-foreground">
-              <label className="mb-1 block font-semibold text-foreground">
-                Preferred wallet for this session
-              </label>
-              <select
-                value={(preferredAddress ?? wallet?.address ?? "").toLowerCase()}
-                onChange={(e) => {
-                  setPreferredAddress(e.target.value);
-                  autoVerifiedWalletRef.current = null;
-                }}
-                className="w-full rounded-md border border-border bg-input px-2 py-1.5 text-xs text-foreground"
-              >
-                {sessionEvmWallets.map((w) => {
-                  const isEmbedded =
-                    (w.walletClientType ?? w.wallet_client_type) === "privy" ||
-                    (w.walletClientType ?? w.wallet_client_type) === "privy-v2" ||
-                    (w.connectorType ?? w.connector_type) === "embedded";
-                  return (
-                    <option key={w.address} value={w.address.toLowerCase()}>
-                      {shortAddress(w.address)} · {isEmbedded ? "embedded" : (w.walletClientType ?? "external")}
-                    </option>
-                  );
-                })}
-              </select>
-            </div>
-          )}
-          {wallet && isVerifying && (
+          {busy && (
             <div
               data-testid="privy-status-verifying"
               className="rounded-md border border-gold/30 bg-gold/5 px-3 py-2 text-xs text-muted-foreground"
             >
-              <span className="font-semibold text-gold">Step 2 / 2 ·</span> Checking BAYC / MAYC
-              ownership and delegate.cash vaults for {shortAddress(wallet.address)}…
+              Checking BAYC / MAYC ownership for {shortAddress(embeddedWallet!.address)}…
             </div>
           )}
           {verificationResult && (
@@ -836,7 +563,7 @@ function PrivyVerifyCardInner({
                       href={verificationResult.delegationDetailsUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-gold underline hover:opacity-80"
+                      className="inline-flex items-center gap-1 text-gold underline cursor-pointer hover:opacity-80"
                     >
                       View delegation details
                       <ExternalLink className="h-3 w-3" />
@@ -850,34 +577,21 @@ function PrivyVerifyCardInner({
           )}
           <button
             onClick={handleSignAndVerify}
-            disabled={busy || !wallet}
-            className="w-full rounded-md bg-gradient-gold px-4 py-2.5 text-sm font-semibold text-gold-foreground shadow-gold disabled:opacity-50 hover:opacity-90"
+            disabled={busy}
+            className="w-full rounded-md bg-gradient-gold px-4 py-2.5 text-sm font-semibold text-gold-foreground shadow-gold cursor-pointer disabled:opacity-50 hover:opacity-90"
           >
-            {isCreatingWallet
-              ? "Waiting for wallet…"
-              : busy
-                ? "Verifying ownership…"
-                : "Sign & verify holdings"}
+            {busy ? "Verifying ownership…" : "Sign & verify holdings"}
           </button>
-          {walletCreateState === "failed" && !wallet && (
-            <button
-              onClick={handleRetryWalletCreation}
-              className="w-full rounded-md border border-gold/40 bg-gold/10 px-3 py-2 text-xs font-semibold text-gold hover:bg-gold/20"
-            >
-              Retry wallet creation
-            </button>
-          )}
-          {!wallet && !isCreatingWallet && user?.wallet?.address && (
-            <div className="text-[11px] text-muted-foreground font-mono">{user.wallet.address}</div>
-          )}
           <button
             onClick={handleDisconnect}
-            className="w-full rounded-md border border-border bg-secondary/30 px-3 py-1.5 text-[11px] text-muted-foreground hover:bg-secondary"
+            className="w-full rounded-md border border-border bg-secondary/30 px-3 py-1.5 text-[11px] text-muted-foreground cursor-pointer hover:bg-secondary"
           >
             Disconnect
           </button>
         </div>
       )}
+      {/* loginStartedHere is retained for parent-orchestration parity */}
+      {loginStartedHere ? null : null}
     </div>
   );
 }
