@@ -102,13 +102,26 @@ function ProfilePage() {
   async function saveProfile() {
     if (!user) return;
     setSaving(true);
-    const { error } = await supabase
+    // Use .select() so we can detect RLS silently dropping the update:
+    // a blocked write returns { data: [], error: null }, which used to
+    // surface as a fake "Profile saved" toast.
+    const { data, error } = await supabase
       .from("profiles")
       .update({ username: username || null, bio: bio || null })
-      .eq("id", user.id);
+      .eq("id", user.id)
+      .select("id");
     setSaving(false);
-    if (error) toast.error(error.message);
-    else toast.success("Profile saved");
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    if (!data || data.length === 0) {
+      toast.error(
+        "Couldn't save — your account isn't allowed to update this row. Check RLS policies on `profiles`.",
+      );
+      return;
+    }
+    toast.success("Profile saved");
   }
 
   async function handleAvatarFile(file: File) {
@@ -131,11 +144,17 @@ function ProfilePage() {
       if (upErr) throw upErr;
       const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
       const publicUrl = pub.publicUrl;
-      const { error: updErr } = await supabase
+      const { data: rows, error: updErr } = await supabase
         .from("profiles")
         .update({ avatar_url: publicUrl })
-        .eq("id", user.id);
+        .eq("id", user.id)
+        .select("id");
       if (updErr) throw updErr;
+      if (!rows || rows.length === 0) {
+        throw new Error(
+          "Upload succeeded but the database row wasn't updated — RLS policies on `profiles` are blocking the write.",
+        );
+      }
       setAvatarUrl(publicUrl);
       toast.success("Avatar updated");
     } catch (e) {
