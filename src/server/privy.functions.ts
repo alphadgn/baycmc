@@ -450,12 +450,12 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
 
     const totalBayc = signerBals.bayc;
     const totalMayc = signerBals.mayc;
-    const delegatedFrom: `0x${string}` | null = null;
-    const verificationBasis: "direct" | "delegated" = "direct";
+    // Delegate.cash is intentionally disabled in the blocking path — keep
+    // the response shape stable so callers/UI don't need to change.
+    const delegatedFrom = null as `0x${string}` | null;
+    const verificationBasis = "direct" as "direct" | "delegated";
     void delegationLookupOk;
     void vaults;
-    void delegatedFrom;
-    void verificationBasis;
 
     const holdsApe = totalBayc > 0n || totalMayc > 0n;
     const collection: "BAYC" | "MAYC" | null = holdsApe ? (totalBayc > 0n ? "BAYC" : "MAYC") : null;
