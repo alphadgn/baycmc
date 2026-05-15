@@ -46,10 +46,9 @@ export async function runLuminaCheckAndPersist(args: {
   // No gate configured → pass-through. Persist as verified so users aren't
   // locked out before admins finish setup.
   if (!cfg?.url) {
-    await supabaseAdmin.from("user_verifications").upsert(
-      { user_id: args.userId, lumina_verified: true },
-      { onConflict: "user_id" },
-    );
+    await supabaseAdmin
+      .from("user_verifications")
+      .upsert({ user_id: args.userId, lumina_verified: true }, { onConflict: "user_id" });
     return { verified: true, configured: false };
   }
 
@@ -64,10 +63,9 @@ export async function runLuminaCheckAndPersist(args: {
     assertSafeHttpsUrl(url);
   } catch (e) {
     console.error("Lumina URL rejected by SSRF guard", e);
-    await supabaseAdmin.from("user_verifications").upsert(
-      { user_id: args.userId, lumina_verified: false },
-      { onConflict: "user_id" },
-    );
+    await supabaseAdmin
+      .from("user_verifications")
+      .upsert({ user_id: args.userId, lumina_verified: false }, { onConflict: "user_id" });
     return { verified: false, configured: true, reason: "unsafe-url" };
   }
 
@@ -92,10 +90,9 @@ export async function runLuminaCheckAndPersist(args: {
     console.error("Lumina REST error", e);
   }
 
-  await supabaseAdmin.from("user_verifications").upsert(
-    { user_id: args.userId, lumina_verified: verified },
-    { onConflict: "user_id" },
-  );
+  await supabaseAdmin
+    .from("user_verifications")
+    .upsert({ user_id: args.userId, lumina_verified: verified }, { onConflict: "user_id" });
 
   return { verified, configured: true };
 }
