@@ -133,6 +133,10 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
   // is unchanged — this is what kills the historic verify loop.
   const inFlightRef = useRef<string | null>(null);
   const completedRef = useRef<Set<string>>(new Set());
+  // Did the user explicitly request verification (button click → event)?
+  // We never auto-prompt the SIWE signature on wallet connect anymore —
+  // it was distorting the rest of the UI on first sign-in.
+  const verifyRequestedRef = useRef(false);
 
   // Only the embedded Privy wallet counts. External wallets are ignored.
   const embeddedWallet =
@@ -148,6 +152,7 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
     const retry = () => {
       inFlightRef.current = null;
       completedRef.current.clear();
+      verifyRequestedRef.current = true;
       setRetryNonce((n) => n + 1);
     };
     window.addEventListener("baycmc:privy-bridge-retry", retry);
@@ -173,6 +178,18 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
         const existingEmail = sess.session?.user.email ?? "";
         if (existingEmail === `${address.toLowerCase()}@wallet.baycmc.local`) {
           completedRef.current.add(address.toLowerCase());
+          // Backfill the freshness marker so future loads stay quiet.
+          if (!isVerifiedFresh(address)) markVerified(address);
+          return;
+        }
+
+        // 24h cache: a fresh marker means we already verified recently.
+        // We can't restore a Supabase session from localStorage alone, so
+        // the user still has to click "Click to verify" if their session
+        // ever expires — but we won't auto-pop the signature modal.
+        if (!verifyRequestedRef.current) {
+          // No explicit user click → bail. The header will render a
+          // "Click to verify" CTA that dispatches the retry event.
           return;
         }
 
@@ -235,6 +252,8 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
         }
 
         completedRef.current.add(address.toLowerCase());
+        markVerified(address);
+        verifyRequestedRef.current = false;
 
         // Surface deterministic UI states for the delegation/direct check:
         if (result.verified) {
@@ -266,6 +285,7 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
         } else {
           toast.dismiss(toastId);
         }
+        verifyRequestedRef.current = false;
       } finally {
         if (inFlightRef.current === address) inFlightRef.current = null;
       }
@@ -287,7 +307,17 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
     retryNonce,
   ]);
 
-  return null;
+  return (
+    <PrivyAuthStateContext.Provider
+      value={{
+        ready: ready && walletsReady,
+        authenticated: !!authenticated,
+        address: walletReady && embeddedWallet ? embeddedWallet.address : null,
+      }}
+    >
+      {/* Children come from PrivyBridgeMount via composition below. */}
+    </PrivyAuthStateContext.Provider>
+  );
 }
 
 /**
