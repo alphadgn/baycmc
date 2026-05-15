@@ -133,7 +133,7 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
           return;
         }
 
-        toast.loading("Checking delegate.cash and on-chain ownership…", { id: toastId });
+        toast.loading("Preparing wallet sign-in…", { id: toastId });
 
         const domain = window.location.host;
         const origin = window.location.origin;
@@ -170,7 +170,7 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
         );
         if (cancelled) return;
 
-        toast.loading("Checking BAYC / MAYC ownership and delegate.cash vaults…", { id: toastId });
+        toast.loading("Checking BAYC / MAYC ownership…", { id: toastId });
         const result = await withTimeout(
           verifyFn({ data: { message, signature } }),
           20_000,
