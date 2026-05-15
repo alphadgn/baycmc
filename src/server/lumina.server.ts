@@ -2,6 +2,19 @@ import { getAddress, isAddress } from "viem";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { assertSafeHttpsUrl } from "@/server/url-guard";
 
+async function fetchWithTimeout(url: string, ms: number) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetch(url, {
+      headers: { accept: "application/json" },
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 /**
  * Run a Lumina authenticity check for the given wallet and persist the
  * result onto `user_verifications.lumina_verified`. Called automatically
@@ -60,7 +73,7 @@ export async function runLuminaCheckAndPersist(args: {
 
   let verified = false;
   try {
-    const res = await fetch(url, { headers: { accept: "application/json" } });
+    const res = await fetchWithTimeout(url, 6_000);
     if (res.ok) {
       const body = (await res.json()) as
         | { owns?: boolean; balance?: number | string; tokens?: unknown[] }
