@@ -103,12 +103,21 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
     };
   }, [isAuthenticated, user]);
 
-  if (isAuthenticated && walletAddress && tokenProof) {
-    return <WalletPill address={walletAddress} collection={collection ?? null} />;
+  // Once a Supabase session exists, the Entrance button is permanently
+  // replaced with the WalletPill (which contains Disconnect). This kills
+  // the "click once, then inoperable" failure mode: there is no second
+  // click, because the button is gone the moment auth completes.
+  if (isAuthenticated) {
+    if (walletAddress) {
+      return <WalletPill address={walletAddress} collection={tokenProof ? collection ?? null : null} />;
+    }
+    // Session exists but profile row hasn't propagated yet (rare race).
+    if (verifLoading) return <div className="h-9 w-24" aria-hidden />;
+    return <div className="h-9 w-24" aria-hidden />;
   }
 
-  // Hide button briefly while loading auth/verification to avoid flash.
-  if (authLoading || (isAuthenticated && verifLoading)) {
+  // Hide button briefly while loading auth to avoid flash.
+  if (authLoading) {
     return <div className="h-9 w-24" aria-hidden />;
   }
 
