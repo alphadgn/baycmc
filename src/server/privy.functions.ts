@@ -489,11 +489,7 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
     }
 
     const holdsApe = totalBayc > 0n || totalMayc > 0n;
-    const collection: "BAYC" | "MAYC" | null = holdsApe
-      ? totalBayc > 0n
-        ? "BAYC"
-        : "MAYC"
-      : null;
+    const collection: "BAYC" | "MAYC" | null = holdsApe ? (totalBayc > 0n ? "BAYC" : "MAYC") : null;
     const delegationDetailsUrl = delegatedFrom
       ? `https://delegate.cash/registry?delegate=${wallet}&vault=${delegatedFrom}`
       : null;

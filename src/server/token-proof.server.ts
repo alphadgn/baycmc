@@ -17,9 +17,7 @@
 import { createPublicClient, getAddress, http, parseAbi, type Address } from "viem";
 import { mainnet } from "viem/chains";
 
-const erc721Abi = parseAbi([
-  "function balanceOf(address owner) view returns (uint256)",
-]);
+const erc721Abi = parseAbi(["function balanceOf(address owner) view returns (uint256)"]);
 
 const POSITIVE_TTL_MS = 60_000; // 1 min — verified holders re-checked often enough
 const NEGATIVE_TTL_MS = 15_000; // 15s  — non-holders re-checked very quickly
@@ -42,7 +40,10 @@ function client() {
     if (!url) {
       throw new Error("Ethereum RPC is not configured.");
     }
-    _client = createPublicClient({ chain: mainnet, transport: http(url, { timeout: 8_000, retryCount: 1 }) });
+    _client = createPublicClient({
+      chain: mainnet,
+      transport: http(url, { timeout: 8_000, retryCount: 1 }),
+    });
   }
   return _client;
 }

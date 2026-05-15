@@ -4,10 +4,7 @@ import { createPublicClient, http, getAddress, parseAbi } from "viem";
 import { mainnet } from "viem/chains";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { BAYC_CONTRACT, DELEGATE_REGISTRY_V2 } from "@/lib/web3/constants";
-import {
-  requireTokenProof,
-  invalidateTokenProof,
-} from "@/server/token-proof.server";
+import { requireTokenProof, invalidateTokenProof } from "@/server/token-proof.server";
 import { recomputeOwnership } from "@/server/ownership.server";
 
 /**
@@ -194,10 +191,7 @@ export const setOtherpageGate = createServerFn({ method: "POST" })
     };
     const { error } = await supabase
       .from("app_settings")
-      .upsert(
-        { key: "otherpage_gate", value, updated_by: userId },
-        { onConflict: "key" },
-      );
+      .upsert({ key: "otherpage_gate", value, updated_by: userId }, { onConflict: "key" });
     if (error) {
       return { ok: false, error: error.message };
     }

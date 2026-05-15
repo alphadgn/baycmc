@@ -21,9 +21,7 @@ import { runLuminaCheckAndPersist } from "@/server/lumina.server";
 const BAYC = "0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D" as const;
 const MAYC = "0x60E4d786628Fea6478F785A6d7e704777c86a7c6" as const;
 
-const erc721Abi = parseAbi([
-  "function balanceOf(address owner) view returns (uint256)",
-]);
+const erc721Abi = parseAbi(["function balanceOf(address owner) view returns (uint256)"]);
 
 const delegateRegistryAbi = parseAbi([
   "struct Delegation { uint8 type_; address to; address from; bytes32 rights; address contract_; uint256 tokenId; uint256 amount; }",
@@ -31,7 +29,10 @@ const delegateRegistryAbi = parseAbi([
 ]);
 
 function publicClient() {
-  return createPublicClient({ chain: mainnet, transport: http(ethRpcUrl(), { timeout: 8_000, retryCount: 1 }) });
+  return createPublicClient({
+    chain: mainnet,
+    transport: http(ethRpcUrl(), { timeout: 8_000, retryCount: 1 }),
+  });
 }
 
 function ethRpcUrl() {
@@ -104,8 +105,7 @@ async function resolveDelegatedVaults(
     const vaults = new Set<string>();
     for (const d of delegations) {
       const noRights =
-        d.rights ===
-        "0x0000000000000000000000000000000000000000000000000000000000000000";
+        d.rights === "0x0000000000000000000000000000000000000000000000000000000000000000";
       if (!noRights) continue;
       if (d.type_ === 1) {
         vaults.add(getAddress(d.from));
@@ -203,11 +203,7 @@ export async function recomputeOwnership(userId: string): Promise<OwnershipSnaps
   }
 
   const holds = totalBayc > 0n || totalMayc > 0n;
-  const collection: "BAYC" | "MAYC" | null = holds
-    ? totalBayc > 0n
-      ? "BAYC"
-      : "MAYC"
-    : null;
+  const collection: "BAYC" | "MAYC" | null = holds ? (totalBayc > 0n ? "BAYC" : "MAYC") : null;
 
   // Only flip bayc_verified=false on a CONFIRMED zero read. If RPC failed
   // entirely (directOk=false AND no vaults checked successfully), preserve
@@ -235,9 +231,7 @@ export async function recomputeOwnership(userId: string): Promise<OwnershipSnaps
     updates.verified_at = null;
   }
 
-  await supabaseAdmin
-    .from("user_verifications")
-    .upsert(updates, { onConflict: "user_id" });
+  await supabaseAdmin.from("user_verifications").upsert(updates, { onConflict: "user_id" });
 
   // Re-evaluate Otherpage on the ape-holder wallet (signer or vault).
   const apeWallet = delegatedFrom ?? wallet;

@@ -52,7 +52,12 @@ type PrivyHooks = {
       input: { message: string },
       options?: {
         address?: string;
-        uiOptions?: { showWalletUIs?: boolean; title?: string; description?: string; buttonText?: string };
+        uiOptions?: {
+          showWalletUIs?: boolean;
+          title?: string;
+          description?: string;
+          buttonText?: string;
+        };
       },
     ) => Promise<{ signature: string }>;
   };
@@ -206,8 +211,7 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
           toast.message("You're in the lobby", {
             id: toastId,
             description:
-              result.reason ??
-              "No BAYC/MAYC found for this wallet — gated rooms stay locked.",
+              result.reason ?? "No BAYC/MAYC found for this wallet — gated rooms stay locked.",
             duration: 6000,
           });
         }
@@ -227,7 +231,18 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
     return () => {
       cancelled = true;
     };
-  }, [ready, authenticated, walletsReady, walletReady, embeddedWallet?.address, signMessage, verifyFn, embeddedWallet, user?.id, retryNonce]);
+  }, [
+    ready,
+    authenticated,
+    walletsReady,
+    walletReady,
+    embeddedWallet?.address,
+    signMessage,
+    verifyFn,
+    embeddedWallet,
+    user?.id,
+    retryNonce,
+  ]);
 
   return null;
 }
