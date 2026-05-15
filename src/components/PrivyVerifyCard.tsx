@@ -145,7 +145,6 @@ export function PrivyVerifyCard({
         setHooks({
           usePrivy: mod.usePrivy,
           useWallets: mod.useWallets,
-          useCreateWallet: mod.useCreateWallet,
           useUser: mod.useUser,
           useSignMessage: mod.useSignMessage,
         });
