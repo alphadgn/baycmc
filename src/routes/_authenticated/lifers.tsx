@@ -14,23 +14,25 @@ export const Route = createFileRoute("/_authenticated/lifers")({
     if (!sess.session) {
       throw redirect({ to: "/" });
     }
+    let snap: Awaited<ReturnType<typeof revalidateOwnership>> | null = null;
     try {
-      const snap = await revalidateOwnership();
+      snap = await revalidateOwnership();
+    } catch (e) {
+      console.warn("lifers beforeLoad: revalidate failed, falling back to cache", e);
+    }
+    if (snap) {
       if (!snap.tokenProof || !snap.otherpageVerified) {
         throw redirect({ to: "/feed" });
       }
-    } catch (e) {
-      // Network failure → fall back to last known DB row (fail-closed
-      // would lock out legit users during RPC outages).
-      const { data } = await supabase
-        .from("user_verifications")
-        .select("bayc_verified, otherpage_verified")
-        .eq("user_id", sess.session.user.id)
-        .maybeSingle();
-      if (!data?.bayc_verified || !data?.otherpage_verified) {
-        throw redirect({ to: "/feed" });
-      }
-      console.warn("lifers beforeLoad: revalidate failed, used cache", e);
+      return;
+    }
+    const { data } = await supabase
+      .from("user_verifications")
+      .select("bayc_verified, otherpage_verified")
+      .eq("user_id", sess.session.user.id)
+      .maybeSingle();
+    if (!data?.bayc_verified || !data?.otherpage_verified) {
+      throw redirect({ to: "/feed" });
     }
   },
   component: () => <Outlet />,
