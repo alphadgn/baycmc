@@ -191,12 +191,6 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
     );
   }
 
-  const [clicked, setClicked] = useState(false);
-  const isBooting = clicked && !privy.ready;
-
-  useEffect(() => {
-    if (privy.ready) setClicked(false);
-  }, [privy.ready]);
 
   return (
     <button
