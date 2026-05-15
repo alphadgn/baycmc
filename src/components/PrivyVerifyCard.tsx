@@ -74,10 +74,7 @@ type PrivyHooks = {
     logout: () => void;
     user?: PrivyUserLike | null;
   };
-  useWallets: () => { wallets: WalletLike[]; ready: boolean };
-  useCreateWallet: () => {
-    createWallet: (options?: { createAdditional?: boolean }) => Promise<WalletLike>;
-  };
+  useWallets: () => { wallets: (WalletLike & { ready?: boolean })[]; ready: boolean };
   useUser: () => { user: PrivyUserLike | null; refreshUser: () => Promise<PrivyUserLike> };
   useSignMessage: () => {
     signMessage: (
