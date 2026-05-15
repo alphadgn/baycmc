@@ -86,9 +86,15 @@ export function AppHeader() {
   );
 }
 
+function sliceAddress(addr: string) {
+  if (!addr || addr.length < 12) return addr;
+  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+}
+
 function EntranceControls({ onOpen }: { onOpen: () => void }) {
   const { isAuthenticated, user, loading: authLoading } = useAuth();
   const { isVerifiedHolder, collection, loading: verifLoading } = useVerificationStatus();
+  const privy = usePrivyAuthState();
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(false);
 
@@ -115,8 +121,8 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
     };
   }, [isAuthenticated, user]);
 
-  // Tier 1 (Lobby): show "Verify holder access" CTA next to the wallet pill.
-  // Tier 2/3: WalletPill alone (with verified collection badge).
+  // Authenticated to Supabase: show wallet pill (and optional verify CTA
+  // for Tier-1 lobby users).
   if (isAuthenticated) {
     if (walletAddress) {
       return (
@@ -156,6 +162,28 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
   }
 
   if (authLoading) return <div className="h-9 w-24" aria-hidden />;
+
+  // Privy wallet is connected but the user hasn't completed the SIWE
+  // signature yet → show "Click to verify". This replaces the old
+  // auto-popping signature modal that was distorting the rest of the UI.
+  if (privy.authenticated && privy.address) {
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          window.dispatchEvent(new Event("baycmc:privy-bridge-retry"));
+        }}
+        className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-gold/40 bg-gold/10 px-4 py-2 text-sm font-semibold text-gold transition hover:bg-gold/20"
+        title={privy.address}
+      >
+        <Lock className="h-3.5 w-3.5" />
+        Click to verify
+        <span className="font-mono text-xs text-gold/70">
+          {sliceAddress(privy.address)}
+        </span>
+      </button>
+    );
+  }
 
   return (
     <button
