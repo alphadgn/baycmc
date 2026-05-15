@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Lock } from "lucide-react";
 import { useAuth } from "@/lib/auth/useAuth";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
+import { usePrivyAuthState } from "@/lib/auth/usePrivyBridge";
 import { supabase } from "@/integrations/supabase/client";
 import { EntranceDialog } from "@/components/EntranceDialog";
 import { EmbroideredImage } from "@/components/EmbroideredImage";
