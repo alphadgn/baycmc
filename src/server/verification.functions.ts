@@ -33,7 +33,10 @@ export const revalidateOwnership = createServerFn({ method: "POST" })
  */
 
 function client() {
-  return createPublicClient({ chain: mainnet, transport: http(ETH_RPC_URL) });
+  return createPublicClient({
+    chain: mainnet,
+    transport: http(ETH_RPC_URL, { timeout: 8_000, retryCount: 1 }),
+  });
 }
 
 const delegateAbi = parseAbi([

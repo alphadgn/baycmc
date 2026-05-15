@@ -36,7 +36,31 @@ const delegateRegistryAbi = parseAbi([
 ]);
 
 function client() {
-  return createPublicClient({ chain: mainnet, transport: http(ETH_RPC_URL) });
+  return createPublicClient({
+    chain: mainnet,
+    transport: http(ETH_RPC_URL, { timeout: 8_000, retryCount: 1 }),
+  });
+}
+
+/**
+ * Reject after `ms` milliseconds with a descriptive error so a hung
+ * upstream RPC can never wedge the verify flow. Successful resolves /
+ * rejections from `p` are passed through unchanged.
+ */
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`Timeout: ${label} after ${ms}ms`)), ms);
+    p.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      },
+    );
+  });
 }
 
 const POSITIVE_BALANCE_TTL_MS = 60_000;
@@ -112,12 +136,16 @@ async function resolveDelegatedVaults(
   }
 
   try {
-    const delegations = (await c.readContract({
-      address: DELEGATE_REGISTRY_V2,
-      abi: delegateRegistryAbi,
-      functionName: "getIncomingDelegations",
-      args: [signer],
-    })) as ReadonlyArray<{
+    const delegations = (await withTimeout(
+      c.readContract({
+        address: DELEGATE_REGISTRY_V2,
+        abi: delegateRegistryAbi,
+        functionName: "getIncomingDelegations",
+        args: [signer],
+      }),
+      6_000,
+      "getIncomingDelegations",
+    )) as ReadonlyArray<{
       type_: number;
       to: `0x${string}`;
       from: `0x${string}`;
@@ -392,27 +420,37 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
     //    counts as verified ownership.
     const c = client();
 
-    // Direct balance check — independent. RPC failure leaves balance=0 but
-    // does not block sign-in: the user still gets a lobby session.
+    // Run direct balance + delegation lookups in parallel but isolated:
+    // a stalled / rejected delegation lookup must NOT wedge the verify.
+    // Balance failure is fatal (we can't decide ape ownership without it);
+    // delegation failure is logged and treated as "no delegations".
     let signerBals = { bayc: 0n, mayc: 0n };
     let directLookupOk = true;
-    try {
-      signerBals = await balancesFor(c, wallet as `0x${string}`);
-    } catch (e) {
-      console.error("RPC balanceOf (signer) failed", e);
-      directLookupOk = false;
-    }
-
-    // Delegation lookup — independent of direct check. Errors degrade to
-    // "no delegation found" so users are never blocked from the lobby
-    // by a delegate.cash / RPC outage. Direct ownership remains the
-    // primary path.
     let vaults: `0x${string}`[] = [];
     let delegationLookupOk = true;
-    try {
-      vaults = await resolveDelegatedVaults(c, wallet as `0x${string}`);
-    } catch (e) {
-      console.error("delegate.cash lookup threw", e);
+
+    const settled = await Promise.allSettled([
+      balancesFor(c, wallet as `0x${string}`),
+      resolveDelegatedVaults(c, wallet as `0x${string}`),
+    ]);
+
+    const balRes = settled[0];
+    const delRes = settled[1];
+
+    if (balRes.status === "fulfilled") {
+      signerBals = balRes.value;
+    } else {
+      console.error("RPC balanceOf (signer) failed", balRes.reason);
+      directLookupOk = false;
+      throw new Error(
+        "We couldn't reach the Ethereum network to verify ownership. Please try again in a moment.",
+      );
+    }
+
+    if (delRes.status === "fulfilled") {
+      vaults = delRes.value;
+    } else {
+      console.warn("delegate.cash lookup failed — proceeding with no delegations", delRes.reason);
       delegationLookupOk = false;
     }
 
