@@ -452,6 +452,10 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
     const totalMayc = signerBals.mayc;
     const delegatedFrom: `0x${string}` | null = null;
     const verificationBasis: "direct" | "delegated" = "direct";
+    void delegationLookupOk;
+    void vaults;
+    void delegatedFrom;
+    void verificationBasis;
 
     const holdsApe = totalBayc > 0n || totalMayc > 0n;
     const collection: "BAYC" | "MAYC" | null = holdsApe ? (totalBayc > 0n ? "BAYC" : "MAYC") : null;
