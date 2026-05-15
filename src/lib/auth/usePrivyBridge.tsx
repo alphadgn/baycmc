@@ -329,17 +329,17 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
     retryNonce,
   ]);
 
-  return (
-    <PrivyAuthStateContext.Provider
-      value={{
-        ready: ready && walletsReady,
-        authenticated: !!authenticated,
-        address: walletReady && embeddedWallet ? embeddedWallet.address : null,
-      }}
-    >
-      {/* Children come from PrivyBridgeMount via composition below. */}
-    </PrivyAuthStateContext.Provider>
-  );
+  // Publish the latest snapshot to the module-level store so the header
+  // (and any other component) can react without being a child of this node.
+  useEffect(() => {
+    setPrivySnapshot({
+      ready: !!ready && !!walletsReady,
+      authenticated: !!authenticated,
+      address: walletReady && embeddedWallet ? embeddedWallet.address : null,
+    });
+  }, [ready, walletsReady, authenticated, walletReady, embeddedWallet]);
+
+  return null;
 }
 
 /**
