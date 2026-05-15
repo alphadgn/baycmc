@@ -506,24 +506,29 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
     const email = `${lower}@wallet.baycmc.local`;
     const password = await deriveWalletPassword(lower);
 
-    const { data: existing } = await supabaseAdmin.auth.admin.listUsers({
-      page: 1,
-      perPage: 1000,
+    const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { wallet: lower, via: "privy" },
     });
-    const found = existing?.users.find((u) => u.email === email);
-    let userId = found?.id;
+    let userId = created.user?.id;
 
     if (!userId) {
-      const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: { wallet: lower, via: "privy" },
+      const alreadyExists = createErr?.message?.toLowerCase().includes("already");
+      if (!alreadyExists) throw createErr ?? new Error("Could not create wallet session");
+
+      const { data: existing } = await supabaseAdmin.auth.admin.listUsers({
+        page: 1,
+        perPage: 1000,
       });
-      if (error) throw error;
-      userId = created.user!.id;
-    } else {
-      await supabaseAdmin.auth.admin.updateUserById(userId, { password });
+      const found = existing?.users.find((u) => u.email === email);
+      userId = found?.id;
+      if (!userId) throw new Error("Could not find wallet session");
+      const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+        password,
+      });
+      if (updateErr) throw updateErr;
     }
 
     await supabaseAdmin
