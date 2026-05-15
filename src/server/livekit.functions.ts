@@ -5,6 +5,61 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { recomputeOwnership } from "@/server/ownership.server";
 
+type RoomAccessResult =
+  | { ok: true; room: { id: string; name: string; tier: "token_proof" | "lifer"; livekit_room: string; active: boolean } }
+  | { ok: false; error: string; code: "room_unavailable" | "bayc_revoked" | "otherpage_revoked" };
+
+async function validateRoomAccess(userId: string, roomId: string): Promise<RoomAccessResult> {
+  const { data: room, error } = await supabaseAdmin
+    .from("rooms")
+    .select("id,name,tier,livekit_room,active")
+    .eq("id", roomId)
+    .maybeSingle();
+  if (error || !room || !room.active) {
+    return { ok: false, error: "Room not found or inactive", code: "room_unavailable" };
+  }
+
+  // Re-run on-chain BAYC/MAYC + delegate.cash and Otherpage checks at the
+  // moment access is requested or refreshed. This is the hard gate that makes
+  // revoked delegations/sold tokens stop future room entry and token minting.
+  const fresh = await recomputeOwnership(userId).catch((e) => {
+    console.error("recomputeOwnership for room access failed", e);
+    return null;
+  });
+
+  const ver = fresh
+    ? {
+        bayc_verified: fresh.tokenProof,
+        otherpage_verified: fresh.otherpageVerified,
+      }
+    : (
+        await supabaseAdmin
+          .from("user_verifications")
+          .select("bayc_verified, otherpage_verified")
+          .eq("user_id", userId)
+          .maybeSingle()
+      ).data;
+
+  if (!ver?.bayc_verified) {
+    return {
+      ok: false,
+      error:
+        "Your BAYC/MAYC access is no longer active. Reconnect a wallet that owns or is delegated an ape to enter exclusive rooms.",
+      code: "bayc_revoked",
+    };
+  }
+  if (room.tier === "lifer" && !ver.otherpage_verified) {
+    return {
+      ok: false,
+      error:
+        "Your Otherpage access is no longer active. Reconnect a wallet with active BAYC/MAYC and Otherpage access to re-enter this room.",
+      code: "otherpage_revoked",
+    };
+  }
+
+  return { ok: true, room };
+}
+
 /**
  * Mint a LiveKit access token after enforcing tier-based access.
  * - token_proof rooms: requires bayc_verified
@@ -19,46 +74,9 @@ export const getLivekitToken = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-
-    const { data: room, error } = await supabase
-      .from("rooms")
-      .select("id,name,tier,livekit_room,active")
-      .eq("id", data.roomId)
-      .maybeSingle();
-    if (error || !room) {
-      return { ok: false as const, error: "Room not found or access denied" };
-    }
-    if (!room.active) {
-      return { ok: false as const, error: "Room is inactive" };
-    }
-
-    // Real-time access validation: re-run on-chain BAYC/MAYC + delegate.cash
-    // lookup at the moment of room entry so revoked delegations or sold
-    // tokens immediately lock the user out.
-    const fresh = await recomputeOwnership(userId).catch((e) => {
-      console.error("recomputeOwnership at room entry failed", e);
-      return null;
-    });
-
-    const ver = fresh
-      ? {
-          bayc_verified: fresh.tokenProof,
-          otherpage_verified: fresh.otherpageVerified,
-        }
-      : (
-          await supabase
-            .from("user_verifications")
-            .select("bayc_verified, otherpage_verified")
-            .eq("user_id", userId)
-            .maybeSingle()
-        ).data;
-
-    if (!ver?.bayc_verified) {
-      return { ok: false as const, error: "BAYC/MAYC ownership required (or revoked)" };
-    }
-    if (room.tier === "lifer" && !ver.otherpage_verified) {
-      return { ok: false as const, error: "Lifer badge required" };
-    }
+    const access = await validateRoomAccess(userId, data.roomId);
+    if (!access.ok) return access;
+    const { room } = access;
 
     const apiKey = process.env.LIVEKIT_API_KEY;
     const apiSecret = process.env.LIVEKIT_API_SECRET;
@@ -101,3 +119,10 @@ export const getLivekitToken = createServerFn({ method: "POST" })
 
     return { ok: true as const, token, url, roomName: room.livekit_room };
   });
+
+export const revalidateLivekitRoomAccess = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { roomId: string }) =>
+    z.object({ roomId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => validateRoomAccess(context.userId, data.roomId));

@@ -86,14 +86,17 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
   const { isAuthenticated, user, loading: authLoading } = useAuth();
   const { tokenProof, collection, loading: verifLoading } = useVerificationStatus();
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [profileLoaded, setProfileLoaded] = useState(false);
 
   // Source of truth: profiles.wallet_address (set by the SIWE bridge).
   useEffect(() => {
     if (!isAuthenticated || !user) {
       setWalletAddress(null);
+      setProfileLoaded(false);
       return;
     }
     let cancelled = false;
+    setProfileLoaded(false);
     (async () => {
       const { data } = await supabase
         .from("profiles")
@@ -102,6 +105,7 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
         .maybeSingle();
       if (cancelled) return;
       setWalletAddress(data?.wallet_address ?? null);
+      setProfileLoaded(true);
     })();
     return () => {
       cancelled = true;
@@ -117,8 +121,19 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
       return <WalletPill address={walletAddress} collection={tokenProof ? collection ?? null : null} />;
     }
     // Session exists but profile row hasn't propagated yet (rare race).
-    if (verifLoading) return <div className="h-9 w-24" aria-hidden />;
-    return <div className="h-9 w-24" aria-hidden />;
+    if (!profileLoaded || verifLoading) return <div className="h-9 w-24" aria-hidden />;
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          window.dispatchEvent(new Event("baycmc:privy-bridge-retry"));
+          onOpen();
+        }}
+        className="cursor-pointer rounded-md border border-gold/40 bg-gold/10 px-4 py-2 text-sm font-semibold text-gold transition hover:bg-gold/20"
+      >
+        Finish sign-in
+      </button>
+    );
   }
 
   // Hide button briefly while loading auth to avoid flash.
@@ -128,6 +143,7 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
 
   return (
     <button
+      type="button"
       onClick={onOpen}
       className="cursor-pointer rounded-md bg-gradient-gold px-4 py-2 text-sm font-semibold text-gold-foreground shadow-gold transition hover:opacity-90"
     >

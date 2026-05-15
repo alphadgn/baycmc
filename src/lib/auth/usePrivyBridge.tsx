@@ -63,6 +63,7 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
   const { wallets, ready: walletsReady } = hooks.useWallets();
   const { signMessage } = hooks.useSignMessage();
   const verifyFn = useServerFn(verifyPrivyOwnership);
+  const [retryNonce, setRetryNonce] = useState(0);
 
   // One-shot guard per wallet address. NEVER cleared while the address
   // is unchanged — this is what kills the historic verify loop.
@@ -78,6 +79,16 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
     ) ?? null;
   const walletReady =
     !!embeddedWallet && (embeddedWallet.ready === undefined || embeddedWallet.ready === true);
+
+  useEffect(() => {
+    const retry = () => {
+      inFlightRef.current = null;
+      completedRef.current.clear();
+      setRetryNonce((n) => n + 1);
+    };
+    window.addEventListener("baycmc:privy-bridge-retry", retry);
+    return () => window.removeEventListener("baycmc:privy-bridge-retry", retry);
+  }, []);
 
   useEffect(() => {
     if (!ready || !authenticated || !walletsReady || !walletReady || !embeddedWallet) return;
@@ -191,7 +202,7 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
     return () => {
       cancelled = true;
     };
-  }, [ready, authenticated, walletsReady, walletReady, embeddedWallet?.address, signMessage, verifyFn, embeddedWallet, user?.id]);
+  }, [ready, authenticated, walletsReady, walletReady, embeddedWallet?.address, signMessage, verifyFn, embeddedWallet, user?.id, retryNonce]);
 
   return null;
 }

@@ -30,6 +30,11 @@ type PrivyHooks = {
   };
 };
 
+function isFrameAncestorBlocked(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return message.toLowerCase().includes("frame ancestor");
+}
+
 export function EntranceDialog({ open, onOpenChange }: EntranceDialogProps) {
   const privyReady = usePrivyReady();
   const [hooks, setHooks] = useState<PrivyHooks | null>(null);
@@ -160,7 +165,15 @@ function WithHooks({
       login();
     } catch (e) {
       console.warn("[EntranceDialog] Privy login() threw:", e);
-      toast.error("Couldn't open the wallet sign-in modal.");
+      if (isFrameAncestorBlocked(e)) {
+        toast.error("Wallet sign-in is blocked inside this embedded preview.", {
+          description: "Open the preview in a new tab or use the published app to continue.",
+          duration: 7000,
+        });
+      } else {
+        toast.error("Couldn't open the wallet sign-in modal.");
+      }
+      triggeredRef.current = false;
     } finally {
       onOpenChange(false);
     }
