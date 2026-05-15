@@ -1,4 +1,5 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { useAuth } from "@/lib/auth/useAuth";
 import { EmbroideredImage } from "@/components/EmbroideredImage";
 
@@ -13,7 +14,18 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
+  const navigate = useNavigate();
+
+  // Once a Supabase session exists, drop the user straight into the lobby.
+  // Non-BAYC users still get the lobby; gated areas (rooms, rides) are
+  // hidden by RLS + nav gating.
+  useEffect(() => {
+    if (loading) return;
+    if (isAuthenticated) {
+      void navigate({ to: "/feed", replace: true });
+    }
+  }, [isAuthenticated, loading, navigate]);
 
   return (
     <main>
