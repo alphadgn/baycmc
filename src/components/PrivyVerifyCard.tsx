@@ -24,6 +24,7 @@ type WalletLike = {
   wallet_client_type?: string;
   connectorType?: string;
   connector_type?: string;
+  ready?: boolean;
   getEthereumProvider?: () => Promise<EthereumProviderLike>;
 };
 
