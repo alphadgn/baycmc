@@ -1,13 +1,18 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useAuth } from "@/lib/auth/useAuth";
+import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import { EmbroideredImage } from "@/components/EmbroideredImage";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "BAYCMC — token-gated for verified BAYC holders" },
-      { name: "description", content: "An exclusive social and real-time platform for verified Bored Ape Yacht Club holders. Verify your BAYC, then drop in." },
+      { title: "BAYCMC — the BAYC/MAYC mobile clubhouse" },
+      {
+        name: "description",
+        content:
+          "Sign in with any wallet or email to enter the lobby. Verify your BAYC or MAYC to unlock conference rooms, the social feed, and live events.",
+      },
     ],
   }),
   component: Index,
@@ -15,17 +20,16 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   const { isAuthenticated, loading } = useAuth();
+  const { isVerifiedHolder, loading: verifLoading } = useVerificationStatus();
   const navigate = useNavigate();
 
-  // Once a Supabase session exists, drop the user straight into the lobby.
-  // Non-BAYC users still get the lobby; gated areas (rooms, rides) are
-  // hidden by RLS + nav gating.
+  // After sign-in: verified holders go straight to the social feed,
+  // everyone else lands in the lobby (Tier 1).
   useEffect(() => {
-    if (loading) return;
-    if (isAuthenticated) {
-      void navigate({ to: "/feed", replace: true });
-    }
-  }, [isAuthenticated, loading, navigate]);
+    if (loading || verifLoading) return;
+    if (!isAuthenticated) return;
+    void navigate({ to: isVerifiedHolder ? "/feed" : "/lobby", replace: true });
+  }, [isAuthenticated, isVerifiedHolder, loading, verifLoading, navigate]);
 
   return (
     <main>
