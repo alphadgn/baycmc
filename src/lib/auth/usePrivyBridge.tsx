@@ -88,6 +88,7 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
 
     let cancelled = false;
     inFlightRef.current = address;
+    const toastId = `privy-bridge-${address.toLowerCase()}`;
 
     void (async () => {
       try {
@@ -99,6 +100,8 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
           completedRef.current.add(address.toLowerCase());
           return;
         }
+
+        toast.loading("Checking delegate.cash and on-chain ownership…", { id: toastId });
 
         const domain = window.location.host;
         const origin = window.location.origin;
@@ -122,9 +125,10 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
             address,
             uiOptions: {
               showWalletUIs: true,
-              title: "Verify ownership",
-              description: "Sign to check BAYC / MAYC ownership.",
-              buttonText: "Sign and verify",
+              title: "Sign in to BAYCMC",
+              description:
+                "Signing in checks BAYC/MAYC ownership directly and via delegate.cash vaults.",
+              buttonText: "Sign and continue",
             },
           },
         );
@@ -133,33 +137,51 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
         const result = await verifyFn({ data: { message, signature } });
         if (cancelled) return;
 
-        if (!result.verified) {
-          completedRef.current.add(address.toLowerCase());
-          toast.error(result.reason ?? "No qualifying BAYC/MAYC assets found.", {
-            duration: 5000,
-          });
+        if (!result.session) {
+          toast.error(result.reason ?? "Sign-in failed.", { id: toastId });
           return;
         }
-
         const { error } = await supabase.auth.setSession({
           access_token: result.session.access_token,
           refresh_token: result.session.refresh_token,
         });
         if (error) {
-          toast.error(error.message);
+          toast.error(error.message, { id: toastId });
           return;
         }
+
         completedRef.current.add(address.toLowerCase());
-        toast.success(
-          result.delegatedFrom
-            ? `Verified — ${result.collection} delegated`
-            : `Verified — ${result.collection} ownership confirmed`,
-        );
+
+        // Surface deterministic UI states for the delegation/direct check:
+        if (result.verified) {
+          if (result.delegatedFrom) {
+            toast.success(
+              `Welcome — ${result.collection} verified via delegate.cash vault ${result.delegatedFrom.slice(0, 6)}…${result.delegatedFrom.slice(-4)}.`,
+              { id: toastId, duration: 5000 },
+            );
+          } else {
+            toast.success(`Welcome — ${result.collection} ownership confirmed.`, {
+              id: toastId,
+              duration: 5000,
+            });
+          }
+        } else {
+          // Lobby-only session (no BAYC/MAYC or delegate.cash blank).
+          toast.message("You're in the lobby", {
+            id: toastId,
+            description:
+              result.reason ??
+              "No BAYC/MAYC found for this wallet — gated rooms stay locked.",
+            duration: 6000,
+          });
+        }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         if (!msg.toLowerCase().includes("user rejected")) {
           console.warn("[PrivyBridge] verify failed:", msg);
-          toast.error(msg || "Verification failed. Please try again.");
+          toast.error(msg || "Sign-in failed. Please try again.", { id: toastId });
+        } else {
+          toast.dismiss(toastId);
         }
       } finally {
         if (inFlightRef.current === address) inFlightRef.current = null;

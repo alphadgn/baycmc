@@ -392,16 +392,28 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
     //    counts as verified ownership.
     const c = client();
 
+    // Direct balance check — independent. RPC failure leaves balance=0 but
+    // does not block sign-in: the user still gets a lobby session.
     let signerBals = { bayc: 0n, mayc: 0n };
-    let vaults: `0x${string}`[] = [];
+    let directLookupOk = true;
     try {
-      [signerBals, vaults] = await Promise.all([
-        balancesFor(c, wallet as `0x${string}`),
-        resolveDelegatedVaults(c, wallet as `0x${string}`),
-      ]);
+      signerBals = await balancesFor(c, wallet as `0x${string}`);
     } catch (e) {
-      console.error("RPC balanceOf failed", e);
-      throw new Error("We couldn't reach Ethereum to check your holdings. Try again in a moment.");
+      console.error("RPC balanceOf (signer) failed", e);
+      directLookupOk = false;
+    }
+
+    // Delegation lookup — independent of direct check. Errors degrade to
+    // "no delegation found" so users are never blocked from the lobby
+    // by a delegate.cash / RPC outage. Direct ownership remains the
+    // primary path.
+    let vaults: `0x${string}`[] = [];
+    let delegationLookupOk = true;
+    try {
+      vaults = await resolveDelegatedVaults(c, wallet as `0x${string}`);
+    } catch (e) {
+      console.error("delegate.cash lookup threw", e);
+      delegationLookupOk = false;
     }
 
     let totalBayc = signerBals.bayc;
@@ -410,7 +422,6 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
     let verificationBasis: "direct" | "delegated" = "direct";
 
     if (totalBayc === 0n && totalMayc === 0n && vaults.length > 0) {
-      // Check each delegated vault until we find one that holds an ape.
       for (const v of vaults) {
         try {
           const b = await balancesFor(c, v);
@@ -427,31 +438,22 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
       }
     }
 
-    if (totalBayc === 0n && totalMayc === 0n) {
-      return {
-        verified: false as const,
-        reason:
-          vaults.length > 0
-            ? "Neither this wallet nor any wallet that delegated to it via delegate.cash holds a BAYC or MAYC. Try a different wallet."
-            : "This wallet doesn't hold any BAYC or MAYC, and no vault has delegated to it. Try a different wallet or set up delegate.cash.",
-        wallet,
-      };
-    }
-
-    const collection: "BAYC" | "MAYC" = totalBayc > 0n ? "BAYC" : "MAYC";
+    const holdsApe = totalBayc > 0n || totalMayc > 0n;
+    const collection: "BAYC" | "MAYC" | null = holdsApe
+      ? totalBayc > 0n
+        ? "BAYC"
+        : "MAYC"
+      : null;
     const delegationDetailsUrl = delegatedFrom
       ? `https://delegate.cash/registry?delegate=${wallet}&vault=${delegatedFrom}`
       : null;
 
-    // 3) Mint / fetch Supabase user (same pattern as tokenproof). We key
-    //    the Supabase user off the *signer* wallet (the Privy email's
-    //    embedded wallet) so the same email always resolves to the same
-    //    account, regardless of which vault delegated this session.
+    // 3) Mint / fetch Supabase user. Every successful signature gets a
+    //    session — gated areas are still protected by RLS via the
+    //    bayc_verified / is_token_proof_verified helpers, so non-holders
+    //    only see the main lobby and direct messages.
     const lower = wallet.toLowerCase();
     const email = `${lower}@wallet.baycmc.local`;
-    // Strong server-derived password (SHA-256 over full service key + wallet).
-    // Always rotated on every sign-in so existing accounts that were created
-    // with the legacy short-prefix password get migrated transparently.
     const password = await deriveWalletPassword(lower);
 
     const { data: existing } = await supabaseAdmin.auth.admin.listUsers({
@@ -471,7 +473,6 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
       if (error) throw error;
       userId = created.user!.id;
     } else {
-      // Rotate to current derived password so legacy accounts can sign in.
       await supabaseAdmin.auth.admin.updateUserById(userId, { password });
     }
 
@@ -482,27 +483,26 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
     await supabaseAdmin.from("user_verifications").upsert(
       {
         user_id: userId,
-        bayc_verified: true,
+        bayc_verified: holdsApe,
         bayc_collection: collection,
         delegation_verified: verificationBasis === "delegated",
         delegation_vault: delegatedFrom,
-        verified_at: new Date().toISOString(),
+        verified_at: holdsApe ? new Date().toISOString() : null,
       },
       { onConflict: "user_id" },
     );
 
-    // Lumina authenticity check on the wallet that actually holds the ape
-    // (vault when delegated, signer otherwise). Pass-through when the
-    // Lumina gate has not been configured by an admin yet.
-    const apeHolder = delegatedFrom ?? wallet;
-    await Promise.all([
-      runLuminaCheckAndPersist({ userId, wallet: apeHolder }).catch((e) =>
-        console.error("Lumina post-privy check failed", e),
-      ),
-      runOtherpageCheckAndPersist({ userId, wallet: apeHolder }).catch((e) =>
-        console.error("Otherpage post-privy check failed", e),
-      ),
-    ]);
+    if (holdsApe) {
+      const apeHolder = delegatedFrom ?? wallet;
+      await Promise.all([
+        runLuminaCheckAndPersist({ userId, wallet: apeHolder }).catch((e) =>
+          console.error("Lumina post-privy check failed", e),
+        ),
+        runOtherpageCheckAndPersist({ userId, wallet: apeHolder }).catch((e) =>
+          console.error("Otherpage post-privy check failed", e),
+        ),
+      ]);
+    }
 
     const { data: signIn, error: signInErr } = await supabaseAdmin.auth.signInWithPassword({
       email,
@@ -513,12 +513,22 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
     }
 
     return {
-      verified: true as const,
+      verified: holdsApe,
       collection,
       wallet,
       verificationBasis,
       delegatedFrom,
       delegationDetailsUrl,
+      delegationLookupOk,
+      directLookupOk,
+      delegationVaultsChecked: vaults.length,
+      reason: holdsApe
+        ? null
+        : vaults.length > 0
+          ? "Signed in to the lobby. No BAYC/MAYC found in this wallet or its delegated vaults — gated rooms remain locked."
+          : delegationLookupOk
+            ? "Signed in to the lobby. No BAYC/MAYC in this wallet and no delegate.cash delegation found."
+            : "Signed in to the lobby. delegate.cash lookup unavailable; only direct ownership was checked.",
       session: {
         access_token: signIn.session.access_token,
         refresh_token: signIn.session.refresh_token,
