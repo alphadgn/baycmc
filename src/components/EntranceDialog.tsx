@@ -16,6 +16,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { getPrivyPublicConfig } from "@/server/privy.functions";
 import { usePrivyReady } from "@/components/PrivyAppProvider";
+import { importWithRetry } from "@/lib/import-with-retry";
 
 interface EntranceDialogProps {
   open: boolean;
@@ -56,7 +57,9 @@ export function EntranceDialog({ open, onOpenChange }: EntranceDialogProps) {
           cfg.configured && id.length >= 20 && id.length <= 40 && /^[a-z0-9]+$/i.test(id);
         setConfigured(valid);
         if (!valid) return;
-        const mod = await import("@privy-io/react-auth");
+        const mod = await importWithRetry(() => import("@privy-io/react-auth"), {
+          label: "privy-react-auth-entrance",
+        });
         if (cancelled) return;
         setHooks({ usePrivy: mod.usePrivy });
       } catch {

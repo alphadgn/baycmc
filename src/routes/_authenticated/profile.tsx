@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Camera, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
 import { toast } from "sonner";
 import { VerificationStatusPanel } from "@/components/VerificationStatusPanel";
+import { NftGallery } from "@/components/NftGallery";
 
 export const Route = createFileRoute("/_authenticated/profile")({
   head: () => ({
@@ -39,9 +41,12 @@ function ProfilePage() {
   const [roles, setRoles] = useState<string[]>([]);
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loadState, setLoadState] = useState<LoadState>("idle");
   const [loadError, setLoadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Lazy-load all server data after mount. We never block render on this —
   // the component shows a skeleton fallback while loadState !== "ready".
@@ -77,6 +82,7 @@ function ProfilePage() {
           setProfile(p);
           setUsername(p.username ?? "");
           setBio(p.bio ?? "");
+          setAvatarUrl(p.avatar_url ?? null);
         }
         if (verifRes.data) setVerif(verifRes.data as VerifRow);
         if (rolesRes.data) setRoles((rolesRes.data as RoleRow[]).map((x) => x.role));
@@ -103,6 +109,40 @@ function ProfilePage() {
     setSaving(false);
     if (error) toast.error(error.message);
     else toast.success("Profile saved");
+  }
+
+  async function handleAvatarFile(file: File) {
+    if (!user) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Pick an image file.");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Image is too large — max 2 MB.");
+      return;
+    }
+    setUploadingAvatar(true);
+    try {
+      const ext = file.name.split(".").pop()?.toLowerCase() || "png";
+      const path = `${user.id}/avatar-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("avatars")
+        .upload(path, file, { upsert: true, contentType: file.type });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
+      const publicUrl = pub.publicUrl;
+      const { error: updErr } = await supabase
+        .from("profiles")
+        .update({ avatar_url: publicUrl })
+        .eq("id", user.id);
+      if (updErr) throw updErr;
+      setAvatarUrl(publicUrl);
+      toast.success("Avatar updated");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't upload avatar");
+    } finally {
+      setUploadingAvatar(false);
+    }
   }
 
   // Verification is handled at Entrance via Privy + on-chain check; profile only shows
@@ -138,7 +178,44 @@ function ProfilePage() {
         <div className="px-6 pb-6 sm:px-8">
           <div className="-mt-12 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div className="flex items-end gap-4">
-              <div className="h-24 w-24 rounded-2xl border-4 border-background bg-gradient-gold shadow-gold" />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingAvatar}
+                className="group relative h-24 w-24 cursor-pointer overflow-hidden rounded-2xl border-4 border-background bg-gradient-gold shadow-gold transition hover:opacity-90 disabled:cursor-wait"
+                aria-label="Change avatar"
+              >
+                {avatarUrl ? (
+                  <img
+                    src={avatarUrl}
+                    alt="Your avatar"
+                    className="h-full w-full object-cover"
+                  />
+                ) : null}
+                <span className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition group-hover:opacity-100">
+                  {uploadingAvatar ? (
+                    <Loader2 className="h-6 w-6 animate-spin text-white" />
+                  ) : (
+                    <Camera className="h-6 w-6 text-white" />
+                  )}
+                </span>
+                {uploadingAvatar && !avatarUrl && (
+                  <span className="absolute inset-0 flex items-center justify-center bg-black/40">
+                    <Loader2 className="h-6 w-6 animate-spin text-white" />
+                  </span>
+                )}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void handleAvatarFile(file);
+                  e.target.value = "";
+                }}
+              />
               <div>
                 <h1 className="font-display text-2xl font-bold sm:text-3xl">
                   {username || "Anonymous Ape"}
@@ -240,6 +317,18 @@ function ProfilePage() {
           </div>
         </section>
       </div>
+
+      {wallet && (
+        <section className="mt-10">
+          <div className="mb-4 flex items-baseline justify-between">
+            <h2 className="font-display text-2xl font-bold">Your collection</h2>
+            <p className="text-xs text-muted-foreground">
+              NFTs in <span className="font-mono">{short}</span> · live from Alchemy
+            </p>
+          </div>
+          <NftGallery address={wallet} />
+        </section>
+      )}
     </main>
   );
 }

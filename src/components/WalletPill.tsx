@@ -129,7 +129,7 @@ export function WalletPill({ address, collection }: WalletPillProps) {
             View profile
           </Link>
           <Link
-            to="/ape-rides"
+            to="/activity"
             onClick={() => setOpen(false)}
             className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm text-foreground transition hover:bg-secondary"
           >

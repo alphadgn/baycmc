@@ -28,6 +28,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { verifyPrivyOwnership } from "@/server/privy.functions";
 import { usePrivyReady } from "@/components/PrivyAppProvider";
 import { logEvent } from "@/lib/diagnostics";
+import { importWithRetry } from "@/lib/import-with-retry";
 
 /**
  * Lightweight, app-wide view of Privy state. Lets the header render
@@ -150,6 +151,22 @@ function withTimeout<T>(p: Promise<T>, ms: number, message: string): Promise<T> 
       },
     );
   });
+}
+
+/**
+ * Privy's iframe at auth.privy.io occasionally fails to load one of its
+ * Next.js chunks on first request ("Loading chunk 5893 failed"). The chunk
+ * is cached server-side after that first miss so a single retry succeeds.
+ * Detect the error shape and let the caller retry once before bubbling up.
+ */
+function isChunkLoadError(error: unknown): boolean {
+  const msg = (error instanceof Error ? error.message : String(error ?? "")).toLowerCase();
+  return (
+    msg.includes("loading chunk") ||
+    msg.includes("loading css chunk") ||
+    msg.includes("failed to fetch dynamically imported module") ||
+    msg.includes("importing a module script failed")
+  );
 }
 
 export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
@@ -302,23 +319,39 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
         });
         const message = siwe.prepareMessage();
 
-        const { signature } = await withTimeout(
-          signMessageRef.current(
-            { message },
-            {
-              address,
-              uiOptions: {
-                showWalletUIs: true,
-                title: "Sign in to BAYCMC",
-                description:
-                  "Signing in checks BAYC/MAYC ownership directly and via delegate.cash vaults.",
-                buttonText: "Sign and continue",
-              },
-            },
-          ),
-          45_000,
-          "Signature request timed out. Please try signing in again.",
-        );
+        const signOpts = {
+          address,
+          uiOptions: {
+            showWalletUIs: true,
+            title: "Sign in to BAYCMC",
+            description:
+              "Signing in checks BAYC/MAYC ownership directly and via delegate.cash vaults.",
+            buttonText: "Sign and continue",
+          },
+        } as const;
+        let signResult: { signature: string };
+        try {
+          signResult = await withTimeout(
+            signMessageRef.current({ message }, signOpts),
+            45_000,
+            "Signature request timed out. Please try signing in again.",
+          );
+        } catch (e) {
+          if (!isChunkLoadError(e)) throw e;
+          // Privy iframe missed a chunk on the first request — retry once
+          // after a short delay so the CDN can serve the cached chunk.
+          logEvent("auth", "warn", "bridge: signMessage chunk-load failed — retrying", {
+            message: e instanceof Error ? e.message : String(e),
+          });
+          toast.loading("Reloading wallet sign-in…", { id: toastId });
+          await new Promise((r) => window.setTimeout(r, 600));
+          signResult = await withTimeout(
+            signMessageRef.current({ message }, signOpts),
+            45_000,
+            "Signature request timed out. Please try signing in again.",
+          );
+        }
+        const { signature } = signResult;
         if (unmountedRef.current) {
           logEvent("auth", "warn", "bridge: aborted after signMessage — component unmounted");
           return;
@@ -376,8 +409,11 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
           }
         } else {
           // Lobby-only session (no BAYC/MAYC or delegate.cash blank).
-          toast.message("You're in the lobby", {
-            id: toastId,
+          // Dismiss the loading toast explicitly first — sonner inherits the
+          // loading spinner when updating a loading toast via the same id
+          // with `toast.message`, which made it appear to roll forever.
+          toast.dismiss(toastId);
+          toast.info("You're in the lobby", {
             description:
               result.reason ?? "No BAYC/MAYC found for this wallet — gated rooms stay locked.",
             duration: 6000,
@@ -439,7 +475,9 @@ export function PrivyBridgeMount() {
     let cancelled = false;
     void (async () => {
       try {
-        const mod = await import("@privy-io/react-auth");
+        const mod = await importWithRetry(() => import("@privy-io/react-auth"), {
+          label: "privy-react-auth-bridge",
+        });
         if (cancelled) return;
         setHooks({
           usePrivy: mod.usePrivy,

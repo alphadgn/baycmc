@@ -2,6 +2,7 @@ import { Component, createContext, useContext, useEffect, useState, type ReactNo
 import { useServerFn } from "@tanstack/react-start";
 import { mainnet as mainnetChain } from "viem/chains";
 import { getPrivyPublicConfig } from "@/server/privy.functions";
+import { importWithRetry } from "@/lib/import-with-retry";
 
 /**
  * `true` only when <PrivyProvider> from @privy-io/react-auth is actually
@@ -82,7 +83,9 @@ export function PrivyAppProvider({ children }: { children: ReactNode }) {
           }
           return;
         }
-        const mod = await import("@privy-io/react-auth");
+        const mod = await importWithRetry(() => import("@privy-io/react-auth"), {
+          label: "privy-react-auth",
+        });
         if (cancelled) return;
         setAppId(cfg.appId.trim());
         setPrivyProviderCmp(() => mod.PrivyProvider);
