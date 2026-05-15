@@ -16,7 +16,6 @@
 //     claims they just minted/transferred and we want a fresh look).
 import { createPublicClient, getAddress, http, parseAbi, type Address } from "viem";
 import { mainnet } from "viem/chains";
-import { ETH_RPC_URL } from "@/lib/web3/constants";
 
 const erc721Abi = parseAbi([
   "function balanceOf(address owner) view returns (uint256)",
@@ -39,9 +38,29 @@ function key(chainId: number, contract: string, wallet: string): string {
 let _client: ReturnType<typeof createPublicClient> | null = null;
 function client() {
   if (!_client) {
-    _client = createPublicClient({ chain: mainnet, transport: http(ETH_RPC_URL) });
+    const url = process.env.ETH_RPC_URL;
+    if (!url) {
+      throw new Error("Ethereum RPC is not configured.");
+    }
+    _client = createPublicClient({ chain: mainnet, transport: http(url, { timeout: 8_000, retryCount: 1 }) });
   }
   return _client;
+}
+
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`Timeout: ${label} after ${ms}ms`)), ms);
+    p.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      },
+    );
+  });
 }
 
 export interface TokenProofResult {
@@ -86,12 +105,16 @@ export async function requireTokenProof(args: {
 
   let balance: bigint;
   try {
-    balance = (await client().readContract({
-      address: contract,
-      abi: erc721Abi,
-      functionName: "balanceOf",
-      args: [wallet],
-    })) as bigint;
+    balance = (await withTimeout(
+      client().readContract({
+        address: contract,
+        abi: erc721Abi,
+        functionName: "balanceOf",
+        args: [wallet],
+      }),
+      8_000,
+      `balanceOf for ${contract}`,
+    )) as bigint;
   } catch (e) {
     console.error("[token-proof] balanceOf failed", { contract, wallet, error: e });
     // Fail-closed: do NOT cache RPC failures so the next request retries.
