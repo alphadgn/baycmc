@@ -1,492 +1,165 @@
+/**
+ * Entrance trigger.
+ *
+ * No dialog, no Tokenproof, no localStorage cache. The "Entrance" button
+ * in the header opens Privy's own modal directly. After Privy login,
+ * `PrivyBridge` (mounted at the root) signs the user into Supabase by
+ * verifying on-chain BAYC/MAYC ownership.
+ *
+ * This file is kept as a named export `EntranceDialog` so AppHeader's
+ * existing import keeps working with no further wiring. The `open` prop
+ * is the trigger: when it flips to `true`, we call Privy's `login()` and
+ * immediately set it back to `false` so re-clicks always re-open the modal.
+ */
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Copy, QrCode, RefreshCw, ExternalLink } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/lib/auth/useAuth";
-import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
-import { writeVerifiedSession } from "@/lib/baycmc/verifiedSession";
-import {
-  startTokenproofSession,
-  pollTokenproofSession,
-} from "@/server/tokenproof.functions";
-import { PrivyVerifyCard } from "@/components/PrivyVerifyCard";
-import { PrivyTroubleshootPanel } from "@/components/PrivyTroubleshootPanel";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { getPrivyPublicConfig } from "@/server/privy.functions";
 
 interface EntranceDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-/**
- * Entrance modal — Tokenproof verification only.
- *
- * Flow: tap Verify → server creates Tokenproof session → user gets a deep
- * link (copyable) and an on-demand QR. We poll until approved/rejected/
- * expired. On expiry, a new session is auto-created. After approval we
- * surface a BAYC or MAYC badge based on what Tokenproof returned.
- */
+type PrivyHooks = {
+  usePrivy: () => {
+    ready: boolean;
+    authenticated: boolean;
+    login: () => void;
+  };
+};
+
 export function EntranceDialog({ open, onOpenChange }: EntranceDialogProps) {
+  const [hooks, setHooks] = useState<PrivyHooks | null>(null);
+  const [configured, setConfigured] = useState<boolean | null>(null);
+  const fetchConfig = useServerFn(getPrivyPublicConfig);
+  const triggeredRef = useRef(false);
+
+  // Lazy-load Privy hooks (SSR-unsafe SDK).
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const cfg = await fetchConfig();
+        if (cancelled) return;
+        const id = (cfg.appId ?? "").trim();
+        const valid =
+          cfg.configured && id.length >= 20 && id.length <= 40 && /^[a-z0-9]+$/i.test(id);
+        setConfigured(valid);
+        if (!valid) return;
+        const mod = await import("@privy-io/react-auth");
+        if (cancelled) return;
+        setHooks({ usePrivy: mod.usePrivy });
+      } catch {
+        if (!cancelled) setConfigured(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchConfig]);
+
   return (
-    <Dialog modal={false} open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="max-h-[90vh] w-[calc(100vw-1rem)] max-w-md overflow-y-auto p-4 sm:max-w-md sm:p-6"
-        onInteractOutside={(e) => {
-          // Privy renders its modal in a portal at the body level. Don't
-          // close our dialog (or steal focus) when the user taps inside it.
-          const target = e.target as HTMLElement | null;
-          if (
-            target?.closest(
-              '[id^="privy"], [class*="privy"], [data-privy-dialog]',
-            )
-          ) {
-            e.preventDefault();
-          }
-        }}
-        onFocusOutside={(e) => {
-          // Allow focus to move into Privy's email input so the iOS
-          // keyboard actually opens on tap.
-          const target = e.target as HTMLElement | null;
-          if (
-            target?.closest(
-              '[id^="privy"], [class*="privy"], [data-privy-dialog]',
-            )
-          ) {
-            e.preventDefault();
-          }
-        }}
-        onPointerDownOutside={(e) => {
-          const target = e.target as HTMLElement | null;
-          if (
-            target?.closest(
-              '[id^="privy"], [class*="privy"], [data-privy-dialog]',
-            )
-          ) {
-            e.preventDefault();
-          }
-        }}
-      >
-        <DialogHeader>
-          <DialogTitle className="text-3xl text-gradient-gold">Entrance</DialogTitle>
-          <DialogDescription>
-            Verify BAYC/MAYC ownership with Tokenproof. No wallet connection
-            in your browser — approve the request in the Tokenproof app.
-          </DialogDescription>
-        </DialogHeader>
-        <EntranceBody open={open} onOpenChange={onOpenChange} />
-      </DialogContent>
-    </Dialog>
+    <PrivyLoginTrigger
+      open={open}
+      onOpenChange={onOpenChange}
+      hooks={hooks}
+      configured={configured}
+      triggeredRef={triggeredRef}
+    />
   );
 }
 
-type ErrorKind = "network" | "rejected" | "credentials" | "timeout" | "unknown";
-type Phase =
-  | "idle"
-  | "starting"
-  | "waiting"
-  | "verifying"
-  | "done"
-  | "error";
-
-const SESSION_TTL_MS = 5 * 60 * 1000;
-const POLL_INTERVAL_MS = 2500;
-const MAX_TRANSIENT_ERRORS = 4;
-
-const ERROR_COPY: Record<ErrorKind, string> = {
-  network:
-    "We couldn't reach Tokenproof. Check your internet connection and try again.",
-  rejected:
-    "You declined the verification request. Tap Start over to try again.",
-  credentials:
-    "Tokenproof rejected our credentials. The site admin needs to update the API key — please try again later.",
-  timeout:
-    "Your verification session timed out. We started a new one — scan or tap to continue.",
-  unknown:
-    "Something went wrong. Tap Start over to begin a fresh verification.",
-};
-
-function classifyError(message: string | undefined | null): ErrorKind {
-  const m = (message ?? "").toLowerCase();
-  if (
-    m.includes("network") ||
-    m.includes("fetch") ||
-    m.includes("connection") ||
-    m.includes("reach tokenproof")
-  ) {
-    return "network";
-  }
-  if (m.includes("declin") || m.includes("reject")) return "rejected";
-  if (m.includes("credential") || m.includes("api key") || m.includes("api_key")) {
-    return "credentials";
-  }
-  if (m.includes("timed out") || m.includes("timeout") || m.includes("expired")) {
-    return "timeout";
-  }
-  return "unknown";
-}
-
-function EntranceBody({
+function PrivyLoginTrigger({
   open,
   onOpenChange,
+  hooks,
+  configured,
+  triggeredRef,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  hooks: PrivyHooks | null;
+  configured: boolean | null;
+  triggeredRef: React.MutableRefObject<boolean>;
 }) {
-  const { isAuthenticated } = useAuth();
-  const { collection: verifiedCollection, tokenProof } =
-    useVerificationStatus();
-  const [phase, setPhase] = useState<Phase>("idle");
-  const [authUrl, setAuthUrl] = useState<string | null>(null);
-  const [qrUrl, setQrUrl] = useState<string | null>(null);
-  const [showQr, setShowQr] = useState(false);
-  const [errorKind, setErrorKind] = useState<ErrorKind | null>(null);
-  const [secondsLeft, setSecondsLeft] = useState<number>(0);
-  const [verifiedAs, setVerifiedAs] = useState<"BAYC" | "MAYC" | null>(null);
-
-  const pollRef = useRef<number | null>(null);
-  const tickRef = useRef<number | null>(null);
-  const expiresAtRef = useRef<number | null>(null);
-  const transientErrorsRef = useRef(0);
-  const autoRestartedRef = useRef(false);
-
-  function clearTimers() {
-    if (pollRef.current) {
-      window.clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
-    if (tickRef.current) {
-      window.clearInterval(tickRef.current);
-      tickRef.current = null;
-    }
-  }
-
-  function resetState() {
-    clearTimers();
-    setAuthUrl(null);
-    setQrUrl(null);
-    setShowQr(false);
-    setErrorKind(null);
-    setSecondsLeft(0);
-    expiresAtRef.current = null;
-    transientErrorsRef.current = 0;
-    autoRestartedRef.current = false;
-  }
-
-  // Reset whenever the dialog closes so reopening gives a fresh start.
-  useEffect(() => {
-    if (!open) {
-      resetState();
-      setPhase("idle");
-      setVerifiedAs(null);
-    }
-  }, [open]);
-
-  useEffect(() => () => clearTimers(), []);
-
-  const startFn = useServerFn(startTokenproofSession);
-  const pollFn = useServerFn(pollTokenproofSession);
-
-  function failWith(kind: ErrorKind, opts?: { autoRestart?: boolean }) {
-    clearTimers();
-    setErrorKind(kind);
-    setPhase("error");
-    // Auto-restart the session for timeouts so the user doesn't have to
-    // tap twice — the dialog is already open and they're waiting.
-    if (opts?.autoRestart && !autoRestartedRef.current) {
-      autoRestartedRef.current = true;
-      window.setTimeout(() => {
-        void handleStart();
-      }, 600);
-    }
-  }
-
-  async function handleStart() {
-    resetState();
-    setPhase("starting");
-    let started: Awaited<ReturnType<typeof startFn>>;
-    try {
-      started = await startFn({ data: {} });
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "";
-      failWith(classifyError(msg));
-      return;
-    }
-
-    if ("notConfigured" in started && started.notConfigured) {
-      failWith("credentials");
-      return;
-    }
-
-    if (!("sessionId" in started)) {
-      failWith("credentials");
-      return;
-    }
-    setAuthUrl(started.authUrl);
-    setQrUrl(started.qrUrl);
-    expiresAtRef.current = started.expiresAt;
-    setSecondsLeft(Math.max(0, Math.round((started.expiresAt - Date.now()) / 1000)));
-    setPhase("waiting");
-    const sessionId = started.sessionId;
-
-    // Countdown tick (display only — server still owns the canonical TTL)
-    tickRef.current = window.setInterval(() => {
-      if (!expiresAtRef.current) return;
-      const left = Math.max(0, Math.round((expiresAtRef.current - Date.now()) / 1000));
-      setSecondsLeft(left);
-      if (left === 0) {
-        failWith("timeout", { autoRestart: true });
-      }
-    }, 1000);
-
-    // Poll for completion
-    pollRef.current = window.setInterval(async () => {
-      try {
-        const res = await pollFn({ data: { sessionId } });
-        transientErrorsRef.current = 0;
-
-        if (res.status === "pending") return;
-        if (res.status === "not_configured") {
-          failWith("credentials");
-          return;
-        }
-
-        if (res.status === "rejected") {
-          failWith("rejected");
-          return;
-        }
-        if (res.status === "expired") {
-          failWith("timeout", { autoRestart: true });
-          return;
-        }
-        if (res.status === "credentials") {
-          failWith("credentials");
-          return;
-        }
-
-        if (res.status === "verified") {
-          console.log("[verify:tokenproof] success branch reached", { wallet: res.wallet, collection: res.collection });
-          clearTimers();
-          setPhase("verifying");
-          const { error } = await supabase.auth.setSession({
-            access_token: res.session.access_token,
-            refresh_token: res.session.refresh_token,
-          });
-          if (error) {
-            failWith(classifyError(error.message));
-            return;
-          }
-          writeVerifiedSession({
-            address: res.wallet,
-            collection: res.collection,
-            verifiedAt: Date.now(),
-            signature: `tokenproof:${sessionId}`,
-          });
-          console.log("[verify:tokenproof] writeVerifiedSession called");
-          setVerifiedAs(res.collection);
-          toast.success(`Verified — ${res.collection} ownership confirmed`);
-          setPhase("done");
-          onOpenChange(false);
-        }
-      } catch (e) {
-        transientErrorsRef.current += 1;
-        if (transientErrorsRef.current >= MAX_TRANSIENT_ERRORS) {
-          const msg = e instanceof Error ? e.message : "";
-          failWith(classifyError(msg) === "unknown" ? "network" : classifyError(msg));
-        }
-        // Otherwise: silently keep polling — likely a transient network blip.
-      }
-    }, POLL_INTERVAL_MS);
-  }
-
-  async function handleSignOut() {
-    await supabase.auth.signOut();
-    toast.success("Signed out");
-  }
-
-  async function handleCopyLink() {
-    if (!authUrl) return;
-    try {
-      await navigator.clipboard.writeText(authUrl);
-      toast.success("Tokenproof link copied");
-    } catch {
-      toast.error("Couldn't copy — long-press the link to copy manually");
-    }
-  }
-
-  const showRetry = phase === "error";
-  const buttonLabel =
-    phase === "starting"
-      ? "Preparing Tokenproof…"
-      : phase === "verifying"
-      ? "Signing you in…"
-      : showRetry
-      ? "Start over"
-      : "Verify with Tokenproof";
-
-  const badgeCollection = verifiedAs ?? (tokenProof ? verifiedCollection : null);
-
-  return (
-    <div className="space-y-4 pt-2">
-      {badgeCollection && (
-        <div className="flex items-center justify-center">
-          <span className="inline-flex items-center gap-2 rounded-full border border-gold/40 bg-gold/10 px-3 py-1 text-xs font-semibold text-gold">
-            <span className="h-1.5 w-1.5 rounded-full bg-gold animate-pulse-glow" />
-            Verified · {badgeCollection}
-          </span>
-        </div>
-      )}
-
-      <div className="rounded-xl border border-gold/30 bg-gradient-to-br from-gold/10 via-transparent to-accent/5 p-5">
-        <div className="text-2xl font-bold text-gradient-gold">Tokenproof</div>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Required to enter every area of BAYCMC. Verifies BAYC/MAYC ownership
-          via{" "}
-          <a
-            href="https://tokenproof.xyz"
-            target="_blank"
-            rel="noreferrer"
-            className="underline hover:text-gold"
-          >
-            tokenproof.xyz
-          </a>
-          .
-        </p>
-
-        {phase === "waiting" && authUrl ? (
-          <div className="mt-4 space-y-3">
-            <div className="flex flex-col gap-2">
-              <a
-                href={authUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center justify-center gap-2 rounded-md bg-gradient-gold px-4 py-2.5 text-sm font-semibold text-gold-foreground shadow-gold hover:opacity-90"
-              >
-                <ExternalLink className="h-4 w-4" />
-                Open in Tokenproof app
-              </a>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={handleCopyLink}
-                  className="inline-flex items-center justify-center gap-2 rounded-md border border-border bg-secondary/40 px-3 py-2 text-xs font-medium hover:bg-secondary"
-                >
-                  <Copy className="h-3.5 w-3.5" />
-                  Copy link
-                </button>
-                <button
-                  onClick={() => setShowQr((v) => !v)}
-                  className="inline-flex items-center justify-center gap-2 rounded-md border border-border bg-secondary/40 px-3 py-2 text-xs font-medium hover:bg-secondary"
-                >
-                  <QrCode className="h-3.5 w-3.5" />
-                  {showQr ? "Hide QR" : "Show QR"}
-                </button>
-              </div>
-            </div>
-
-            {showQr && qrUrl && (
-              <div className="flex flex-col items-center gap-2 pt-1">
-                <img
-                  src={qrUrl}
-                  alt="Scan with the Tokenproof app"
-                  className="h-44 w-44 rounded-md border border-gold/30 bg-white p-2"
-                />
-                <p className="text-center text-[11px] text-muted-foreground">
-                  Scan with the Tokenproof app on your phone
-                </p>
-              </div>
-            )}
-
-            <div className="flex items-center justify-between pt-1 text-[11px] text-muted-foreground">
-              <span>Waiting for approval…</span>
-              <span className="font-mono">{formatTime(secondsLeft)} left</span>
-            </div>
-            <button
-              onClick={() => failWith("unknown")}
-              className="w-full rounded-md border border-border bg-secondary/30 px-3 py-1.5 text-[11px] text-muted-foreground hover:bg-secondary"
-            >
-              Cancel
-            </button>
-          </div>
-        ) : phase === "error" && errorKind ? (
-          <div className="mt-4 space-y-3">
-            <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {ERROR_COPY[errorKind]}
-            </div>
-            <button
-              onClick={handleStart}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-gradient-gold px-4 py-3 text-sm font-semibold text-gold-foreground shadow-gold hover:opacity-90"
-            >
-              <RefreshCw className="h-4 w-4" />
-              {buttonLabel}
-            </button>
-          </div>
-        ) : phase === "done" ? (
-          <div className="mt-4 rounded-md border border-gold/30 bg-gold/5 px-3 py-3 text-center text-sm text-gold">
-            You're in. Welcome to BAYCMC.
-          </div>
-        ) : (
-          <button
-            onClick={handleStart}
-            disabled={phase === "starting" || phase === "verifying"}
-            className="mt-4 w-full rounded-md bg-gradient-gold px-4 py-3 text-sm font-semibold text-gold-foreground shadow-gold transition disabled:opacity-50 hover:opacity-90"
-          >
-            {buttonLabel}
-          </button>
-        )}
-      </div>
-
-      <PrivyVerifyCard
-        onVerified={({ address, collection, signature }) => {
-          console.log("[verify:privy] onVerified fired", { address, collection });
-          writeVerifiedSession({
-            address,
-            collection,
-            verifiedAt: Date.now(),
-            signature,
-          });
-          console.log("[verify:privy] writeVerifiedSession called");
-          onOpenChange(false);
-        }}
-        onLoginRequested={() => {
-          // Keep this dialog mounted so the post-login wallet creation and
-          // verification status can run, while `modal={false}` prevents a
-          // focus trap from blocking Privy's mobile email input.
-        }}
-        onNoQualifyingAssets={(reason) => {
-          // Show error for 3 seconds then dismiss + return user to landing.
-          const id = toast.error(reason || "No qualifying BAYC/MAYC assets found.", {
-            duration: 3000,
-          });
-          window.setTimeout(() => {
-            toast.dismiss(id);
-            onOpenChange(false);
-          }, 3000);
-        }}
+  // Render-time hooks call requires unconditional ordering — gate the
+  // wrapped component instead of the hook itself.
+  if (!hooks) {
+    return (
+      <NoHooksTrigger
+        open={open}
+        onOpenChange={onOpenChange}
+        configured={configured}
       />
-
-      <PrivyTroubleshootPanel />
-
-      {isAuthenticated && (
-        <button
-          onClick={handleSignOut}
-          className="w-full rounded-md border border-border bg-secondary/30 px-3 py-2 text-xs text-muted-foreground hover:bg-secondary"
-        >
-          Sign out
-        </button>
-      )}
-    </div>
+    );
+  }
+  return (
+    <WithHooks
+      open={open}
+      onOpenChange={onOpenChange}
+      hooks={hooks}
+      triggeredRef={triggeredRef}
+    />
   );
 }
 
+function NoHooksTrigger({
+  open,
+  onOpenChange,
+  configured,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  configured: boolean | null;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    if (configured === false) {
+      toast.error(
+        "Wallet sign-in is being set up. Please try again in a moment.",
+      );
+    }
+    onOpenChange(false);
+  }, [open, configured, onOpenChange]);
+  return null;
+}
 
-function formatTime(seconds: number) {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}:${s.toString().padStart(2, "0")}`;
+function WithHooks({
+  open,
+  onOpenChange,
+  hooks,
+  triggeredRef,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  hooks: PrivyHooks;
+  triggeredRef: React.MutableRefObject<boolean>;
+}) {
+  const { ready, authenticated, login } = hooks.usePrivy();
+
+  useEffect(() => {
+    if (!open) {
+      triggeredRef.current = false;
+      return;
+    }
+    if (triggeredRef.current) return;
+    if (!ready) return;
+    triggeredRef.current = true;
+    if (authenticated) {
+      // Already signed in to Privy — bridge handles Supabase session.
+      onOpenChange(false);
+      return;
+    }
+    try {
+      login();
+    } catch (e) {
+      console.warn("[EntranceDialog] Privy login() threw:", e);
+      toast.error("Couldn't open the wallet sign-in modal.");
+    } finally {
+      onOpenChange(false);
+    }
+  }, [open, ready, authenticated, login, onOpenChange, triggeredRef]);
+
+  return null;
 }

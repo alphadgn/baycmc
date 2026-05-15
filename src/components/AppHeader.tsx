@@ -6,11 +6,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { EntranceDialog } from "@/components/EntranceDialog";
 import { EmbroideredImage } from "@/components/EmbroideredImage";
 import { WalletPill } from "@/components/WalletPill";
-import {
-  onVerifiedSessionChange,
-  readVerifiedSession,
-  writeVerifiedSession,
-} from "@/lib/baycmc/verifiedSession";
 
 export function AppHeader() {
   const { isAuthenticated } = useAuth();
@@ -85,23 +80,12 @@ export function AppHeader() {
 function EntranceControls({ onOpen }: { onOpen: () => void }) {
   const { isAuthenticated, user, loading: authLoading } = useAuth();
   const { tokenProof, collection, loading: verifLoading } = useVerificationStatus();
-  const [cachedSession, setCachedSession] = useState(() => readVerifiedSession());
-  const [walletAddress, setWalletAddress] = useState<string | null>(() => cachedSession?.address ?? null);
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
 
-  useEffect(
-    () =>
-      onVerifiedSessionChange(() => {
-        const next = readVerifiedSession();
-        setCachedSession(next);
-        setWalletAddress(next?.address ?? null);
-      }),
-    [],
-  );
-
-  // Load wallet address from profile once authenticated.
+  // Source of truth: profiles.wallet_address (set by the SIWE bridge).
   useEffect(() => {
     if (!isAuthenticated || !user) {
-      setWalletAddress(readVerifiedSession()?.address ?? null);
+      setWalletAddress(null);
       return;
     }
     let cancelled = false;
@@ -112,43 +96,18 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
         .eq("id", user.id)
         .maybeSingle();
       if (cancelled) return;
-      setWalletAddress(data?.wallet_address ?? readVerifiedSession()?.address ?? null);
+      setWalletAddress(data?.wallet_address ?? null);
     })();
     return () => {
       cancelled = true;
     };
   }, [isAuthenticated, user]);
 
-  // Persist verified session to localStorage when DB confirms verification.
-  useEffect(() => {
-    if (tokenProof && walletAddress) {
-      writeVerifiedSession({
-        address: walletAddress,
-        collection: collection ?? null,
-        verifiedAt: Date.now(),
-        signature: readVerifiedSession()?.signature ?? "server-verified",
-      });
-    }
-  }, [tokenProof, walletAddress, collection]);
-
-  // Show the pill if either the live state is verified, OR the cached
-  // session is fresh and matches the connected wallet (avoids button flash).
-  const showPill =
-    walletAddress &&
-    (tokenProof ||
-      (cachedSession &&
-        cachedSession.address.toLowerCase() === walletAddress.toLowerCase()));
-
-  if (showPill && walletAddress) {
-    return (
-      <WalletPill
-        address={walletAddress}
-        collection={collection ?? cachedSession?.collection ?? null}
-      />
-    );
+  if (isAuthenticated && walletAddress && tokenProof) {
+    return <WalletPill address={walletAddress} collection={collection ?? null} />;
   }
 
-  // Hide button briefly while still loading auth/verification to avoid flash.
+  // Hide button briefly while loading auth/verification to avoid flash.
   if (authLoading || (isAuthenticated && verifLoading)) {
     return <div className="h-9 w-24" aria-hidden />;
   }
