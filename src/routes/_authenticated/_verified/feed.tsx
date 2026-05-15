@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { SocialFeed } from "@/components/SocialFeed";
 
-export const Route = createFileRoute("/_authenticated/feed")({
+export const Route = createFileRoute("/_authenticated/_verified/feed")({
   head: () => ({
     meta: [
       { title: "Feed — BAYCMC" },

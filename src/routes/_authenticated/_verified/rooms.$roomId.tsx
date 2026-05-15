@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ConferenceRoom } from "@/components/ConferenceRoom";
 
-export const Route = createFileRoute("/_authenticated/rooms/$roomId")({
+export const Route = createFileRoute("/_authenticated/_verified/rooms/$roomId")({
   component: RoomDetail,
 });
 

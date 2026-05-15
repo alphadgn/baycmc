@@ -14,7 +14,7 @@ import { Track } from "livekit-client";
 import "@livekit/components-styles";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/_authenticated/ape-rides/$rideId")({
+export const Route = createFileRoute("/_authenticated/_verified/ape-rides/$rideId")({
   component: ApeRideViewer,
 });
 
