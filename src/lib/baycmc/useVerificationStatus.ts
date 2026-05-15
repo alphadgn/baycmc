@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
+import { revalidateOwnership } from "@/server/verification.functions";
 
 export type BaycCollection = "BAYC" | "MAYC" | null;
 
