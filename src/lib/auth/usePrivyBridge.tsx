@@ -145,7 +145,20 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
         );
         if (cancelled) return;
 
-        const result = await verifyFn({ data: { message, signature } });
+        const result = await Promise.race([
+          verifyFn({ data: { message, signature } }),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () =>
+                reject(
+                  new Error(
+                    "The verification check is taking longer than expected. Please try again.",
+                  ),
+                ),
+              20_000,
+            ),
+          ),
+        ]);
         if (cancelled) return;
 
         if (!result.session) {
