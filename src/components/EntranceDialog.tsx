@@ -117,14 +117,15 @@ function NoHooksTrigger({
   onOpenChange: (open: boolean) => void;
   configured: boolean | null;
 }) {
+  // Queue the intent: keep `open=true` until Privy hooks arrive, then
+  // <WithHooks> will pick it up and call login(). Only close early if we
+  // know wallet sign-in is permanently unavailable.
   useEffect(() => {
     if (!open) return;
     if (configured === false) {
-      toast.error(
-        "Wallet sign-in is being set up. Please try again in a moment.",
-      );
+      toast.error("Wallet sign-in is being set up. Please try again in a moment.");
+      onOpenChange(false);
     }
-    onOpenChange(false);
   }, [open, configured, onOpenChange]);
   return null;
 }
