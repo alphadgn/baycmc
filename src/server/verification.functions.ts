@@ -3,7 +3,7 @@ import { z } from "zod";
 import { createPublicClient, http, getAddress, parseAbi } from "viem";
 import { mainnet } from "viem/chains";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { BAYC_CONTRACT, DELEGATE_REGISTRY_V2, ETH_RPC_URL } from "@/lib/web3/constants";
+import { BAYC_CONTRACT, DELEGATE_REGISTRY_V2 } from "@/lib/web3/constants";
 import {
   requireTokenProof,
   invalidateTokenProof,
@@ -33,9 +33,13 @@ export const revalidateOwnership = createServerFn({ method: "POST" })
  */
 
 function client() {
+  const url = process.env.ETH_RPC_URL;
+  if (!url) {
+    throw new Error("Ethereum RPC is not configured.");
+  }
   return createPublicClient({
     chain: mainnet,
-    transport: http(ETH_RPC_URL, { timeout: 8_000, retryCount: 1 }),
+    transport: http(url, { timeout: 8_000, retryCount: 1 }),
   });
 }
 
