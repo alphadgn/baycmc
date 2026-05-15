@@ -423,39 +423,53 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
       };
     }
 
-    // 2) Check BAYC + MAYC balances on-chain via Alchemy (ETH_RPC_URL).
-    //    Direct balanceOf only — delegate.cash is intentionally OUT of the
-    //    blocking verify path because it has stalled the flow indefinitely
-    //    in production. A signed-in user with no apes lands in the lobby
-    //    and can re-trigger verification later if they wire up a vault.
+    // 2) Check BAYC + MAYC balances on-chain via Alchemy (ETH_RPC_URL), and
+    //    independently look for delegate.cash vaults. Delegation lookup is
+    //    non-fatal: if it times out or the registry RPC fails, direct balance
+    //    verification still completes and the user still enters the lobby.
     const c = client();
 
-    let signerBals = { bayc: 0n, mayc: 0n };
-    const directLookupOk = true;
-    const vaults: `0x${string}`[] = [];
-    const delegationLookupOk = false;
+    const [balancesResult, vaultsResult] = await Promise.allSettled([
+      balancesFor(c, wallet as `0x${string}`),
+      resolveDelegatedVaults(c, wallet as `0x${string}`),
+    ]);
 
-    try {
-      signerBals = await withTimeout(
-        balancesFor(c, wallet as `0x${string}`),
-        7_000,
-        `balanceOf BAYC/MAYC for ${wallet}`,
-      );
-    } catch (e) {
-      console.error("RPC balanceOf (signer) failed", e);
+    if (balancesResult.status === "rejected") {
+      console.error("RPC balanceOf (signer) failed", balancesResult.reason);
       throw new Error(
         "We couldn't reach the Ethereum network to verify ownership. Please try again in a moment.",
       );
     }
 
-    const totalBayc = signerBals.bayc;
-    const totalMayc = signerBals.mayc;
-    // Delegate.cash is intentionally disabled in the blocking path — keep
-    // the response shape stable so callers/UI don't need to change.
-    const delegatedFrom = null as `0x${string}` | null;
-    const verificationBasis = "direct" as "direct" | "delegated";
-    void delegationLookupOk;
-    void vaults;
+    const signerBals = balancesResult.value;
+    const directLookupOk = true;
+    const delegationLookupOk = vaultsResult.status === "fulfilled";
+    if (vaultsResult.status === "rejected") {
+      console.warn("delegate.cash lookup failed during Privy ownership verify", vaultsResult.reason);
+    }
+    const vaults = delegationLookupOk ? vaultsResult.value : [];
+
+    let totalBayc = signerBals.bayc;
+    let totalMayc = signerBals.mayc;
+    let delegatedFrom: `0x${string}` | null = null;
+
+    if (totalBayc === 0n && totalMayc === 0n && vaults.length > 0) {
+      for (const v of vaults) {
+        try {
+          const b = await balancesFor(c, v);
+          if (b.bayc > 0n || b.mayc > 0n) {
+            totalBayc += b.bayc;
+            totalMayc += b.mayc;
+            delegatedFrom = v;
+            break;
+          }
+        } catch (e) {
+          console.error("RPC balanceOf (delegated vault) failed", v, e);
+        }
+      }
+    }
+
+    const verificationBasis: "direct" | "delegated" = delegatedFrom ? "delegated" : "direct";
 
     const holdsApe = totalBayc > 0n || totalMayc > 0n;
     const collection: "BAYC" | "MAYC" | null = holdsApe ? (totalBayc > 0n ? "BAYC" : "MAYC") : null;
