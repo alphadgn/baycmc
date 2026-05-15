@@ -2,6 +2,19 @@ import { getAddress, isAddress } from "viem";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { assertSafeHttpsUrl } from "@/server/url-guard";
 
+async function fetchWithTimeout(url: string, ms: number) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetch(url, {
+      headers: { accept: "application/json" },
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 /**
  * Run a Lumina authenticity check for the given wallet and persist the
  * result onto `user_verifications.lumina_verified`. Called automatically
@@ -33,10 +46,9 @@ export async function runLuminaCheckAndPersist(args: {
   // No gate configured → pass-through. Persist as verified so users aren't
   // locked out before admins finish setup.
   if (!cfg?.url) {
-    await supabaseAdmin.from("user_verifications").upsert(
-      { user_id: args.userId, lumina_verified: true },
-      { onConflict: "user_id" },
-    );
+    await supabaseAdmin
+      .from("user_verifications")
+      .upsert({ user_id: args.userId, lumina_verified: true }, { onConflict: "user_id" });
     return { verified: true, configured: false };
   }
 
@@ -51,16 +63,15 @@ export async function runLuminaCheckAndPersist(args: {
     assertSafeHttpsUrl(url);
   } catch (e) {
     console.error("Lumina URL rejected by SSRF guard", e);
-    await supabaseAdmin.from("user_verifications").upsert(
-      { user_id: args.userId, lumina_verified: false },
-      { onConflict: "user_id" },
-    );
+    await supabaseAdmin
+      .from("user_verifications")
+      .upsert({ user_id: args.userId, lumina_verified: false }, { onConflict: "user_id" });
     return { verified: false, configured: true, reason: "unsafe-url" };
   }
 
   let verified = false;
   try {
-    const res = await fetch(url, { headers: { accept: "application/json" } });
+    const res = await fetchWithTimeout(url, 6_000);
     if (res.ok) {
       const body = (await res.json()) as
         | { owns?: boolean; balance?: number | string; tokens?: unknown[] }
@@ -79,10 +90,9 @@ export async function runLuminaCheckAndPersist(args: {
     console.error("Lumina REST error", e);
   }
 
-  await supabaseAdmin.from("user_verifications").upsert(
-    { user_id: args.userId, lumina_verified: verified },
-    { onConflict: "user_id" },
-  );
+  await supabaseAdmin
+    .from("user_verifications")
+    .upsert({ user_id: args.userId, lumina_verified: verified }, { onConflict: "user_id" });
 
   return { verified, configured: true };
 }

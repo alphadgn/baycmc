@@ -5,7 +5,7 @@ import { SiweMessage } from "siwe";
 import { createPublicClient, http, getAddress, parseAbi, isAddress } from "viem";
 import { mainnet } from "viem/chains";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { ETH_RPC_URL, DELEGATE_REGISTRY_V2 } from "@/lib/web3/constants";
+import { DELEGATE_REGISTRY_V2 } from "@/lib/web3/constants";
 import { runLuminaCheckAndPersist } from "@/server/lumina.server";
 import { runOtherpageCheckAndPersist } from "@/server/otherpage.server";
 import { deriveWalletPassword } from "@/server/wallet-password";
@@ -38,8 +38,16 @@ const delegateRegistryAbi = parseAbi([
 function client() {
   return createPublicClient({
     chain: mainnet,
-    transport: http(ETH_RPC_URL, { timeout: 8_000, retryCount: 1 }),
+    transport: http(ethRpcUrl(), { timeout: 8_000, retryCount: 1 }),
   });
+}
+
+function ethRpcUrl() {
+  const url = process.env.ETH_RPC_URL;
+  if (!url) {
+    throw new Error("Ethereum RPC is not configured. Please try again later.");
+  }
+  return url;
 }
 
 /**
@@ -93,20 +101,24 @@ async function balancesFor(
     return { bayc: hit.bayc, mayc: hit.mayc };
   }
 
-  const [bayc, mayc] = await Promise.all([
-    c.readContract({
-      address: BAYC,
-      abi: erc721Abi,
-      functionName: "balanceOf",
-      args: [owner],
-    }) as Promise<bigint>,
-    c.readContract({
-      address: MAYC,
-      abi: erc721Abi,
-      functionName: "balanceOf",
-      args: [owner],
-    }) as Promise<bigint>,
-  ]);
+  const [bayc, mayc] = await withTimeout(
+    Promise.all([
+      c.readContract({
+        address: BAYC,
+        abi: erc721Abi,
+        functionName: "balanceOf",
+        args: [owner],
+      }) as Promise<bigint>,
+      c.readContract({
+        address: MAYC,
+        abi: erc721Abi,
+        functionName: "balanceOf",
+        args: [owner],
+      }) as Promise<bigint>,
+    ]),
+    8_000,
+    `balanceOf BAYC/MAYC for ${owner}`,
+  );
 
   const hasBalance = bayc > 0n || mayc > 0n;
   balanceCache.set(key, {
@@ -477,11 +489,7 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
     }
 
     const holdsApe = totalBayc > 0n || totalMayc > 0n;
-    const collection: "BAYC" | "MAYC" | null = holdsApe
-      ? totalBayc > 0n
-        ? "BAYC"
-        : "MAYC"
-      : null;
+    const collection: "BAYC" | "MAYC" | null = holdsApe ? (totalBayc > 0n ? "BAYC" : "MAYC") : null;
     const delegationDetailsUrl = delegatedFrom
       ? `https://delegate.cash/registry?delegate=${wallet}&vault=${delegatedFrom}`
       : null;
@@ -494,24 +502,29 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
     const email = `${lower}@wallet.baycmc.local`;
     const password = await deriveWalletPassword(lower);
 
-    const { data: existing } = await supabaseAdmin.auth.admin.listUsers({
-      page: 1,
-      perPage: 1000,
+    const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { wallet: lower, via: "privy" },
     });
-    const found = existing?.users.find((u) => u.email === email);
-    let userId = found?.id;
+    let userId = created.user?.id;
 
     if (!userId) {
-      const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: { wallet: lower, via: "privy" },
+      const alreadyExists = createErr?.message?.toLowerCase().includes("already");
+      if (!alreadyExists) throw createErr ?? new Error("Could not create wallet session");
+
+      const { data: existing } = await supabaseAdmin.auth.admin.listUsers({
+        page: 1,
+        perPage: 1000,
       });
-      if (error) throw error;
-      userId = created.user!.id;
-    } else {
-      await supabaseAdmin.auth.admin.updateUserById(userId, { password });
+      const found = existing?.users.find((u) => u.email === email);
+      userId = found?.id;
+      if (!userId) throw new Error("Could not find wallet session");
+      const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+        password,
+      });
+      if (updateErr) throw updateErr;
     }
 
     await supabaseAdmin

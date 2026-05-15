@@ -3,11 +3,8 @@ import { z } from "zod";
 import { createPublicClient, http, getAddress, parseAbi } from "viem";
 import { mainnet } from "viem/chains";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { BAYC_CONTRACT, DELEGATE_REGISTRY_V2, ETH_RPC_URL } from "@/lib/web3/constants";
-import {
-  requireTokenProof,
-  invalidateTokenProof,
-} from "@/server/token-proof.server";
+import { BAYC_CONTRACT, DELEGATE_REGISTRY_V2 } from "@/lib/web3/constants";
+import { requireTokenProof, invalidateTokenProof } from "@/server/token-proof.server";
 import { recomputeOwnership } from "@/server/ownership.server";
 
 /**
@@ -33,9 +30,13 @@ export const revalidateOwnership = createServerFn({ method: "POST" })
  */
 
 function client() {
+  const url = process.env.ETH_RPC_URL;
+  if (!url) {
+    throw new Error("Ethereum RPC is not configured.");
+  }
   return createPublicClient({
     chain: mainnet,
-    transport: http(ETH_RPC_URL, { timeout: 8_000, retryCount: 1 }),
+    transport: http(url, { timeout: 8_000, retryCount: 1 }),
   });
 }
 
@@ -190,10 +191,7 @@ export const setOtherpageGate = createServerFn({ method: "POST" })
     };
     const { error } = await supabase
       .from("app_settings")
-      .upsert(
-        { key: "otherpage_gate", value, updated_by: userId },
-        { onConflict: "key" },
-      );
+      .upsert({ key: "otherpage_gate", value, updated_by: userId }, { onConflict: "key" });
     if (error) {
       return { ok: false, error: error.message };
     }

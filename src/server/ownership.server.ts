@@ -1,7 +1,7 @@
 import { createPublicClient, http, getAddress, parseAbi, isAddress } from "viem";
 import { mainnet } from "viem/chains";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { ETH_RPC_URL, DELEGATE_REGISTRY_V2 } from "@/lib/web3/constants";
+import { DELEGATE_REGISTRY_V2 } from "@/lib/web3/constants";
 import { runOtherpageCheckAndPersist } from "@/server/otherpage.server";
 import { runLuminaCheckAndPersist } from "@/server/lumina.server";
 
@@ -21,9 +21,7 @@ import { runLuminaCheckAndPersist } from "@/server/lumina.server";
 const BAYC = "0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D" as const;
 const MAYC = "0x60E4d786628Fea6478F785A6d7e704777c86a7c6" as const;
 
-const erc721Abi = parseAbi([
-  "function balanceOf(address owner) view returns (uint256)",
-]);
+const erc721Abi = parseAbi(["function balanceOf(address owner) view returns (uint256)"]);
 
 const delegateRegistryAbi = parseAbi([
   "struct Delegation { uint8 type_; address to; address from; bytes32 rights; address contract_; uint256 tokenId; uint256 amount; }",
@@ -31,24 +29,55 @@ const delegateRegistryAbi = parseAbi([
 ]);
 
 function publicClient() {
-  return createPublicClient({ chain: mainnet, transport: http(ETH_RPC_URL) });
+  return createPublicClient({
+    chain: mainnet,
+    transport: http(ethRpcUrl(), { timeout: 8_000, retryCount: 1 }),
+  });
+}
+
+function ethRpcUrl() {
+  const url = process.env.ETH_RPC_URL;
+  if (!url) {
+    throw new Error("Ethereum RPC is not configured.");
+  }
+  return url;
+}
+
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`Timeout: ${label} after ${ms}ms`)), ms);
+    p.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      },
+    );
+  });
 }
 
 async function balancesFor(c: ReturnType<typeof publicClient>, owner: `0x${string}`) {
-  const [bayc, mayc] = await Promise.all([
-    c.readContract({
-      address: BAYC,
-      abi: erc721Abi,
-      functionName: "balanceOf",
-      args: [owner],
-    }) as Promise<bigint>,
-    c.readContract({
-      address: MAYC,
-      abi: erc721Abi,
-      functionName: "balanceOf",
-      args: [owner],
-    }) as Promise<bigint>,
-  ]);
+  const [bayc, mayc] = await withTimeout(
+    Promise.all([
+      c.readContract({
+        address: BAYC,
+        abi: erc721Abi,
+        functionName: "balanceOf",
+        args: [owner],
+      }) as Promise<bigint>,
+      c.readContract({
+        address: MAYC,
+        abi: erc721Abi,
+        functionName: "balanceOf",
+        args: [owner],
+      }) as Promise<bigint>,
+    ]),
+    8_000,
+    `balanceOf BAYC/MAYC for ${owner}`,
+  );
   return { bayc, mayc };
 }
 
@@ -57,12 +86,16 @@ async function resolveDelegatedVaults(
   signer: `0x${string}`,
 ): Promise<`0x${string}`[]> {
   try {
-    const delegations = (await c.readContract({
-      address: DELEGATE_REGISTRY_V2,
-      abi: delegateRegistryAbi,
-      functionName: "getIncomingDelegations",
-      args: [signer],
-    })) as ReadonlyArray<{
+    const delegations = (await withTimeout(
+      c.readContract({
+        address: DELEGATE_REGISTRY_V2,
+        abi: delegateRegistryAbi,
+        functionName: "getIncomingDelegations",
+        args: [signer],
+      }),
+      6_000,
+      "getIncomingDelegations",
+    )) as ReadonlyArray<{
       type_: number;
       from: `0x${string}`;
       rights: `0x${string}`;
@@ -72,8 +105,7 @@ async function resolveDelegatedVaults(
     const vaults = new Set<string>();
     for (const d of delegations) {
       const noRights =
-        d.rights ===
-        "0x0000000000000000000000000000000000000000000000000000000000000000";
+        d.rights === "0x0000000000000000000000000000000000000000000000000000000000000000";
       if (!noRights) continue;
       if (d.type_ === 1) {
         vaults.add(getAddress(d.from));
@@ -171,11 +203,7 @@ export async function recomputeOwnership(userId: string): Promise<OwnershipSnaps
   }
 
   const holds = totalBayc > 0n || totalMayc > 0n;
-  const collection: "BAYC" | "MAYC" | null = holds
-    ? totalBayc > 0n
-      ? "BAYC"
-      : "MAYC"
-    : null;
+  const collection: "BAYC" | "MAYC" | null = holds ? (totalBayc > 0n ? "BAYC" : "MAYC") : null;
 
   // Only flip bayc_verified=false on a CONFIRMED zero read. If RPC failed
   // entirely (directOk=false AND no vaults checked successfully), preserve
@@ -203,9 +231,7 @@ export async function recomputeOwnership(userId: string): Promise<OwnershipSnaps
     updates.verified_at = null;
   }
 
-  await supabaseAdmin
-    .from("user_verifications")
-    .upsert(updates, { onConflict: "user_id" });
+  await supabaseAdmin.from("user_verifications").upsert(updates, { onConflict: "user_id" });
 
   // Re-evaluate Otherpage on the ape-holder wallet (signer or vault).
   const apeWallet = delegatedFrom ?? wallet;
