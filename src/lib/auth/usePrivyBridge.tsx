@@ -26,6 +26,7 @@ import { SiweMessage } from "siwe";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { verifyPrivyOwnership } from "@/server/privy.functions";
+import { usePrivyReady } from "@/components/PrivyAppProvider";
 
 type EthereumProviderLike = {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
