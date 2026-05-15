@@ -10,7 +10,7 @@ import { WalletPill } from "@/components/WalletPill";
 export function AppHeader() {
   const { isAuthenticated } = useAuth();
   const [entranceOpen, setEntranceOpen] = useState(false);
-  const { isLifer } = useVerificationStatus();
+  const { tokenProof, isLifer } = useVerificationStatus();
 
   return (
     <>
@@ -31,21 +31,26 @@ export function AppHeader() {
             </Link>
             {isAuthenticated && (
               <>
+                {/* Main lobby — open to every signed-in user. */}
                 <Link to="/feed" className="cursor-pointer text-muted-foreground hover:text-foreground transition">
-                  Feed
+                  Lobby
                 </Link>
                 <Link to="/messages" className="cursor-pointer text-muted-foreground hover:text-foreground transition">
                   Messages
                 </Link>
-                <Link to="/rooms" className="cursor-pointer text-muted-foreground hover:text-foreground transition">
-                  Rooms
-                </Link>
-                <Link to="/ape-rides" className="cursor-pointer text-muted-foreground hover:text-foreground transition">
-                  Ape Rides
-                </Link>
                 <Link to="/profile" className="cursor-pointer text-muted-foreground hover:text-foreground transition">
                   Profile
                 </Link>
+                {tokenProof && (
+                  <>
+                    <Link to="/rooms" className="cursor-pointer text-muted-foreground hover:text-foreground transition">
+                      Rooms
+                    </Link>
+                    <Link to="/ape-rides" className="cursor-pointer text-muted-foreground hover:text-foreground transition">
+                      Ape Rides
+                    </Link>
+                  </>
+                )}
               </>
             )}
             {isLifer && (
