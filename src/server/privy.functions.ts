@@ -423,70 +423,35 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
       };
     }
 
-    // 2) Check BAYC + MAYC balances on-chain. The signer wallet is the
-    //    Privy embedded/connected wallet for the user's email. They may not
-    //    hold the apes directly — instead they may be a "hot" wallet that a
-    //    cold "vault" has delegated to via delegate.cash for entry purposes.
-    //    We therefore also walk every incoming delegation and check those
-    //    vaults' balances. Any positive balance (signer OR delegated vault)
-    //    counts as verified ownership.
+    // 2) Check BAYC + MAYC balances on-chain via Alchemy (ETH_RPC_URL).
+    //    Direct balanceOf only — delegate.cash is intentionally OUT of the
+    //    blocking verify path because it has stalled the flow indefinitely
+    //    in production. A signed-in user with no apes lands in the lobby
+    //    and can re-trigger verification later if they wire up a vault.
     const c = client();
 
-    // Run direct balance + delegation lookups in parallel but isolated:
-    // a stalled / rejected delegation lookup must NOT wedge the verify.
-    // Balance failure is fatal (we can't decide ape ownership without it);
-    // delegation failure is logged and treated as "no delegations".
     let signerBals = { bayc: 0n, mayc: 0n };
-    let directLookupOk = true;
-    let vaults: `0x${string}`[] = [];
-    let delegationLookupOk = true;
+    const directLookupOk = true;
+    const vaults: `0x${string}`[] = [];
+    const delegationLookupOk = false;
 
-    const settled = await Promise.allSettled([
-      balancesFor(c, wallet as `0x${string}`),
-      resolveDelegatedVaults(c, wallet as `0x${string}`),
-    ]);
-
-    const balRes = settled[0];
-    const delRes = settled[1];
-
-    if (balRes.status === "fulfilled") {
-      signerBals = balRes.value;
-    } else {
-      console.error("RPC balanceOf (signer) failed", balRes.reason);
-      directLookupOk = false;
+    try {
+      signerBals = await withTimeout(
+        balancesFor(c, wallet as `0x${string}`),
+        7_000,
+        `balanceOf BAYC/MAYC for ${wallet}`,
+      );
+    } catch (e) {
+      console.error("RPC balanceOf (signer) failed", e);
       throw new Error(
         "We couldn't reach the Ethereum network to verify ownership. Please try again in a moment.",
       );
     }
 
-    if (delRes.status === "fulfilled") {
-      vaults = delRes.value;
-    } else {
-      console.warn("delegate.cash lookup failed — proceeding with no delegations", delRes.reason);
-      delegationLookupOk = false;
-    }
-
-    let totalBayc = signerBals.bayc;
-    let totalMayc = signerBals.mayc;
-    let delegatedFrom: `0x${string}` | null = null;
-    let verificationBasis: "direct" | "delegated" = "direct";
-
-    if (totalBayc === 0n && totalMayc === 0n && vaults.length > 0) {
-      for (const v of vaults) {
-        try {
-          const b = await balancesFor(c, v);
-          if (b.bayc > 0n || b.mayc > 0n) {
-            totalBayc += b.bayc;
-            totalMayc += b.mayc;
-            delegatedFrom = v;
-            verificationBasis = "delegated";
-            break;
-          }
-        } catch (e) {
-          console.error("RPC balanceOf failed for vault", v, e);
-        }
-      }
-    }
+    const totalBayc = signerBals.bayc;
+    const totalMayc = signerBals.mayc;
+    const delegatedFrom: `0x${string}` | null = null;
+    const verificationBasis: "direct" | "delegated" = "direct";
 
     const holdsApe = totalBayc > 0n || totalMayc > 0n;
     const collection: "BAYC" | "MAYC" | null = holdsApe ? (totalBayc > 0n ? "BAYC" : "MAYC") : null;
