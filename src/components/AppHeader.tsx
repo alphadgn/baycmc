@@ -185,13 +185,24 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
     );
   }
 
+  const [clicked, setClicked] = useState(false);
+  const isBooting = clicked && !privy.ready;
+
+  useEffect(() => {
+    if (privy.ready) setClicked(false);
+  }, [privy.ready]);
+
   return (
     <button
       type="button"
-      onClick={onOpen}
-      className="cursor-pointer rounded-md bg-gradient-gold px-4 py-2 text-sm font-semibold text-gold-foreground shadow-gold transition hover:opacity-90"
+      disabled={isBooting}
+      onClick={() => {
+        setClicked(true);
+        onOpen();
+      }}
+      className="cursor-pointer rounded-md bg-gradient-gold px-4 py-2 text-sm font-semibold text-gold-foreground shadow-gold transition hover:opacity-90 disabled:cursor-wait disabled:opacity-70"
     >
-      Entrance
+      {isBooting ? "Loading sign-in…" : "Entrance"}
     </button>
   );
 }
