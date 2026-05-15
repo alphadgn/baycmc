@@ -159,6 +159,15 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
   const verifyFn = useServerFn(verifyPrivyOwnership);
   const [retryNonce, setRetryNonce] = useState(0);
 
+  // signMessage/verifyFn are new refs every render — store them in refs so
+  // we can call the latest version inside the effect without putting them
+  // in the dep array (which would re-fire the effect on every render and
+  // silently cancel in-flight verifies via the closure cleanup).
+  const signMessageRef = useRef(signMessage);
+  signMessageRef.current = signMessage;
+  const verifyFnRef = useRef(verifyFn);
+  verifyFnRef.current = verifyFn;
+
   // One-shot guard per wallet address. NEVER cleared while the address
   // is unchanged — this is what kills the historic verify loop.
   const inFlightRef = useRef<string | null>(null);
@@ -167,6 +176,17 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
   // We never auto-prompt the SIWE signature on wallet connect anymore —
   // it was distorting the rest of the UI on first sign-in.
   const verifyRequestedRef = useRef(false);
+  // True only when the bridge component is unmounting. Used to suppress
+  // post-await state updates in the truly-gone case. Plain `cancelled`
+  // closure flags were causing silent aborts when the effect re-fired
+  // due to render-time ref changes (signMessage / verifyFn).
+  const unmountedRef = useRef(false);
+  useEffect(() => {
+    unmountedRef.current = false;
+    return () => {
+      unmountedRef.current = true;
+    };
+  }, []);
 
   // Only the embedded Privy wallet counts. External wallets are ignored.
   const embeddedWallet =
@@ -224,7 +244,6 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
       return;
     }
 
-    let cancelled = false;
     inFlightRef.current = address;
     const toastId = `privy-bridge-${address.toLowerCase()}`;
     logEvent("auth", "info", "bridge: entering verify path", {
@@ -284,7 +303,7 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
         const message = siwe.prepareMessage();
 
         const { signature } = await withTimeout(
-          signMessage(
+          signMessageRef.current(
             { message },
             {
               address,
@@ -300,16 +319,22 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
           45_000,
           "Signature request timed out. Please try signing in again.",
         );
-        if (cancelled) return;
+        if (unmountedRef.current) {
+          logEvent("auth", "warn", "bridge: aborted after signMessage — component unmounted");
+          return;
+        }
         logEvent("auth", "info", "bridge: signature obtained — calling verifyFn");
 
         toast.loading("Checking BAYC / MAYC ownership…", { id: toastId });
         const result = await withTimeout(
-          verifyFn({ data: { message, signature } }),
+          verifyFnRef.current({ data: { message, signature } }),
           20_000,
           "The verification check is taking longer than expected. Please try again.",
         );
-        if (cancelled) return;
+        if (unmountedRef.current) {
+          logEvent("auth", "warn", "bridge: aborted after verifyFn — component unmounted");
+          return;
+        }
         logEvent("auth", "info", "bridge: verifyFn returned", {
           verified: result.verified,
           hasSession: !!result.session,
@@ -373,18 +398,16 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
       }
     })();
 
-    return () => {
-      cancelled = true;
-    };
+    // No cleanup that flips a `cancelled` flag — the previous version
+    // silently aborted in-flight signMessage promises every time Privy
+    // returned a new signMessage / verifyFn reference, which was on every
+    // render. inFlightRef + completedRef + unmountedRef are sufficient.
   }, [
     ready,
     authenticated,
     walletsReady,
     walletReady,
     embeddedWallet?.address,
-    signMessage,
-    verifyFn,
-    embeddedWallet,
     user?.id,
     retryNonce,
   ]);
