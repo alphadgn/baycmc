@@ -604,6 +604,7 @@ export type Database = {
       }
       is_lifer: { Args: { _user_id: string }; Returns: boolean }
       is_token_proof_verified: { Args: { _user_id: string }; Returns: boolean }
+      is_verified_holder: { Args: { _user_id: string }; Returns: boolean }
       log_audit_event: {
         Args: { _event_type: string; _metadata?: Json; _target_id?: string }
         Returns: string
