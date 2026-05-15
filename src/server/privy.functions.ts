@@ -420,27 +420,37 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
     //    counts as verified ownership.
     const c = client();
 
-    // Direct balance check — independent. RPC failure leaves balance=0 but
-    // does not block sign-in: the user still gets a lobby session.
+    // Run direct balance + delegation lookups in parallel but isolated:
+    // a stalled / rejected delegation lookup must NOT wedge the verify.
+    // Balance failure is fatal (we can't decide ape ownership without it);
+    // delegation failure is logged and treated as "no delegations".
     let signerBals = { bayc: 0n, mayc: 0n };
     let directLookupOk = true;
-    try {
-      signerBals = await balancesFor(c, wallet as `0x${string}`);
-    } catch (e) {
-      console.error("RPC balanceOf (signer) failed", e);
-      directLookupOk = false;
-    }
-
-    // Delegation lookup — independent of direct check. Errors degrade to
-    // "no delegation found" so users are never blocked from the lobby
-    // by a delegate.cash / RPC outage. Direct ownership remains the
-    // primary path.
     let vaults: `0x${string}`[] = [];
     let delegationLookupOk = true;
-    try {
-      vaults = await resolveDelegatedVaults(c, wallet as `0x${string}`);
-    } catch (e) {
-      console.error("delegate.cash lookup threw", e);
+
+    const settled = await Promise.allSettled([
+      balancesFor(c, wallet as `0x${string}`),
+      resolveDelegatedVaults(c, wallet as `0x${string}`),
+    ]);
+
+    const balRes = settled[0];
+    const delRes = settled[1];
+
+    if (balRes.status === "fulfilled") {
+      signerBals = balRes.value;
+    } else {
+      console.error("RPC balanceOf (signer) failed", balRes.reason);
+      directLookupOk = false;
+      throw new Error(
+        "We couldn't reach the Ethereum network to verify ownership. Please try again in a moment.",
+      );
+    }
+
+    if (delRes.status === "fulfilled") {
+      vaults = delRes.value;
+    } else {
+      console.warn("delegate.cash lookup failed — proceeding with no delegations", delRes.reason);
       delegationLookupOk = false;
     }
 
