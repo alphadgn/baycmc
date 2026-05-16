@@ -335,10 +335,23 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
       try {
         // If the user already has a Supabase session for this wallet,
         // do nothing. This handles refresh after first verify.
+        //
+        // Exception: an explicit re-verify request from the user (the
+        // "Verify holder access" dropdown action) MUST run the SIWE flow
+        // again so we can re-check ownership on-chain against a fresh
+        // signature. Without this, the dropdown action would silently
+        // short-circuit and never pop the Privy signing modal.
         const { data: sess } = await supabase.auth.getSession();
         const existingEmail = sess.session?.user.email ?? "";
-        if (existingEmail === `${address.toLowerCase()}@wallet.baycmc.local`) {
-          logEvent("auth", "info", "bridge: existing Supabase session matches wallet — short-circuit");
+        if (
+          existingEmail === `${address.toLowerCase()}@wallet.baycmc.local` &&
+          !verifyRequestedRef.current
+        ) {
+          logEvent(
+            "auth",
+            "info",
+            "bridge: existing Supabase session matches wallet — short-circuit",
+          );
           completedRef.current.add(address.toLowerCase());
           // Backfill the freshness marker so future loads stay quiet.
           if (!isVerifiedFresh(address)) markVerified(address);
@@ -452,7 +465,9 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
         });
 
         if (!result.session) {
-          logEvent("auth", "error", "bridge: server returned no session", { reason: result.reason });
+          logEvent("auth", "error", "bridge: server returned no session", {
+            reason: result.reason,
+          });
           toast.error(result.reason ?? "Sign-in failed.", { id: toastId });
           return;
         }
@@ -469,6 +484,12 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
 
         completedRef.current.add(address.toLowerCase());
         markVerified(address);
+
+        // Tell consumers of useVerificationStatus to reload their row from
+        // user_verifications — the server fn just rewrote it. Without this,
+        // a re-verify from inside the wallet pill leaves the header (and
+        // gated nav) stuck on the pre-recheck state until a full reload.
+        window.dispatchEvent(new Event("baycmc:verification-refresh"));
 
         // Surface deterministic UI states for the delegation/direct check:
         if (result.verified) {

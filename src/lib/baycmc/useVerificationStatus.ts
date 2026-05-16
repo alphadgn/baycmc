@@ -64,6 +64,19 @@ export function useVerificationStatus(): VerificationStatus {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, authLoading]);
 
+  // The Privy bridge fires this after an explicit re-verify (the
+  // "Verify holder access" dropdown action). The user's id is unchanged,
+  // so the [user?.id] effect above won't re-fire on its own.
+  useEffect(() => {
+    if (!user) return;
+    const refresh = () => {
+      void load();
+    };
+    window.addEventListener("baycmc:verification-refresh", refresh);
+    return () => window.removeEventListener("baycmc:verification-refresh", refresh);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
   return {
     loading: authLoading || loading,
     isVerifiedHolder,
