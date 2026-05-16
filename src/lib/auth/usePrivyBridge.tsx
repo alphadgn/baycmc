@@ -247,15 +247,21 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
     };
   }, []);
 
-  // Only the embedded Privy wallet counts. External wallets are ignored.
-  const embeddedWallet =
-    wallets.find(
-      (w) =>
-        (w.walletClientType ?? w.wallet_client_type) === "privy" ||
-        (w.walletClientType ?? w.wallet_client_type) === "privy-v2",
-    ) ?? null;
+  // Pick the wallet the user actually intends to verify with. An external
+  // wallet (MetaMask / Rainbow / WalletConnect / Coinbase / …) ALWAYS wins
+  // over the auto-provisioned Privy embedded wallet — if the user connected
+  // one, it's because their BAYC/MAYC lives there. We fall back to the
+  // embedded wallet only when no external is linked (e.g. email-only login,
+  // in which case the embedded is the user's only identity).
+  function isEmbeddedPrivyWallet(w: WalletLike) {
+    const t = w.walletClientType ?? w.wallet_client_type;
+    return t === "privy" || t === "privy-v2";
+  }
+  const externalWallet = wallets.find((w) => !isEmbeddedPrivyWallet(w)) ?? null;
+  const fallbackEmbedded = wallets.find(isEmbeddedPrivyWallet) ?? null;
+  const primaryWallet = externalWallet ?? fallbackEmbedded;
   const walletReady =
-    !!embeddedWallet && (embeddedWallet.ready === undefined || embeddedWallet.ready === true);
+    !!primaryWallet && (primaryWallet.ready === undefined || primaryWallet.ready === true);
 
   useEffect(() => {
     const retry = () => {
@@ -309,19 +315,19 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
   }, [logout]);
 
   useEffect(() => {
-    if (!ready || !authenticated || !walletsReady || !walletReady || !embeddedWallet) {
+    if (!ready || !authenticated || !walletsReady || !walletReady || !primaryWallet) {
       logEvent("auth", "debug", "bridge gate: not ready", {
         ready,
         authenticated,
         walletsReady,
         walletReady,
-        hasEmbedded: !!embeddedWallet,
+        hasPrimary: !!primaryWallet,
       });
       return;
     }
-    const address = embeddedWallet.address;
+    const address = primaryWallet.address;
     if (!address) {
-      logEvent("auth", "warn", "bridge gate: embedded wallet has no address");
+      logEvent("auth", "warn", "bridge gate: primary wallet has no address");
       return;
     }
     if (inFlightRef.current === address) {
@@ -425,10 +431,12 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
         const domain = window.location.host;
         const origin = window.location.origin;
         const nonce = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+        // No `statement` — SIWE renders the default
+        // "{domain} wants you to sign in with your Ethereum account:" line.
+        // Keeps the modal short and recognisable.
         const siwe = new SiweMessage({
           domain,
           address,
-          statement: "Sign in to BAYCMC to verify BAYC/MAYC ownership.",
           uri: origin,
           version: "1",
           chainId: 1,
@@ -529,31 +537,11 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
         // gated nav) stuck on the pre-recheck state until a full reload.
         window.dispatchEvent(new Event("baycmc:verification-refresh"));
 
-        // Surface deterministic UI states for the delegation/direct check:
-        if (result.verified) {
-          if (result.delegatedFrom) {
-            toast.success(
-              `Welcome — ${result.collection} verified via delegate.cash vault ${result.delegatedFrom.slice(0, 6)}…${result.delegatedFrom.slice(-4)}.`,
-              { id: toastId, duration: 5000 },
-            );
-          } else {
-            toast.success(`Welcome — ${result.collection} ownership confirmed.`, {
-              id: toastId,
-              duration: 5000,
-            });
-          }
-        } else {
-          // Lobby-only session (no BAYC/MAYC or delegate.cash blank).
-          // Dismiss the loading toast explicitly first — sonner inherits the
-          // loading spinner when updating a loading toast via the same id
-          // with `toast.message`, which made it appear to roll forever.
-          toast.dismiss(toastId);
-          toast.info("You're in the lobby", {
-            description:
-              result.reason ?? "No BAYC/MAYC found for this wallet — gated rooms stay locked.",
-            duration: 6000,
-          });
-        }
+        // No success / info toast after verification. The UI itself reflects
+        // the result: gated nav items unlock (or stay locked) once
+        // useVerificationStatus refreshes via the event above. Errors below
+        // still surface a toast because the user needs to know about them.
+        toast.dismiss(toastId);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         if (!msg.toLowerCase().includes("user rejected")) {
@@ -578,7 +566,7 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
     authenticated,
     walletsReady,
     walletReady,
-    embeddedWallet?.address,
+    primaryWallet?.address,
     user?.id,
     retryNonce,
   ]);
@@ -590,9 +578,9 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
     patchPrivySnapshot({
       ready: !!ready && !!walletsReady,
       authenticated: !!authenticated,
-      address: walletReady && embeddedWallet ? embeddedWallet.address : null,
+      address: walletReady && primaryWallet ? primaryWallet.address : null,
     });
-  }, [ready, walletsReady, authenticated, walletReady, embeddedWallet]);
+  }, [ready, walletsReady, authenticated, walletReady, primaryWallet]);
 
   return null;
 }

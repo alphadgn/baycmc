@@ -144,7 +144,12 @@ export function AppHeader() {
                     </SheetTitle>
                   </SheetHeader>
                   <nav className="flex flex-col p-3">
-                    {NAV_ITEMS.map((item) => {
+                    {NAV_ITEMS.filter(
+                      // Lifer rooms must NEVER appear for users who aren't
+                      // already a Lifer (BAYC/MAYC verified + Otherpage badge).
+                      // Showing them locked would tease access we don't grant.
+                      (item) => item.tier !== "lifer" || isLifer,
+                    ).map((item) => {
                       const accessible =
                         item.tier === "all" ||
                         (item.tier === "verified" && isVerifiedHolder) ||
