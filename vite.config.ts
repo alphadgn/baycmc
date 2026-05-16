@@ -6,18 +6,23 @@
 // You can pass additional config via defineConfig({ vite: { ... } }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
-// Override the default import-protection rule (`**/server/**`) so that
-// `*.functions.ts` files (createServerFn wrappers — safe to import from the
-// client; the bundler splits handler bodies into a server-only chunk) and
-// `url-guard.ts` (pure helper) are not blocked. `*.server.ts` files remain
-// fully protected.
+// The lovable wrapper sets a default `client.files: ["**/server/**"]` for the
+// TanStack import-protection plugin and merges via vite's `mergeConfig`, which
+// concatenates arrays. That means we can't drop the default by overriding
+// `files`. Instead we whitelist `*.functions.*` modules (createServerFn
+// wrappers — safe to import from the client; TanStack splits handler bodies
+// into a server-only chunk) via `excludeFiles`. Genuinely server-only modules
+// (`*.server.ts`) stay protected.
 export default defineConfig({
   tanstackStart: {
     importProtection: {
       behavior: "error",
       client: {
-        files: ["**/*.server.ts", "**/*.server.tsx", "**/*.server.js"],
-        specifiers: ["server-only"],
+        excludeFiles: [
+          "**/*.functions.ts",
+          "**/*.functions.tsx",
+          "**/*.functions.js",
+        ],
       },
     },
   },
