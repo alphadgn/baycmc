@@ -177,6 +177,7 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
   } = useVerificationStatus();
   const privy = usePrivyAuthState();
   const recheck = useServerFn(revalidateOwnership);
+  const router = useRouter();
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [recheckBusy, setRecheckBusy] = useState(false);
   const [profileLoaded, setProfileLoaded] = useState(false);
