@@ -4,6 +4,7 @@ import { z } from "zod";
 import { SiweMessage } from "siwe";
 import { createPublicClient, http, getAddress, parseAbi, isAddress } from "viem";
 import { mainnet } from "viem/chains";
+import { PrivyClient } from "@privy-io/server-auth";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { DELEGATE_REGISTRY_V2 } from "@/lib/web3/constants";
 import { runLuminaCheckAndPersist } from "@/server/lumina.server";
@@ -346,6 +347,152 @@ export const inspectWalletHoldings = createServerFn({ method: "POST" })
     };
   });
 
+/**
+ * Lazily-built Privy server client. Requires PRIVY_APP_ID + PRIVY_APP_SECRET
+ * env vars — the secret is what lets us verify access tokens (JWTs) issued
+ * by Privy without round-tripping a JWKS lookup on every request.
+ */
+let _privyClient: PrivyClient | null = null;
+function privyServer(): PrivyClient {
+  if (_privyClient) return _privyClient;
+  const appId = process.env.PRIVY_APP_ID?.trim();
+  const appSecret = process.env.PRIVY_APP_SECRET?.trim();
+  if (!appId || !appSecret) {
+    throw new Error(
+      "Privy server credentials missing (PRIVY_APP_ID / PRIVY_APP_SECRET). Ask an admin to finish setup.",
+    );
+  }
+  _privyClient = new PrivyClient(appId, appSecret);
+  return _privyClient;
+}
+
+/**
+ * Mint a Supabase session for a Privy-authenticated user WITHOUT a SIWE
+ * signature. Used as the first-touch entrance: user signs in via the Privy
+ * modal (email / social / wallet — Privy may collect its own signature for
+ * external wallets) and we trust Privy's access token as proof of identity.
+ *
+ * Ownership of BAYC/MAYC is NOT checked here — the user lands in the lobby
+ * (Tier 1). When they later try to enter a gated area, the client triggers
+ * the full SIWE-backed `verifyPrivyOwnership` flow.
+ *
+ * Security: the access token is verified against Privy (signature + audience
+ * + expiry) and the wallet must appear in the verified user's linked
+ * accounts — a client can't claim a wallet they don't own.
+ */
+export const establishLobbySession = createServerFn({ method: "POST" })
+  .inputValidator((input: { accessToken: string; wallet: string }) =>
+    z
+      .object({
+        accessToken: z.string().min(20).max(4000),
+        wallet: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const privy = privyServer();
+
+    // 1) Verify the access token. Throws if signature / audience / expiry
+    //    is invalid. Returns the Privy user id + session id.
+    let claims: { userId: string };
+    try {
+      const verified = await privy.verifyAuthToken(data.accessToken);
+      claims = { userId: verified.userId };
+    } catch (e) {
+      console.error("Privy verifyAuthToken failed", e);
+      throw new Error("Couldn't verify Privy session. Please sign in again.");
+    }
+
+    // 2) Confirm the wallet belongs to this Privy user. Anyone with a valid
+    //    Privy token could otherwise claim any wallet — getUser is the only
+    //    authoritative source.
+    const wallet = getAddress(data.wallet);
+    const lower = wallet.toLowerCase();
+    let privyUser: Awaited<ReturnType<typeof privy.getUser>>;
+    try {
+      privyUser = await privy.getUser(claims.userId);
+    } catch (e) {
+      console.error("Privy getUser failed", e);
+      throw new Error("Couldn't load your Privy account. Please try again.");
+    }
+    const linkedWallets = (privyUser.linkedAccounts ?? [])
+      .filter((a): a is typeof a & { address: string } => "address" in a && !!a.address)
+      .map((a) => a.address.toLowerCase());
+    if (!linkedWallets.includes(lower)) {
+      console.warn("Privy lobby session rejected: wallet not in linked accounts", {
+        userId: claims.userId,
+        wallet: lower,
+      });
+      throw new Error("That wallet isn't linked to your Privy account.");
+    }
+
+    // 3) Mint / fetch Supabase user. Same wallet-keyed scheme as the
+    //    SIWE-backed path, so a later ownership upgrade just updates the
+    //    same row (no orphan duplicates).
+    const email = `${lower}@wallet.baycmc.local`;
+    const password = await deriveWalletPassword(lower);
+
+    const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { wallet: lower, via: "privy-lobby", privy_user_id: claims.userId },
+    });
+    let userId = created.user?.id;
+
+    if (!userId) {
+      const alreadyExists = createErr?.message?.toLowerCase().includes("already");
+      if (!alreadyExists) throw createErr ?? new Error("Could not create wallet session");
+
+      const { data: existing } = await supabaseAdmin.auth.admin.listUsers({
+        page: 1,
+        perPage: 1000,
+      });
+      const found = existing?.users.find((u) => u.email === email);
+      userId = found?.id;
+      if (!userId) throw new Error("Could not find wallet session");
+      const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+        password,
+      });
+      if (updateErr) throw updateErr;
+    }
+
+    await supabaseAdmin
+      .from("profiles")
+      .upsert({ id: userId, wallet_address: lower }, { onConflict: "id" });
+
+    // Seed an unverified row so downstream RLS helpers don't crash on a
+    // missing user_verifications. Ownership stays false until the user
+    // completes the SIWE flow from a gated area.
+    await supabaseAdmin.from("user_verifications").upsert(
+      {
+        user_id: userId,
+        bayc_verified: false,
+        bayc_collection: null,
+        delegation_verified: false,
+        delegation_vault: null,
+        verified_at: null,
+      },
+      { onConflict: "user_id", ignoreDuplicates: true },
+    );
+
+    const { data: signIn, error: signInErr } = await supabaseAdmin.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (signInErr || !signIn.session) {
+      throw signInErr ?? new Error("Could not mint session");
+    }
+
+    return {
+      wallet,
+      session: {
+        access_token: signIn.session.access_token,
+        refresh_token: signIn.session.refresh_token,
+      },
+    };
+  });
+
 export const verifyPrivyOwnership = createServerFn({ method: "POST" })
   .inputValidator((input: { message: string; signature: string }) =>
     z
@@ -448,7 +595,10 @@ export const verifyPrivyOwnership = createServerFn({ method: "POST" })
     const directLookupOk = true;
     const delegationLookupOk = vaultsResult.status === "fulfilled";
     if (vaultsResult.status === "rejected") {
-      console.warn("delegate.cash lookup failed during Privy ownership verify", vaultsResult.reason);
+      console.warn(
+        "delegate.cash lookup failed during Privy ownership verify",
+        vaultsResult.reason,
+      );
     }
     const vaults = delegationLookupOk ? vaultsResult.value : [];
 
