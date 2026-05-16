@@ -39,9 +39,9 @@ function LobbyPage() {
   const { isVerifiedHolder, loading: verifLoading } = useVerificationStatus();
 
   return (
-    <main className="mx-auto max-w-4xl px-3 pt-3 pb-2 sm:px-6 sm:pt-6">
+    <main className="flex h-[calc(100dvh-4rem)] flex-col">
       {!verifLoading && !isVerifiedHolder && (
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gold/30 bg-gold/5 px-3 py-2 text-xs sm:mb-4 sm:px-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gold/20 bg-gold/5 px-3 py-2 text-xs sm:px-4">
           <span className="flex items-center gap-2 text-gold">
             <Lock className="h-3.5 w-3.5" />
             Conference rooms & feed are locked until you verify.
