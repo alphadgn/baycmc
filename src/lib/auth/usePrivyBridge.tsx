@@ -25,7 +25,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { SiweMessage } from "siwe";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { verifyPrivyOwnership } from "@/server/privy.functions";
+import { establishLobbySession, verifyPrivyOwnership } from "@/server/privy.functions";
 import { usePrivyReady } from "@/components/PrivyAppProvider";
 import { logEvent } from "@/lib/diagnostics";
 import { importWithRetry } from "@/lib/import-with-retry";
@@ -120,6 +120,7 @@ type PrivyHooks = {
     authenticated: boolean;
     user?: { id?: string; email?: { address?: string } | null } | null;
     logout: () => Promise<void>;
+    getAccessToken: () => Promise<string | null>;
   };
   useWallets: () => { wallets: WalletLike[]; ready: boolean };
   useSignMessage: () => {
@@ -203,20 +204,26 @@ function isChunkLoadError(error: unknown): boolean {
 }
 
 export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
-  const { ready, authenticated, user, logout } = hooks.usePrivy();
+  const { ready, authenticated, user, logout, getAccessToken } = hooks.usePrivy();
   const { wallets, ready: walletsReady } = hooks.useWallets();
   const { signMessage } = hooks.useSignMessage();
   const verifyFn = useServerFn(verifyPrivyOwnership);
+  const lobbyFn = useServerFn(establishLobbySession);
   const [retryNonce, setRetryNonce] = useState(0);
 
-  // signMessage/verifyFn are new refs every render — store them in refs so
-  // we can call the latest version inside the effect without putting them
-  // in the dep array (which would re-fire the effect on every render and
-  // silently cancel in-flight verifies via the closure cleanup).
+  // signMessage/verifyFn/lobbyFn/getAccessToken are new refs every render —
+  // store them in refs so we can call the latest version inside the effect
+  // without putting them in the dep array (which would re-fire the effect
+  // on every render and silently cancel in-flight verifies via the closure
+  // cleanup).
   const signMessageRef = useRef(signMessage);
   signMessageRef.current = signMessage;
   const verifyFnRef = useRef(verifyFn);
   verifyFnRef.current = verifyFn;
+  const lobbyFnRef = useRef(lobbyFn);
+  lobbyFnRef.current = lobbyFn;
+  const getAccessTokenRef = useRef(getAccessToken);
+  getAccessTokenRef.current = getAccessToken;
 
   // One-shot guard per wallet address. NEVER cleared while the address
   // is unchanged — this is what kills the historic verify loop.
@@ -360,20 +367,53 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
           return;
         }
 
-        // No existing-session short-circuit hit → auto-pop SIWE. We used
-        // to gate this behind an explicit user click, but that left users
-        // stranded on a "Click to verify" CTA after Privy login. The
-        // single-flight guards (inFlightRef + completedRef) above already
-        // prevent the historic "Preparing wallet sign-in…" loop, so it's
-        // safe to fire automatically here.
-
         // Consume the explicit-request flag immediately so a thrown error
         // below doesn't leave us re-firing the loading toast on every
         // re-render of the bridge (which is what produced the stuck
         // "Preparing wallet sign-in…" loop).
+        const explicitVerify = verifyRequestedRef.current;
         verifyRequestedRef.current = false;
         patchPrivySnapshot({ verifying: true });
 
+        // First-touch entrance: no SIWE. Hand the Privy access token to
+        // `establishLobbySession`, which verifies the token server-side
+        // and mints a Supabase session keyed by the wallet. The on-chain
+        // BAYC/MAYC check is deferred to the moment the user actually
+        // tries to enter a gated area (see verifyPrivyOwnership flow
+        // below — fired by an explicit retry event).
+        if (!explicitVerify) {
+          logEvent("auth", "info", "bridge: establishing lobby session (no SIWE)");
+          const accessToken = await getAccessTokenRef.current();
+          if (!accessToken) {
+            throw new Error("Privy session is missing an access token. Please sign in again.");
+          }
+          const lobby = await withTimeout(
+            lobbyFnRef.current({ data: { accessToken, wallet: address } }),
+            20_000,
+            "Lobby sign-in is taking longer than expected. Please try again.",
+          );
+          if (unmountedRef.current) return;
+          const { error } = await supabase.auth.setSession({
+            access_token: lobby.session.access_token,
+            refresh_token: lobby.session.refresh_token,
+          });
+          if (error) {
+            logEvent("auth", "error", "bridge: lobby setSession failed", {
+              message: error.message,
+            });
+            toast.error(error.message, { id: toastId });
+            return;
+          }
+          logEvent("auth", "info", "bridge: lobby Supabase session set");
+          completedRef.current.add(address.toLowerCase());
+          markVerified(address);
+          window.dispatchEvent(new Event("baycmc:verification-refresh"));
+          return;
+        }
+
+        // Explicit re-verify (e.g. "Verify holder access" dropdown action
+        // or a gated-area click). Build a SIWE message, get a signature
+        // from Privy, then run the full on-chain ownership check.
         logEvent("auth", "info", "bridge: building SIWE + calling signMessage");
         // Top-center keeps the prep toast out of the way of Privy's modal
         // (which lands centered, with its action button near the middle).

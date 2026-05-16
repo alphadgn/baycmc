@@ -1,6 +1,6 @@
 import { Link, useLocation, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Loader2, Menu, X } from "lucide-react";
+import { ArrowLeft, Loader2, Lock, Menu, X } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth/useAuth";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
@@ -47,13 +47,42 @@ export function AppHeader() {
   const { isVerifiedHolder, isLifer } = useVerificationStatus();
   const [entranceOpen, setEntranceOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  // Lobby user tapped a locked nav item; once verification flips, navigate
+  // to the saved destination automatically.
+  const [pendingGatedRoute, setPendingGatedRoute] = useState<{
+    to: NavItem["to"];
+    tier: "verified" | "lifer";
+  } | null>(null);
   const router = useRouter();
   const location = useLocation();
 
-  // Hamburger is hidden until the user has at least verified holder status —
-  // unverified lobby visitors don't see the gated rooms list at all.
-  const showHamburger = isAuthenticated && isVerifiedHolder;
+  // Show the hamburger to every authenticated user — lobby visitors get to
+  // browse the full clubhouse menu and see exactly what unlocks once they
+  // verify a BAYC/MAYC. Gated items render with a lock icon and pop the
+  // Privy signing modal on click.
+  const showHamburger = isAuthenticated;
   const showBack = isAuthenticated && !HOME_ROUTES.has(location.pathname);
+
+  useEffect(() => {
+    if (!pendingGatedRoute) return;
+    const accessible =
+      (pendingGatedRoute.tier === "verified" && isVerifiedHolder) ||
+      (pendingGatedRoute.tier === "lifer" && isLifer);
+    if (!accessible) return;
+    const target = pendingGatedRoute.to;
+    setPendingGatedRoute(null);
+    void router.navigate({ to: target });
+  }, [pendingGatedRoute, isVerifiedHolder, isLifer, router]);
+
+  function handleGatedClick(e: React.MouseEvent, item: NavItem & { tier: "verified" | "lifer" }) {
+    e.preventDefault();
+    setNavOpen(false);
+    setPendingGatedRoute({ to: item.to, tier: item.tier });
+    // Triggers the SIWE flow in usePrivyBridge → on success the
+    // verification-refresh event fires → useVerificationStatus reloads →
+    // the pendingGatedRoute effect navigates.
+    window.dispatchEvent(new Event("baycmc:privy-bridge-retry"));
+  }
 
   return (
     <>
@@ -115,28 +144,59 @@ export function AppHeader() {
                     </SheetTitle>
                   </SheetHeader>
                   <nav className="flex flex-col p-3">
-                    {NAV_ITEMS.filter((item) => {
-                      if (item.tier === "all") return true;
-                      if (item.tier === "verified") return isVerifiedHolder;
-                      if (item.tier === "lifer") return isLifer;
-                      return false;
-                    }).map((item) => (
-                      <Link
-                        key={item.to}
-                        to={item.to}
-                        onClick={() => setNavOpen(false)}
-                        className={`flex items-center justify-between rounded-md px-3 py-3 text-sm font-medium transition hover:bg-secondary/60 ${
-                          item.tier === "lifer" ? "text-gold" : "text-foreground"
-                        }`}
-                      >
-                        <span>{item.label}</span>
-                        {item.tier === "lifer" && (
-                          <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-gold">
-                            Lifer
+                    {NAV_ITEMS.map((item) => {
+                      const accessible =
+                        item.tier === "all" ||
+                        (item.tier === "verified" && isVerifiedHolder) ||
+                        (item.tier === "lifer" && isLifer);
+                      const sharedClass = `flex items-center justify-between rounded-md px-3 py-3 text-sm font-medium transition hover:bg-secondary/60 ${
+                        item.tier === "lifer" ? "text-gold" : "text-foreground"
+                      }`;
+                      if (accessible) {
+                        return (
+                          <Link
+                            key={item.to}
+                            to={item.to}
+                            onClick={() => setNavOpen(false)}
+                            className={sharedClass}
+                          >
+                            <span>{item.label}</span>
+                            {item.tier === "lifer" && (
+                              <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-gold">
+                                Lifer
+                              </span>
+                            )}
+                          </Link>
+                        );
+                      }
+                      // Locked tier (verified/lifer) for a lobby user: tap
+                      // pops the Privy signing modal via the bridge retry
+                      // event and stashes the route for post-verify nav.
+                      return (
+                        <button
+                          key={item.to}
+                          type="button"
+                          onClick={(e) =>
+                            handleGatedClick(e, {
+                              ...item,
+                              tier: item.tier as "verified" | "lifer",
+                            })
+                          }
+                          className={`${sharedClass} cursor-pointer text-left opacity-70`}
+                          title={`Verify your ${item.tier === "lifer" ? "Otherpage / Lifer token" : "BAYC or MAYC"} to unlock`}
+                        >
+                          <span className="inline-flex items-center gap-2">
+                            <Lock className="h-3.5 w-3.5 text-gold/70" />
+                            {item.label}
                           </span>
-                        )}
-                      </Link>
-                    ))}
+                          {item.tier === "lifer" && (
+                            <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-gold">
+                              Lifer
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
                   </nav>
                   <div className="border-t border-border/60 p-3 text-[11px] text-muted-foreground">
                     {isLifer
