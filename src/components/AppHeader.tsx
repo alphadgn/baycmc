@@ -258,11 +258,13 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
         });
       }
       await refreshVerification();
+      void router.navigate({ to: "/lobby" });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't run the ownership check.", {
         id: toastId,
         duration: 7000,
       });
+      void router.navigate({ to: "/lobby" });
     } finally {
       setRecheckBusy(false);
     }
