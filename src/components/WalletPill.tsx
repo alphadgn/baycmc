@@ -83,15 +83,36 @@ export function WalletPill({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
-          type="button"
-          className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-full border border-gold/30 bg-secondary/40 px-2.5 pr-3 text-xs font-mono text-foreground transition hover:border-gold/60 hover:bg-secondary/70"
-          aria-label="Wallet menu"
-        >
-          <AddressAvatar address={address} />
-          <span className="tabular-nums">{sliceAddress(address)}</span>
-          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-        </button>
+        {isVerifiedHolder ? (
+          <button
+            type="button"
+            className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-full border border-gold/30 bg-secondary/40 px-2.5 pr-3 font-mono text-xs text-foreground transition hover:border-gold/60 hover:bg-secondary/70"
+            aria-label="Wallet menu"
+          >
+            <AddressAvatar address={address} />
+            <span className="tabular-nums">{sliceAddress(address)}</span>
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+          </button>
+        ) : (
+          // Lobby users (Tier 1) see a CTA-style trigger so it's obvious the
+          // header control is actionable — a bare sliced address didn't
+          // telegraph "click me to verify". Dropdown still opens on click
+          // and surfaces Profile/Activity/Disconnect alongside the verify
+          // action.
+          <button
+            type="button"
+            className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-gold/40 bg-gold/10 px-2.5 text-xs font-semibold text-gold transition hover:bg-gold/20 sm:gap-2 sm:px-3"
+            aria-label={`Verify holder access — ${address}`}
+            title="Click to verify BAYC/MAYC ownership"
+          >
+            <Lock className="h-3.5 w-3.5" />
+            <span>Verify</span>
+            <span className="font-mono text-[10px] text-gold/70 tabular-nums sm:text-xs">
+              {sliceAddress(address)}
+            </span>
+            <ChevronDown className="h-3.5 w-3.5 text-gold/70" />
+          </button>
+        )}
       </PopoverTrigger>
       <PopoverContent align="end" sideOffset={8} className="w-72 border-gold/20 bg-popover p-0">
         <div className="flex items-center gap-3 border-b border-border/60 p-4">
