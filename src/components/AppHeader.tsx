@@ -1,6 +1,6 @@
 import { Link, useLocation, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Lock, Menu, X } from "lucide-react";
+import { ArrowLeft, Loader2, Menu, X } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth/useAuth";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
@@ -255,6 +255,10 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
   if (authLoading) return <div className="h-9 w-24" aria-hidden />;
 
   if (privy.authenticated && privy.address) {
+    // Privy connected; the bridge auto-pops SIWE now, so we don't need a
+    // standalone "Verify" CTA here. Render the calm sliced-address pill —
+    // matches the look users see in the lobby. The whole pill stays
+    // clickable so a user who rejected the Privy signing modal can retry.
     return (
       <button
         type="button"
@@ -262,15 +266,12 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
         onClick={() => {
           window.dispatchEvent(new Event("baycmc:privy-bridge-retry"));
         }}
-        className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-gold/40 bg-gold/10 px-2 py-2 text-xs font-semibold text-gold transition hover:bg-gold/20 disabled:cursor-wait disabled:opacity-70 sm:gap-2 sm:px-3 sm:text-sm"
-        title={privy.address}
-        aria-label={`Click to verify ${privy.address}`}
+        className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-full border border-gold/30 bg-secondary/40 px-2.5 pr-3 font-mono text-xs text-foreground transition hover:border-gold/60 hover:bg-secondary/70 disabled:cursor-wait disabled:opacity-70"
+        title={verifying ? "Signing in…" : privy.address}
+        aria-label={`Wallet ${privy.address}${verifying ? " — signing in" : ""}`}
       >
-        <Lock className="h-3.5 w-3.5" />
-        <span>{verifying ? "Verifying…" : "Verify"}</span>
-        <span className="font-mono text-[10px] text-gold/70 sm:text-xs">
-          {sliceAddress(privy.address)}
-        </span>
+        {verifying ? <Loader2 className="h-3.5 w-3.5 animate-spin text-gold/70" /> : null}
+        <span className="tabular-nums">{sliceAddress(privy.address)}</span>
       </button>
     );
   }

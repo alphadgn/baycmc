@@ -222,9 +222,11 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
   // is unchanged — this is what kills the historic verify loop.
   const inFlightRef = useRef<string | null>(null);
   const completedRef = useRef<Set<string>>(new Set());
-  // Did the user explicitly request verification (button click → event)?
-  // We never auto-prompt the SIWE signature on wallet connect anymore —
-  // it was distorting the rest of the UI on first sign-in.
+  // True when the user fired the "Verify holder access" dropdown action.
+  // It only changes behaviour in one place: it lets an *already-signed-in*
+  // user pop a fresh SIWE signature instead of short-circuiting on the
+  // existing session. For a first-time connect we now auto-pop SIWE
+  // unconditionally — no manual "Verify" click required.
   const verifyRequestedRef = useRef(false);
   // True only when the bridge component is unmounting. Used to suppress
   // post-await state updates in the truly-gone case. Plain `cancelled`
@@ -358,16 +360,12 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
           return;
         }
 
-        // 24h cache: a fresh marker means we already verified recently.
-        // We can't restore a Supabase session from localStorage alone, so
-        // the user still has to click "Click to verify" if their session
-        // ever expires — but we won't auto-pop the signature modal.
-        if (!verifyRequestedRef.current) {
-          // No explicit user click → bail. The header will render a
-          // "Click to verify" CTA that dispatches the retry event.
-          logEvent("auth", "debug", "bridge: no explicit verify request — waiting on user click");
-          return;
-        }
+        // No existing-session short-circuit hit → auto-pop SIWE. We used
+        // to gate this behind an explicit user click, but that left users
+        // stranded on a "Click to verify" CTA after Privy login. The
+        // single-flight guards (inFlightRef + completedRef) above already
+        // prevent the historic "Preparing wallet sign-in…" loop, so it's
+        // safe to fire automatically here.
 
         // Consume the explicit-request flag immediately so a thrown error
         // below doesn't leave us re-firing the loading toast on every
