@@ -62,8 +62,8 @@ export function GifPicker({ onPick }: GifPickerProps) {
   if (!configured) {
     return (
       <div className="rounded-xl border border-border bg-popover p-4 text-center text-xs text-muted-foreground">
-        GIF picker isn't configured. Add <span className="font-mono">GIPHY_API_KEY</span>{" "}
-        in Lovable Cloud secrets to enable Giphy.
+        GIF picker isn't configured. Add <span className="font-mono">GIPHY_API_KEY</span> in Lovable
+        Cloud secrets to enable Giphy.
         <br />
         <a
           href="https://developers.giphy.com/dashboard/"
@@ -82,7 +82,6 @@ export function GifPicker({ onPick }: GifPickerProps) {
       <div className="flex items-center gap-2 border-b border-border/60 px-3 py-2">
         <Search className="h-4 w-4 text-muted-foreground" />
         <input
-          autoFocus
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search Giphy…"

@@ -450,9 +450,10 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
           address,
           uiOptions: {
             showWalletUIs: true,
-            title: "Sign in to BAYCMC",
-            description:
-              "Signing in checks BAYC/MAYC ownership directly and via delegate.cash vaults.",
+            // Keep the modal copy as plain as possible — the SIWE body
+            // below already shows the domain + Ethereum account line.
+            title: "Sign message",
+            description: `${window.location.origin} wants to sign a message.`,
             buttonText: "Sign and continue",
           },
         } as const;
@@ -537,11 +538,15 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
         // gated nav) stuck on the pre-recheck state until a full reload.
         window.dispatchEvent(new Event("baycmc:verification-refresh"));
 
-        // No success / info toast after verification. The UI itself reflects
-        // the result: gated nav items unlock (or stay locked) once
-        // useVerificationStatus refreshes via the event above. Errors below
-        // still surface a toast because the user needs to know about them.
-        toast.dismiss(toastId);
+        // Minimal verified / not-verified toast — single word, short
+        // duration. The detailed UI feedback comes from the gated nav
+        // unlocking via useVerificationStatus, but the user still wants
+        // a tiny confirmation that the check actually ran.
+        if (result.verified) {
+          toast.success("Verified", { id: toastId, duration: 2500 });
+        } else {
+          toast.error("Not verified", { id: toastId, duration: 2500 });
+        }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         if (!msg.toLowerCase().includes("user rejected")) {
