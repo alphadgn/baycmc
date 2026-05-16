@@ -177,6 +177,7 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
   } = useVerificationStatus();
   const privy = usePrivyAuthState();
   const recheck = useServerFn(revalidateOwnership);
+  const router = useRouter();
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [recheckBusy, setRecheckBusy] = useState(false);
   const [profileLoaded, setProfileLoaded] = useState(false);
@@ -258,11 +259,13 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
         });
       }
       await refreshVerification();
+      void router.navigate({ to: "/lobby" });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't run the ownership check.", {
         id: toastId,
         duration: 7000,
       });
+      void router.navigate({ to: "/lobby" });
     } finally {
       setRecheckBusy(false);
     }
