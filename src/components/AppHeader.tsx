@@ -267,7 +267,7 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
         aria-label={`Click to verify ${privy.address}`}
       >
         <Lock className="h-3.5 w-3.5" />
-        <span className="hidden sm:inline">{verifying ? "Verifying…" : "Click to verify"}</span>
+        <span>{verifying ? "Verifying…" : "Verify"}</span>
         <span className="font-mono text-[10px] text-gold/70 sm:text-xs">
           {sliceAddress(privy.address)}
         </span>
