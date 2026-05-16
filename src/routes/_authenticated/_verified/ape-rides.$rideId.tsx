@@ -58,12 +58,12 @@ function ApeRideViewer() {
 
   if (!token || !url) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-12">
+      <div className="mx-auto max-w-3xl px-4 py-8 sm:py-12">
         <Link to="/ape-rides" className="text-xs text-muted-foreground hover:text-foreground">
           ← All Ape Rides
         </Link>
-        <div className="glass mt-4 rounded-2xl p-12 text-center shadow-card">
-          <h1 className="font-display text-4xl text-gradient-gold">Ape Ride</h1>
+        <div className="glass mt-4 rounded-2xl p-6 text-center shadow-card sm:p-12">
+          <h1 className="font-display text-3xl text-gradient-gold sm:text-4xl">Ape Ride</h1>
           <p className="mt-3 text-sm text-muted-foreground">
             Join the live stream from inside the Wynwood clubhouse.
           </p>

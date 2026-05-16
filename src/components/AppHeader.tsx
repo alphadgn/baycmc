@@ -1,6 +1,6 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useLocation, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Lock, Menu, X } from "lucide-react";
+import { ArrowLeft, Lock, Menu, X } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth/useAuth";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
@@ -45,32 +45,58 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/profile", label: "Profile", tier: "all" },
 ];
 
+// Routes treated as "home" — no back arrow shown here.
+const HOME_ROUTES = new Set<string>(["/", "/lobby"]);
+
 export function AppHeader() {
   const { isAuthenticated } = useAuth();
   const { isVerifiedHolder, isLifer } = useVerificationStatus();
   const [entranceOpen, setEntranceOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  const router = useRouter();
+  const location = useLocation();
 
   // Hamburger is hidden until the user has at least verified holder status —
   // unverified lobby visitors don't see the gated rooms list at all.
   const showHamburger = isAuthenticated && isVerifiedHolder;
+  const showBack = isAuthenticated && !HOME_ROUTES.has(location.pathname);
 
   return (
     <>
       <header className="sticky top-0 z-50 glass">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-2 px-3 sm:px-6">
-          <Link
-            to="/"
-            aria-label="BAYCMC"
-            className="inline-flex min-w-0 shrink cursor-pointer items-center"
-          >
-            <EmbroideredImage
-              variant="baycmc"
-              size="lg"
-              alt="BAYCmc"
-              clamp="clamp(1.4rem, 5vw, 3rem)"
-            />
-          </Link>
+          <div className="flex min-w-0 shrink items-center gap-1.5 sm:gap-3">
+            {showBack && (
+              <button
+                type="button"
+                onClick={() => {
+                  // history.back if there's something to go back to inside
+                  // this app; otherwise route to the lobby (the tier-1 home).
+                  if (window.history.length > 1) {
+                    router.history.back();
+                  } else {
+                    void router.navigate({ to: "/lobby" });
+                  }
+                }}
+                aria-label="Go back"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border bg-secondary/40 text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+            )}
+            <Link
+              to="/"
+              aria-label="BAYCMC"
+              className="inline-flex min-w-0 shrink cursor-pointer items-center"
+            >
+              <EmbroideredImage
+                variant="baycmc"
+                size="lg"
+                alt="BAYCmc"
+                clamp="clamp(1.4rem, 5vw, 3rem)"
+              />
+            </Link>
+          </div>
 
           <div className="flex min-w-0 items-center gap-2">
             <EntranceControls onOpen={() => setEntranceOpen(true)} />
@@ -119,7 +145,7 @@ export function AppHeader() {
                     {isLifer
                       ? "Lifer access — every door is open."
                       : isVerifiedHolder
-                        ? "Verified holder — Lifer rooms appear when you hold the Lifer token."
+                        ? "Verified holder access."
                         : ""}
                   </div>
                 </SheetContent>
@@ -193,30 +219,33 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
 
   if (isAuthenticated) {
     if (walletAddress) {
+      // Single control that swaps state:
+      //   • Not verified  → "Verify" button (icon + label).
+      //   • Verified      → sliced wallet pill (with the collection badge).
+      // Keeps the header uncluttered on mobile and gives unverified users
+      // a single obvious next action.
+      if (!verifLoading && !isVerifiedHolder) {
+        return (
+          <button
+            type="button"
+            disabled={verifying}
+            onClick={() => {
+              window.dispatchEvent(new Event("baycmc:privy-bridge-retry"));
+            }}
+            title="Verify holder access"
+            aria-label="Verify holder access"
+            className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-gold/40 bg-gold/10 px-3 py-2 text-xs font-semibold text-gold transition hover:bg-gold/20 disabled:cursor-wait disabled:opacity-70 sm:text-sm"
+          >
+            <Lock className="h-3.5 w-3.5" />
+            {verifying ? "Verifying…" : "Verify"}
+          </button>
+        );
+      }
       return (
-        <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
-          {!verifLoading && !isVerifiedHolder && (
-            <button
-              type="button"
-              disabled={verifying}
-              onClick={() => {
-                window.dispatchEvent(new Event("baycmc:privy-bridge-retry"));
-              }}
-              title="Verify holder access"
-              aria-label="Verify holder access"
-              className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-md border border-gold/40 bg-gold/10 px-2 py-2 text-xs font-semibold text-gold transition hover:bg-gold/20 disabled:cursor-wait disabled:opacity-70 sm:px-3"
-            >
-              <Lock className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">
-                {verifying ? "Verifying…" : "Verify holder"}
-              </span>
-            </button>
-          )}
-          <WalletPill
-            address={walletAddress}
-            collection={isVerifiedHolder ? collection ?? null : null}
-          />
-        </div>
+        <WalletPill
+          address={walletAddress}
+          collection={isVerifiedHolder ? collection ?? null : null}
+        />
       );
     }
     if (!profileLoaded || verifLoading) return <div className="h-9 w-24" aria-hidden />;

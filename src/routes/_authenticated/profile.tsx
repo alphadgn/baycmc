@@ -25,7 +25,6 @@ interface VerifRow {
   bayc_verified: boolean;
   lumina_verified: boolean;
   delegation_verified: boolean;
-  otherpage_verified: boolean;
   bayc_token_ids: number[];
 }
 interface RoleRow {
@@ -164,9 +163,10 @@ function ProfilePage() {
     }
   }
 
-  // Verification is handled at Entrance via Privy + on-chain check; profile only shows
-  // current status. (Otherpage premium check is performed server-side at
-  // gated routes.)
+  // Verification is handled at Entrance via Privy + on-chain check; profile
+  // only shows the public-facing BAYC/MAYC status. Lifer access is checked
+  // silently in the background — the Lifer rooms appear in the navigation
+  // menu only when both gates pass, with no visible "badge" affordance here.
 
   if (authLoading || !user) return <ProfileSkeleton />;
   if (loadState === "loading" || loadState === "idle") return <ProfileSkeleton />;
@@ -320,15 +320,6 @@ function ProfilePage() {
               label="delegate.cash vault"
               ok={!!verif?.delegation_verified}
               action={<span className="text-xs text-muted-foreground">Coming soon</span>}
-            />
-            <VerifyRow
-              label="Otherpage premium"
-              ok={!!verif?.otherpage_verified}
-              action={
-                <span className="text-xs text-muted-foreground">
-                  {verif?.otherpage_verified ? "Verified" : "Checked at gated rooms"}
-                </span>
-              }
             />
           </ul>
           <div className="mt-6">

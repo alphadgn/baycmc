@@ -131,6 +131,18 @@
     -webkit-font-smoothing: antialiased;
   }
 
+  /* iOS Safari auto-zooms inputs whose computed font-size is < 16px. Force
+     a 16px minimum on every editable control so the viewport stays put
+     when a field receives focus on a phone. Desktop styling can still
+     override visually via line-height / scale. */
+  @media (max-width: 640px) {
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+    textarea,
+    select {
+      font-size: 16px !important;
+    }
+  }
+
   body {
     background-image:
       radial-gradient(circle at 20% 0%, oklch(0.78 0.14 78 / 8%) 0%, transparent 40%),

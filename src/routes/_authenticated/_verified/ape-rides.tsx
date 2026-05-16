@@ -160,10 +160,10 @@ function ApeRidesPage() {
   const canHost = geo.status === "ok" && geo.inside && !myActiveRide;
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
-      <header className="mb-8">
-        <h1 className="font-display text-4xl text-gradient-gold">Ape Rides</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+    <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
+      <header className="mb-6 sm:mb-8">
+        <h1 className="font-display text-3xl text-gradient-gold sm:text-4xl">Ape Rides</h1>
+        <p className="mt-2 text-xs text-muted-foreground sm:text-sm">
           Pair with a member physically inside the Wynwood, FL clubhouse and
           watch their live POV. Hosting is unlocked only when your GPS places
           you inside the clubhouse geofence.

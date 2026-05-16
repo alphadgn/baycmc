@@ -36,8 +36,8 @@ function RoomDetail() {
   if (!name) {
     return (
       <main className="mx-auto max-w-2xl px-4 py-16 text-center">
-        <h1 className="font-display text-4xl text-gradient-gold">Room not found</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <h1 className="font-display text-3xl text-gradient-gold sm:text-4xl">Room not found</h1>
+        <p className="mt-2 text-xs text-muted-foreground sm:text-sm">
           You may not have access to this room.
         </p>
         <Link to="/rooms" className="mt-6 inline-block text-gold underline">
@@ -48,12 +48,12 @@ function RoomDetail() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
+    <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
       <Link to="/rooms" className="text-xs text-muted-foreground hover:text-gold">
         ← All rooms
       </Link>
       <header className="my-4">
-        <h1 className="font-display text-5xl text-gradient-gold">{name}</h1>
+        <h1 className="font-display text-3xl text-gradient-gold sm:text-5xl">{name}</h1>
         <p className="text-xs uppercase tracking-widest text-muted-foreground">
           {tier === "lifer" ? "Lifer-only" : "Verified"}
         </p>

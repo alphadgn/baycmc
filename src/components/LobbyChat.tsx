@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { format, isSameDay } from "date-fns";
 import {
   CornerDownLeft,
+  Hash,
   Image as ImageIcon,
   Loader2,
   MoreHorizontal,
@@ -10,24 +12,30 @@ import {
   SmilePlus,
   Sticker,
   Trash2,
+  Users,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase as typedSupabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
-
-// New tables (lobby_messages, lobby_message_reactions) aren't in the
-// generated Database type yet — Lovable regenerates `types.ts` from the
-// remote schema only after migrations land. Cast through an untyped
-// SupabaseClient so this file compiles before that regen.
-const supabase = typedSupabase as unknown as SupabaseClient;
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { GifPicker } from "@/components/GifPicker";
 import type { GifResult } from "@/server/giphy.functions";
+
+// New tables aren't in the generated Database type yet — see profile-side
+// notes. Cast through an untyped client so this file compiles before regen.
+const supabase = typedSupabase as unknown as SupabaseClient;
 
 interface LobbyMessage {
   id: string;
@@ -53,8 +61,19 @@ interface ReactionRow {
 }
 
 const QUICK_EMOJI = ["🔥", "🐵", "🍌", "🙌", "❤️", "👀", "💎", "🤝", "😂", "🎉", "🚀"];
+const INSERT_EMOJI = [
+  "😀", "😂", "🤣", "😅", "😎", "🤔", "😇", "😉", "🙃", "😘",
+  "🥰", "🤩", "🤗", "🤭", "😴", "🤤", "🥳", "😡", "😱", "😭",
+  "🙏", "👍", "👎", "👏", "💪", "🙌", "👀", "🐵", "🐒", "🦍",
+  "🍌", "🥃", "🚀", "🔥", "💎", "🌊", "🌈", "⭐", "✨", "💯",
+  "❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "💔", "💢", "💯",
+];
 
-export function LobbyChat() {
+interface LobbyChatProps {
+  channelName?: string;
+}
+
+export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<LobbyMessage[]>([]);
   const [profiles, setProfiles] = useState<Record<string, ProfileMini>>({});
@@ -65,16 +84,15 @@ export function LobbyChat() {
   const [replyTo, setReplyTo] = useState<LobbyMessage | null>(null);
   const [posting, setPosting] = useState(false);
   const [gifOpen, setGifOpen] = useState(false);
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const [membersOpen, setMembersOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const hydrateProfiles = useCallback(async (msgs: LobbyMessage[]) => {
     const missing = Array.from(
-      new Set(
-        msgs
-          .map((m) => m.user_id)
-          .filter((id) => !profiles[id]),
-      ),
+      new Set(msgs.map((m) => m.user_id).filter((id) => !profiles[id])),
     );
     if (!missing.length) return;
     const { data } = await supabase
@@ -108,7 +126,6 @@ export function LobbyChat() {
       setMessages(msgs);
       setLoading(false);
       void hydrateProfiles(msgs);
-      // Reactions
       if (msgs.length > 0) {
         const ids = msgs.map((m) => m.id);
         const { data: rxs } = await supabase
@@ -130,7 +147,7 @@ export function LobbyChat() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Realtime subscriptions
+  // Realtime
   useEffect(() => {
     const ch = supabase
       .channel("lobby-chat")
@@ -199,6 +216,16 @@ export function LobbyChat() {
     for (const x of messages) m.set(x.id, x);
     return m;
   }, [messages]);
+
+  // Unique recent posters → "members in this lobby" list.
+  const memberList = useMemo(() => {
+    const seen = new Map<string, ProfileMini>();
+    for (const m of messages) {
+      const p = profiles[m.user_id];
+      if (p && !seen.has(p.id)) seen.set(p.id, p);
+    }
+    return [...seen.values()];
+  }, [messages, profiles]);
 
   async function uploadPendingImage(): Promise<string | null> {
     if (!pendingImage || !user) return null;
@@ -269,9 +296,95 @@ export function LobbyChat() {
     }
   }
 
+  function insertEmoji(e: string) {
+    setBody((prev) => prev + e);
+    setEmojiOpen(false);
+    // Restore focus so users can keep typing right after.
+    setTimeout(() => inputRef.current?.focus(), 0);
+  }
+
+  // Pre-compute date-divider positions: each message gets a `showDate`
+  // flag when its calendar day differs from the previous message's.
+  const enriched = useMemo(() => {
+    let prev: Date | null = null;
+    return messages.map((m) => {
+      const cur = new Date(m.created_at);
+      const showDate = !prev || !isSameDay(prev, cur);
+      prev = cur;
+      return { msg: m, showDate, date: cur };
+    });
+  }, [messages]);
+
   return (
-    <div className="glass flex h-[75vh] flex-col rounded-2xl shadow-card sm:h-[80vh]">
-      <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto p-3 sm:p-5">
+    <div className="glass flex h-[calc(100dvh-9rem)] flex-col overflow-hidden rounded-2xl shadow-card sm:h-[78dvh]">
+      {/* Channel header (Discord-style) */}
+      <div className="flex items-center justify-between gap-2 border-b border-border/60 px-3 py-2.5 sm:px-4">
+        <div className="flex min-w-0 items-center gap-2">
+          <Hash className="h-4 w-4 text-muted-foreground" />
+          <span className="truncate text-sm font-semibold">{channelName}</span>
+        </div>
+        <Sheet open={membersOpen} onOpenChange={setMembersOpen}>
+          <SheetTrigger asChild>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-secondary/40 px-2.5 py-1.5 text-xs text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+              aria-label="Show members"
+            >
+              <Users className="h-3.5 w-3.5" />
+              <span className="tabular-nums">{memberList.length}</span>
+            </button>
+          </SheetTrigger>
+          <SheetContent
+            side="right"
+            className="w-[88vw] max-w-sm border-l border-gold/20 bg-popover p-0"
+          >
+            <SheetHeader className="border-b border-border/60 p-5">
+              <SheetTitle className="font-display text-base">
+                Members in lobby
+              </SheetTitle>
+            </SheetHeader>
+            {memberList.length === 0 ? (
+              <p className="p-5 text-xs italic text-muted-foreground">
+                No members posting yet.
+              </p>
+            ) : (
+              <ul className="p-2">
+                {memberList.map((p) => {
+                  const name =
+                    p.username ??
+                    (p.wallet_address
+                      ? `${p.wallet_address.slice(0, 6)}…${p.wallet_address.slice(-4)}`
+                      : "anon");
+                  return (
+                    <li
+                      key={p.id}
+                      className="flex items-center gap-3 rounded-lg p-2 transition hover:bg-secondary/60"
+                    >
+                      <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full border border-border bg-gradient-gold">
+                        {p.avatar_url ? (
+                          <img
+                            src={p.avatar_url}
+                            alt={name}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-[10px] font-semibold text-gold-foreground">
+                            {(name ?? "??").slice(0, 2).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                      <span className="truncate text-sm font-medium">{name}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </SheetContent>
+        </Sheet>
+      </div>
+
+      {/* Message stream */}
+      <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto p-2 sm:p-4">
         {loading ? (
           <div className="space-y-2">
             {[1, 2, 3, 4, 5].map((i) => (
@@ -283,40 +396,44 @@ export function LobbyChat() {
             Welcome to the lobby. Say hi 👋
           </p>
         ) : (
-          messages.map((m) => (
-            <MessageRow
-              key={m.id}
-              message={m}
-              author={profiles[m.user_id]}
-              replyTarget={m.reply_to_id ? messageById.get(m.reply_to_id) ?? null : null}
-              replyTargetAuthor={
-                m.reply_to_id
-                  ? profiles[messageById.get(m.reply_to_id)?.user_id ?? ""] ?? null
-                  : null
-              }
-              reactions={reactions[m.id] ?? []}
-              currentUserId={user?.id ?? null}
-              onReply={() => setReplyTo(m)}
-              onReact={(emoji) => toggleReaction(m.id, emoji)}
-              onDelete={() => deleteMessage(m.id)}
-            />
+          enriched.map(({ msg, showDate, date }) => (
+            <div key={msg.id}>
+              {showDate && (
+                <div className="my-3 flex items-center gap-3 px-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+                  <span className="h-px flex-1 bg-border/60" />
+                  <span>{format(date, "EEE, MMM d, yyyy")}</span>
+                  <span className="h-px flex-1 bg-border/60" />
+                </div>
+              )}
+              <MessageRow
+                message={msg}
+                author={profiles[msg.user_id]}
+                replyTarget={msg.reply_to_id ? messageById.get(msg.reply_to_id) ?? null : null}
+                replyTargetAuthor={
+                  msg.reply_to_id
+                    ? profiles[messageById.get(msg.reply_to_id)?.user_id ?? ""] ?? null
+                    : null
+                }
+                reactions={reactions[msg.id] ?? []}
+                currentUserId={user?.id ?? null}
+                onReply={() => setReplyTo(msg)}
+                onReact={(emoji) => toggleReaction(msg.id, emoji)}
+                onDelete={() => deleteMessage(msg.id)}
+              />
+            </div>
           ))
         )}
       </div>
 
       {replyTo && (
-        <div className="flex items-center justify-between gap-2 border-t border-border/60 bg-muted/10 px-4 py-2 text-xs">
+        <div className="flex items-center justify-between gap-2 border-t border-border/60 bg-muted/10 px-3 py-2 text-xs sm:px-4">
           <div className="min-w-0">
             <span className="text-muted-foreground">Replying to </span>
             <span className="font-semibold text-gold">
               {profiles[replyTo.user_id]?.username ?? "anon"}
             </span>
             <span className="ml-2 truncate text-muted-foreground">
-              {replyTo.body
-                ? replyTo.body.slice(0, 80)
-                : replyTo.image_url
-                  ? "[image]"
-                  : "[gif]"}
+              {replyTo.body ? replyTo.body.slice(0, 80) : replyTo.image_url ? "[image]" : "[gif]"}
             </span>
           </div>
           <button
@@ -331,7 +448,7 @@ export function LobbyChat() {
       )}
 
       {pendingImage && (
-        <div className="flex items-center justify-between gap-2 border-t border-border/60 bg-muted/10 px-4 py-2 text-xs">
+        <div className="flex items-center justify-between gap-2 border-t border-border/60 bg-muted/10 px-3 py-2 text-xs sm:px-4">
           <span className="truncate text-muted-foreground">
             <ImageIcon className="mr-1 inline h-3.5 w-3.5" />
             {pendingImage.name}
@@ -350,12 +467,13 @@ export function LobbyChat() {
         </div>
       )}
 
+      {/* Composer — pinned to the bottom */}
       <form
         onSubmit={(e) => {
           e.preventDefault();
           void send();
         }}
-        className="flex items-end gap-2 border-t border-border/60 p-2 sm:p-3"
+        className="flex items-center gap-1.5 border-t border-border/60 bg-card/40 px-2 py-2 sm:gap-2 sm:px-3"
       >
         <button
           type="button"
@@ -365,7 +483,7 @@ export function LobbyChat() {
           aria-label="Attach image"
           title="Attach image"
         >
-          <ImageIcon className="h-4.5 w-4.5" />
+          <ImageIcon className="h-[18px] w-[18px]" />
         </button>
         <input
           ref={fileRef}
@@ -392,13 +510,13 @@ export function LobbyChat() {
               aria-label="Insert GIF"
               title="Insert GIF"
             >
-              <Sticker className="h-4.5 w-4.5" />
+              <Sticker className="h-[18px] w-[18px]" />
             </button>
           </PopoverTrigger>
           <PopoverContent
-            align="end"
+            align="start"
             sideOffset={8}
-            className="w-80 border-gold/20 bg-popover p-0"
+            className="w-[min(20rem,calc(100vw-1rem))] border-gold/20 bg-popover p-0"
           >
             <GifPicker
               onPick={(g: GifResult) => {
@@ -409,6 +527,7 @@ export function LobbyChat() {
           </PopoverContent>
         </Popover>
         <textarea
+          ref={inputRef}
           value={body}
           onChange={(e) => setBody(e.target.value)}
           onKeyDown={(e) => {
@@ -421,25 +540,58 @@ export function LobbyChat() {
             user
               ? replyTo
                 ? `Reply to ${profiles[replyTo.user_id]?.username ?? "anon"}…`
-                : "Message the lobby…"
+                : `Message #${channelName}`
               : "Sign in to chat"
           }
           rows={1}
           maxLength={2000}
           disabled={!user || posting}
-          className="min-h-[36px] flex-1 resize-none rounded-md border border-border bg-input px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          // text-base = 16px prevents iOS Safari auto-zoom on focus.
+          className="min-h-[36px] flex-1 resize-none rounded-full border border-border bg-input px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-ring sm:text-sm"
+          style={{ fontSize: 16 }}
         />
+        <Popover open={emojiOpen} onOpenChange={setEmojiOpen}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              disabled={!user || posting}
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground"
+              aria-label="Insert emoji"
+              title="Insert emoji"
+            >
+              <Smile className="h-[18px] w-[18px]" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            align="end"
+            sideOffset={8}
+            className="w-[min(20rem,calc(100vw-1rem))] border-gold/20 bg-popover p-2"
+          >
+            <div className="grid grid-cols-10 gap-1">
+              {INSERT_EMOJI.map((e) => (
+                <button
+                  key={e}
+                  type="button"
+                  onClick={() => insertEmoji(e)}
+                  className="rounded p-1 text-lg leading-none transition hover:bg-secondary"
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
         <button
           type="submit"
           disabled={!user || posting || (!body.trim() && !pendingImage)}
-          className="inline-flex h-9 shrink-0 items-center gap-1 rounded-md bg-gradient-gold px-3 text-xs font-semibold text-gold-foreground shadow-gold disabled:opacity-50 sm:px-4 sm:text-sm"
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-gold text-gold-foreground shadow-gold disabled:opacity-50"
+          aria-label="Send"
         >
           {posting ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <CornerDownLeft className="h-4 w-4" />
           )}
-          <span className="hidden sm:inline">Send</span>
         </button>
       </form>
     </div>
@@ -475,14 +627,13 @@ function MessageRow({
       : "anon");
   const initials = (name ?? "??").slice(0, 2).toUpperCase();
 
-  // Group reactions by emoji.
   const grouped = reactions.reduce<Record<string, ReactionRow[]>>((acc, r) => {
     (acc[r.emoji] ??= []).push(r);
     return acc;
   }, {});
 
   return (
-    <div className="group flex items-start gap-3 rounded-lg px-2 py-1.5 transition hover:bg-secondary/30">
+    <div className="group flex items-start gap-2.5 rounded-lg px-2 py-1.5 transition hover:bg-secondary/30 sm:gap-3">
       <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full border border-border bg-gradient-gold">
         {author?.avatar_url ? (
           <img src={author.avatar_url} alt={name} className="h-full w-full object-cover" />
@@ -493,13 +644,10 @@ function MessageRow({
         )}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="flex items-baseline gap-2 text-xs">
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs">
           <span className={mine ? "font-semibold text-gold" : "font-semibold"}>{name}</span>
-          <span className="text-muted-foreground">
-            {new Date(message.created_at).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
+          <span className="text-[10px] text-muted-foreground">
+            {format(new Date(message.created_at), "HH:mm")}
           </span>
         </div>
         {replyTarget && (
@@ -637,7 +785,3 @@ function MessageRow({
     </div>
   );
 }
-
-// Avoid unused-import warnings for icons that are decorative or used only
-// in branches above the JSX.
-void Smile;

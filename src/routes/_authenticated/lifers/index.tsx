@@ -21,8 +21,8 @@ function LifersHome() {
             Welcome, Lifer.
           </h1>
           <p className="mt-3 max-w-2xl text-sm text-muted-foreground sm:text-base">
-            This wing of BAYCMC is invisible to anyone without both verified BAYC/MAYC and
-            Otherpage verification. The conference room and the Lifer thread are yours.
+            This wing of BAYCMC is invisible to anyone outside the Lifer circle.
+            The conference room and the Lifer thread are yours.
           </p>
         </div>
 

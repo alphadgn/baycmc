@@ -84,9 +84,9 @@ function RoomsPage() {
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-display text-5xl text-gradient-gold">Conference Rooms</h1>
-          <p className="mt-1 text-sm text-muted-foreground font-sans-display">
-            20 rooms · click any room to book or join the live conference
+          <h1 className="font-display text-3xl text-gradient-gold sm:text-5xl">Conference Rooms</h1>
+          <p className="mt-1 text-xs text-muted-foreground font-sans-display sm:text-sm">
+            20 rooms · tap any room to book or join the live conference
           </p>
         </div>
       </header>
