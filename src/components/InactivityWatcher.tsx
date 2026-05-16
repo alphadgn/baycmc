@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { clearWalletAuthLocalState } from "@/lib/auth/usePrivyBridge";
 
 const INACTIVITY_MS = 5 * 60 * 1000; // 5 minutes — strict
 const ACTIVITY_EVENTS = [
@@ -13,9 +14,19 @@ const ACTIVITY_EVENTS = [
 ] as const;
 
 /**
- * Strict 5-minute inactivity sign-out. Listens for any user input on the
- * window; if no input lands within INACTIVITY_MS, signs the user out of
- * Supabase and (best-effort) Privy. Mounted once at the app root.
+ * Strict 5-minute inactivity sign-out.
+ *
+ * On timeout we:
+ *   1. Sign out of Supabase.
+ *   2. Dispatch `baycmc:privy-logout` — the PrivyBridge handles this from
+ *      inside Privy's React context and calls `logout()` for real.
+ *   3. Synchronously wipe any persisted Privy / verify cache from
+ *      localStorage so a refresh after timeout can never short-circuit
+ *      back into the app without going through the Privy modal again.
+ *
+ * Without step 2+3 the prior implementation left the Privy session in
+ * localStorage; reopening the app silently logged the user back in,
+ * skipping the modal — a security gap.
  */
 export function InactivityWatcher() {
   const timerRef = useRef<number | null>(null);
@@ -32,18 +43,18 @@ export function InactivityWatcher() {
       } catch (e) {
         console.warn("[InactivityWatcher] supabase signOut failed", e);
       }
-      // Best-effort Privy logout — dynamic import keeps this off the SSR path.
+      // Hand off to the PrivyBridge to perform Privy logout from inside
+      // the hook context, then nuke local caches as a belt-and-braces.
       try {
-        const mod = await import("@privy-io/react-auth");
-        const { usePrivy } = mod;
-        // We can't easily call hooks here, but we can trigger a logout if we had access to the client.
-        // Since we are outside the React tree context, we rely on Supabase session invalidation
-        // which Privy's AuthProvider will observe.
-        void usePrivy;
+        window.dispatchEvent(new Event("baycmc:privy-logout"));
       } catch {
         /* noop */
       }
-      toast.info("Signed out after 5 minutes of inactivity.");
+      clearWalletAuthLocalState();
+      toast.info("Signed out after 5 minutes of inactivity.", {
+        description: "Re-enter through the wallet sign-in modal to continue.",
+        duration: 8000,
+      });
     };
 
     const reset = () => {
@@ -54,7 +65,6 @@ export function InactivityWatcher() {
       }, INACTIVITY_MS);
     };
 
-    // Only arm the timer when there's an active session.
     let unsub: (() => void) | null = null;
     void supabase.auth.getSession().then(({ data }) => {
       if (data.session) reset();

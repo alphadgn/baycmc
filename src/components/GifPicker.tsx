@@ -85,7 +85,7 @@ export function GifPicker({ onPick }: GifPickerProps) {
           autoFocus
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search Tenor…"
+          placeholder="Search Giphy…"
           className="flex-1 bg-transparent text-sm focus:outline-none"
         />
       </div>
@@ -98,22 +98,31 @@ export function GifPicker({ onPick }: GifPickerProps) {
           No results.
         </div>
       ) : (
-        <div className="grid flex-1 grid-cols-2 gap-2 overflow-y-auto p-2 sm:grid-cols-3">
-          {items.map((g) => (
-            <button
-              key={g.id}
-              type="button"
-              onClick={() => onPick(g)}
-              className="overflow-hidden rounded-lg bg-muted/40 transition hover:ring-2 hover:ring-gold/60"
-            >
-              <img
-                src={g.preview}
-                alt={g.description}
-                loading="lazy"
-                className="h-24 w-full object-cover"
-              />
-            </button>
-          ))}
+        // Masonry-style: CSS columns let each thumbnail keep its native
+        // aspect ratio. Each item is `block w-full` (the column's width)
+        // with `h-auto`, and `break-inside-avoid` stops a single thumb
+        // from being split across columns. Replaces the prior grid of
+        // fixed-height `object-cover` tiles, which cropped every GIF.
+        <div className="flex-1 overflow-y-auto p-2">
+          <div className="columns-2 gap-2 sm:columns-3 [&>*]:mb-2">
+            {items.map((g) => (
+              <button
+                key={g.id}
+                type="button"
+                onClick={() => onPick(g)}
+                className="block w-full overflow-hidden rounded-lg bg-muted/40 break-inside-avoid transition hover:ring-2 hover:ring-gold/60"
+              >
+                <img
+                  src={g.preview}
+                  alt={g.description}
+                  loading="lazy"
+                  width={g.width || 200}
+                  height={g.height || 200}
+                  className="block h-auto w-full"
+                />
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>

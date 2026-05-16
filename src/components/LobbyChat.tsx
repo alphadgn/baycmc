@@ -677,23 +677,28 @@ function MessageRow({
             href={message.image_url}
             target="_blank"
             rel="noreferrer"
-            className="mt-1.5 inline-block max-w-xs overflow-hidden rounded-lg border border-border"
+            className="mt-1.5 inline-block max-w-[260px] overflow-hidden rounded-lg border border-border sm:max-w-xs"
           >
             <img
               src={message.image_url}
               alt="attachment"
               loading="lazy"
-              className="max-h-72 object-cover"
+              // No object-cover here — keep the natural aspect ratio.
+              // max-h caps absurdly tall images; everything else flows.
+              className="block h-auto max-h-72 w-full object-contain"
             />
           </a>
         )}
         {message.gif_url && (
-          <div className="mt-1.5 inline-block max-w-xs overflow-hidden rounded-lg border border-border">
+          <div className="mt-1.5 inline-block max-w-[260px] overflow-hidden rounded-lg border border-border sm:max-w-xs">
             <img
               src={message.gif_url}
               alt="gif"
               loading="lazy"
-              className="max-h-72 object-cover"
+              // GIFs must keep their native aspect ratio — Giphy returns
+              // wide square and tall variants, and object-cover was
+              // cropping any frame that didn't match the container.
+              className="block h-auto max-h-72 w-full object-contain"
             />
           </div>
         )}

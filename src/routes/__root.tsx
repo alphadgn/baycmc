@@ -4,6 +4,7 @@ import { PrivyAppProvider } from "@/components/PrivyAppProvider";
 import { PrivyBridgeMount } from "@/lib/auth/usePrivyBridge";
 import { AppHeader } from "@/components/AppHeader";
 import { InactivityWatcher } from "@/components/InactivityWatcher";
+import { AuthRedirectWatcher } from "@/components/AuthRedirectWatcher";
 import { Toaster } from "@/components/ui/sonner";
 import { installDiagnostics } from "@/lib/diagnostics";
 
@@ -88,6 +89,7 @@ function RootComponent() {
         <Outlet />
         <Toaster />
         <InactivityWatcher />
+        <AuthRedirectWatcher />
       </div>
     </PrivyAppProvider>
   );

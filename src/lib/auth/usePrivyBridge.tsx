@@ -119,6 +119,7 @@ type PrivyHooks = {
     ready: boolean;
     authenticated: boolean;
     user?: { id?: string; email?: { address?: string } | null } | null;
+    logout: () => Promise<void>;
   };
   useWallets: () => { wallets: WalletLike[]; ready: boolean };
   useSignMessage: () => {
@@ -136,6 +137,38 @@ type PrivyHooks = {
     ) => Promise<{ signature: string }>;
   };
 };
+
+/**
+ * Hard-reset every shred of cached wallet state. Used by the inactivity
+ * timer (and any other forced sign-out path) so the next visit must go
+ * through Privy's modal from scratch. Without this, Privy's own session
+ * persists in localStorage and the bridge can short-circuit the user
+ * back in without a fresh signature.
+ */
+export function clearWalletAuthLocalState() {
+  if (typeof window === "undefined") return;
+  try {
+    const ls = window.localStorage;
+    // Our 24h verify-fresh markers
+    for (let i = ls.length - 1; i >= 0; i--) {
+      const k = ls.key(i);
+      if (!k) continue;
+      if (k.startsWith("baycmc:verified:")) ls.removeItem(k);
+      // Privy persists session/wallet metadata under "privy:*" keys.
+      // Clearing them forces a full re-login on next visit.
+      if (k.startsWith("privy:")) ls.removeItem(k);
+    }
+    // Privy also caches a couple of items in sessionStorage.
+    const ss = window.sessionStorage;
+    for (let i = ss.length - 1; i >= 0; i--) {
+      const k = ss.key(i);
+      if (!k) continue;
+      if (k.startsWith("privy:")) ss.removeItem(k);
+    }
+  } catch {
+    /* private mode / quota — ignore */
+  }
+}
 
 function withTimeout<T>(p: Promise<T>, ms: number, message: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -170,7 +203,7 @@ function isChunkLoadError(error: unknown): boolean {
 }
 
 export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
-  const { ready, authenticated, user } = hooks.usePrivy();
+  const { ready, authenticated, user, logout } = hooks.usePrivy();
   const { wallets, ready: walletsReady } = hooks.useWallets();
   const { signMessage } = hooks.useSignMessage();
   const verifyFn = useServerFn(verifyPrivyOwnership);
@@ -235,6 +268,36 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
     window.addEventListener("baycmc:privy-bridge-retry", retry);
     return () => window.removeEventListener("baycmc:privy-bridge-retry", retry);
   }, []);
+
+  // Hard sign-out from Privy on demand. The inactivity timer can't call
+  // Privy hooks itself (it lives outside this React tree), so it dispatches
+  // a window event we handle here from inside the hook context.
+  useEffect(() => {
+    const onLogout = () => {
+      logEvent("auth", "info", "forced Privy logout");
+      // Wipe our caches first so the bridge can't re-verify silently on
+      // the next render cycle while Privy is mid-teardown.
+      completedRef.current.clear();
+      inFlightRef.current = null;
+      verifyRequestedRef.current = false;
+      patchPrivySnapshot({
+        ready: false,
+        authenticated: false,
+        address: null,
+        verifying: false,
+      });
+      void (async () => {
+        try {
+          await logout();
+        } catch (e) {
+          console.warn("[PrivyBridge] logout threw", e);
+        }
+        clearWalletAuthLocalState();
+      })();
+    };
+    window.addEventListener("baycmc:privy-logout", onLogout);
+    return () => window.removeEventListener("baycmc:privy-logout", onLogout);
+  }, [logout]);
 
   useEffect(() => {
     if (!ready || !authenticated || !walletsReady || !walletReady || !embeddedWallet) {
@@ -301,7 +364,12 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
         patchPrivySnapshot({ verifying: true });
 
         logEvent("auth", "info", "bridge: building SIWE + calling signMessage");
-        toast.loading("Preparing wallet sign-in…", { id: toastId });
+        // Top-center keeps the prep toast out of the way of Privy's modal
+        // (which lands centered, with its action button near the middle).
+        toast.loading("Preparing wallet sign-in…", {
+          id: toastId,
+          position: "top-center",
+        });
 
         const domain = window.location.host;
         const origin = window.location.origin;
@@ -329,6 +397,10 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
             buttonText: "Sign and continue",
           },
         } as const;
+        // Dismiss the "Preparing wallet sign-in…" toast NOW, just before
+        // Privy opens its modal. Otherwise the toast sits at the bottom of
+        // the viewport and covers Privy's "Sign and continue" button.
+        toast.dismiss(toastId);
         let signResult: { signature: string };
         try {
           signResult = await withTimeout(
@@ -338,13 +410,17 @@ export function PrivyBridge({ hooks }: { hooks: PrivyHooks }) {
           );
         } catch (e) {
           if (!isChunkLoadError(e)) throw e;
-          // Privy iframe missed a chunk on the first request — retry once
-          // after a short delay so the CDN can serve the cached chunk.
           logEvent("auth", "warn", "bridge: signMessage chunk-load failed — retrying", {
             message: e instanceof Error ? e.message : String(e),
           });
-          toast.loading("Reloading wallet sign-in…", { id: toastId });
+          // Show a brief retry toast at top-center where it won't overlap
+          // Privy's modal action button on the next attempt.
+          toast.loading("Reloading wallet sign-in…", {
+            id: toastId,
+            position: "top-center",
+          });
           await new Promise((r) => window.setTimeout(r, 600));
+          toast.dismiss(toastId);
           signResult = await withTimeout(
             signMessageRef.current({ message }, signOpts),
             45_000,
