@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { ChevronDown, Copy, LogOut, User as UserIcon, Activity } from "lucide-react";
+import { Activity, ChevronDown, Copy, Loader2, Lock, LogOut, User as UserIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { signOut } from "@/lib/auth/useAuth";
 import { toast } from "sonner";
@@ -8,6 +8,11 @@ import { toast } from "sonner";
 interface WalletPillProps {
   address: string;
   collection: "BAYC" | "MAYC" | null;
+  /** Lobby users (Tier 1) get a "Verify holder access" dropdown item that
+   *  triggers a fresh Privy signature + on-chain ownership check. */
+  isVerifiedHolder?: boolean;
+  onVerify?: () => void;
+  verifying?: boolean;
 }
 
 function sliceAddress(addr: string) {
@@ -23,7 +28,7 @@ function AddressAvatar({ address, size = 20 }: { address: string; size?: number 
     const h2 = parseInt(a.slice(6, 12) || "0", 16);
     const h3 = parseInt(a.slice(12, 18) || "0", 16);
     const hue1 = h1 % 360;
-    const hue2 = (h2 % 360 + 120) % 360;
+    const hue2 = ((h2 % 360) + 120) % 360;
     return {
       c1: `hsl(${hue1} 80% 55%)`,
       c2: `hsl(${hue2} 80% 45%)`,
@@ -43,7 +48,13 @@ function AddressAvatar({ address, size = 20 }: { address: string; size?: number 
   );
 }
 
-export function WalletPill({ address, collection }: WalletPillProps) {
+export function WalletPill({
+  address,
+  collection,
+  isVerifiedHolder = collection !== null,
+  onVerify,
+  verifying = false,
+}: WalletPillProps) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -82,11 +93,7 @@ export function WalletPill({ address, collection }: WalletPillProps) {
           <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
         </button>
       </PopoverTrigger>
-      <PopoverContent
-        align="end"
-        sideOffset={8}
-        className="w-72 border-gold/20 bg-popover p-0"
-      >
+      <PopoverContent align="end" sideOffset={8} className="w-72 border-gold/20 bg-popover p-0">
         <div className="flex items-center gap-3 border-b border-border/60 p-4">
           <AddressAvatar address={address} size={36} />
           <div className="min-w-0 flex-1">
@@ -116,6 +123,31 @@ export function WalletPill({ address, collection }: WalletPillProps) {
               <span className="h-1.5 w-1.5 rounded-full bg-gold" />
               {collection} verified
             </span>
+          </div>
+        )}
+
+        {!isVerifiedHolder && onVerify && (
+          <div className="px-4 py-3">
+            <button
+              type="button"
+              disabled={verifying}
+              onClick={() => {
+                onVerify();
+                setOpen(false);
+              }}
+              className="inline-flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-md border border-gold/40 bg-gold/10 px-3 py-2 text-xs font-semibold text-gold transition hover:bg-gold/20 disabled:cursor-wait disabled:opacity-70"
+            >
+              {verifying ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Lock className="h-3.5 w-3.5" />
+              )}
+              {verifying ? "Verifying…" : "Verify holder access"}
+            </button>
+            <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
+              Re-checks BAYC/MAYC ownership on-chain (direct or via delegate.cash). You'll be asked
+              to sign a message.
+            </p>
           </div>
         )}
 

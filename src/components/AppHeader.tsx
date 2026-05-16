@@ -1,23 +1,15 @@
 import { Link, useLocation, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Loader2, Lock, Menu, X } from "lucide-react";
+import { ArrowLeft, Lock, Menu, X } from "lucide-react";
 import { toast } from "sonner";
-import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/lib/auth/useAuth";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import { usePrivyAuthState } from "@/lib/auth/usePrivyBridge";
 import { supabase } from "@/integrations/supabase/client";
-import { revalidateOwnership } from "@/server/verification.functions";
 import { EntranceDialog } from "@/components/EntranceDialog";
 import { EmbroideredImage } from "@/components/EmbroideredImage";
 import { WalletPill } from "@/components/WalletPill";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 interface NavItem {
   to:
@@ -113,7 +105,10 @@ export function AppHeader() {
                     <Menu className="h-5 w-5" />
                   </button>
                 </SheetTrigger>
-                <SheetContent side="right" className="w-[88vw] max-w-sm border-l border-gold/20 bg-popover p-0">
+                <SheetContent
+                  side="right"
+                  className="w-[88vw] max-w-sm border-l border-gold/20 bg-popover p-0"
+                >
                   <SheetHeader className="border-b border-border/60 p-5">
                     <SheetTitle className="font-display text-lg text-gradient-gold">
                       Clubhouse
@@ -169,17 +164,9 @@ function sliceAddress(addr: string) {
 
 function EntranceControls({ onOpen }: { onOpen: () => void }) {
   const { isAuthenticated, user, loading: authLoading } = useAuth();
-  const {
-    isVerifiedHolder,
-    collection,
-    loading: verifLoading,
-    refresh: refreshVerification,
-  } = useVerificationStatus();
+  const { isVerifiedHolder, collection, loading: verifLoading } = useVerificationStatus();
   const privy = usePrivyAuthState();
-  const recheck = useServerFn(revalidateOwnership);
-  const router = useRouter();
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [recheckBusy, setRecheckBusy] = useState(false);
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [clicked, setClicked] = useState(false);
   const isBooting = clicked && !privy.ready;
@@ -193,8 +180,7 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
     if (privy.ready) return;
     const t = window.setTimeout(() => {
       toast.error("Wallet sign-in didn't load.", {
-        description:
-          "Check that PRIVY_APP_ID is set in .env and the dev server was restarted.",
+        description: "Check that PRIVY_APP_ID is set in .env and the dev server was restarted.",
         duration: 8000,
       });
       setClicked(false);
@@ -227,80 +213,26 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
 
   const verifying = privy.verifying;
 
-  // Real on-chain re-check for the wallet already linked to this profile.
-  // Doesn't re-open Privy; just hits `revalidateOwnership` which runs a
-  // fresh balanceOf + delegate.cash lookup, persists the result, and we
-  // tell the user exactly what came back.
-  async function runRecheck() {
-    if (recheckBusy) return;
-    setRecheckBusy(true);
-    const toastId = "recheck-ownership";
-    toast.loading("Checking BAYC / MAYC ownership on-chain…", {
-      id: toastId,
-      position: "top-center",
-    });
-    try {
-      const snap = await recheck();
-      if (snap.tokenProof) {
-        toast.success(
-          snap.delegationVault
-            ? `Verified — ${snap.collection} via delegate.cash vault ${snap.delegationVault.slice(0, 6)}…${snap.delegationVault.slice(-4)}.`
-            : `Verified — ${snap.collection} ownership confirmed.`,
-          { id: toastId, duration: 5000 },
-        );
-      } else {
-        toast.message("No BAYC/MAYC found yet", {
-          id: toastId,
-          description:
-            snap.reason === "rpc-unavailable-prior-state-preserved"
-              ? "Ethereum RPC was unreachable — we kept your previous status. Try again in a moment."
-              : "Neither this wallet nor any delegate.cash vault holds a BAYC/MAYC right now.",
-          duration: 7000,
-        });
-      }
-      await refreshVerification();
-      void router.navigate({ to: "/lobby" });
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't run the ownership check.", {
-        id: toastId,
-        duration: 7000,
-      });
-      void router.navigate({ to: "/lobby" });
-    } finally {
-      setRecheckBusy(false);
-    }
+  // Re-verification (lobby → holder): hands off to the Privy bridge,
+  // which pops a fresh SIWE signature and re-runs the on-chain check.
+  // The bridge dispatches "baycmc:verification-refresh" on success so
+  // useVerificationStatus reloads — no manual refresh needed here.
+  function requestReverify() {
+    window.dispatchEvent(new Event("baycmc:privy-bridge-retry"));
   }
 
   if (isAuthenticated) {
     if (walletAddress) {
-      // Single control that swaps state:
-      //   • Not verified  → "Verify" button (icon + label). Clicking it
-      //     runs a fresh on-chain check of the linked wallet — no Privy
-      //     re-prompt, since the user is already signed in.
-      //   • Verified      → sliced wallet pill (with the collection badge).
-      if (!verifLoading && !isVerifiedHolder) {
-        return (
-          <button
-            type="button"
-            disabled={recheckBusy || verifying}
-            onClick={() => void runRecheck()}
-            title="Check on-chain BAYC/MAYC ownership"
-            aria-label="Verify holder access"
-            className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-gold/40 bg-gold/10 px-3 py-2 text-xs font-semibold text-gold transition hover:bg-gold/20 disabled:cursor-wait disabled:opacity-70 sm:text-sm"
-          >
-            {recheckBusy ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Lock className="h-3.5 w-3.5" />
-            )}
-            {recheckBusy ? "Checking…" : verifying ? "Verifying…" : "Verify"}
-          </button>
-        );
-      }
+      // Always render the sliced-address pill once authenticated. Lobby
+      // users (Tier 1) get a "Verify holder access" action inside the
+      // pill's dropdown which triggers a fresh signature + on-chain check.
       return (
         <WalletPill
           address={walletAddress}
-          collection={isVerifiedHolder ? collection ?? null : null}
+          collection={isVerifiedHolder ? (collection ?? null) : null}
+          isVerifiedHolder={isVerifiedHolder}
+          onVerify={requestReverify}
+          verifying={verifying || verifLoading}
         />
       );
     }
@@ -335,9 +267,7 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
         aria-label={`Click to verify ${privy.address}`}
       >
         <Lock className="h-3.5 w-3.5" />
-        <span className="hidden sm:inline">
-          {verifying ? "Verifying…" : "Click to verify"}
-        </span>
+        <span className="hidden sm:inline">{verifying ? "Verifying…" : "Click to verify"}</span>
         <span className="font-mono text-[10px] text-gold/70 sm:text-xs">
           {sliceAddress(privy.address)}
         </span>
