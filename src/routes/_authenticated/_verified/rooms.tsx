@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth/useAuth";
 import { createBooking, cancelBooking } from "@/server/bookings.functions";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { RoomCalendar } from "@/components/RoomCalendar";
 
 interface Room {
   id: string;
@@ -97,6 +98,22 @@ function RoomsPage() {
           ))}
         </div>
       ) : (
+        <>
+        <div className="mb-6">
+          <RoomCalendar
+            rooms={rooms}
+            bookings={bookings}
+            currentUserId={user?.id ?? null}
+            onCancel={async (id) => {
+              const res = await cancel({ data: { bookingId: id } });
+              if (!res.ok) toast.error(res.error);
+              else {
+                toast.success("Booking cancelled");
+                await load();
+              }
+            }}
+          />
+        </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {rooms.map((room) => {
             const upcoming = bookings.filter((b) => b.room_id === room.id).slice(0, 2);
@@ -155,6 +172,7 @@ function RoomsPage() {
             );
           })}
         </div>
+        </>
       )}
 
       {selectedRoom && (

@@ -1,0 +1,643 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  CornerDownLeft,
+  Image as ImageIcon,
+  Loader2,
+  MoreHorizontal,
+  Reply,
+  Smile,
+  SmilePlus,
+  Sticker,
+  Trash2,
+  X,
+} from "lucide-react";
+import { toast } from "sonner";
+import { supabase as typedSupabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth/useAuth";
+
+// New tables (lobby_messages, lobby_message_reactions) aren't in the
+// generated Database type yet — Lovable regenerates `types.ts` from the
+// remote schema only after migrations land. Cast through an untyped
+// SupabaseClient so this file compiles before that regen.
+const supabase = typedSupabase as unknown as SupabaseClient;
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { GifPicker } from "@/components/GifPicker";
+import type { GifResult } from "@/server/giphy.functions";
+
+interface LobbyMessage {
+  id: string;
+  user_id: string;
+  body: string | null;
+  image_url: string | null;
+  gif_url: string | null;
+  reply_to_id: string | null;
+  created_at: string;
+}
+
+interface ProfileMini {
+  id: string;
+  username: string | null;
+  avatar_url: string | null;
+  wallet_address: string | null;
+}
+
+interface ReactionRow {
+  message_id: string;
+  user_id: string;
+  emoji: string;
+}
+
+const QUICK_EMOJI = ["🔥", "🐵", "🍌", "🙌", "❤️", "👀", "💎", "🤝", "😂", "🎉", "🚀"];
+
+export function LobbyChat() {
+  const { user } = useAuth();
+  const [messages, setMessages] = useState<LobbyMessage[]>([]);
+  const [profiles, setProfiles] = useState<Record<string, ProfileMini>>({});
+  const [reactions, setReactions] = useState<Record<string, ReactionRow[]>>({});
+  const [loading, setLoading] = useState(true);
+  const [body, setBody] = useState("");
+  const [pendingImage, setPendingImage] = useState<File | null>(null);
+  const [replyTo, setReplyTo] = useState<LobbyMessage | null>(null);
+  const [posting, setPosting] = useState(false);
+  const [gifOpen, setGifOpen] = useState(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  const hydrateProfiles = useCallback(async (msgs: LobbyMessage[]) => {
+    const missing = Array.from(
+      new Set(
+        msgs
+          .map((m) => m.user_id)
+          .filter((id) => !profiles[id]),
+      ),
+    );
+    if (!missing.length) return;
+    const { data } = await supabase
+      .from("profiles")
+      .select("id,username,avatar_url,wallet_address")
+      .in("id", missing);
+    if (!data) return;
+    setProfiles((prev) => {
+      const next = { ...prev };
+      for (const p of data as ProfileMini[]) next[p.id] = p;
+      return next;
+    });
+  }, [profiles]);
+
+  // Initial load
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("lobby_messages")
+        .select("id,user_id,body,image_url,gif_url,reply_to_id,created_at")
+        .order("created_at", { ascending: true })
+        .limit(300);
+      if (cancelled) return;
+      if (error) {
+        toast.error(error.message);
+        setLoading(false);
+        return;
+      }
+      const msgs = (data ?? []) as LobbyMessage[];
+      setMessages(msgs);
+      setLoading(false);
+      void hydrateProfiles(msgs);
+      // Reactions
+      if (msgs.length > 0) {
+        const ids = msgs.map((m) => m.id);
+        const { data: rxs } = await supabase
+          .from("lobby_message_reactions")
+          .select("message_id,user_id,emoji")
+          .in("message_id", ids);
+        if (!cancelled && rxs) {
+          const grouped: Record<string, ReactionRow[]> = {};
+          for (const r of rxs as ReactionRow[]) {
+            (grouped[r.message_id] ??= []).push(r);
+          }
+          setReactions(grouped);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Realtime subscriptions
+  useEffect(() => {
+    const ch = supabase
+      .channel("lobby-chat")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "lobby_messages" },
+        async (payload) => {
+          const m = payload.new as LobbyMessage;
+          setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
+          await hydrateProfiles([m]);
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "lobby_messages" },
+        (payload) => {
+          const id = (payload.old as { id?: string })?.id;
+          if (!id) return;
+          setMessages((prev) => prev.filter((m) => m.id !== id));
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "lobby_message_reactions" },
+        (payload) => {
+          const r = payload.new as ReactionRow;
+          setReactions((prev) => {
+            const list = prev[r.message_id] ?? [];
+            if (list.some((x) => x.user_id === r.user_id && x.emoji === r.emoji)) {
+              return prev;
+            }
+            return { ...prev, [r.message_id]: [...list, r] };
+          });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "lobby_message_reactions" },
+        (payload) => {
+          const old = payload.old as Partial<ReactionRow>;
+          if (!old.message_id || !old.user_id || !old.emoji) return;
+          setReactions((prev) => {
+            const list = prev[old.message_id!] ?? [];
+            const next = list.filter(
+              (r) => !(r.user_id === old.user_id && r.emoji === old.emoji),
+            );
+            return { ...prev, [old.message_id!]: next };
+          });
+        },
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(ch);
+    };
+  }, [hydrateProfiles]);
+
+  // Scroll to bottom on new message
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, [messages.length]);
+
+  const messageById = useMemo(() => {
+    const m = new Map<string, LobbyMessage>();
+    for (const x of messages) m.set(x.id, x);
+    return m;
+  }, [messages]);
+
+  async function uploadPendingImage(): Promise<string | null> {
+    if (!pendingImage || !user) return null;
+    const ext = pendingImage.name.split(".").pop()?.toLowerCase() || "png";
+    const path = `${user.id}/chat-${Date.now()}.${ext}`;
+    const { error } = await supabase.storage
+      .from("chat-attachments")
+      .upload(path, pendingImage, { upsert: false, contentType: pendingImage.type });
+    if (error) throw error;
+    const { data } = supabase.storage.from("chat-attachments").getPublicUrl(path);
+    return data.publicUrl;
+  }
+
+  async function send(opts: { gifUrl?: string } = {}) {
+    if (!user) return;
+    const text = body.trim();
+    const hasContent = !!text || !!pendingImage || !!opts.gifUrl;
+    if (!hasContent) return;
+    setPosting(true);
+    try {
+      let imageUrl: string | null = null;
+      if (pendingImage) {
+        imageUrl = await uploadPendingImage();
+      }
+      const { error } = await supabase.from("lobby_messages").insert({
+        user_id: user.id,
+        body: text || null,
+        image_url: imageUrl,
+        gif_url: opts.gifUrl ?? null,
+        reply_to_id: replyTo?.id ?? null,
+      });
+      if (error) throw error;
+      setBody("");
+      setPendingImage(null);
+      setReplyTo(null);
+      if (fileRef.current) fileRef.current.value = "";
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't send message");
+    } finally {
+      setPosting(false);
+    }
+  }
+
+  async function deleteMessage(id: string) {
+    const { error } = await supabase.from("lobby_messages").delete().eq("id", id);
+    if (error) toast.error(error.message);
+  }
+
+  async function toggleReaction(messageId: string, emoji: string) {
+    if (!user) return;
+    const list = reactions[messageId] ?? [];
+    const mine = list.find((r) => r.user_id === user.id && r.emoji === emoji);
+    if (mine) {
+      const { error } = await supabase
+        .from("lobby_message_reactions")
+        .delete()
+        .eq("message_id", messageId)
+        .eq("user_id", user.id)
+        .eq("emoji", emoji);
+      if (error) toast.error(error.message);
+    } else {
+      const { error } = await supabase
+        .from("lobby_message_reactions")
+        .insert({ message_id: messageId, user_id: user.id, emoji });
+      if (error && !error.message.toLowerCase().includes("duplicate")) {
+        toast.error(error.message);
+      }
+    }
+  }
+
+  return (
+    <div className="glass flex h-[75vh] flex-col rounded-2xl shadow-card sm:h-[80vh]">
+      <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto p-3 sm:p-5">
+        {loading ? (
+          <div className="space-y-2">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="h-14 animate-pulse rounded-lg bg-muted/20" />
+            ))}
+          </div>
+        ) : messages.length === 0 ? (
+          <p className="py-12 text-center text-sm text-muted-foreground">
+            Welcome to the lobby. Say hi 👋
+          </p>
+        ) : (
+          messages.map((m) => (
+            <MessageRow
+              key={m.id}
+              message={m}
+              author={profiles[m.user_id]}
+              replyTarget={m.reply_to_id ? messageById.get(m.reply_to_id) ?? null : null}
+              replyTargetAuthor={
+                m.reply_to_id
+                  ? profiles[messageById.get(m.reply_to_id)?.user_id ?? ""] ?? null
+                  : null
+              }
+              reactions={reactions[m.id] ?? []}
+              currentUserId={user?.id ?? null}
+              onReply={() => setReplyTo(m)}
+              onReact={(emoji) => toggleReaction(m.id, emoji)}
+              onDelete={() => deleteMessage(m.id)}
+            />
+          ))
+        )}
+      </div>
+
+      {replyTo && (
+        <div className="flex items-center justify-between gap-2 border-t border-border/60 bg-muted/10 px-4 py-2 text-xs">
+          <div className="min-w-0">
+            <span className="text-muted-foreground">Replying to </span>
+            <span className="font-semibold text-gold">
+              {profiles[replyTo.user_id]?.username ?? "anon"}
+            </span>
+            <span className="ml-2 truncate text-muted-foreground">
+              {replyTo.body
+                ? replyTo.body.slice(0, 80)
+                : replyTo.image_url
+                  ? "[image]"
+                  : "[gif]"}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setReplyTo(null)}
+            className="rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
+            aria-label="Cancel reply"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
+      {pendingImage && (
+        <div className="flex items-center justify-between gap-2 border-t border-border/60 bg-muted/10 px-4 py-2 text-xs">
+          <span className="truncate text-muted-foreground">
+            <ImageIcon className="mr-1 inline h-3.5 w-3.5" />
+            {pendingImage.name}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setPendingImage(null);
+              if (fileRef.current) fileRef.current.value = "";
+            }}
+            className="rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
+            aria-label="Remove attachment"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void send();
+        }}
+        className="flex items-end gap-2 border-t border-border/60 p-2 sm:p-3"
+      >
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          disabled={posting}
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground"
+          aria-label="Attach image"
+          title="Attach image"
+        >
+          <ImageIcon className="h-4.5 w-4.5" />
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (!f) return;
+            if (f.size > 5 * 1024 * 1024) {
+              toast.error("Image is too large — max 5 MB.");
+              e.target.value = "";
+              return;
+            }
+            setPendingImage(f);
+          }}
+        />
+        <Popover open={gifOpen} onOpenChange={setGifOpen}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              disabled={posting}
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground"
+              aria-label="Insert GIF"
+              title="Insert GIF"
+            >
+              <Sticker className="h-4.5 w-4.5" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            align="end"
+            sideOffset={8}
+            className="w-80 border-gold/20 bg-popover p-0"
+          >
+            <GifPicker
+              onPick={(g: GifResult) => {
+                setGifOpen(false);
+                void send({ gifUrl: g.url });
+              }}
+            />
+          </PopoverContent>
+        </Popover>
+        <textarea
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              void send();
+            }
+          }}
+          placeholder={
+            user
+              ? replyTo
+                ? `Reply to ${profiles[replyTo.user_id]?.username ?? "anon"}…`
+                : "Message the lobby…"
+              : "Sign in to chat"
+          }
+          rows={1}
+          maxLength={2000}
+          disabled={!user || posting}
+          className="min-h-[36px] flex-1 resize-none rounded-md border border-border bg-input px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        />
+        <button
+          type="submit"
+          disabled={!user || posting || (!body.trim() && !pendingImage)}
+          className="inline-flex h-9 shrink-0 items-center gap-1 rounded-md bg-gradient-gold px-3 text-xs font-semibold text-gold-foreground shadow-gold disabled:opacity-50 sm:px-4 sm:text-sm"
+        >
+          {posting ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <CornerDownLeft className="h-4 w-4" />
+          )}
+          <span className="hidden sm:inline">Send</span>
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function MessageRow({
+  message,
+  author,
+  replyTarget,
+  replyTargetAuthor,
+  reactions,
+  currentUserId,
+  onReply,
+  onReact,
+  onDelete,
+}: {
+  message: LobbyMessage;
+  author?: ProfileMini;
+  replyTarget: LobbyMessage | null;
+  replyTargetAuthor: ProfileMini | null;
+  reactions: ReactionRow[];
+  currentUserId: string | null;
+  onReply: () => void;
+  onReact: (emoji: string) => void;
+  onDelete: () => void;
+}) {
+  const mine = message.user_id === currentUserId;
+  const name =
+    author?.username ??
+    (author?.wallet_address
+      ? `${author.wallet_address.slice(0, 6)}…${author.wallet_address.slice(-4)}`
+      : "anon");
+  const initials = (name ?? "??").slice(0, 2).toUpperCase();
+
+  // Group reactions by emoji.
+  const grouped = reactions.reduce<Record<string, ReactionRow[]>>((acc, r) => {
+    (acc[r.emoji] ??= []).push(r);
+    return acc;
+  }, {});
+
+  return (
+    <div className="group flex items-start gap-3 rounded-lg px-2 py-1.5 transition hover:bg-secondary/30">
+      <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full border border-border bg-gradient-gold">
+        {author?.avatar_url ? (
+          <img src={author.avatar_url} alt={name} className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-[11px] font-semibold text-gold-foreground">
+            {initials}
+          </div>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline gap-2 text-xs">
+          <span className={mine ? "font-semibold text-gold" : "font-semibold"}>{name}</span>
+          <span className="text-muted-foreground">
+            {new Date(message.created_at).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </span>
+        </div>
+        {replyTarget && (
+          <div className="mt-1 flex items-start gap-1.5 rounded-md border-l-2 border-gold/50 bg-muted/20 px-2 py-1 text-[11px]">
+            <Reply className="mt-0.5 h-3 w-3 text-gold/70" />
+            <div className="min-w-0">
+              <span className="font-semibold text-gold/90">
+                {replyTargetAuthor?.username ?? "anon"}
+              </span>
+              <span className="ml-1 truncate text-muted-foreground">
+                {replyTarget.body
+                  ? replyTarget.body.slice(0, 100)
+                  : replyTarget.image_url
+                    ? "[image]"
+                    : "[gif]"}
+              </span>
+            </div>
+          </div>
+        )}
+        {message.body && (
+          <p className="mt-0.5 whitespace-pre-wrap break-words text-sm leading-relaxed">
+            {message.body}
+          </p>
+        )}
+        {message.image_url && (
+          <a
+            href={message.image_url}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-1.5 inline-block max-w-xs overflow-hidden rounded-lg border border-border"
+          >
+            <img
+              src={message.image_url}
+              alt="attachment"
+              loading="lazy"
+              className="max-h-72 object-cover"
+            />
+          </a>
+        )}
+        {message.gif_url && (
+          <div className="mt-1.5 inline-block max-w-xs overflow-hidden rounded-lg border border-border">
+            <img
+              src={message.gif_url}
+              alt="gif"
+              loading="lazy"
+              className="max-h-72 object-cover"
+            />
+          </div>
+        )}
+        {Object.keys(grouped).length > 0 && (
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {Object.entries(grouped).map(([emoji, list]) => {
+              const mineToo = currentUserId
+                ? list.some((r) => r.user_id === currentUserId)
+                : false;
+              return (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => onReact(emoji)}
+                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition ${
+                    mineToo
+                      ? "border-gold/60 bg-gold/15 text-foreground"
+                      : "border-border bg-secondary/40 text-muted-foreground hover:border-gold/40"
+                  }`}
+                >
+                  <span>{emoji}</span>
+                  <span className="text-[10px] tabular-nums">{list.length}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      <div className="flex shrink-0 items-center gap-1 opacity-0 transition group-hover:opacity-100">
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className="rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
+              aria-label="Add reaction"
+              title="React"
+            >
+              <SmilePlus className="h-3.5 w-3.5" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-auto border-gold/20 bg-popover p-2">
+            <div className="flex flex-wrap gap-1">
+              {QUICK_EMOJI.map((e) => (
+                <button
+                  key={e}
+                  type="button"
+                  onClick={() => onReact(e)}
+                  className="rounded p-1.5 text-lg transition hover:bg-secondary"
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+        <button
+          type="button"
+          onClick={onReply}
+          className="rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
+          aria-label="Reply"
+          title="Reply"
+        >
+          <Reply className="h-3.5 w-3.5" />
+        </button>
+        {mine && (
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className="rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                aria-label="More"
+              >
+                <MoreHorizontal className="h-3.5 w-3.5" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-40 border-gold/20 bg-popover p-1">
+              <button
+                type="button"
+                onClick={onDelete}
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-destructive hover:bg-destructive/10"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Delete
+              </button>
+            </PopoverContent>
+          </Popover>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Avoid unused-import warnings for icons that are decorative or used only
+// in branches above the JSX.
+void Smile;
