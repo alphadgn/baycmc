@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
@@ -7,6 +7,7 @@ import { createBooking, cancelBooking } from "@/server/bookings.functions";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { RoomCalendar } from "@/components/RoomCalendar";
+import { useVerificationRevalidation } from "@/hooks/useVerificationRevalidation";
 
 interface Room {
   id: string;
