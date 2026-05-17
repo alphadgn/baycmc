@@ -198,7 +198,9 @@ function RoomsPage() {
                 <div className="mt-4 flex gap-2">
                   <button
                     onClick={() => setSelectedRoom(room)}
-                    className="flex-1 rounded-md border border-gold/40 bg-gold/10 px-3 py-2 text-xs font-semibold text-gold hover:bg-gold/20 font-sans-display"
+                    disabled={!canBook}
+                    title={!canBook ? "Verified BAYC/MAYC required to book" : undefined}
+                    className="flex-1 rounded-md border border-gold/40 bg-gold/10 px-3 py-2 text-xs font-semibold text-gold hover:bg-gold/20 font-sans-display disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     Book
                   </button>
