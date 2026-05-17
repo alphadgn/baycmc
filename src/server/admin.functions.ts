@@ -204,3 +204,86 @@ export const getMyAdminContext = createServerFn({ method: "POST" })
       roles,
     };
   });
+
+/** List chapter submissions (admin+). */
+export const listChapterSubmissions = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { status?: "pending" | "approved" | "rejected" | "all" }) =>
+    z.object({ status: z.enum(["pending", "approved", "rejected", "all"]).optional() }).parse(input ?? {}),
+  )
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context.userId);
+    let q = supabaseAdmin
+      .from("chapter_submissions")
+      .select("id, user_id, chapter_name, city, region, pitch, status, reviewer_id, review_notes, reviewed_at, created_at")
+      .order("created_at", { ascending: false })
+      .limit(500);
+    if (data.status && data.status !== "all") q = q.eq("status", data.status);
+    const { data: rows, error } = await q;
+    if (error) throw new Error(error.message);
+
+    const ids = Array.from(new Set((rows ?? []).map((r) => r.user_id)));
+    const profiles = ids.length
+      ? (await supabaseAdmin.from("profiles").select("id, username, wallet_address").in("id", ids)).data ?? []
+      : [];
+    const pmap = new Map(profiles.map((p) => [p.id, p]));
+    return {
+      submissions: (rows ?? []).map((r) => ({
+        ...r,
+        applicant: pmap.get(r.user_id) ?? null,
+      })),
+    };
+  });
+
+/** Review (approve / reject) a chapter submission with optional notes. */
+export const reviewChapterSubmission = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: {
+    submissionId: string;
+    decision: "approved" | "rejected";
+    notes?: string;
+  }) =>
+    z
+      .object({
+        submissionId: z.string().uuid(),
+        decision: z.enum(["approved", "rejected"]),
+        notes: z.string().max(2000).optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context.userId);
+
+    const { data: sub, error: fetchErr } = await supabaseAdmin
+      .from("chapter_submissions")
+      .select("id, user_id, status")
+      .eq("id", data.submissionId)
+      .maybeSingle();
+    if (fetchErr) throw new Error(fetchErr.message);
+    if (!sub) throw new Error("Submission not found");
+
+    const { error } = await supabaseAdmin
+      .from("chapter_submissions")
+      .update({
+        status: data.decision,
+        review_notes: data.notes ?? null,
+        reviewer_id: context.userId,
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq("id", data.submissionId);
+    if (error) throw new Error(error.message);
+
+    if (data.decision === "approved") {
+      await supabaseAdmin
+        .from("user_roles")
+        .upsert({ user_id: sub.user_id, role: "chapter_leader" }, { onConflict: "user_id,role" });
+    }
+
+    await supabaseAdmin.rpc("log_audit_event", {
+      _event_type: "chapter.review",
+      _target_id: data.submissionId,
+      _metadata: { decision: data.decision, notes: data.notes ?? null, by: context.userId },
+    });
+
+    return { ok: true };
+  });
