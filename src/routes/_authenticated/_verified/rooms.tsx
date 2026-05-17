@@ -80,13 +80,47 @@ function RoomsPage() {
   useEffect(() => {
     void load();
     const channel = supabase
-      .channel("bookings")
+      .channel(`rooms-live-${user?.id ?? "anon"}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "room_bookings" }, () =>
         load(),
       )
+      .on("postgres_changes", { event: "*", schema: "public", table: "rooms" }, () => load())
+      .on(
+        "postgres_changes",
+        user
+          ? { event: "*", schema: "public", table: "user_verifications", filter: `user_id=eq.${user.id}` }
+          : { event: "*", schema: "public", table: "user_verifications" },
+        () => load(),
+      )
+      .on(
+        "postgres_changes",
+        user
+          ? { event: "*", schema: "public", table: "user_roles", filter: `user_id=eq.${user.id}` }
+          : { event: "*", schema: "public", table: "user_roles" },
+        () => load(),
+      )
       .subscribe();
+
+    // Re-load on auth state changes (sign-in/out, token refresh, account switch)
+    const { data: authSub } = supabase.auth.onAuthStateChange(() => {
+      void load();
+    });
+
+    // Re-load when wallet/delegation status is refreshed elsewhere in the app
+    const onWalletRefresh = () => void load();
+    window.addEventListener("baycmc:verification-refreshed", onWalletRefresh);
+    window.addEventListener("baycmc:wallet-changed", onWalletRefresh);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
     return () => {
       void supabase.removeChannel(channel);
+      authSub.subscription.unsubscribe();
+      window.removeEventListener("baycmc:verification-refreshed", onWalletRefresh);
+      window.removeEventListener("baycmc:wallet-changed", onWalletRefresh);
+      document.removeEventListener("visibilitychange", onVisible);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
