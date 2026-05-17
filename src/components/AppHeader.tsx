@@ -22,9 +22,11 @@ interface NavItem {
     | "/profile"
     | "/activity"
     | "/lifers"
-    | "/lifers/messages";
+    | "/lifers/messages"
+    | "/admin"
+    | "/super-admin";
   label: string;
-  tier: "all" | "verified" | "lifer";
+  tier: "all" | "verified" | "lifer" | "admin" | "super_admin";
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -37,6 +39,8 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/lifers/messages", label: "Lifer Chat", tier: "lifer" },
   { to: "/activity", label: "My Activity", tier: "all" },
   { to: "/profile", label: "Profile", tier: "all" },
+  { to: "/admin", label: "Administrator", tier: "admin" },
+  { to: "/super-admin", label: "Super Admin", tier: "super_admin" },
 ];
 
 // Routes treated as "home" — no back arrow shown here.
