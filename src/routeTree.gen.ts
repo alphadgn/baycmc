@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as DiagnosticsRouteImport } from './routes/diagnostics'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedSuperAdminRouteImport } from './routes/_authenticated/super-admin'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 import { Route as AuthenticatedLobbyRouteImport } from './routes/_authenticated/lobby'
 import { Route as AuthenticatedLifersRouteImport } from './routes/_authenticated/lifers'
@@ -21,6 +22,7 @@ import { Route as AuthenticatedVerifiedRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedLifersIndexRouteImport } from './routes/_authenticated/lifers/index'
 import { Route as AuthenticatedLifersRoomRouteImport } from './routes/_authenticated/lifers/room'
 import { Route as AuthenticatedLifersMessagesRouteImport } from './routes/_authenticated/lifers/messages'
+import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin.users'
 import { Route as AuthenticatedAdminOtherpageRouteImport } from './routes/_authenticated/admin.otherpage'
 import { Route as AuthenticatedAdminLuminaRouteImport } from './routes/_authenticated/admin.lumina'
 import { Route as AuthenticatedVerifiedRoomsRouteImport } from './routes/_authenticated/_verified/rooms'
@@ -43,6 +45,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedSuperAdminRoute = AuthenticatedSuperAdminRouteImport.update({
+  id: '/super-admin',
+  path: '/super-admin',
+  getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
   id: '/profile',
@@ -90,6 +97,11 @@ const AuthenticatedLifersMessagesRoute =
     path: '/messages',
     getParentRoute: () => AuthenticatedLifersRoute,
   } as any)
+const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
 const AuthenticatedAdminOtherpageRoute =
   AuthenticatedAdminOtherpageRouteImport.update({
     id: '/otherpage',
@@ -147,12 +159,14 @@ export interface FileRoutesByFullPath {
   '/lifers': typeof AuthenticatedLifersRouteWithChildren
   '/lobby': typeof AuthenticatedLobbyRoute
   '/profile': typeof AuthenticatedProfileRoute
+  '/super-admin': typeof AuthenticatedSuperAdminRoute
   '/ape-rides': typeof AuthenticatedVerifiedApeRidesRouteWithChildren
   '/feed': typeof AuthenticatedVerifiedFeedRoute
   '/messages': typeof AuthenticatedVerifiedMessagesRoute
   '/rooms': typeof AuthenticatedVerifiedRoomsRouteWithChildren
   '/admin/lumina': typeof AuthenticatedAdminLuminaRoute
   '/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
+  '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/lifers/messages': typeof AuthenticatedLifersMessagesRoute
   '/lifers/room': typeof AuthenticatedLifersRoomRoute
   '/lifers/': typeof AuthenticatedLifersIndexRoute
@@ -166,12 +180,14 @@ export interface FileRoutesByTo {
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/lobby': typeof AuthenticatedLobbyRoute
   '/profile': typeof AuthenticatedProfileRoute
+  '/super-admin': typeof AuthenticatedSuperAdminRoute
   '/ape-rides': typeof AuthenticatedVerifiedApeRidesRouteWithChildren
   '/feed': typeof AuthenticatedVerifiedFeedRoute
   '/messages': typeof AuthenticatedVerifiedMessagesRoute
   '/rooms': typeof AuthenticatedVerifiedRoomsRouteWithChildren
   '/admin/lumina': typeof AuthenticatedAdminLuminaRoute
   '/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
+  '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/lifers/messages': typeof AuthenticatedLifersMessagesRoute
   '/lifers/room': typeof AuthenticatedLifersRoomRoute
   '/lifers': typeof AuthenticatedLifersIndexRoute
@@ -189,12 +205,14 @@ export interface FileRoutesById {
   '/_authenticated/lifers': typeof AuthenticatedLifersRouteWithChildren
   '/_authenticated/lobby': typeof AuthenticatedLobbyRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
+  '/_authenticated/super-admin': typeof AuthenticatedSuperAdminRoute
   '/_authenticated/_verified/ape-rides': typeof AuthenticatedVerifiedApeRidesRouteWithChildren
   '/_authenticated/_verified/feed': typeof AuthenticatedVerifiedFeedRoute
   '/_authenticated/_verified/messages': typeof AuthenticatedVerifiedMessagesRoute
   '/_authenticated/_verified/rooms': typeof AuthenticatedVerifiedRoomsRouteWithChildren
   '/_authenticated/admin/lumina': typeof AuthenticatedAdminLuminaRoute
   '/_authenticated/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
+  '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/_authenticated/lifers/messages': typeof AuthenticatedLifersMessagesRoute
   '/_authenticated/lifers/room': typeof AuthenticatedLifersRoomRoute
   '/_authenticated/lifers/': typeof AuthenticatedLifersIndexRoute
@@ -211,12 +229,14 @@ export interface FileRouteTypes {
     | '/lifers'
     | '/lobby'
     | '/profile'
+    | '/super-admin'
     | '/ape-rides'
     | '/feed'
     | '/messages'
     | '/rooms'
     | '/admin/lumina'
     | '/admin/otherpage'
+    | '/admin/users'
     | '/lifers/messages'
     | '/lifers/room'
     | '/lifers/'
@@ -230,12 +250,14 @@ export interface FileRouteTypes {
     | '/admin'
     | '/lobby'
     | '/profile'
+    | '/super-admin'
     | '/ape-rides'
     | '/feed'
     | '/messages'
     | '/rooms'
     | '/admin/lumina'
     | '/admin/otherpage'
+    | '/admin/users'
     | '/lifers/messages'
     | '/lifers/room'
     | '/lifers'
@@ -252,12 +274,14 @@ export interface FileRouteTypes {
     | '/_authenticated/lifers'
     | '/_authenticated/lobby'
     | '/_authenticated/profile'
+    | '/_authenticated/super-admin'
     | '/_authenticated/_verified/ape-rides'
     | '/_authenticated/_verified/feed'
     | '/_authenticated/_verified/messages'
     | '/_authenticated/_verified/rooms'
     | '/_authenticated/admin/lumina'
     | '/_authenticated/admin/otherpage'
+    | '/_authenticated/admin/users'
     | '/_authenticated/lifers/messages'
     | '/_authenticated/lifers/room'
     | '/_authenticated/lifers/'
@@ -293,6 +317,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/super-admin': {
+      id: '/_authenticated/super-admin'
+      path: '/super-admin'
+      fullPath: '/super-admin'
+      preLoaderRoute: typeof AuthenticatedSuperAdminRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/profile': {
       id: '/_authenticated/profile'
@@ -356,6 +387,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/lifers/messages'
       preLoaderRoute: typeof AuthenticatedLifersMessagesRouteImport
       parentRoute: typeof AuthenticatedLifersRoute
+    }
+    '/_authenticated/admin/users': {
+      id: '/_authenticated/admin/users'
+      path: '/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AuthenticatedAdminUsersRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
     }
     '/_authenticated/admin/otherpage': {
       id: '/_authenticated/admin/otherpage'
@@ -469,11 +507,13 @@ const AuthenticatedVerifiedRouteWithChildren =
 interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminLuminaRoute: typeof AuthenticatedAdminLuminaRoute
   AuthenticatedAdminOtherpageRoute: typeof AuthenticatedAdminOtherpageRoute
+  AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminLuminaRoute: AuthenticatedAdminLuminaRoute,
   AuthenticatedAdminOtherpageRoute: AuthenticatedAdminOtherpageRoute,
+  AuthenticatedAdminUsersRoute: AuthenticatedAdminUsersRoute,
 }
 
 const AuthenticatedAdminRouteWithChildren =
@@ -501,6 +541,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedLifersRoute: typeof AuthenticatedLifersRouteWithChildren
   AuthenticatedLobbyRoute: typeof AuthenticatedLobbyRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
+  AuthenticatedSuperAdminRoute: typeof AuthenticatedSuperAdminRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -510,6 +551,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedLifersRoute: AuthenticatedLifersRouteWithChildren,
   AuthenticatedLobbyRoute: AuthenticatedLobbyRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
+  AuthenticatedSuperAdminRoute: AuthenticatedSuperAdminRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
