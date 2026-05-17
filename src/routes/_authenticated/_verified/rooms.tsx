@@ -43,7 +43,7 @@ function RoomsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [isLifer, setIsLifer] = useState(false);
+  
 
   const create = useServerFn(createBooking);
   const cancel = useServerFn(cancelBooking);
