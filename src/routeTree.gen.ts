@@ -21,6 +21,7 @@ import { Route as AuthenticatedVerifiedRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedLifersIndexRouteImport } from './routes/_authenticated/lifers/index'
 import { Route as AuthenticatedLifersRoomRouteImport } from './routes/_authenticated/lifers/room'
 import { Route as AuthenticatedLifersMessagesRouteImport } from './routes/_authenticated/lifers/messages'
+import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin.users'
 import { Route as AuthenticatedAdminOtherpageRouteImport } from './routes/_authenticated/admin.otherpage'
 import { Route as AuthenticatedAdminLuminaRouteImport } from './routes/_authenticated/admin.lumina'
 import { Route as AuthenticatedVerifiedRoomsRouteImport } from './routes/_authenticated/_verified/rooms'
@@ -90,6 +91,11 @@ const AuthenticatedLifersMessagesRoute =
     path: '/messages',
     getParentRoute: () => AuthenticatedLifersRoute,
   } as any)
+const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
 const AuthenticatedAdminOtherpageRoute =
   AuthenticatedAdminOtherpageRouteImport.update({
     id: '/otherpage',
@@ -153,6 +159,7 @@ export interface FileRoutesByFullPath {
   '/rooms': typeof AuthenticatedVerifiedRoomsRouteWithChildren
   '/admin/lumina': typeof AuthenticatedAdminLuminaRoute
   '/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
+  '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/lifers/messages': typeof AuthenticatedLifersMessagesRoute
   '/lifers/room': typeof AuthenticatedLifersRoomRoute
   '/lifers/': typeof AuthenticatedLifersIndexRoute
@@ -172,6 +179,7 @@ export interface FileRoutesByTo {
   '/rooms': typeof AuthenticatedVerifiedRoomsRouteWithChildren
   '/admin/lumina': typeof AuthenticatedAdminLuminaRoute
   '/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
+  '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/lifers/messages': typeof AuthenticatedLifersMessagesRoute
   '/lifers/room': typeof AuthenticatedLifersRoomRoute
   '/lifers': typeof AuthenticatedLifersIndexRoute
@@ -195,6 +203,7 @@ export interface FileRoutesById {
   '/_authenticated/_verified/rooms': typeof AuthenticatedVerifiedRoomsRouteWithChildren
   '/_authenticated/admin/lumina': typeof AuthenticatedAdminLuminaRoute
   '/_authenticated/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
+  '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/_authenticated/lifers/messages': typeof AuthenticatedLifersMessagesRoute
   '/_authenticated/lifers/room': typeof AuthenticatedLifersRoomRoute
   '/_authenticated/lifers/': typeof AuthenticatedLifersIndexRoute
@@ -217,6 +226,7 @@ export interface FileRouteTypes {
     | '/rooms'
     | '/admin/lumina'
     | '/admin/otherpage'
+    | '/admin/users'
     | '/lifers/messages'
     | '/lifers/room'
     | '/lifers/'
@@ -236,6 +246,7 @@ export interface FileRouteTypes {
     | '/rooms'
     | '/admin/lumina'
     | '/admin/otherpage'
+    | '/admin/users'
     | '/lifers/messages'
     | '/lifers/room'
     | '/lifers'
@@ -258,6 +269,7 @@ export interface FileRouteTypes {
     | '/_authenticated/_verified/rooms'
     | '/_authenticated/admin/lumina'
     | '/_authenticated/admin/otherpage'
+    | '/_authenticated/admin/users'
     | '/_authenticated/lifers/messages'
     | '/_authenticated/lifers/room'
     | '/_authenticated/lifers/'
@@ -356,6 +368,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/lifers/messages'
       preLoaderRoute: typeof AuthenticatedLifersMessagesRouteImport
       parentRoute: typeof AuthenticatedLifersRoute
+    }
+    '/_authenticated/admin/users': {
+      id: '/_authenticated/admin/users'
+      path: '/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AuthenticatedAdminUsersRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
     }
     '/_authenticated/admin/otherpage': {
       id: '/_authenticated/admin/otherpage'
@@ -469,11 +488,13 @@ const AuthenticatedVerifiedRouteWithChildren =
 interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminLuminaRoute: typeof AuthenticatedAdminLuminaRoute
   AuthenticatedAdminOtherpageRoute: typeof AuthenticatedAdminOtherpageRoute
+  AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminLuminaRoute: AuthenticatedAdminLuminaRoute,
   AuthenticatedAdminOtherpageRoute: AuthenticatedAdminOtherpageRoute,
+  AuthenticatedAdminUsersRoute: AuthenticatedAdminUsersRoute,
 }
 
 const AuthenticatedAdminRouteWithChildren =
@@ -524,3 +545,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
