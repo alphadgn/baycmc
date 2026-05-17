@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as DiagnosticsRouteImport } from './routes/diagnostics'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedSuperAdminRouteImport } from './routes/_authenticated/super-admin'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 import { Route as AuthenticatedLobbyRouteImport } from './routes/_authenticated/lobby'
 import { Route as AuthenticatedLifersRouteImport } from './routes/_authenticated/lifers'
@@ -44,6 +45,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedSuperAdminRoute = AuthenticatedSuperAdminRouteImport.update({
+  id: '/super-admin',
+  path: '/super-admin',
+  getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
   id: '/profile',
@@ -153,6 +159,7 @@ export interface FileRoutesByFullPath {
   '/lifers': typeof AuthenticatedLifersRouteWithChildren
   '/lobby': typeof AuthenticatedLobbyRoute
   '/profile': typeof AuthenticatedProfileRoute
+  '/super-admin': typeof AuthenticatedSuperAdminRoute
   '/ape-rides': typeof AuthenticatedVerifiedApeRidesRouteWithChildren
   '/feed': typeof AuthenticatedVerifiedFeedRoute
   '/messages': typeof AuthenticatedVerifiedMessagesRoute
@@ -173,6 +180,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/lobby': typeof AuthenticatedLobbyRoute
   '/profile': typeof AuthenticatedProfileRoute
+  '/super-admin': typeof AuthenticatedSuperAdminRoute
   '/ape-rides': typeof AuthenticatedVerifiedApeRidesRouteWithChildren
   '/feed': typeof AuthenticatedVerifiedFeedRoute
   '/messages': typeof AuthenticatedVerifiedMessagesRoute
@@ -197,6 +205,7 @@ export interface FileRoutesById {
   '/_authenticated/lifers': typeof AuthenticatedLifersRouteWithChildren
   '/_authenticated/lobby': typeof AuthenticatedLobbyRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
+  '/_authenticated/super-admin': typeof AuthenticatedSuperAdminRoute
   '/_authenticated/_verified/ape-rides': typeof AuthenticatedVerifiedApeRidesRouteWithChildren
   '/_authenticated/_verified/feed': typeof AuthenticatedVerifiedFeedRoute
   '/_authenticated/_verified/messages': typeof AuthenticatedVerifiedMessagesRoute
@@ -220,6 +229,7 @@ export interface FileRouteTypes {
     | '/lifers'
     | '/lobby'
     | '/profile'
+    | '/super-admin'
     | '/ape-rides'
     | '/feed'
     | '/messages'
@@ -240,6 +250,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/lobby'
     | '/profile'
+    | '/super-admin'
     | '/ape-rides'
     | '/feed'
     | '/messages'
@@ -263,6 +274,7 @@ export interface FileRouteTypes {
     | '/_authenticated/lifers'
     | '/_authenticated/lobby'
     | '/_authenticated/profile'
+    | '/_authenticated/super-admin'
     | '/_authenticated/_verified/ape-rides'
     | '/_authenticated/_verified/feed'
     | '/_authenticated/_verified/messages'
@@ -305,6 +317,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/super-admin': {
+      id: '/_authenticated/super-admin'
+      path: '/super-admin'
+      fullPath: '/super-admin'
+      preLoaderRoute: typeof AuthenticatedSuperAdminRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/profile': {
       id: '/_authenticated/profile'
@@ -522,6 +541,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedLifersRoute: typeof AuthenticatedLifersRouteWithChildren
   AuthenticatedLobbyRoute: typeof AuthenticatedLobbyRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
+  AuthenticatedSuperAdminRoute: typeof AuthenticatedSuperAdminRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -531,6 +551,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedLifersRoute: AuthenticatedLifersRouteWithChildren,
   AuthenticatedLobbyRoute: AuthenticatedLobbyRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
+  AuthenticatedSuperAdminRoute: AuthenticatedSuperAdminRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
