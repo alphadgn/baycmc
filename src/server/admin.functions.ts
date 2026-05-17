@@ -142,7 +142,12 @@ export const overrideVerification = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await requireAdmin(context.userId);
 
-    const patch: Record<string, unknown> = { user_id: data.targetUserId };
+    const patch: {
+      user_id: string;
+      bayc_verified?: boolean;
+      otherpage_verified?: boolean;
+      verified_at?: string;
+    } = { user_id: data.targetUserId };
     if (typeof data.bayc_verified === "boolean") patch.bayc_verified = data.bayc_verified;
     if (typeof data.otherpage_verified === "boolean") patch.otherpage_verified = data.otherpage_verified;
     if (data.bayc_verified) patch.verified_at = new Date().toISOString();
