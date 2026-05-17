@@ -22,9 +22,11 @@ interface NavItem {
     | "/profile"
     | "/activity"
     | "/lifers"
-    | "/lifers/messages";
+    | "/lifers/messages"
+    | "/admin"
+    | "/super-admin";
   label: string;
-  tier: "all" | "verified" | "lifer";
+  tier: "all" | "verified" | "lifer" | "admin" | "super_admin";
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -37,24 +39,48 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/lifers/messages", label: "Lifer Chat", tier: "lifer" },
   { to: "/activity", label: "My Activity", tier: "all" },
   { to: "/profile", label: "Profile", tier: "all" },
+  { to: "/admin", label: "Administrator", tier: "admin" },
+  { to: "/super-admin", label: "Super Admin", tier: "super_admin" },
 ];
 
 // Routes treated as "home" — no back arrow shown here.
 const HOME_ROUTES = new Set<string>(["/", "/lobby"]);
 
 export function AppHeader() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { isVerifiedHolder, isLifer } = useVerificationStatus();
   const [entranceOpen, setEntranceOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
-  // Lobby user tapped a locked nav item; once verification flips, navigate
-  // to the saved destination automatically.
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [pendingGatedRoute, setPendingGatedRoute] = useState<{
     to: NavItem["to"];
     tier: "verified" | "lifer";
   } | null>(null);
   const router = useRouter();
   const location = useLocation();
+
+  useEffect(() => {
+    if (!user) {
+      setIsAdmin(false);
+      setIsSuperAdmin(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id);
+      if (cancelled) return;
+      const roles = (data ?? []).map((r) => r.role);
+      setIsSuperAdmin(roles.includes("super_admin"));
+      setIsAdmin(roles.includes("admin") || roles.includes("super_admin"));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   // Show the hamburger to every authenticated user — lobby visitors get to
   // browse the full clubhouse menu and see exactly what unlocks once they
@@ -144,18 +170,26 @@ export function AppHeader() {
                     </SheetTitle>
                   </SheetHeader>
                   <nav className="flex flex-col p-3">
-                    {NAV_ITEMS.filter(
-                      // Lifer rooms must NEVER appear for users who aren't
-                      // already a Lifer (BAYC/MAYC verified + Otherpage badge).
-                      // Showing them locked would tease access we don't grant.
-                      (item) => item.tier !== "lifer" || isLifer,
-                    ).map((item) => {
+                    {NAV_ITEMS.filter((item) => {
+                      // Admin/super-admin items are hidden from regular users.
+                      // Lifer items only show to verified Lifers.
+                      if (item.tier === "lifer") return isLifer;
+                      if (item.tier === "super_admin") return isSuperAdmin;
+                      if (item.tier === "admin") return isAdmin;
+                      return true;
+                    }).map((item) => {
                       const accessible =
                         item.tier === "all" ||
                         (item.tier === "verified" && isVerifiedHolder) ||
-                        (item.tier === "lifer" && isLifer);
+                        (item.tier === "lifer" && isLifer) ||
+                        (item.tier === "admin" && isAdmin) ||
+                        (item.tier === "super_admin" && isSuperAdmin);
+                      const isAdminTier =
+                        item.tier === "admin" || item.tier === "super_admin";
                       const sharedClass = `flex items-center justify-between rounded-md px-3 py-3 text-sm font-medium transition hover:bg-secondary/60 ${
-                        item.tier === "lifer" ? "text-gold" : "text-foreground"
+                        item.tier === "lifer" || isAdminTier
+                          ? "text-gold"
+                          : "text-foreground"
                       }`;
                       if (accessible) {
                         return (
@@ -169,6 +203,11 @@ export function AppHeader() {
                             {item.tier === "lifer" && (
                               <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-gold">
                                 Lifer
+                              </span>
+                            )}
+                            {isAdminTier && (
+                              <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-gold">
+                                {item.tier === "super_admin" ? "Super" : "Admin"}
                               </span>
                             )}
                           </Link>
