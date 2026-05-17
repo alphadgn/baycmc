@@ -88,26 +88,7 @@ export function AppHeader() {
   const showHamburger = isAuthenticated;
   const showBack = isAuthenticated && !HOME_ROUTES.has(location.pathname);
 
-  useEffect(() => {
-    if (!pendingGatedRoute) return;
-    const accessible =
-      (pendingGatedRoute.tier === "verified" && isVerifiedHolder) ||
-      (pendingGatedRoute.tier === "lifer" && isLifer);
-    if (!accessible) return;
-    const target = pendingGatedRoute.to;
-    setPendingGatedRoute(null);
-    void router.navigate({ to: target });
-  }, [pendingGatedRoute, isVerifiedHolder, isLifer, router]);
 
-  function handleGatedClick(e: React.MouseEvent, item: NavItem & { tier: "verified" | "lifer" }) {
-    e.preventDefault();
-    setNavOpen(false);
-    setPendingGatedRoute({ to: item.to, tier: item.tier });
-    // Triggers the SIWE flow in usePrivyBridge → on success the
-    // verification-refresh event fires → useVerificationStatus reloads →
-    // the pendingGatedRoute effect navigates.
-    window.dispatchEvent(new Event("baycmc:privy-bridge-retry"));
-  }
 
   return (
     <>
