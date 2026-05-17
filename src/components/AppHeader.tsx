@@ -47,18 +47,40 @@ const NAV_ITEMS: NavItem[] = [
 const HOME_ROUTES = new Set<string>(["/", "/lobby"]);
 
 export function AppHeader() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { isVerifiedHolder, isLifer } = useVerificationStatus();
   const [entranceOpen, setEntranceOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
-  // Lobby user tapped a locked nav item; once verification flips, navigate
-  // to the saved destination automatically.
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [pendingGatedRoute, setPendingGatedRoute] = useState<{
     to: NavItem["to"];
     tier: "verified" | "lifer";
   } | null>(null);
   const router = useRouter();
   const location = useLocation();
+
+  useEffect(() => {
+    if (!user) {
+      setIsAdmin(false);
+      setIsSuperAdmin(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id);
+      if (cancelled) return;
+      const roles = (data ?? []).map((r) => r.role);
+      setIsSuperAdmin(roles.includes("super_admin"));
+      setIsAdmin(roles.includes("admin") || roles.includes("super_admin"));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   // Show the hamburger to every authenticated user — lobby visitors get to
   // browse the full clubhouse menu and see exactly what unlocks once they
