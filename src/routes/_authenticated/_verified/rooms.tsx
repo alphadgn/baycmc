@@ -119,6 +119,20 @@ function RoomsPage() {
         </div>
       </header>
 
+      {!loading && !canBook && (
+        <div className="glass mb-6 rounded-2xl border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive font-sans-display">
+          You're signed in, but no verified BAYC/MAYC holding was detected
+          in your connected wallet. Booking is disabled until verification
+          is restored. Reconnect or refresh your wallet to try again.
+        </div>
+      )}
+      {!loading && canBook && !otherpageVerified && (
+        <div className="glass mb-6 rounded-2xl border border-gold/30 bg-gold/5 p-3 text-xs text-muted-foreground font-sans-display">
+          Lifer rooms are hidden — no Otherpage / Lifer token detected in
+          your wallet.
+        </div>
+      )}
+
       {loading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[...Array(6)].map((_, i) => (
