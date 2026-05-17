@@ -53,10 +53,9 @@ export function AppHeader() {
   const [navOpen, setNavOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
-  const [pendingGatedRoute, setPendingGatedRoute] = useState<{
-    to: NavItem["to"];
-    tier: "verified" | "lifer";
-  } | null>(null);
+  // pendingGatedRoute removed: gated nav entries are now hidden entirely
+  // until verification completes, so there's no in-menu retry flow.
+
   const router = useRouter();
   const location = useLocation();
 
