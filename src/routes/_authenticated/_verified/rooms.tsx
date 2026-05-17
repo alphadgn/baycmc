@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
@@ -7,6 +7,7 @@ import { createBooking, cancelBooking } from "@/server/bookings.functions";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { RoomCalendar } from "@/components/RoomCalendar";
+import { useVerificationRevalidation } from "@/hooks/useVerificationRevalidation";
 
 interface Room {
   id: string;
@@ -43,7 +44,9 @@ function RoomsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  
+  const [baycVerified, setBaycVerified] = useState(false);
+  const [otherpageVerified, setOtherpageVerified] = useState(false);
+  const prevAccessRef = useRef<{ bayc: boolean; op: boolean } | null>(null);
 
   const create = useServerFn(createBooking);
   const cancel = useServerFn(cancelBooking);
@@ -69,8 +72,23 @@ function RoomsPage() {
         : Promise.resolve({ data: null as { bayc_verified: boolean; otherpage_verified: boolean } | null }),
     ]);
     const allRooms = (r as Room[]) ?? [];
-    const dualVerified = !!(ver?.bayc_verified && ver?.otherpage_verified);
-    
+    const bayc = !!ver?.bayc_verified;
+    const op = !!ver?.otherpage_verified;
+    const dualVerified = bayc && op;
+
+    // Notify the user immediately if they lost access while on this page.
+    const prev = prevAccessRef.current;
+    if (prev) {
+      if (prev.bayc && !bayc) {
+        toast.error("BAYC/MAYC verification lost — bookings are disabled.");
+      } else if (prev.op && !op) {
+        toast.error("Otherpage / Lifer token no longer detected — Lifer rooms hidden.");
+      }
+    }
+    prevAccessRef.current = { bayc, op };
+
+    setBaycVerified(bayc);
+    setOtherpageVerified(op);
     setRooms(dualVerified ? allRooms : allRooms.filter((rm) => rm.tier !== "lifer"));
     setBookings((b as Booking[]) ?? []);
     setIsAdmin(!!roles?.some((x) => x.role === "admin" || x.role === "super_admin"));
@@ -79,51 +97,16 @@ function RoomsPage() {
 
   useEffect(() => {
     void load();
-    const channel = supabase
-      .channel(`rooms-live-${user?.id ?? "anon"}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "room_bookings" }, () =>
-        load(),
-      )
-      .on("postgres_changes", { event: "*", schema: "public", table: "rooms" }, () => load())
-      .on(
-        "postgres_changes",
-        user
-          ? { event: "*", schema: "public", table: "user_verifications", filter: `user_id=eq.${user.id}` }
-          : { event: "*", schema: "public", table: "user_verifications" },
-        () => load(),
-      )
-      .on(
-        "postgres_changes",
-        user
-          ? { event: "*", schema: "public", table: "user_roles", filter: `user_id=eq.${user.id}` }
-          : { event: "*", schema: "public", table: "user_roles" },
-        () => load(),
-      )
-      .subscribe();
-
-    // Re-load on auth state changes (sign-in/out, token refresh, account switch)
-    const { data: authSub } = supabase.auth.onAuthStateChange(() => {
-      void load();
-    });
-
-    // Re-load when wallet/delegation status is refreshed elsewhere in the app
-    const onWalletRefresh = () => void load();
-    window.addEventListener("baycmc:verification-refreshed", onWalletRefresh);
-    window.addEventListener("baycmc:wallet-changed", onWalletRefresh);
-    const onVisible = () => {
-      if (document.visibilityState === "visible") void load();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-
-    return () => {
-      void supabase.removeChannel(channel);
-      authSub.subscription.unsubscribe();
-      window.removeEventListener("baycmc:verification-refreshed", onWalletRefresh);
-      window.removeEventListener("baycmc:wallet-changed", onWalletRefresh);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
+
+  useVerificationRevalidation({
+    userId: user?.id ?? null,
+    onRevalidate: load,
+    watchRooms: true,
+  });
+
+  const canBook = baycVerified || isAdmin;
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
@@ -135,6 +118,20 @@ function RoomsPage() {
           </p>
         </div>
       </header>
+
+      {!loading && !canBook && (
+        <div className="glass mb-6 rounded-2xl border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive font-sans-display">
+          You're signed in, but no verified BAYC/MAYC holding was detected
+          in your connected wallet. Booking is disabled until verification
+          is restored. Reconnect or refresh your wallet to try again.
+        </div>
+      )}
+      {!loading && canBook && !otherpageVerified && (
+        <div className="glass mb-6 rounded-2xl border border-gold/30 bg-gold/5 p-3 text-xs text-muted-foreground font-sans-display">
+          Lifer rooms are hidden — no Otherpage / Lifer token detected in
+          your wallet.
+        </div>
+      )}
 
       {loading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -201,7 +198,9 @@ function RoomsPage() {
                 <div className="mt-4 flex gap-2">
                   <button
                     onClick={() => setSelectedRoom(room)}
-                    className="flex-1 rounded-md border border-gold/40 bg-gold/10 px-3 py-2 text-xs font-semibold text-gold hover:bg-gold/20 font-sans-display"
+                    disabled={!canBook}
+                    title={!canBook ? "Verified BAYC/MAYC required to book" : undefined}
+                    className="flex-1 rounded-md border border-gold/40 bg-gold/10 px-3 py-2 text-xs font-semibold text-gold hover:bg-gold/20 font-sans-display disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     Book
                   </button>
