@@ -40,7 +40,19 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
           .maybeSingle()
       ).data;
 
-  if (!ver?.bayc_verified) {
+  // Role bypass: super_admin / admin / verified_user skip the BAYC
+  // ownership re-check. The Otherpage / lifer gate below is NEVER bypassed
+  // by role — lifer rooms always require an actual on-chain Otherpage token
+  // AND a verified BAYC/MAYC holding.
+  const { data: roleRows } = await supabaseAdmin
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId);
+  const hasBypassRole = !!roleRows?.some(
+    (r) => r.role === "super_admin" || r.role === "admin" || r.role === "verified_user",
+  );
+
+  if (!ver?.bayc_verified && !hasBypassRole) {
     return {
       ok: false,
       error:
@@ -48,11 +60,11 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
       code: "bayc_revoked",
     };
   }
-  if (room.tier === "lifer" && !ver.otherpage_verified) {
+  if (room.tier === "lifer" && !(ver?.bayc_verified && ver?.otherpage_verified)) {
     return {
       ok: false,
       error:
-        "Your Otherpage access is no longer active. Reconnect a wallet with active BAYC/MAYC and Otherpage access to re-enter this room.",
+        "Lifer rooms require both a verified BAYC/MAYC holding and an Otherpage / Lifer token in your wallet. Roles do not bypass this gate.",
       code: "otherpage_revoked",
     };
   }
