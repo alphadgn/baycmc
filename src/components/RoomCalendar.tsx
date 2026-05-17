@@ -39,10 +39,8 @@ const MONTH_LABELS = [
 const DOW = ["S", "M", "T", "W", "T", "F", "S"];
 
 /**
- * BAYCmc calendar — clean printable 12-month year grid in the style of the
- * uploaded reference. Days with bookings are subtly highlighted; tap any day
- * to see who has it reserved. Conflict prevention is enforced server-side by
- * the `prevent_booking_overlap` trigger.
+ * BAYCmc calendar — minimal printed-poster style year overview.
+ * Click a month to expand it into a full day grid for booking selection.
  */
 export function RoomCalendar({
   rooms,
@@ -52,6 +50,7 @@ export function RoomCalendar({
 }: RoomCalendarProps) {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
+  const [expandedMonth, setExpandedMonth] = useState<number | null>(null);
   const [selected, setSelected] = useState<Date | null>(null);
 
   const roomsById = useMemo(() => {
@@ -60,7 +59,6 @@ export function RoomCalendar({
     return m;
   }, [rooms]);
 
-  // Map of yyyy-MM-dd -> bookings on that day (current year only)
   const byDay = useMemo(() => {
     const map = new Map<string, Booking[]>();
     for (const b of bookings) {
@@ -83,155 +81,234 @@ export function RoomCalendar({
     ? byDay.get(format(selected, "yyyy-MM-dd")) ?? []
     : [];
 
+  function renderMonthGrid(mIdx: number, opts: { large: boolean }) {
+    const monthStart = startOfMonth(new Date(year, mIdx, 1));
+    const monthEnd = endOfMonth(monthStart);
+    const gridStart = startOfWeek(monthStart, { weekStartsOn: 0 });
+    const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
+    const days = eachDayOfInterval({ start: gridStart, end: gridEnd });
+    const { large } = opts;
+
+    return (
+      <>
+        <div
+          className={`grid grid-cols-7 ${large ? "text-sm" : "text-[10px]"} font-semibold tracking-wider text-foreground/70`}
+        >
+          {DOW.map((d, i) => (
+            <div key={i} className={`${large ? "py-2" : "py-1"} text-center`}>{d}</div>
+          ))}
+        </div>
+        <div className="h-px w-full bg-foreground/30" />
+        <div className={`mt-${large ? "2" : "1"} grid grid-cols-7 ${large ? "gap-1" : "gap-y-0.5"}`}>
+          {days.map((day) => {
+            const inMonth = isSameMonth(day, monthStart);
+            const isToday = isSameDay(day, today);
+            const key = format(day, "yyyy-MM-dd");
+            const has = (byDay.get(key)?.length ?? 0) > 0;
+            const isSelected = selected && isSameDay(day, selected);
+            if (!large) {
+              return (
+                <div
+                  key={key}
+                  className={`relative aspect-square text-center font-mono text-[10px] leading-none ${
+                    inMonth ? "text-foreground" : "text-transparent"
+                  }`}
+                >
+                  <span className="absolute inset-0 flex items-center justify-center">
+                    {format(day, "d")}
+                  </span>
+                  {has && (
+                    <span className="absolute bottom-0 left-1/2 h-0.5 w-0.5 -translate-x-1/2 rounded-full bg-gold" />
+                  )}
+                </div>
+              );
+            }
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => inMonth && setSelected(day)}
+                disabled={!inMonth}
+                className={`relative aspect-square rounded-full text-center text-sm transition ${
+                  inMonth ? "text-foreground" : "text-transparent"
+                } ${
+                  isSelected
+                    ? "bg-gold text-gold-foreground"
+                    : isToday
+                      ? "bg-gold/20 font-semibold text-gold"
+                      : has
+                        ? "bg-secondary/60 font-semibold hover:bg-secondary"
+                        : "hover:bg-secondary/40"
+                }`}
+                aria-label={inMonth ? format(day, "PPP") : undefined}
+              >
+                <span className="absolute inset-0 flex items-center justify-center">
+                  {format(day, "d")}
+                </span>
+                {has && !isSelected && (
+                  <span className="absolute bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-gold" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </>
+    );
+  }
+
+  if (expandedMonth !== null) {
+    return (
+      <section className="rounded-2xl bg-background p-5 shadow-card sm:p-8">
+        <header className="mb-6 flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              setExpandedMonth(null);
+              setSelected(null);
+            }}
+            className="inline-flex items-center gap-1 text-xs uppercase tracking-[0.25em] text-muted-foreground hover:text-foreground"
+            aria-label="Back to year"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            {year}
+          </button>
+          <h2 className="font-display text-3xl font-bold tracking-tight sm:text-5xl">
+            {MONTH_LABELS[expandedMonth]}
+          </h2>
+          <div className="flex gap-1">
+            <button
+              type="button"
+              onClick={() =>
+                setExpandedMonth((m) => (m === null ? null : (m + 11) % 12))
+              }
+              className="rounded-md p-1.5 text-muted-foreground hover:bg-secondary"
+              aria-label="Previous month"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setExpandedMonth((m) => (m === null ? null : (m + 1) % 12))
+              }
+              className="rounded-md p-1.5 text-muted-foreground hover:bg-secondary"
+              aria-label="Next month"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </header>
+
+        {renderMonthGrid(expandedMonth, { large: true })}
+
+        {selected && (
+          <div
+            className="mt-6 rounded-xl border border-border/60 bg-background/40 p-4"
+            aria-live="polite"
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <h4 className="font-display text-lg">
+                {format(selected, "EEEE, MMMM d")}
+              </h4>
+              <button
+                type="button"
+                onClick={() => setSelected(null)}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                Close
+              </button>
+            </div>
+            {selectedBookings.length === 0 ? (
+              <p className="text-xs italic text-muted-foreground">
+                No bookings on this day. Choose a room below to reserve a time.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {selectedBookings.map((b) => {
+                  const room = roomsById.get(b.room_id);
+                  const mine = b.user_id === currentUserId;
+                  return (
+                    <li
+                      key={b.id}
+                      className={`flex items-center justify-between rounded-md border px-3 py-2 text-xs ${
+                        mine
+                          ? "border-gold/40 bg-gold/10"
+                          : "border-border bg-secondary/40"
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <div className="font-mono tabular-nums text-muted-foreground">
+                          {format(new Date(b.starts_at), "HH:mm")}–
+                          {format(new Date(b.ends_at), "HH:mm")}
+                        </div>
+                        <div className="truncate font-semibold">{b.title}</div>
+                        <div className="truncate text-[10px] text-muted-foreground">
+                          {room?.name ?? "room"}
+                        </div>
+                      </div>
+                      {mine && (
+                        <button
+                          type="button"
+                          onClick={() => onCancel(b.id)}
+                          className="ml-3 shrink-0 text-[10px] text-destructive underline"
+                        >
+                          cancel
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        )}
+      </section>
+    );
+  }
+
   return (
-    <section className="glass rounded-2xl p-4 shadow-card sm:p-6">
-      <header className="mb-5 flex items-center justify-between gap-3">
+    <section className="rounded-2xl bg-background p-5 shadow-card sm:p-10">
+      <header className="mb-8 flex items-center justify-between gap-3">
         <button
           type="button"
           onClick={() => setYear((y) => y - 1)}
-          className="rounded-md border border-border bg-secondary/40 p-1.5 text-muted-foreground hover:bg-secondary"
+          className="rounded-md p-2 text-muted-foreground hover:bg-secondary"
           aria-label="Previous year"
         >
-          <ChevronLeft className="h-4 w-4" />
+          <ChevronLeft className="h-5 w-5" />
         </button>
-        <div className="text-center">
-          <div className="font-display text-4xl font-bold text-gradient-gold sm:text-6xl">
-            {year}
-          </div>
-          <p className="mt-1 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-            BAYCmc calendar · 12-month overview
-          </p>
-        </div>
+        <h2 className="font-display text-6xl font-extrabold tracking-tight text-foreground sm:text-8xl">
+          {year}
+        </h2>
         <button
           type="button"
           onClick={() => setYear((y) => y + 1)}
-          className="rounded-md border border-border bg-secondary/40 p-1.5 text-muted-foreground hover:bg-secondary"
+          className="rounded-md p-2 text-muted-foreground hover:bg-secondary"
           aria-label="Next year"
         >
-          <ChevronRight className="h-4 w-4" />
+          <ChevronRight className="h-5 w-5" />
         </button>
       </header>
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {MONTH_LABELS.map((label, mIdx) => {
-          const monthStart = startOfMonth(new Date(year, mIdx, 1));
-          const monthEnd = endOfMonth(monthStart);
-          const gridStart = startOfWeek(monthStart, { weekStartsOn: 0 });
-          const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
-          const days = eachDayOfInterval({ start: gridStart, end: gridEnd });
-
-          return (
-            <div key={label} className="rounded-lg p-2">
-              <h3 className="mb-2 font-display text-lg font-bold tracking-tight">
-                {label}
-              </h3>
-              <div className="grid grid-cols-7 gap-y-1 border-b border-border/60 pb-1 text-[10px] font-semibold text-muted-foreground">
-                {DOW.map((d, i) => (
-                  <div key={i} className="text-center">{d}</div>
-                ))}
-              </div>
-              <div className="mt-1 grid grid-cols-7 gap-y-0.5">
-                {days.map((day) => {
-                  const inMonth = isSameMonth(day, monthStart);
-                  const isToday = isSameDay(day, today);
-                  const key = format(day, "yyyy-MM-dd");
-                  const has = (byDay.get(key)?.length ?? 0) > 0;
-                  const isSelected = selected && isSameDay(day, selected);
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => inMonth && setSelected(day)}
-                      disabled={!inMonth}
-                      className={`relative aspect-square text-center text-[10px] leading-none transition ${
-                        inMonth ? "text-foreground" : "text-transparent"
-                      } ${
-                        isSelected
-                          ? "rounded-full bg-gold text-gold-foreground"
-                          : isToday
-                            ? "rounded-full bg-gold/20 font-semibold text-gold"
-                            : has
-                              ? "rounded-full bg-secondary/60 font-semibold hover:bg-secondary"
-                              : "hover:text-gold"
-                      }`}
-                      aria-label={inMonth ? format(day, "PPP") : undefined}
-                    >
-                      <span className="absolute inset-0 flex items-center justify-center">
-                        {format(day, "d")}
-                      </span>
-                      {has && !isSelected && (
-                        <span className="absolute bottom-0 left-1/2 h-0.5 w-0.5 -translate-x-1/2 rounded-full bg-gold" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
+      <div className="grid grid-cols-1 gap-x-8 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
+        {MONTH_LABELS.map((label, mIdx) => (
+          <button
+            key={label}
+            type="button"
+            onClick={() => {
+              setExpandedMonth(mIdx);
+              setSelected(null);
+            }}
+            className="group rounded-lg p-2 text-left transition hover:bg-secondary/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+            aria-label={`Open ${label}`}
+          >
+            <h3 className="mb-3 font-display text-2xl font-bold tracking-tight group-hover:text-gold">
+              {label}
+            </h3>
+            {renderMonthGrid(mIdx, { large: false })}
+          </button>
+        ))}
       </div>
-
-      {selected && (
-        <div
-          className="mt-6 rounded-xl border border-border/60 bg-background/40 p-4"
-          aria-live="polite"
-        >
-          <div className="mb-3 flex items-center justify-between">
-            <h4 className="font-display text-lg">
-              {format(selected, "EEEE, MMMM d")}
-            </h4>
-            <button
-              type="button"
-              onClick={() => setSelected(null)}
-              className="text-xs text-muted-foreground hover:text-foreground"
-            >
-              Close
-            </button>
-          </div>
-          {selectedBookings.length === 0 ? (
-            <p className="text-xs italic text-muted-foreground">
-              No bookings on this day.
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {selectedBookings.map((b) => {
-                const room = roomsById.get(b.room_id);
-                const mine = b.user_id === currentUserId;
-                return (
-                  <li
-                    key={b.id}
-                    className={`flex items-center justify-between rounded-md border px-3 py-2 text-xs ${
-                      mine
-                        ? "border-gold/40 bg-gold/10"
-                        : "border-border bg-secondary/40"
-                    }`}
-                  >
-                    <div className="min-w-0">
-                      <div className="font-mono tabular-nums text-muted-foreground">
-                        {format(new Date(b.starts_at), "HH:mm")}–
-                        {format(new Date(b.ends_at), "HH:mm")}
-                      </div>
-                      <div className="truncate font-semibold">{b.title}</div>
-                      <div className="truncate text-[10px] text-muted-foreground">
-                        {room?.name ?? "room"}
-                      </div>
-                    </div>
-                    {mine && (
-                      <button
-                        type="button"
-                        onClick={() => onCancel(b.id)}
-                        className="ml-3 shrink-0 text-[10px] text-destructive underline"
-                      >
-                        cancel
-                      </button>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-      )}
     </section>
   );
 }
