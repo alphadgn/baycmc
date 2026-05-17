@@ -70,7 +70,7 @@ function RoomsPage() {
     ]);
     const allRooms = (r as Room[]) ?? [];
     const dualVerified = !!(ver?.bayc_verified && ver?.otherpage_verified);
-    setIsLifer(dualVerified);
+    
     setRooms(dualVerified ? allRooms : allRooms.filter((rm) => rm.tier !== "lifer"));
     setBookings((b as Booking[]) ?? []);
     setIsAdmin(!!roles?.some((x) => x.role === "admin" || x.role === "super_admin"));
