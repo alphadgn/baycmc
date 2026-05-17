@@ -61,10 +61,12 @@ export function ConferenceRoom({ roomId, roomName }: ConferenceRoomProps) {
   }
 
   useEffect(() => {
+    void join();
     return () => {
       setToken(null);
       setUrl(null);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId]);
 
   useEffect(() => {
