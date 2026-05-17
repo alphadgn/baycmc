@@ -43,13 +43,14 @@ function RoomsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isLifer, setIsLifer] = useState(false);
 
   const create = useServerFn(createBooking);
   const cancel = useServerFn(cancelBooking);
 
   async function load() {
     setLoading(true);
-    const [{ data: r }, { data: b }, { data: roles }] = await Promise.all([
+    const [{ data: r }, { data: b }, { data: roles }, { data: ver }] = await Promise.all([
       supabase.from("rooms").select("*").eq("active", true).order("name"),
       supabase
         .from("room_bookings")
@@ -59,8 +60,18 @@ function RoomsPage() {
       user
         ? supabase.from("user_roles").select("role").eq("user_id", user.id)
         : Promise.resolve({ data: [] as { role: string }[] }),
+      user
+        ? supabase
+            .from("user_verifications")
+            .select("bayc_verified,otherpage_verified")
+            .eq("user_id", user.id)
+            .maybeSingle()
+        : Promise.resolve({ data: null as { bayc_verified: boolean; otherpage_verified: boolean } | null }),
     ]);
-    setRooms((r as Room[]) ?? []);
+    const allRooms = (r as Room[]) ?? [];
+    const dualVerified = !!(ver?.bayc_verified && ver?.otherpage_verified);
+    setIsLifer(dualVerified);
+    setRooms(dualVerified ? allRooms : allRooms.filter((rm) => rm.tier !== "lifer"));
     setBookings((b as Booking[]) ?? []);
     setIsAdmin(!!roles?.some((x) => x.role === "admin" || x.role === "super_admin"));
     setLoading(false);
