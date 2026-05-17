@@ -171,19 +171,13 @@ export function AppHeader() {
                   </SheetHeader>
                   <nav className="flex flex-col p-3">
                     {NAV_ITEMS.filter((item) => {
-                      // Admin/super-admin items are hidden from regular users.
-                      // Lifer items only show to verified Lifers.
+                      // Hide gated items entirely from users without access.
+                      if (item.tier === "verified") return isVerifiedHolder;
                       if (item.tier === "lifer") return isLifer;
                       if (item.tier === "super_admin") return isSuperAdmin;
                       if (item.tier === "admin") return isAdmin;
                       return true;
                     }).map((item) => {
-                      const accessible =
-                        item.tier === "all" ||
-                        (item.tier === "verified" && isVerifiedHolder) ||
-                        (item.tier === "lifer" && isLifer) ||
-                        (item.tier === "admin" && isAdmin) ||
-                        (item.tier === "super_admin" && isSuperAdmin);
                       const isAdminTier =
                         item.tier === "admin" || item.tier === "super_admin";
                       const sharedClass = `flex items-center justify-between rounded-md px-3 py-3 text-sm font-medium transition hover:bg-secondary/60 ${
@@ -191,54 +185,25 @@ export function AppHeader() {
                           ? "text-gold"
                           : "text-foreground"
                       }`;
-                      if (accessible) {
-                        return (
-                          <Link
-                            key={item.to}
-                            to={item.to}
-                            onClick={() => setNavOpen(false)}
-                            className={sharedClass}
-                          >
-                            <span>{item.label}</span>
-                            {item.tier === "lifer" && (
-                              <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-gold">
-                                Lifer
-                              </span>
-                            )}
-                            {isAdminTier && (
-                              <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-gold">
-                                {item.tier === "super_admin" ? "Super" : "Admin"}
-                              </span>
-                            )}
-                          </Link>
-                        );
-                      }
-                      // Locked tier (verified/lifer) for a lobby user: tap
-                      // pops the Privy signing modal via the bridge retry
-                      // event and stashes the route for post-verify nav.
                       return (
-                        <button
+                        <Link
                           key={item.to}
-                          type="button"
-                          onClick={(e) =>
-                            handleGatedClick(e, {
-                              ...item,
-                              tier: item.tier as "verified" | "lifer",
-                            })
-                          }
-                          className={`${sharedClass} cursor-pointer text-left opacity-70`}
-                          title={`Verify your ${item.tier === "lifer" ? "Otherpage / Lifer token" : "BAYC or MAYC"} to unlock`}
+                          to={item.to}
+                          onClick={() => setNavOpen(false)}
+                          className={sharedClass}
                         >
-                          <span className="inline-flex items-center gap-2">
-                            <Lock className="h-3.5 w-3.5 text-gold/70" />
-                            {item.label}
-                          </span>
+                          <span>{item.label}</span>
                           {item.tier === "lifer" && (
                             <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-gold">
                               Lifer
                             </span>
                           )}
-                        </button>
+                          {isAdminTier && (
+                            <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-gold">
+                              {item.tier === "super_admin" ? "Super" : "Admin"}
+                            </span>
+                          )}
+                        </Link>
                       );
                     })}
                   </nav>
