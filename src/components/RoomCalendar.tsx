@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { addDays, format, isSameDay, startOfDay } from "date-fns";
+import { format } from "date-fns";
 
 interface Booking {
   id: string;
@@ -23,10 +23,13 @@ interface RoomCalendarProps {
   onCancel: (bookingId: string) => void;
 }
 
-const DAYS_VISIBLE = 7;
+const MONTH_LABELS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
 
 /**
- * BAYCmc calendar — 7-day rolling view of bookings across every room.
+ * BAYCmc calendar — 12-month yearly view of bookings across every room.
  * Conflict prevention is enforced server-side by the
  * `prevent_booking_overlap` trigger; this UI just visualizes the schedule
  * so members can see free slots before they book.
@@ -37,12 +40,10 @@ export function RoomCalendar({
   currentUserId,
   onCancel,
 }: RoomCalendarProps) {
-  const [anchor, setAnchor] = useState(() => startOfDay(new Date()));
-
-  const days = useMemo(
-    () => Array.from({ length: DAYS_VISIBLE }, (_, i) => addDays(anchor, i)),
-    [anchor],
-  );
+  const [year, setYear] = useState(() => new Date().getFullYear());
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
 
   const roomsById = useMemo(() => {
     const m = new Map<string, Room>();
@@ -50,11 +51,13 @@ export function RoomCalendar({
     return m;
   }, [rooms]);
 
-  const byDay = useMemo(() => {
-    const map = new Map<string, Booking[]>();
+  const byMonth = useMemo(() => {
+    const map = new Map<number, Booking[]>();
     for (const b of bookings) {
-      const day = format(new Date(b.starts_at), "yyyy-MM-dd");
-      (map.get(day) ?? map.set(day, []).get(day)!).push(b);
+      const d = new Date(b.starts_at);
+      if (d.getFullYear() !== year) continue;
+      const m = d.getMonth();
+      (map.get(m) ?? map.set(m, []).get(m)!).push(b);
     }
     for (const list of map.values()) {
       list.sort(
@@ -62,7 +65,7 @@ export function RoomCalendar({
       );
     }
     return map;
-  }, [bookings]);
+  }, [bookings, year]);
 
   return (
     <section className="glass rounded-2xl p-4 shadow-card sm:p-6">
@@ -72,71 +75,68 @@ export function RoomCalendar({
             BAYCmc calendar
           </h2>
           <p className="text-xs text-muted-foreground">
-            All scheduled meetups · double bookings blocked at the database
+            {year} · 12-month overview · double bookings blocked at the database
           </p>
         </div>
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={() => setAnchor((a) => addDays(a, -DAYS_VISIBLE))}
+            onClick={() => setYear((y) => y - 1)}
             className="rounded-md border border-border bg-secondary/40 p-1.5 text-muted-foreground hover:bg-secondary"
-            aria-label="Previous week"
+            aria-label="Previous year"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
           <button
             type="button"
-            onClick={() => setAnchor(startOfDay(new Date()))}
+            onClick={() => setYear(currentYear)}
             className="rounded-md border border-border bg-secondary/40 px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground hover:bg-secondary"
           >
-            Today
+            This year
           </button>
           <button
             type="button"
-            onClick={() => setAnchor((a) => addDays(a, DAYS_VISIBLE))}
+            onClick={() => setYear((y) => y + 1)}
             className="rounded-md border border-border bg-secondary/40 p-1.5 text-muted-foreground hover:bg-secondary"
-            aria-label="Next week"
+            aria-label="Next year"
           >
             <ChevronRight className="h-4 w-4" />
           </button>
         </div>
       </header>
 
-      <div className="grid gap-2 sm:grid-cols-7">
-        {days.map((d) => {
-          const isToday = isSameDay(d, new Date());
-          const key = format(d, "yyyy-MM-dd");
-          const dayBookings = byDay.get(key) ?? [];
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+        {MONTH_LABELS.map((label, m) => {
+          const isCurrent = m === currentMonth && year === currentYear;
+          const monthBookings = byMonth.get(m) ?? [];
+          const preview = monthBookings.slice(0, 3);
+          const more = monthBookings.length - preview.length;
           return (
             <div
-              key={key}
-              className={`rounded-lg border p-2 transition ${
-                isToday
+              key={label}
+              className={`rounded-lg border p-3 transition ${
+                isCurrent
                   ? "border-gold/60 bg-gold/5"
                   : "border-border/60 bg-background/30"
               }`}
             >
               <div className="mb-2 flex items-baseline justify-between">
                 <span
-                  className={`text-[10px] font-semibold uppercase tracking-wider ${
-                    isToday ? "text-gold" : "text-muted-foreground"
+                  className={`font-display text-base ${
+                    isCurrent ? "text-gradient-gold" : "text-foreground"
                   }`}
                 >
-                  {format(d, "EEE")}
+                  {label}
                 </span>
-                <span
-                  className={`font-display text-lg ${
-                    isToday ? "text-gradient-gold" : "text-foreground"
-                  }`}
-                >
-                  {format(d, "d")}
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  {monthBookings.length} booking{monthBookings.length === 1 ? "" : "s"}
                 </span>
               </div>
-              {dayBookings.length === 0 ? (
+              {preview.length === 0 ? (
                 <p className="text-[10px] italic text-muted-foreground">Open</p>
               ) : (
                 <ul className="space-y-1">
-                  {dayBookings.map((b) => {
+                  {preview.map((b) => {
                     const room = roomsById.get(b.room_id);
                     const mine = b.user_id === currentUserId;
                     return (
@@ -149,11 +149,11 @@ export function RoomCalendar({
                         }`}
                         title={`${b.title} · ${room?.name ?? "room"} · ${format(
                           new Date(b.starts_at),
-                          "HH:mm",
-                        )}–${format(new Date(b.ends_at), "HH:mm")}`}
+                          "MMM d HH:mm",
+                        )}`}
                       >
                         <div className="font-mono tabular-nums">
-                          {format(new Date(b.starts_at), "HH:mm")}
+                          {format(new Date(b.starts_at), "MMM d · HH:mm")}
                         </div>
                         <div className="truncate font-semibold text-foreground">
                           {b.title}
@@ -171,6 +171,11 @@ export function RoomCalendar({
                       </li>
                     );
                   })}
+                  {more > 0 && (
+                    <li className="text-[10px] text-muted-foreground">
+                      +{more} more
+                    </li>
+                  )}
                 </ul>
               )}
             </div>
