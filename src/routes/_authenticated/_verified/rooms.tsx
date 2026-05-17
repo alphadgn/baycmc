@@ -44,7 +44,9 @@ function RoomsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  
+  const [baycVerified, setBaycVerified] = useState(false);
+  const [otherpageVerified, setOtherpageVerified] = useState(false);
+  const prevAccessRef = useRef<{ bayc: boolean; op: boolean } | null>(null);
 
   const create = useServerFn(createBooking);
   const cancel = useServerFn(cancelBooking);
@@ -70,8 +72,23 @@ function RoomsPage() {
         : Promise.resolve({ data: null as { bayc_verified: boolean; otherpage_verified: boolean } | null }),
     ]);
     const allRooms = (r as Room[]) ?? [];
-    const dualVerified = !!(ver?.bayc_verified && ver?.otherpage_verified);
-    
+    const bayc = !!ver?.bayc_verified;
+    const op = !!ver?.otherpage_verified;
+    const dualVerified = bayc && op;
+
+    // Notify the user immediately if they lost access while on this page.
+    const prev = prevAccessRef.current;
+    if (prev) {
+      if (prev.bayc && !bayc) {
+        toast.error("BAYC/MAYC verification lost — bookings are disabled.");
+      } else if (prev.op && !op) {
+        toast.error("Otherpage / Lifer token no longer detected — Lifer rooms hidden.");
+      }
+    }
+    prevAccessRef.current = { bayc, op };
+
+    setBaycVerified(bayc);
+    setOtherpageVerified(op);
     setRooms(dualVerified ? allRooms : allRooms.filter((rm) => rm.tier !== "lifer"));
     setBookings((b as Booking[]) ?? []);
     setIsAdmin(!!roles?.some((x) => x.role === "admin" || x.role === "super_admin"));
@@ -80,51 +97,16 @@ function RoomsPage() {
 
   useEffect(() => {
     void load();
-    const channel = supabase
-      .channel(`rooms-live-${user?.id ?? "anon"}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "room_bookings" }, () =>
-        load(),
-      )
-      .on("postgres_changes", { event: "*", schema: "public", table: "rooms" }, () => load())
-      .on(
-        "postgres_changes",
-        user
-          ? { event: "*", schema: "public", table: "user_verifications", filter: `user_id=eq.${user.id}` }
-          : { event: "*", schema: "public", table: "user_verifications" },
-        () => load(),
-      )
-      .on(
-        "postgres_changes",
-        user
-          ? { event: "*", schema: "public", table: "user_roles", filter: `user_id=eq.${user.id}` }
-          : { event: "*", schema: "public", table: "user_roles" },
-        () => load(),
-      )
-      .subscribe();
-
-    // Re-load on auth state changes (sign-in/out, token refresh, account switch)
-    const { data: authSub } = supabase.auth.onAuthStateChange(() => {
-      void load();
-    });
-
-    // Re-load when wallet/delegation status is refreshed elsewhere in the app
-    const onWalletRefresh = () => void load();
-    window.addEventListener("baycmc:verification-refreshed", onWalletRefresh);
-    window.addEventListener("baycmc:wallet-changed", onWalletRefresh);
-    const onVisible = () => {
-      if (document.visibilityState === "visible") void load();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-
-    return () => {
-      void supabase.removeChannel(channel);
-      authSub.subscription.unsubscribe();
-      window.removeEventListener("baycmc:verification-refreshed", onWalletRefresh);
-      window.removeEventListener("baycmc:wallet-changed", onWalletRefresh);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
+
+  useVerificationRevalidation({
+    userId: user?.id ?? null,
+    onRevalidate: load,
+    watchRooms: true,
+  });
+
+  const canBook = baycVerified || isAdmin;
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
