@@ -105,19 +105,20 @@ export function ConferenceRoom({
     }
   }, [getToken, roomId]);
 
-  // Cleanup the ticker if the component unmounts mid-connect.
+  // Auto-join on mount and re-join when the user navigates to a different
+  // room. Matches the reference UX (the room shows "Connecting to room…"
+  // immediately on landing — no extra click). Cleanup the progress ticker
+  // if the component unmounts mid-connect.
   useEffect(() => {
+    void join();
     return () => {
       if (progressTimer.current) {
         window.clearInterval(progressTimer.current);
         progressTimer.current = null;
       }
     };
-  }, []);
-
-  // Reset when navigating to a different room.
-  useEffect(() => {
-    setState({ phase: "idle" });
+    // `join` is memoised on roomId, so depending on roomId is equivalent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId]);
 
   // Background re-validation every 30s while live — drop the user if their

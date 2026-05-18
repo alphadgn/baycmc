@@ -60,7 +60,7 @@ function Index() {
             </h1>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground sm:mt-3 sm:text-xl">
               Yacht Club social network, live audio rooms, conference bookings, and local chapter
-              sub communities — all behind a single signature from your wallet.
+              sub communities — all from proof of ownership by trusted Privy verification.
             </p>
             <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
               {isAuthenticated ? (
@@ -113,7 +113,7 @@ function Index() {
             {[
               { n: "01", t: "Sign in", d: "Connect any wallet or email through Privy. You're instantly inside the lobby — no waiting, no extra app." },
               { n: "02", t: "Verify your ape", d: "Verify a BAYC or MAYC in your wallet (or a vault delegated to you on delegate.cash) to unlock the feed, conference rooms, messages, and Ape Rides." },
-              { n: "03", t: "Unlock the Lifer clubhouse", d: "Lifer rooms unlock automatically for the inner circle once you're inside." },
+              { n: "03", t: "Unlock the clubhouse lore", d: "Unlock the clubhouse lore once you're inside." },
             ].map((s) => (
               <div key={s.n} className="glass rounded-2xl p-6 shadow-card">
                 <div className="font-display text-xs text-gold tracking-widest">{s.n}</div>

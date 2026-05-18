@@ -195,6 +195,51 @@ export type Database = {
         }
         Relationships: []
       }
+      chapter_submissions: {
+        Row: {
+          chapter_name: string
+          city: string | null
+          created_at: string
+          id: string
+          pitch: string | null
+          region: string | null
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewer_id: string | null
+          status: Database["public"]["Enums"]["chapter_submission_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          chapter_name: string
+          city?: string | null
+          created_at?: string
+          id?: string
+          pitch?: string | null
+          region?: string | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          status?: Database["public"]["Enums"]["chapter_submission_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          chapter_name?: string
+          city?: string | null
+          created_at?: string
+          id?: string
+          pitch?: string | null
+          region?: string | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          status?: Database["public"]["Enums"]["chapter_submission_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       lifer_messages: {
         Row: {
           body: string
@@ -696,6 +741,7 @@ export type Database = {
       ape_ride_request_status: "pending" | "accepted" | "declined" | "cancelled"
       ape_ride_status: "live" | "ended"
       app_role: "super_admin" | "admin" | "verified_user" | "chapter_leader"
+      chapter_submission_status: "pending" | "approved" | "rejected"
       room_tier: "token_proof" | "lifer"
     }
     CompositeTypes: {
@@ -827,6 +873,7 @@ export const Constants = {
       ape_ride_request_status: ["pending", "accepted", "declined", "cancelled"],
       ape_ride_status: ["live", "ended"],
       app_role: ["super_admin", "admin", "verified_user", "chapter_leader"],
+      chapter_submission_status: ["pending", "approved", "rejected"],
       room_tier: ["token_proof", "lifer"],
     },
   },

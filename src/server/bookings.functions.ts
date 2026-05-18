@@ -46,11 +46,25 @@ export const createBooking = createServerFn({ method: "POST" })
       .select("bayc_verified, otherpage_verified")
       .eq("user_id", userId)
       .maybeSingle();
-    if (!ver?.bayc_verified) {
+    // Role bypass: super_admin / admin / verified_user skip the BAYC
+    // ownership check, but the Otherpage / lifer gate is never bypassed —
+    // those rooms always require an actual on-chain Otherpage token AND a
+    // verified BAYC/MAYC holding.
+    const { data: roleRows } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId);
+    const hasBypassRole = !!roleRows?.some(
+      (r) => r.role === "super_admin" || r.role === "admin" || r.role === "verified_user",
+    );
+    if (!ver?.bayc_verified && !hasBypassRole) {
       return { ok: false as const, error: "Verified BAYC/MAYC holder access required to book." };
     }
-    if (room.tier === "lifer" && !ver.otherpage_verified) {
-      return { ok: false as const, error: "Lifer badge required for this room." };
+    if (room.tier === "lifer" && !(ver?.bayc_verified && ver?.otherpage_verified)) {
+      return {
+        ok: false as const,
+        error: "Lifer access requires a verified BAYC/MAYC holding AND an Otherpage / Lifer token in your wallet.",
+      };
     }
 
     let overrideBy: string | null = null;

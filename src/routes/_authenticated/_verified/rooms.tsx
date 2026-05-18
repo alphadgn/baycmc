@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
@@ -10,6 +10,7 @@ import { Calendar, Lock, Plus, Users, Gamepad2 } from "lucide-react";
 import { RoomCalendar } from "@/components/RoomCalendar";
 import { getRoomThemeImage, getRoomThemeAmbience } from "@/lib/baycmc/roomThemes";
 import { useRoomPreferences } from "@/lib/baycmc/useRoomPreferences";
+import { useVerificationRevalidation } from "@/hooks/useVerificationRevalidation";
 
 interface Room {
   id: string;
@@ -54,13 +55,16 @@ function RoomsPage() {
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
+  const [baycVerified, setBaycVerified] = useState(false);
+  const [, setOtherpageVerified] = useState(false);
+  const prevAccessRef = useRef<{ bayc: boolean; op: boolean } | null>(null);
 
   const create = useServerFn(createBooking);
   const cancel = useServerFn(cancelBooking);
 
   async function load() {
     setLoading(true);
-    const [{ data: r }, { data: b }, { data: roles }] = await Promise.all([
+    const [{ data: r }, { data: b }, { data: roles }, { data: ver }] = await Promise.all([
       supabase
         .from("rooms")
         .select("id,name,description,capacity,tier,livekit_room,theme,display_order,is_locked,kind")
@@ -75,8 +79,31 @@ function RoomsPage() {
       user
         ? supabase.from("user_roles").select("role").eq("user_id", user.id)
         : Promise.resolve({ data: [] as { role: string }[] }),
+      user
+        ? supabase
+            .from("user_verifications")
+            .select("bayc_verified,otherpage_verified")
+            .eq("user_id", user.id)
+            .maybeSingle()
+        : Promise.resolve({
+            data: null as { bayc_verified: boolean; otherpage_verified: boolean } | null,
+          }),
     ]);
-    setRooms((r as Room[]) ?? []);
+    const allRooms = (r as Room[]) ?? [];
+    const bayc = !!ver?.bayc_verified;
+    const op = !!ver?.otherpage_verified;
+    const dualVerified = bayc && op;
+
+    // Notify the user immediately if they lost access while on this page.
+    const prev = prevAccessRef.current;
+    if (prev && prev.bayc && !bayc) {
+      toast.error("BAYC/MAYC verification lost — bookings are disabled.");
+    }
+    prevAccessRef.current = { bayc, op };
+
+    setBaycVerified(bayc);
+    setOtherpageVerified(op);
+    setRooms(dualVerified ? allRooms : allRooms.filter((rm) => rm.tier !== "lifer"));
     setBookings((b as Booking[]) ?? []);
     setIsAdmin(!!roles?.some((x) => x.role === "admin" || x.role === "super_admin"));
     setLoading(false);
@@ -84,25 +111,25 @@ function RoomsPage() {
 
   useEffect(() => {
     void load();
-    const channel = supabase
-      .channel("bookings")
-      .on("postgres_changes", { event: "*", schema: "public", table: "room_bookings" }, () =>
-        load(),
-      )
-      .on("postgres_changes", { event: "*", schema: "public", table: "rooms" }, () => load())
-      .subscribe();
-    return () => {
-      void supabase.removeChannel(channel);
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
+  // Unified realtime + auth + wallet revalidation. Replaces my earlier
+  // ad-hoc room_bookings channel. `watchRooms: true` so room CRUD (e.g. an
+  // admin locking a room) also triggers a refetch.
+  useVerificationRevalidation({
+    userId: user?.id ?? null,
+    onRevalidate: load,
+    watchRooms: true,
+  });
+
   // Show themed rooms only — the new visual model is per-room ambience and
   // older rows (Boardroom, Atrium, Penthouse, etc.) don't have an image yet.
-  const visibleRooms = useMemo(
-    () => rooms.filter((r) => r.theme),
-    [rooms],
-  );
+  const visibleRooms = useMemo(() => rooms.filter((r) => r.theme), [rooms]);
+
+  // Verified BAYC/MAYC OR an elevated role can create bookings. Lifer rooms
+  // are already filtered out above when the user isn't dual-verified.
+  const canBook = baycVerified || isAdmin;
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
@@ -124,6 +151,14 @@ function RoomsPage() {
           {showCalendar ? "Hide booking calendar" : "Booking calendar"}
         </button>
       </header>
+
+      {!loading && !canBook && (
+        <div className="glass mb-6 rounded-2xl border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive font-sans-display">
+          You're signed in, but no verified BAYC/MAYC holding was detected in your connected
+          wallet. Booking is disabled until verification is restored. Reconnect or refresh your
+          wallet to try again.
+        </div>
+      )}
 
       {showCalendar && !loading && (
         <div className="mb-6">
@@ -159,6 +194,7 @@ function RoomsPage() {
                   key={room.id}
                   room={room}
                   bookings={bookings.filter((b) => b.room_id === room.id).slice(0, 2)}
+                  canBook={canBook}
                   onBook={() => setSelectedRoom(room)}
                 />
               ))}
@@ -220,10 +256,12 @@ function RoomsPage() {
 function RoomCard({
   room,
   bookings,
+  canBook,
   onBook,
 }: {
   room: Room;
   bookings: Booking[];
+  canBook: boolean;
   onBook: () => void;
 }) {
   const bg = getRoomThemeImage(room.theme);
@@ -292,7 +330,9 @@ function RoomCard({
             <button
               type="button"
               onClick={onBook}
-              className="flex-1 rounded-md border border-gold/40 bg-gold/10 px-3 py-2 text-[11px] font-semibold text-gold transition hover:bg-gold/20"
+              disabled={!canBook}
+              title={!canBook ? "Verified BAYC/MAYC required to book" : undefined}
+              className="flex-1 rounded-md border border-gold/40 bg-gold/10 px-3 py-2 text-[11px] font-semibold text-gold transition hover:bg-gold/20 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Book
             </button>
@@ -300,7 +340,7 @@ function RoomCard({
           <Link
             to="/rooms/$roomId"
             params={{ roomId: room.id }}
-            className={`${isGame ? "flex-1" : "flex-1"} rounded-md bg-gradient-gold px-3 py-2 text-center text-[11px] font-semibold text-gold-foreground shadow-gold`}
+            className="flex-1 rounded-md bg-gradient-gold px-3 py-2 text-center text-[11px] font-semibold text-gold-foreground shadow-gold"
           >
             {isGame ? "Enter game" : "Enter"}
           </Link>
