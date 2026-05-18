@@ -30,6 +30,10 @@
   --color-success-foreground: var(--success-foreground);
   --color-gold: var(--gold);
   --color-gold-foreground: var(--gold-foreground);
+  --color-calendar-paper: var(--calendar-paper);
+  --color-calendar-ink: var(--calendar-ink);
+  --color-calendar-rule: var(--calendar-rule);
+  --color-calendar-muted-ink: var(--calendar-muted-ink);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
