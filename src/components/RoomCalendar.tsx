@@ -159,7 +159,7 @@ export function RoomCalendar({
 
   if (expandedMonth !== null) {
     return (
-      <section className="rounded-2xl bg-background p-5 shadow-card sm:p-8">
+      <section className="mx-auto w-full max-w-4xl bg-calendar-paper px-6 py-8 text-calendar-ink shadow-card sm:px-10 sm:py-12">
         <header className="mb-6 flex items-center justify-between gap-3">
           <button
             type="button"
@@ -167,13 +167,13 @@ export function RoomCalendar({
               setExpandedMonth(null);
               setSelected(null);
             }}
-            className="inline-flex items-center gap-1 text-xs uppercase tracking-[0.25em] text-muted-foreground hover:text-foreground"
+            className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-[0.25em] text-calendar-muted-ink hover:text-calendar-ink"
             aria-label="Back to year"
           >
             <ChevronLeft className="h-4 w-4" />
             {year}
           </button>
-          <h2 className="font-display text-3xl font-bold tracking-tight sm:text-5xl">
+          <h2 className="font-display text-3xl font-extrabold tracking-tight sm:text-5xl">
             {MONTH_LABELS[expandedMonth]}
           </h2>
           <div className="flex gap-1">
@@ -182,7 +182,7 @@ export function RoomCalendar({
               onClick={() =>
                 setExpandedMonth((m) => (m === null ? null : (m + 11) % 12))
               }
-              className="rounded-md p-1.5 text-muted-foreground hover:bg-secondary"
+              className="rounded-md p-1.5 text-calendar-muted-ink hover:bg-calendar-rule/40"
               aria-label="Previous month"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -192,7 +192,7 @@ export function RoomCalendar({
               onClick={() =>
                 setExpandedMonth((m) => (m === null ? null : (m + 1) % 12))
               }
-              className="rounded-md p-1.5 text-muted-foreground hover:bg-secondary"
+              className="rounded-md p-1.5 text-calendar-muted-ink hover:bg-calendar-rule/40"
               aria-label="Next month"
             >
               <ChevronRight className="h-4 w-4" />
