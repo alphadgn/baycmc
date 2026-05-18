@@ -88,18 +88,22 @@ export function RoomCalendar({
     const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
     const days = eachDayOfInterval({ start: gridStart, end: gridEnd });
     const { large } = opts;
+    const weekdayClass = large
+      ? "grid grid-cols-7 text-sm font-bold tracking-wider text-calendar-muted-ink"
+      : "grid grid-cols-7 text-[8px] font-extrabold tracking-wider text-calendar-ink sm:text-[10px]";
+    const dayGridClass = large
+      ? "mt-4 grid grid-cols-7 gap-y-3"
+      : "mt-1 grid grid-cols-7 gap-y-1.5";
 
     return (
       <>
-        <div
-          className={`grid grid-cols-7 ${large ? "text-sm" : "text-[10px]"} font-semibold tracking-wider text-foreground/70`}
-        >
+        <div className={weekdayClass}>
           {DOW.map((d, i) => (
-            <div key={i} className={`${large ? "py-2" : "py-1"} text-center`}>{d}</div>
+            <div key={i} className={`${large ? "py-2" : "py-0.5"} text-center`}>{d}</div>
           ))}
         </div>
-        <div className="h-px w-full bg-foreground/30" />
-        <div className={`mt-${large ? "2" : "1"} grid grid-cols-7 ${large ? "gap-1" : "gap-y-0.5"}`}>
+        <div className="h-px w-full bg-calendar-rule" />
+        <div className={dayGridClass}>
           {days.map((day) => {
             const inMonth = isSameMonth(day, monthStart);
             const isToday = isSameDay(day, today);
@@ -110,16 +114,13 @@ export function RoomCalendar({
               return (
                 <div
                   key={key}
-                  className={`relative aspect-square text-center font-mono text-[10px] leading-none ${
-                    inMonth ? "text-foreground" : "text-transparent"
+                  className={`relative h-4 text-center font-display text-[8px] font-extrabold leading-none sm:h-5 sm:text-[10px] ${
+                    inMonth ? "text-calendar-ink" : "text-transparent"
                   }`}
                 >
                   <span className="absolute inset-0 flex items-center justify-center">
                     {format(day, "d")}
                   </span>
-                  {has && (
-                    <span className="absolute bottom-0 left-1/2 h-0.5 w-0.5 -translate-x-1/2 rounded-full bg-gold" />
-                  )}
                 </div>
               );
             }
@@ -129,16 +130,16 @@ export function RoomCalendar({
                 type="button"
                 onClick={() => inMonth && setSelected(day)}
                 disabled={!inMonth}
-                className={`relative aspect-square rounded-full text-center text-sm transition ${
-                  inMonth ? "text-foreground" : "text-transparent"
+                className={`relative h-10 rounded-md text-center font-display text-sm font-bold transition ${
+                  inMonth ? "text-calendar-ink" : "text-transparent"
                 } ${
                   isSelected
                     ? "bg-gold text-gold-foreground"
                     : isToday
-                      ? "bg-gold/20 font-semibold text-gold"
+                      ? "bg-gold/20 text-calendar-ink"
                       : has
-                        ? "bg-secondary/60 font-semibold hover:bg-secondary"
-                        : "hover:bg-secondary/40"
+                        ? "bg-gold/10 hover:bg-gold/20"
+                        : "hover:bg-calendar-rule/40"
                 }`}
                 aria-label={inMonth ? format(day, "PPP") : undefined}
               >
