@@ -541,9 +541,13 @@ export type Database = {
           capacity: number
           created_at: string
           description: string | null
+          display_order: number | null
           id: string
+          is_locked: boolean
+          kind: string
           livekit_room: string
           name: string
+          theme: string | null
           tier: Database["public"]["Enums"]["room_tier"]
         }
         Insert: {
@@ -551,9 +555,13 @@ export type Database = {
           capacity?: number
           created_at?: string
           description?: string | null
+          display_order?: number | null
           id?: string
+          is_locked?: boolean
+          kind?: string
           livekit_room: string
           name: string
+          theme?: string | null
           tier?: Database["public"]["Enums"]["room_tier"]
         }
         Update: {
@@ -561,9 +569,13 @@ export type Database = {
           capacity?: number
           created_at?: string
           description?: string | null
+          display_order?: number | null
           id?: string
+          is_locked?: boolean
+          kind?: string
           livekit_room?: string
           name?: string
+          theme?: string | null
           tier?: Database["public"]["Enums"]["room_tier"]
         }
         Relationships: []
