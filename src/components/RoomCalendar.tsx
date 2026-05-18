@@ -268,30 +268,30 @@ export function RoomCalendar({
   }
 
   return (
-    <section className="rounded-2xl bg-background p-5 shadow-card sm:p-10">
-      <header className="mb-8 flex items-center justify-between gap-3">
+    <section className="mx-auto aspect-[3/4] w-full min-w-[760px] max-w-5xl bg-calendar-paper px-14 py-12 text-calendar-ink shadow-card sm:px-16 sm:py-14">
+      <header className="mb-10 flex items-center justify-between gap-3">
         <button
           type="button"
           onClick={() => setYear((y) => y - 1)}
-          className="rounded-md p-2 text-muted-foreground hover:bg-secondary"
+          className="rounded-md p-2 text-calendar-muted-ink hover:bg-calendar-rule/40"
           aria-label="Previous year"
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
-        <h2 className="font-display text-6xl font-extrabold tracking-tight text-foreground sm:text-8xl">
+        <h2 className="font-display text-7xl font-extrabold tracking-tight text-calendar-ink sm:text-8xl">
           {year}
         </h2>
         <button
           type="button"
           onClick={() => setYear((y) => y + 1)}
-          className="rounded-md p-2 text-muted-foreground hover:bg-secondary"
+          className="rounded-md p-2 text-calendar-muted-ink hover:bg-calendar-rule/40"
           aria-label="Next year"
         >
           <ChevronRight className="h-5 w-5" />
         </button>
       </header>
 
-      <div className="grid grid-cols-1 gap-x-8 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-3 gap-x-16 gap-y-10">
         {MONTH_LABELS.map((label, mIdx) => (
           <button
             key={label}
@@ -300,10 +300,10 @@ export function RoomCalendar({
               setExpandedMonth(mIdx);
               setSelected(null);
             }}
-            className="group rounded-lg p-2 text-left transition hover:bg-secondary/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+            className="group text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-gold"
             aria-label={`Open ${label}`}
           >
-            <h3 className="mb-3 font-display text-2xl font-bold tracking-tight group-hover:text-gold">
+            <h3 className="mb-3 text-center font-display text-3xl font-extrabold tracking-tight text-calendar-ink group-hover:text-gold">
               {label}
             </h3>
             {renderMonthGrid(mIdx, { large: false })}
