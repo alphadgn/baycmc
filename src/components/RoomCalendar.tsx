@@ -268,8 +268,8 @@ export function RoomCalendar({
   }
 
   return (
-    <section className="mx-auto aspect-[3/4] w-full min-w-[760px] max-w-5xl bg-calendar-paper px-14 py-12 text-calendar-ink shadow-card sm:px-16 sm:py-14">
-      <header className="mb-10 flex items-center justify-between gap-3">
+    <section className="mx-auto aspect-[3/4] w-full max-w-5xl bg-calendar-paper px-5 py-8 text-calendar-ink shadow-card sm:px-16 sm:py-14">
+      <header className="mb-6 flex items-center justify-between gap-3 sm:mb-10">
         <button
           type="button"
           onClick={() => setYear((y) => y - 1)}
@@ -278,7 +278,7 @@ export function RoomCalendar({
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
-        <h2 className="font-display text-7xl font-extrabold tracking-tight text-calendar-ink sm:text-8xl">
+        <h2 className="font-display text-5xl font-extrabold tracking-tight text-calendar-ink sm:text-8xl">
           {year}
         </h2>
         <button
@@ -291,7 +291,7 @@ export function RoomCalendar({
         </button>
       </header>
 
-      <div className="grid grid-cols-3 gap-x-16 gap-y-10">
+      <div className="grid grid-cols-3 gap-x-5 gap-y-6 sm:gap-x-16 sm:gap-y-10">
         {MONTH_LABELS.map((label, mIdx) => (
           <button
             key={label}
@@ -303,7 +303,7 @@ export function RoomCalendar({
             className="group text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-gold"
             aria-label={`Open ${label}`}
           >
-            <h3 className="mb-3 text-center font-display text-3xl font-extrabold tracking-tight text-calendar-ink group-hover:text-gold">
+            <h3 className="mb-2 text-center font-display text-base font-extrabold tracking-tight text-calendar-ink group-hover:text-gold sm:mb-3 sm:text-3xl">
               {label}
             </h3>
             {renderMonthGrid(mIdx, { large: false })}
