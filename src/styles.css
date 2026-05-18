@@ -59,6 +59,11 @@
   --gold: oklch(0.82 0.15 80);
   --gold-foreground: oklch(0.14 0.01 80);
 
+  --calendar-paper: oklch(0.99 0 0);
+  --calendar-ink: oklch(0.22 0 0);
+  --calendar-rule: oklch(0.78 0 0);
+  --calendar-muted-ink: oklch(0.38 0 0);
+
   --secondary: oklch(0.24 0.015 80);
   --secondary-foreground: oklch(0.95 0.02 85);
 
