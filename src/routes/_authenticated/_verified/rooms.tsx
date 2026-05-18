@@ -92,20 +92,23 @@ function RoomsPage() {
     const allRooms = (r as Room[]) ?? [];
     const bayc = !!ver?.bayc_verified;
     const op = !!ver?.otherpage_verified;
-    const dualVerified = bayc && op;
+    const admin = !!roles?.some((x) => x.role === "admin" || x.role === "super_admin");
+    // Admins administer the clubhouse — they see every tier including
+    // Lifer-only rooms without holding tokens.
+    const seesLiferRooms = (bayc && op) || admin;
 
     // Notify the user immediately if they lost access while on this page.
     const prev = prevAccessRef.current;
-    if (prev && prev.bayc && !bayc) {
+    if (prev && prev.bayc && !bayc && !admin) {
       toast.error("BAYC/MAYC verification lost — bookings are disabled.");
     }
     prevAccessRef.current = { bayc, op };
 
     setBaycVerified(bayc);
     setOtherpageVerified(op);
-    setRooms(dualVerified ? allRooms : allRooms.filter((rm) => rm.tier !== "lifer"));
+    setRooms(seesLiferRooms ? allRooms : allRooms.filter((rm) => rm.tier !== "lifer"));
     setBookings((b as Booking[]) ?? []);
-    setIsAdmin(!!roles?.some((x) => x.role === "admin" || x.role === "super_admin"));
+    setIsAdmin(admin);
     setLoading(false);
   }
 

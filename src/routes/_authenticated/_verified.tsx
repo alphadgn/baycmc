@@ -20,6 +20,16 @@ export const Route = createFileRoute("/_authenticated/_verified")({
       throw redirect({ to: "/" });
     }
 
+    // Admin bypass — admins administer the clubhouse and need access to
+    // every verified-tier route without holding BAYC/MAYC themselves.
+    const { data: roles } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", sess.session.user.id);
+    if (roles?.some((r) => r.role === "admin" || r.role === "super_admin")) {
+      return;
+    }
+
     let snap: Awaited<ReturnType<typeof revalidateOwnership>> | null = null;
     try {
       snap = await revalidateOwnership();

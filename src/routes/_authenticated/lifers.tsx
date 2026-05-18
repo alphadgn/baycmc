@@ -14,6 +14,17 @@ export const Route = createFileRoute("/_authenticated/lifers")({
     if (!sess.session) {
       throw redirect({ to: "/" });
     }
+
+    // Admin bypass — admins / super_admins enter the Lifer lounge without
+    // an on-chain Otherpage token.
+    const { data: roles } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", sess.session.user.id);
+    if (roles?.some((r) => r.role === "admin" || r.role === "super_admin")) {
+      return;
+    }
+
     let snap: Awaited<ReturnType<typeof revalidateOwnership>> | null = null;
     try {
       snap = await revalidateOwnership();

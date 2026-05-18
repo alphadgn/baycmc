@@ -17,6 +17,8 @@ export interface VerificationStatus {
   otherpage: boolean;
   /** Tier 3 — verified holder + Otherpage / Lifer token. */
   isLifer: boolean;
+  /** Has admin or super_admin role. */
+  isAdmin: boolean;
   refresh: () => Promise<void>;
 }
 
@@ -25,19 +27,27 @@ export interface VerificationStatus {
  *
  * UI hint only — actual access control is enforced server-side by RLS
  * (`is_verified_holder`, `is_lifer`) and per-request server fns.
+ *
+ * Role overlay: `admin` / `super_admin` users bypass BOTH the BAYC and the
+ * Lifer gate (they administer the clubhouse and need access everywhere
+ * without holding tokens themselves). `verified_user` role currently has
+ * no overlay here — the BAYC gate is checked by the underlying RLS helper
+ * `is_verified_holder()` which already grants the verified_user role.
  */
 export function useVerificationStatus(): VerificationStatus {
   const { user, loading: authLoading, isAuthenticated } = useAuth();
-  const [isVerifiedHolder, setIsVerifiedHolder] = useState(false);
+  const [baycVerified, setBaycVerified] = useState(false);
   const [collection, setCollection] = useState<BaycCollection>(null);
   const [otherpage, setOtherpage] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   async function load() {
     if (!user) {
-      setIsVerifiedHolder(false);
+      setBaycVerified(false);
       setCollection(null);
       setOtherpage(false);
+      setIsAdmin(false);
       setLoading(false);
       return;
     }
@@ -47,14 +57,18 @@ export function useVerificationStatus(): VerificationStatus {
     } catch (e) {
       console.warn("revalidateOwnership failed, using cached row", e);
     }
-    const { data } = await supabase
-      .from("user_verifications")
-      .select("bayc_verified, otherpage_verified, bayc_collection")
-      .eq("user_id", user.id)
-      .maybeSingle();
-    setIsVerifiedHolder(!!data?.bayc_verified);
-    setOtherpage(!!data?.otherpage_verified);
-    setCollection((data?.bayc_collection as BaycCollection | undefined) ?? null);
+    const [{ data: ver }, { data: roles }] = await Promise.all([
+      supabase
+        .from("user_verifications")
+        .select("bayc_verified, otherpage_verified, bayc_collection")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+      supabase.from("user_roles").select("role").eq("user_id", user.id),
+    ]);
+    setBaycVerified(!!ver?.bayc_verified);
+    setOtherpage(!!ver?.otherpage_verified);
+    setCollection((ver?.bayc_collection as BaycCollection | undefined) ?? null);
+    setIsAdmin(!!roles?.some((r) => r.role === "admin" || r.role === "super_admin"));
     setLoading(false);
   }
 
@@ -77,6 +91,11 @@ export function useVerificationStatus(): VerificationStatus {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
+  // Admin overlay: treat admins as if they hold BAYC + Lifer. Server-side
+  // gates (RLS, livekit/bookings server fns) apply the same bypass.
+  const isVerifiedHolder = baycVerified || isAdmin;
+  const isLifer = (baycVerified && otherpage) || isAdmin;
+
   return {
     loading: authLoading || loading,
     isVerifiedHolder,
@@ -84,7 +103,8 @@ export function useVerificationStatus(): VerificationStatus {
     tokenProof: isVerifiedHolder,
     collection,
     otherpage,
-    isLifer: isVerifiedHolder && otherpage,
+    isLifer,
+    isAdmin,
     refresh: load,
   };
 }
