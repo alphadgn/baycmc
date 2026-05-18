@@ -8,6 +8,7 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { Calendar, Lock, Plus, Users, Gamepad2 } from "lucide-react";
 import { RoomCalendar } from "@/components/RoomCalendar";
+import { RoomsShell, RoomsIdleBottomBar } from "@/components/RoomsShell";
 import { getRoomThemeImage, getRoomThemeAmbience } from "@/lib/baycmc/roomThemes";
 import { useRoomPreferences } from "@/lib/baycmc/useRoomPreferences";
 import { useVerificationRevalidation } from "@/hooks/useVerificationRevalidation";
@@ -134,17 +135,35 @@ function RoomsPage() {
   // are already filtered out above when the user isn't dual-verified.
   const canBook = baycVerified || isAdmin;
 
+  const cancelById = async (id: string) => {
+    const res = await cancel({ data: { bookingId: id } });
+    if (!res.ok) toast.error(res.error);
+    else {
+      toast.success("Booking cancelled");
+      await load();
+    }
+  };
+
+  const rightRail = (
+    <div className="space-y-3">
+      <PreferencesPanel />
+      <BookingsSummary
+        bookings={bookings}
+        rooms={visibleRooms}
+        currentUserId={user?.id ?? null}
+        onCancel={cancelById}
+      />
+    </div>
+  );
+
   return (
-    <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
-      <header className="mb-5 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="font-display text-3xl text-gradient-gold sm:text-5xl">
-            Conference Rooms
-          </h1>
-          <p className="mt-1 text-xs text-muted-foreground font-sans-display sm:text-sm">
-            Choose a room to join and connect with others in real time.
-          </p>
-        </div>
+    <RoomsShell
+      title="Conference Rooms"
+      subtitle="Choose a room to join and connect with others in real time."
+      rightRail={rightRail}
+      bottomBar={<RoomsIdleBottomBar />}
+    >
+      <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
         <button
           type="button"
           onClick={() => setShowCalendar((v) => !v)}
@@ -153,10 +172,10 @@ function RoomsPage() {
           <Calendar className="h-3.5 w-3.5" />
           {showCalendar ? "Hide booking calendar" : "Booking calendar"}
         </button>
-      </header>
+      </div>
 
       {!loading && !canBook && (
-        <div className="glass mb-6 rounded-2xl border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive font-sans-display">
+        <div className="glass mb-5 rounded-2xl border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive font-sans-display">
           You're signed in, but no verified BAYC/MAYC holding was detected in your connected
           wallet. Booking is disabled until verification is restored. Reconnect or refresh your
           wallet to try again.
@@ -164,66 +183,36 @@ function RoomsPage() {
       )}
 
       {showCalendar && !loading && (
-        <div className="mb-6">
+        <div className="mb-5">
           <RoomCalendar
             rooms={visibleRooms}
             bookings={bookings}
             currentUserId={user?.id ?? null}
-            onCancel={async (id) => {
-              const res = await cancel({ data: { bookingId: id } });
-              if (!res.ok) toast.error(res.error);
-              else {
-                toast.success("Booking cancelled");
-                await load();
-              }
-            }}
+            onCancel={cancelById}
           />
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_18rem]">
-        {/* Room grid */}
-        <section>
-          {loading ? (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {[...Array(6)].map((_, i) => (
-                <div key={i} className="h-48 animate-pulse rounded-2xl bg-muted/20" />
-              ))}
-            </div>
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {visibleRooms.map((room) => (
-                <RoomCard
-                  key={room.id}
-                  room={room}
-                  bookings={bookings.filter((b) => b.room_id === room.id).slice(0, 2)}
-                  canBook={canBook}
-                  onBook={() => setSelectedRoom(room)}
-                />
-              ))}
-              {isAdmin && <CreateRoomTile />}
-            </div>
-          )}
-        </section>
-
-        {/* Right rail */}
-        <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
-          <PreferencesPanel />
-          <BookingsSummary
-            bookings={bookings}
-            rooms={visibleRooms}
-            currentUserId={user?.id ?? null}
-            onCancel={async (id) => {
-              const res = await cancel({ data: { bookingId: id } });
-              if (!res.ok) toast.error(res.error);
-              else {
-                toast.success("Booking cancelled");
-                await load();
-              }
-            }}
-          />
-        </aside>
-      </div>
+      {loading ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="h-48 animate-pulse rounded-2xl bg-muted/20" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {visibleRooms.map((room) => (
+            <RoomCard
+              key={room.id}
+              room={room}
+              bookings={bookings.filter((b) => b.room_id === room.id).slice(0, 2)}
+              canBook={canBook}
+              onBook={() => setSelectedRoom(room)}
+            />
+          ))}
+          {isAdmin && <CreateRoomTile />}
+        </div>
+      )}
 
       {selectedRoom && (
         <BookingModal
@@ -252,7 +241,7 @@ function RoomsPage() {
           }}
         />
       )}
-    </main>
+    </RoomsShell>
   );
 }
 
@@ -271,8 +260,15 @@ function RoomCard({
   const ambience = getRoomThemeAmbience(room.theme);
   const isGame = room.kind === "game";
 
+  // The whole card is a link — click anywhere on it to enter the room. The
+  // Book button inside stops propagation so it opens the modal instead.
   return (
-    <div className="group glass relative flex flex-col overflow-hidden rounded-2xl border border-border/60 shadow-card transition hover:border-gold/40">
+    <Link
+      to="/rooms/$roomId"
+      params={{ roomId: room.id }}
+      aria-label={`Enter ${room.name}`}
+      className="group glass relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-border/60 shadow-card transition hover:border-gold/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/60"
+    >
       <div className="relative aspect-[16/10] w-full overflow-hidden">
         {bg ? (
           <img
@@ -332,7 +328,12 @@ function RoomCard({
           {!isGame && (
             <button
               type="button"
-              onClick={onBook}
+              onClick={(e) => {
+                // Don't navigate when the user wants to open the booking modal.
+                e.preventDefault();
+                e.stopPropagation();
+                onBook();
+              }}
               disabled={!canBook}
               title={!canBook ? "Verified BAYC/MAYC required to book" : undefined}
               className="flex-1 rounded-md border border-gold/40 bg-gold/10 px-3 py-2 text-[11px] font-semibold text-gold transition hover:bg-gold/20 disabled:cursor-not-allowed disabled:opacity-40"
@@ -340,16 +341,12 @@ function RoomCard({
               Book
             </button>
           )}
-          <Link
-            to="/rooms/$roomId"
-            params={{ roomId: room.id }}
-            className="flex-1 rounded-md bg-gradient-gold px-3 py-2 text-center text-[11px] font-semibold text-gold-foreground shadow-gold"
-          >
+          <span className="flex-1 rounded-md bg-gradient-gold px-3 py-2 text-center text-[11px] font-semibold text-gold-foreground shadow-gold">
             {isGame ? "Enter game" : "Enter"}
-          </Link>
+          </span>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
 

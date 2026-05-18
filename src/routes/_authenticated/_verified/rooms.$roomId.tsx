@@ -1,6 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ChevronLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { ConferenceRoom } from "@/components/ConferenceRoom";
 import { getRoomThemeImage, getRoomThemeAmbience } from "@/lib/baycmc/roomThemes";
@@ -36,8 +35,8 @@ function RoomDetail() {
 
   if (loading) {
     return (
-      <main className="mx-auto max-w-6xl px-4 py-8">
-        <div className="h-[70vh] animate-pulse rounded-2xl bg-muted/20" />
+      <main className="flex min-h-[100dvh] items-center justify-center px-4">
+        <div className="h-[60vh] w-full max-w-4xl animate-pulse rounded-2xl bg-muted/20" />
       </main>
     );
   }
@@ -55,35 +54,13 @@ function RoomDetail() {
     );
   }
 
-  const bg = getRoomThemeImage(meta.theme);
-  const ambience = getRoomThemeAmbience(meta.theme);
-
   return (
-    <main className="relative mx-auto max-w-6xl px-3 py-4 sm:px-6 sm:py-6">
-      <Link
-        to="/rooms"
-        className="inline-flex items-center gap-1 text-xs text-muted-foreground transition hover:text-gold"
-      >
-        <ChevronLeft className="h-3 w-3" /> All rooms
-      </Link>
-      <header className="my-3 flex flex-wrap items-end justify-between gap-2">
-        <div className="min-w-0">
-          <h1 className="truncate font-display text-3xl text-gradient-gold sm:text-5xl">
-            {meta.name}
-          </h1>
-          <p className="text-[11px] uppercase tracking-widest text-muted-foreground">
-            {meta.tier === "lifer" ? "Lifer-only" : "Verified"}
-            {ambience ? ` · ${ambience}` : null}
-          </p>
-        </div>
-      </header>
-
-      <ConferenceRoom
-        roomId={roomId}
-        roomName={meta.name}
-        backgroundImage={bg}
-        kind={meta.kind}
-      />
-    </main>
+    <ConferenceRoom
+      roomId={roomId}
+      roomName={meta.name}
+      ambience={getRoomThemeAmbience(meta.theme)}
+      backgroundImage={getRoomThemeImage(meta.theme)}
+      kind={meta.kind}
+    />
   );
 }

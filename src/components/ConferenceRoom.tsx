@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import {
   getLivekitToken,
@@ -22,15 +23,23 @@ import {
   Loader2,
   Lock,
   LogOut,
+  MessageCircle,
+  Mic,
   MicOff,
+  Monitor,
   RefreshCw,
   UserMinus,
+  Users,
+  Video as VideoIcon,
+  VideoOff,
 } from "lucide-react";
 import { useRoomPreferences } from "@/lib/baycmc/useRoomPreferences";
+import { RoomsShell } from "@/components/RoomsShell";
 
 interface ConferenceRoomProps {
   roomId: string;
   roomName: string;
+  ambience?: string | null;
   backgroundImage?: string | null;
   kind?: "conference" | "game";
 }
@@ -41,22 +50,27 @@ type JoinState =
   | { phase: "live"; token: string; url: string; isHost: boolean }
   | { phase: "error"; message: string; recoverable: boolean; accessLoss?: boolean };
 
+/**
+ * Room-detail page surface. Owns the connection state machine and renders
+ * the RoomsShell layout in every phase (idle / connecting / error / live)
+ * so the user never sees the layout shift between phases.
+ */
 export function ConferenceRoom({
   roomId,
   roomName,
+  ambience = null,
   backgroundImage = null,
   kind = "conference",
 }: ConferenceRoomProps) {
   const [state, setState] = useState<JoinState>({ phase: "idle" });
-  const { prefs } = useRoomPreferences();
   const getToken = useServerFn(getLivekitToken);
   const revalidateAccess = useServerFn(revalidateLivekitRoomAccess);
+  const navigate = useNavigate();
 
   const progressTimer = useRef<number | null>(null);
 
   const join = useCallback(async () => {
     setState({ phase: "connecting", progress: 5 });
-    // Visual progress ticker — caps short of 100 until LiveKit actually opens.
     if (progressTimer.current) window.clearInterval(progressTimer.current);
     progressTimer.current = window.setInterval(() => {
       setState((prev) =>
@@ -79,12 +93,7 @@ export function ConferenceRoom({
         } else {
           toast.error(res.error);
         }
-        setState({
-          phase: "error",
-          message: res.error,
-          recoverable: !accessLoss,
-          accessLoss,
-        });
+        setState({ phase: "error", message: res.error, recoverable: !accessLoss, accessLoss });
         return;
       }
       setState({
@@ -105,10 +114,7 @@ export function ConferenceRoom({
     }
   }, [getToken, roomId]);
 
-  // Auto-join on mount and re-join when the user navigates to a different
-  // room. Matches the reference UX (the room shows "Connecting to room…"
-  // immediately on landing — no extra click). Cleanup the progress ticker
-  // if the component unmounts mid-connect.
+  // Auto-join on mount and re-join when the user lands on a different room.
   useEffect(() => {
     void join();
     return () => {
@@ -117,24 +123,18 @@ export function ConferenceRoom({
         progressTimer.current = null;
       }
     };
-    // `join` is memoised on roomId, so depending on roomId is equivalent.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId]);
 
-  // Background re-validation every 30s while live — drop the user if their
-  // BAYC/MAYC delegation got revoked or the room was locked.
+  // Periodic re-validation while live — drop the user out if their delegation
+  // got revoked or the host locked the room mid-call.
   useEffect(() => {
     if (state.phase !== "live") return;
     let cancelled = false;
     async function checkAccess() {
       const res = await revalidateAccess({ data: { roomId } }).catch(() => null);
       if (cancelled || !res || res.ok) return;
-      setState({
-        phase: "error",
-        message: res.error,
-        recoverable: false,
-        accessLoss: true,
-      });
+      setState({ phase: "error", message: res.error, recoverable: false, accessLoss: true });
       toast.error("Access changed", { description: res.error, duration: 8000 });
     }
     const interval = window.setInterval(checkAccess, 30_000);
@@ -148,64 +148,116 @@ export function ConferenceRoom({
     };
   }, [state.phase, roomId, revalidateAccess]);
 
-  // Themed background wrapper used across every state — keeps the room
-  // ambience consistent before, during, and after the LiveKit connection.
-  const wrapperStyle: React.CSSProperties = backgroundImage
+  const goBack = useCallback(() => {
+    void navigate({ to: "/rooms" });
+  }, [navigate]);
+
+  // ─── LIVE PHASE ──────────────────────────────────────────────────────────
+  if (state.phase === "live") {
+    return (
+      <LiveKitRoom
+        token={state.token}
+        serverUrl={state.url}
+        connect
+        data-lk-theme="default"
+        onDisconnected={() => setState({ phase: "idle" })}
+        // We render the LiveKit toolbar ourselves so the bottom bar matches
+        // the conf.png mockup; suppress the SDK's default UI.
+        style={{ background: "transparent" }}
+      >
+        <RoomsShell
+          title={roomName}
+          subtitle={ambience ?? undefined}
+          rightRail={
+            <LiveRightRail
+              roomId={roomId}
+              isHost={state.isHost}
+              connecting={false}
+            />
+          }
+          bottomBar={
+            <LiveBottomBar
+              onLeave={() => {
+                setState({ phase: "idle" });
+                goBack();
+              }}
+            />
+          }
+        >
+          <VideoArea backgroundImage={backgroundImage} kind={kind} roomName={roomName} />
+          <RoomAudioRenderer />
+        </RoomsShell>
+      </LiveKitRoom>
+    );
+  }
+
+  // ─── IDLE / CONNECTING / ERROR PHASES ────────────────────────────────────
+  return (
+    <RoomsShell
+      title={roomName}
+      subtitle={ambience ?? undefined}
+      rightRail={<PreLiveRightRail state={state} onRetry={() => void join()} />}
+      bottomBar={<PreLiveBottomBar onLeave={goBack} />}
+    >
+      <PreLivePanel
+        state={state}
+        kind={kind}
+        backgroundImage={backgroundImage}
+        roomName={roomName}
+        onRetry={() => void join()}
+      />
+    </RoomsShell>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// PRE-LIVE views (idle / connecting / error)
+// ────────────────────────────────────────────────────────────────────────────
+
+function PreLivePanel({
+  state,
+  kind,
+  backgroundImage,
+  roomName,
+  onRetry,
+}: {
+  state: JoinState;
+  kind: "conference" | "game";
+  backgroundImage: string | null;
+  roomName: string;
+  onRetry: () => void;
+}) {
+  const bgStyle: React.CSSProperties = backgroundImage
     ? {
-        backgroundImage: `linear-gradient(rgba(8,8,12,0.72), rgba(8,8,12,0.88)), url(${backgroundImage})`,
+        backgroundImage: `linear-gradient(rgba(8,8,12,0.7), rgba(8,8,12,0.88)), url(${backgroundImage})`,
         backgroundSize: "cover",
         backgroundPosition: "center",
       }
     : {};
 
-  if (state.phase === "live") {
-    return (
-      <LiveRoom
-        token={state.token}
-        url={state.url}
-        roomId={roomId}
-        roomName={roomName}
-        isHost={state.isHost}
-        backgroundImage={backgroundImage}
-        kind={kind}
-        prefsMicEnabled={prefs.micEnabled}
-        prefsCameraEnabled={prefs.cameraEnabled}
-        onLeave={() => setState({ phase: "idle" })}
-      />
-    );
-  }
-
   return (
     <div
-      className="relative overflow-hidden rounded-2xl border border-border/60 shadow-card"
-      style={wrapperStyle}
+      className="relative flex min-h-[60vh] items-center justify-center overflow-hidden rounded-2xl border border-border/60 p-6 shadow-card sm:p-10"
+      style={bgStyle}
     >
-      <div className="grid gap-4 p-5 sm:p-8 lg:grid-cols-[1fr_18rem]">
-        <div className="min-h-[60vh] rounded-xl bg-background/40 p-6 backdrop-blur-sm sm:p-10">
-          {state.phase === "connecting" && (
-            <ConnectingPanel progress={state.progress} roomName={roomName} />
-          )}
-          {state.phase === "error" && (
-            <ErrorPanel
-              roomName={roomName}
-              message={state.message}
-              recoverable={state.recoverable}
-              accessLoss={state.accessLoss}
-              onRetry={() => void join()}
-            />
-          )}
-          {state.phase === "idle" && (
-            <IdlePanel roomName={roomName} kind={kind} onJoin={() => void join()} />
-          )}
-        </div>
-
-        <RightRail state={state} />
-      </div>
+      {state.phase === "connecting" && <ConnectingHero progress={state.progress} roomName={roomName} />}
+      {state.phase === "error" && (
+        <ErrorHero
+          roomName={roomName}
+          message={state.message}
+          recoverable={state.recoverable}
+          accessLoss={state.accessLoss}
+          onRetry={onRetry}
+        />
+      )}
+      {state.phase === "idle" && (
+        <IdleHero roomName={roomName} kind={kind} onJoin={onRetry} />
+      )}
     </div>
   );
 }
 
-function IdlePanel({
+function IdleHero({
   roomName,
   kind,
   onJoin,
@@ -215,16 +267,15 @@ function IdlePanel({
   onJoin: () => void;
 }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center text-center">
+    <div className="text-center">
       <h2 className="font-display text-3xl text-gradient-gold sm:text-5xl">{roomName}</h2>
-      <p className="mt-3 max-w-md text-sm text-muted-foreground font-sans-display">
+      <p className="mx-auto mt-3 max-w-md text-sm text-muted-foreground font-sans-display">
         {kind === "game"
-          ? "Real-time PvP arena. Pair up with another verified member and play head-to-head."
-          : "Live audio + video conference. Your saved camera and microphone preferences will be applied as soon as you connect."}
+          ? "Real-time PvP arena. Pair with another verified member and play head-to-head."
+          : "Live audio + video conference. Your saved camera and microphone preferences are applied as soon as you connect."}
       </p>
       <button
         type="button"
-        data-testid="enter-exclusive-room"
         onClick={onJoin}
         className="mt-6 rounded-md bg-gradient-gold px-6 py-3 text-sm font-semibold text-gold-foreground shadow-gold font-sans-display"
       >
@@ -234,27 +285,17 @@ function IdlePanel({
   );
 }
 
-function ConnectingPanel({
-  progress,
-  roomName,
-}: {
-  progress: number;
-  roomName: string;
-}) {
+function ConnectingHero({ progress, roomName }: { progress: number; roomName: string }) {
   return (
-    <div
-      role="status"
-      aria-live="polite"
-      className="flex h-full flex-col items-center justify-center text-center"
-    >
-      <Loader2 className="h-10 w-10 animate-spin text-gold" />
+    <div role="status" aria-live="polite" className="text-center">
+      <Loader2 className="mx-auto h-10 w-10 animate-spin text-gold" />
       <h2 className="mt-4 font-display text-2xl text-foreground sm:text-3xl">
         Connecting to {roomName}…
       </h2>
       <p className="mt-2 text-xs text-muted-foreground font-sans-display sm:text-sm">
-        Verifying access, minting your LiveKit token, and joining the conference.
+        Verifying access, minting your LiveKit token, and opening the conference.
       </p>
-      <div className="mt-5 w-full max-w-sm">
+      <div className="mx-auto mt-5 w-full max-w-sm">
         <div className="h-1.5 w-full overflow-hidden rounded-full bg-border/40">
           <div
             className="h-full rounded-full bg-gradient-gold transition-[width] duration-200"
@@ -262,18 +303,14 @@ function ConnectingPanel({
           />
         </div>
         <p className="mt-2 text-[10px] uppercase tracking-widest text-muted-foreground">
-          {progress < 30
-            ? "Verifying holder…"
-            : progress < 60
-              ? "Minting token…"
-              : "Opening room…"}
+          {progress < 30 ? "Verifying holder…" : progress < 60 ? "Minting token…" : "Opening room…"}
         </p>
       </div>
     </div>
   );
 }
 
-function ErrorPanel({
+function ErrorHero({
   roomName,
   message,
   recoverable,
@@ -289,22 +326,19 @@ function ErrorPanel({
   return (
     <div
       role="alertdialog"
-      aria-labelledby="conf-error-title"
       data-testid={accessLoss ? "exclusive-access-loss" : "conf-error"}
-      className="flex h-full flex-col items-center justify-center text-center"
+      className="text-center"
     >
-      <div className="rounded-full border border-destructive/40 bg-destructive/10 p-3">
+      <div className="mx-auto w-fit rounded-full border border-destructive/40 bg-destructive/10 p-3">
         <AlertTriangle className="h-7 w-7 text-destructive" />
       </div>
-      <h2 id="conf-error-title" className="mt-4 font-display text-2xl text-foreground sm:text-3xl">
-        Connection failed
-      </h2>
+      <h2 className="mt-4 font-display text-2xl text-foreground sm:text-3xl">Connection failed</h2>
       <p className="mt-1 text-xs uppercase tracking-widest text-muted-foreground">
         Couldn't connect to {roomName}
       </p>
-      <p className="mt-3 max-w-md text-sm text-foreground font-sans-display">{message}</p>
+      <p className="mx-auto mt-3 max-w-md text-sm text-foreground font-sans-display">{message}</p>
       {accessLoss && (
-        <p className="mt-2 max-w-md text-xs text-muted-foreground font-sans-display">
+        <p className="mx-auto mt-2 max-w-md text-xs text-muted-foreground font-sans-display">
           Refresh your wallet delegation or reconnect with a wallet that currently qualifies, then
           try again.
         </p>
@@ -319,62 +353,243 @@ function ErrorPanel({
             <RefreshCw className="h-3.5 w-3.5" /> Retry
           </button>
         )}
-        <a
-          href="/rooms"
-          className="rounded-md border border-border bg-secondary/40 px-4 py-2 text-xs font-medium hover:bg-secondary"
-        >
-          Back to rooms
-        </a>
       </div>
     </div>
   );
 }
 
-function RightRail({ state }: { state: JoinState }) {
-  const { prefs, setPrefs } = useRoomPreferences();
+function PreLiveRightRail({
+  state,
+  onRetry,
+}: {
+  state: JoinState;
+  onRetry: () => void;
+}) {
   return (
-    <aside className="space-y-3">
+    <div className="space-y-3">
       {state.phase === "error" && (
         <Panel tone="destructive" title="Connection Failed" icon={<AlertTriangle className="h-3.5 w-3.5" />}>
           <p className="text-[11px] text-muted-foreground">{state.message}</p>
+          {state.recoverable && (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-md bg-destructive px-3 py-1.5 text-[11px] font-semibold text-destructive-foreground hover:opacity-90"
+            >
+              <RefreshCw className="h-3 w-3" /> Retry
+            </button>
+          )}
         </Panel>
       )}
       {state.phase === "connecting" && (
         <Panel title="Connecting to room…" icon={<Loader2 className="h-3.5 w-3.5 animate-spin" />}>
-          <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-border/40">
+          <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-border/40">
             <div
               className="h-full rounded-full bg-gradient-gold transition-[width]"
               style={{ width: `${state.progress}%` }}
             />
           </div>
+          <p className="mt-1.5 text-[10px] uppercase tracking-widest text-muted-foreground">
+            {state.progress < 30 ? "Verifying holder…" : state.progress < 60 ? "Minting token…" : "Opening room…"}
+          </p>
         </Panel>
       )}
-      <Panel title="Your Preferences">
-        <div className="space-y-2 text-xs">
-          <Row
-            label="Camera"
-            checked={prefs.cameraEnabled}
-            onChange={(v) => setPrefs({ cameraEnabled: v })}
-          />
-          <Row
-            label="Microphone"
-            checked={prefs.micEnabled}
-            onChange={(v) => setPrefs({ micEnabled: v })}
-          />
-          <label className="flex cursor-pointer items-start gap-2 pt-1 text-[10px] text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={prefs.applyToAll}
-              onChange={(e) => setPrefs({ applyToAll: e.target.checked })}
-              className="mt-0.5"
-            />
-            Keep settings for all rooms
-          </label>
-        </div>
-      </Panel>
-    </aside>
+      <PreferencesPanel />
+      <HostControlsPlaceholder />
+    </div>
   );
 }
+
+function PreLiveBottomBar({ onLeave }: { onLeave: () => void }) {
+  return (
+    <BottomBarShell
+      onLeave={onLeave}
+      controls={
+        <>
+          <BottomIcon label="Mic" icon={<Mic className="h-4 w-4" />} disabled />
+          <BottomIcon label="Cam" icon={<VideoIcon className="h-4 w-4" />} disabled />
+          <BottomIcon label="Screen" icon={<Monitor className="h-4 w-4" />} disabled />
+          <BottomIcon label="Chat" icon={<MessageCircle className="h-4 w-4" />} disabled />
+          <BottomIcon label="Participants" icon={<Users className="h-4 w-4" />} disabled />
+        </>
+      }
+    />
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// LIVE views (inside LiveKitRoom — can use room context hooks)
+// ────────────────────────────────────────────────────────────────────────────
+
+function VideoArea({
+  backgroundImage,
+  kind,
+  roomName,
+}: {
+  backgroundImage: string | null;
+  kind: "conference" | "game";
+  roomName: string;
+}) {
+  const wrapperStyle: React.CSSProperties = backgroundImage
+    ? {
+        backgroundImage: `linear-gradient(rgba(8,8,12,0.78), rgba(8,8,12,0.92)), url(${backgroundImage})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }
+    : {};
+
+  return (
+    <div
+      className="overflow-hidden rounded-2xl border border-border/60 shadow-card"
+      style={{ ...wrapperStyle, minHeight: "60vh" }}
+    >
+      <div className="h-full min-h-[60vh] bg-background/30 backdrop-blur-sm">
+        {kind === "game" ? <GameRoomScaffold roomName={roomName} /> : <VideoConference />}
+      </div>
+    </div>
+  );
+}
+
+function LiveRightRail({
+  roomId,
+  isHost,
+  connecting,
+}: {
+  roomId: string;
+  isHost: boolean;
+  connecting: boolean;
+}) {
+  return (
+    <div className="space-y-3">
+      {connecting && (
+        <Panel title="Connecting to room…" icon={<Loader2 className="h-3.5 w-3.5 animate-spin" />}>
+          <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-border/40">
+            <div className="h-full w-1/2 rounded-full bg-gradient-gold" />
+          </div>
+        </Panel>
+      )}
+      <LivePreferencesPanel />
+      {isHost && <HostControlsPanel roomId={roomId} />}
+    </div>
+  );
+}
+
+function LiveBottomBar({ onLeave }: { onLeave: () => void }) {
+  const local = useLocalParticipant();
+  const room = useRoomContext();
+  const participants = useParticipants();
+  const { prefs, setPrefs } = useRoomPreferences();
+  const [screenOn, setScreenOn] = useState(false);
+
+  async function toggleMic() {
+    const v = !prefs.micEnabled;
+    setPrefs({ micEnabled: v });
+    try {
+      await local.localParticipant.setMicrophoneEnabled(v);
+    } catch (e) {
+      console.warn("toggleMic", e);
+    }
+  }
+  async function toggleCam() {
+    const v = !prefs.cameraEnabled;
+    setPrefs({ cameraEnabled: v });
+    try {
+      await local.localParticipant.setCameraEnabled(v);
+    } catch (e) {
+      console.warn("toggleCam", e);
+    }
+  }
+  async function toggleScreen() {
+    const next = !screenOn;
+    setScreenOn(next);
+    try {
+      await local.localParticipant.setScreenShareEnabled(next);
+    } catch (e) {
+      setScreenOn(!next);
+      console.warn("toggleScreen", e);
+    }
+  }
+
+  return (
+    <BottomBarShell
+      onLeave={() => {
+        void room?.disconnect();
+        onLeave();
+      }}
+      participants={participants.length}
+      controls={
+        <>
+          <BottomIcon
+            label="Mic"
+            active={prefs.micEnabled}
+            icon={prefs.micEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
+            onClick={() => void toggleMic()}
+          />
+          <BottomIcon
+            label="Cam"
+            active={prefs.cameraEnabled}
+            icon={
+              prefs.cameraEnabled ? (
+                <VideoIcon className="h-4 w-4" />
+              ) : (
+                <VideoOff className="h-4 w-4" />
+              )
+            }
+            onClick={() => void toggleCam()}
+          />
+          <BottomIcon
+            label="Screen"
+            active={screenOn}
+            icon={<Monitor className="h-4 w-4" />}
+            onClick={() => void toggleScreen()}
+          />
+          <BottomIcon
+            label="Chat"
+            icon={<MessageCircle className="h-4 w-4" />}
+            disabled
+          />
+          <BottomIcon
+            label={`Participants${participants.length ? ` (${participants.length})` : ""}`}
+            icon={<Users className="h-4 w-4" />}
+          />
+        </>
+      }
+    />
+  );
+}
+
+function GameRoomScaffold({ roomName }: { roomName: string }) {
+  const participants = useParticipants();
+  return (
+    <div className="flex h-full min-h-[60vh] flex-col items-center justify-center gap-3 p-6 text-center">
+      <h3 className="font-display text-2xl text-gradient-gold sm:text-3xl">{roomName}</h3>
+      <p className="max-w-md text-xs text-muted-foreground font-sans-display sm:text-sm">
+        PvP arena ready. The realtime channel is open — once a game is wired up, both players will
+        exchange moves through this room.
+      </p>
+      <div className="mt-2 rounded-xl border border-border/40 bg-background/40 px-4 py-3 backdrop-blur-sm">
+        <p className="text-[10px] uppercase tracking-widest text-muted-foreground">In the arena</p>
+        <ul className="mt-1 flex flex-wrap items-center justify-center gap-1.5 text-[11px]">
+          {participants.map((p) => (
+            <li
+              key={p.identity}
+              className="rounded-full border border-gold/30 bg-gold/5 px-2 py-0.5 text-gold"
+            >
+              {p.name || p.identity.slice(0, 6)}
+            </li>
+          ))}
+        </ul>
+      </div>
+      <p className="mt-2 text-[10px] italic text-muted-foreground">
+        Background art coming soon · game wiring scaffolded.
+      </p>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Shared right-rail panels
+// ────────────────────────────────────────────────────────────────────────────
 
 function Panel({
   title,
@@ -406,117 +621,39 @@ function Panel({
   );
 }
 
-function Row({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
+function PreferencesPanel() {
+  const { prefs, setPrefs } = useRoomPreferences();
   return (
-    <div className="flex items-center justify-between">
-      <span className="text-foreground">{label}</span>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        onClick={() => onChange(!checked)}
-        className={`relative h-5 w-9 rounded-full transition ${checked ? "bg-gradient-gold" : "bg-secondary"}`}
-      >
-        <span
-          className={`absolute top-0.5 h-4 w-4 rounded-full bg-background shadow transition ${checked ? "left-4" : "left-0.5"}`}
+    <Panel title="Your Preferences">
+      <div className="space-y-2 text-xs">
+        <ToggleRow
+          label="Camera"
+          checked={prefs.cameraEnabled}
+          onChange={(v) => setPrefs({ cameraEnabled: v })}
         />
-      </button>
-    </div>
+        <ToggleRow
+          label="Microphone"
+          checked={prefs.micEnabled}
+          onChange={(v) => setPrefs({ micEnabled: v })}
+        />
+        <label className="flex cursor-pointer items-start gap-2 pt-1 text-[10px] text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={prefs.applyToAll}
+            onChange={(e) => setPrefs({ applyToAll: e.target.checked })}
+            className="mt-0.5"
+          />
+          Keep settings for all rooms
+        </label>
+      </div>
+    </Panel>
   );
 }
 
-/**
- * Live LiveKit conference view. Renders the themed background as a faint
- * backdrop behind the VideoConference UI so the room ambience persists.
- */
-function LiveRoom({
-  token,
-  url,
-  roomId,
-  roomName,
-  isHost,
-  backgroundImage,
-  kind,
-  prefsMicEnabled,
-  prefsCameraEnabled,
-  onLeave,
-}: {
-  token: string;
-  url: string;
-  roomId: string;
-  roomName: string;
-  isHost: boolean;
-  backgroundImage: string | null;
-  kind: "conference" | "game";
-  prefsMicEnabled: boolean;
-  prefsCameraEnabled: boolean;
-  onLeave: () => void;
-}) {
-  const wrapperStyle: React.CSSProperties = backgroundImage
-    ? {
-        backgroundImage: `linear-gradient(rgba(8,8,12,0.78), rgba(8,8,12,0.92)), url(${backgroundImage})`,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-      }
-    : {};
-
-  return (
-    <div
-      className="relative overflow-hidden rounded-2xl border border-border/60 shadow-card"
-      style={wrapperStyle}
-    >
-      <LiveKitRoom
-        token={token}
-        serverUrl={url}
-        connect={true}
-        audio={prefsMicEnabled}
-        video={prefsCameraEnabled}
-        data-lk-theme="default"
-        onDisconnected={() => {
-          onLeave();
-        }}
-        style={{ background: "transparent" }}
-      >
-        <div className="grid gap-3 p-2 sm:gap-4 sm:p-3 lg:grid-cols-[1fr_18rem] lg:p-4">
-          <div
-            className="overflow-hidden rounded-xl border border-border/40 bg-background/40 backdrop-blur-sm"
-            style={{ minHeight: "70vh" }}
-          >
-            {kind === "game" ? (
-              <GameRoomScaffold roomName={roomName} />
-            ) : (
-              <VideoConference />
-            )}
-            <RoomAudioRenderer />
-            <InRoomLeaveBar onLeave={onLeave} />
-          </div>
-
-          <aside className="space-y-3">
-            <Panel title="Your Preferences">
-              <LivePreferenceToggles />
-            </Panel>
-            {isHost && <HostControlsPanel roomId={roomId} />}
-          </aside>
-        </div>
-      </LiveKitRoom>
-    </div>
-  );
-}
-
-function LivePreferenceToggles() {
+function LivePreferencesPanel() {
   const { prefs, setPrefs } = useRoomPreferences();
   const local = useLocalParticipant();
 
-  // Reflect the user's actual mic/camera state in the toggle and persist
-  // the change back to preferences so the next room inherits it.
   async function toggleMic(v: boolean) {
     setPrefs({ micEnabled: v });
     try {
@@ -535,19 +672,32 @@ function LivePreferenceToggles() {
   }
 
   return (
-    <div className="space-y-2 text-xs">
-      <Row label="Camera" checked={prefs.cameraEnabled} onChange={(v) => void toggleCam(v)} />
-      <Row label="Microphone" checked={prefs.micEnabled} onChange={(v) => void toggleMic(v)} />
-      <label className="flex cursor-pointer items-start gap-2 pt-1 text-[10px] text-muted-foreground">
-        <input
-          type="checkbox"
-          checked={prefs.applyToAll}
-          onChange={(e) => setPrefs({ applyToAll: e.target.checked })}
-          className="mt-0.5"
-        />
-        Keep settings for all rooms
-      </label>
-    </div>
+    <Panel title="Your Preferences">
+      <div className="space-y-2 text-xs">
+        <ToggleRow label="Camera" checked={prefs.cameraEnabled} onChange={(v) => void toggleCam(v)} />
+        <ToggleRow label="Microphone" checked={prefs.micEnabled} onChange={(v) => void toggleMic(v)} />
+        <label className="flex cursor-pointer items-start gap-2 pt-1 text-[10px] text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={prefs.applyToAll}
+            onChange={(e) => setPrefs({ applyToAll: e.target.checked })}
+            className="mt-0.5"
+          />
+          Keep settings for all rooms
+        </label>
+      </div>
+    </Panel>
+  );
+}
+
+function HostControlsPlaceholder() {
+  return (
+    <Panel title="Host Controls" icon={<Lock className="h-3.5 w-3.5" />}>
+      <p className="text-[11px] text-muted-foreground">
+        Host controls (mute all, lock, kick) appear here once you're connected as the room's
+        active host.
+      </p>
+    </Panel>
   );
 }
 
@@ -561,8 +711,6 @@ function HostControlsPanel({ roomId }: { roomId: string }) {
   const kickFn = useServerFn(kickRoomParticipant);
   const muteAllFn = useServerFn(muteAllRoomParticipants);
 
-  // The local participant is the host themselves — they shouldn't see a
-  // "kick yourself" button. LiveKit gives every participant `identity`.
   const localId = room?.localParticipant.identity;
   const others = participants.filter((p) => p.identity !== localId);
 
@@ -647,60 +795,101 @@ function HostControlsPanel({ roomId }: { roomId: string }) {
   );
 }
 
-function InRoomLeaveBar({ onLeave }: { onLeave: () => void }) {
-  const room = useRoomContext();
+function ToggleRow({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
   return (
-    <div className="flex items-center justify-between gap-3 border-t border-border/40 bg-background/70 px-3 py-2 backdrop-blur-sm">
-      <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
-        Room Settings
-      </span>
+    <div className="flex items-center justify-between">
+      <span className="text-foreground">{label}</span>
       <button
         type="button"
-        onClick={() => {
-          void room?.disconnect();
-          onLeave();
-        }}
-        className="inline-flex items-center gap-2 rounded-md bg-destructive px-3 py-1.5 text-[11px] font-semibold text-destructive-foreground hover:opacity-90"
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onChange(!checked)}
+        className={`relative h-5 w-9 rounded-full transition ${checked ? "bg-gradient-gold" : "bg-secondary"}`}
       >
-        <LogOut className="h-3.5 w-3.5" /> Leave Room
+        <span
+          className={`absolute top-0.5 h-4 w-4 rounded-full bg-background shadow transition ${checked ? "left-4" : "left-0.5"}`}
+        />
       </button>
     </div>
   );
 }
 
-/**
- * Game Room scaffold — placeholder PvP surface.
- *
- * The room joins LiveKit so we have a low-latency data channel ready
- * (`canPublishData: true` in the access token). A real game's state will
- * ride that channel later; for now the scaffold just shows the connected
- * participants so it's clear the room is "live and ready for PvP".
- */
-function GameRoomScaffold({ roomName }: { roomName: string }) {
-  const participants = useParticipants();
+// ────────────────────────────────────────────────────────────────────────────
+// Bottom-bar primitives
+// ────────────────────────────────────────────────────────────────────────────
+
+function BottomBarShell({
+  onLeave,
+  controls,
+  participants,
+}: {
+  onLeave: () => void;
+  controls: React.ReactNode;
+  participants?: number;
+}) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
-      <h3 className="font-display text-2xl text-gradient-gold sm:text-3xl">{roomName}</h3>
-      <p className="max-w-md text-xs text-muted-foreground font-sans-display sm:text-sm">
-        PvP arena ready. The realtime channel is open — once a game is wired up, both players will
-        exchange moves through this room.
-      </p>
-      <div className="mt-2 rounded-xl border border-border/40 bg-background/40 px-4 py-3 backdrop-blur-sm">
-        <p className="text-[10px] uppercase tracking-widest text-muted-foreground">In the arena</p>
-        <ul className="mt-1 flex flex-wrap items-center justify-center gap-1.5 text-[11px]">
-          {participants.map((p) => (
-            <li
-              key={p.identity}
-              className="rounded-full border border-gold/30 bg-gold/5 px-2 py-0.5 text-gold"
-            >
-              {p.name || p.identity.slice(0, 6)}
-            </li>
-          ))}
-        </ul>
+    <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-3 sm:px-6">
+      <span className="inline-flex items-center gap-2 text-[11px] uppercase tracking-widest text-muted-foreground">
+        <Lock className="h-3.5 w-3.5" /> Room Settings
+      </span>
+
+      <div className="flex flex-1 items-center justify-center gap-2 sm:gap-3">{controls}</div>
+
+      <div className="flex items-center gap-2">
+        {typeof participants === "number" && (
+          <span className="hidden text-[11px] text-muted-foreground sm:inline">
+            {participants} in room
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={onLeave}
+          className="inline-flex items-center gap-2 rounded-md bg-destructive px-4 py-2 text-[11px] font-semibold text-destructive-foreground hover:opacity-90"
+        >
+          <LogOut className="h-3.5 w-3.5" /> Leave Room
+        </button>
       </div>
-      <p className="mt-2 text-[10px] text-muted-foreground italic">
-        Background art coming soon · game wiring scaffolded.
-      </p>
     </div>
+  );
+}
+
+function BottomIcon({
+  label,
+  icon,
+  disabled,
+  active,
+  onClick,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  disabled?: boolean;
+  active?: boolean;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      className={`flex h-12 w-14 flex-col items-center justify-center rounded-md text-[10px] font-medium transition ${
+        disabled
+          ? "cursor-not-allowed border border-border/40 bg-secondary/20 text-muted-foreground/60"
+          : active
+            ? "border border-gold/40 bg-gold/10 text-gold"
+            : "border border-border bg-secondary/50 text-foreground hover:bg-secondary"
+      }`}
+    >
+      <span aria-hidden>{icon}</span>
+      <span className="mt-0.5 truncate">{label}</span>
+    </button>
   );
 }
