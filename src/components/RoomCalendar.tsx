@@ -33,8 +33,18 @@ interface RoomCalendarProps {
 }
 
 const MONTH_LABELS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
 ];
 const DOW = ["S", "M", "T", "W", "T", "F", "S"];
 
@@ -42,12 +52,7 @@ const DOW = ["S", "M", "T", "W", "T", "F", "S"];
  * BAYCmc calendar — minimal printed-poster style year overview.
  * Click a month to expand it into a full day grid for booking selection.
  */
-export function RoomCalendar({
-  rooms,
-  bookings,
-  currentUserId,
-  onCancel,
-}: RoomCalendarProps) {
+export function RoomCalendar({ rooms, bookings, currentUserId, onCancel }: RoomCalendarProps) {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [expandedMonth, setExpandedMonth] = useState<number | null>(null);
@@ -70,16 +75,12 @@ export function RoomCalendar({
       map.set(key, list);
     }
     for (const list of map.values()) {
-      list.sort(
-        (a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime(),
-      );
+      list.sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime());
     }
     return map;
   }, [bookings, year]);
 
-  const selectedBookings = selected
-    ? byDay.get(format(selected, "yyyy-MM-dd")) ?? []
-    : [];
+  const selectedBookings = selected ? (byDay.get(format(selected, "yyyy-MM-dd")) ?? []) : [];
 
   function renderMonthGrid(mIdx: number, opts: { large: boolean }) {
     const monthStart = startOfMonth(new Date(year, mIdx, 1));
@@ -99,7 +100,9 @@ export function RoomCalendar({
       <>
         <div className={weekdayClass}>
           {DOW.map((d, i) => (
-            <div key={i} className={`${large ? "py-2" : "py-0.5"} text-center`}>{d}</div>
+            <div key={i} className={`${large ? "py-2" : "py-0.5"} text-center`}>
+              {d}
+            </div>
           ))}
         </div>
         <div className="h-px w-full bg-calendar-rule" />
@@ -179,9 +182,7 @@ export function RoomCalendar({
           <div className="flex gap-1">
             <button
               type="button"
-              onClick={() =>
-                setExpandedMonth((m) => (m === null ? null : (m + 11) % 12))
-              }
+              onClick={() => setExpandedMonth((m) => (m === null ? null : (m + 11) % 12))}
               className="rounded-md p-1.5 text-calendar-muted-ink hover:bg-calendar-rule/40"
               aria-label="Previous month"
             >
@@ -189,9 +190,7 @@ export function RoomCalendar({
             </button>
             <button
               type="button"
-              onClick={() =>
-                setExpandedMonth((m) => (m === null ? null : (m + 1) % 12))
-              }
+              onClick={() => setExpandedMonth((m) => (m === null ? null : (m + 1) % 12))}
               className="rounded-md p-1.5 text-calendar-muted-ink hover:bg-calendar-rule/40"
               aria-label="Next month"
             >
@@ -208,9 +207,7 @@ export function RoomCalendar({
             aria-live="polite"
           >
             <div className="mb-3 flex items-center justify-between">
-              <h4 className="font-display text-lg">
-                {format(selected, "EEEE, MMMM d")}
-              </h4>
+              <h4 className="font-display text-lg">{format(selected, "EEEE, MMMM d")}</h4>
               <button
                 type="button"
                 onClick={() => setSelected(null)}
