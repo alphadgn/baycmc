@@ -204,7 +204,7 @@ export function RoomCalendar({
 
         {selected && (
           <div
-            className="mt-6 rounded-xl border border-border/60 bg-background/40 p-4"
+            className="mt-8 border border-calendar-rule bg-calendar-paper p-4"
             aria-live="polite"
           >
             <div className="mb-3 flex items-center justify-between">
@@ -214,13 +214,13 @@ export function RoomCalendar({
               <button
                 type="button"
                 onClick={() => setSelected(null)}
-                className="text-xs text-muted-foreground hover:text-foreground"
+                className="text-xs font-bold text-calendar-muted-ink hover:text-calendar-ink"
               >
                 Close
               </button>
             </div>
             {selectedBookings.length === 0 ? (
-              <p className="text-xs italic text-muted-foreground">
+              <p className="text-xs italic text-calendar-muted-ink">
                 No bookings on this day. Choose a room below to reserve a time.
               </p>
             ) : (
@@ -234,7 +234,7 @@ export function RoomCalendar({
                       className={`flex items-center justify-between rounded-md border px-3 py-2 text-xs ${
                         mine
                           ? "border-gold/40 bg-gold/10"
-                          : "border-border bg-secondary/40"
+                          : "border-calendar-rule bg-calendar-rule/20"
                       }`}
                     >
                       <div className="min-w-0">
