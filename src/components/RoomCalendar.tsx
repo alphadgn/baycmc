@@ -90,7 +90,7 @@ export function RoomCalendar({
     const { large } = opts;
     const weekdayClass = large
       ? "grid grid-cols-7 text-sm font-bold tracking-wider text-calendar-muted-ink"
-      : "grid grid-cols-7 text-[8px] font-extrabold tracking-wider text-calendar-ink sm:text-[10px]";
+      : "grid grid-cols-7 text-[6px] font-extrabold tracking-wider text-calendar-ink sm:text-[10px]";
     const dayGridClass = large
       ? "mt-4 grid grid-cols-7 gap-y-3"
       : "mt-1 grid grid-cols-7 gap-y-1.5";
@@ -114,7 +114,7 @@ export function RoomCalendar({
               return (
                 <div
                   key={key}
-                  className={`relative h-4 text-center font-display text-[8px] font-extrabold leading-none sm:h-5 sm:text-[10px] ${
+                  className={`relative h-3 text-center font-display text-[6px] font-extrabold leading-none sm:h-5 sm:text-[10px] ${
                     inMonth ? "text-calendar-ink" : "text-transparent"
                   }`}
                 >
