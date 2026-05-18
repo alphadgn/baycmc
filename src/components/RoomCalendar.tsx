@@ -33,8 +33,18 @@ interface RoomCalendarProps {
 }
 
 const MONTH_LABELS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
 ];
 const DOW = ["S", "M", "T", "W", "T", "F", "S"];
 
@@ -42,12 +52,7 @@ const DOW = ["S", "M", "T", "W", "T", "F", "S"];
  * BAYCmc calendar — minimal printed-poster style year overview.
  * Click a month to expand it into a full day grid for booking selection.
  */
-export function RoomCalendar({
-  rooms,
-  bookings,
-  currentUserId,
-  onCancel,
-}: RoomCalendarProps) {
+export function RoomCalendar({ rooms, bookings, currentUserId, onCancel }: RoomCalendarProps) {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [expandedMonth, setExpandedMonth] = useState<number | null>(null);
@@ -70,16 +75,12 @@ export function RoomCalendar({
       map.set(key, list);
     }
     for (const list of map.values()) {
-      list.sort(
-        (a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime(),
-      );
+      list.sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime());
     }
     return map;
   }, [bookings, year]);
 
-  const selectedBookings = selected
-    ? byDay.get(format(selected, "yyyy-MM-dd")) ?? []
-    : [];
+  const selectedBookings = selected ? (byDay.get(format(selected, "yyyy-MM-dd")) ?? []) : [];
 
   function renderMonthGrid(mIdx: number, opts: { large: boolean }) {
     const monthStart = startOfMonth(new Date(year, mIdx, 1));
@@ -88,18 +89,24 @@ export function RoomCalendar({
     const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
     const days = eachDayOfInterval({ start: gridStart, end: gridEnd });
     const { large } = opts;
+    const weekdayClass = large
+      ? "grid grid-cols-7 text-sm font-bold tracking-wider text-calendar-muted-ink"
+      : "grid grid-cols-7 text-[6px] font-extrabold tracking-wider text-calendar-ink sm:text-[10px]";
+    const dayGridClass = large
+      ? "mt-4 grid grid-cols-7 gap-y-3"
+      : "mt-1 grid grid-cols-7 gap-y-1.5";
 
     return (
       <>
-        <div
-          className={`grid grid-cols-7 ${large ? "text-sm" : "text-[10px]"} font-semibold tracking-wider text-foreground/70`}
-        >
+        <div className={weekdayClass}>
           {DOW.map((d, i) => (
-            <div key={i} className={`${large ? "py-2" : "py-1"} text-center`}>{d}</div>
+            <div key={i} className={`${large ? "py-2" : "py-0.5"} text-center`}>
+              {d}
+            </div>
           ))}
         </div>
-        <div className="h-px w-full bg-foreground/30" />
-        <div className={`mt-${large ? "2" : "1"} grid grid-cols-7 ${large ? "gap-1" : "gap-y-0.5"}`}>
+        <div className="h-px w-full bg-calendar-rule" />
+        <div className={dayGridClass}>
           {days.map((day) => {
             const inMonth = isSameMonth(day, monthStart);
             const isToday = isSameDay(day, today);
@@ -110,16 +117,13 @@ export function RoomCalendar({
               return (
                 <div
                   key={key}
-                  className={`relative aspect-square text-center font-mono text-[10px] leading-none ${
-                    inMonth ? "text-foreground" : "text-transparent"
+                  className={`relative h-3 text-center font-display text-[6px] font-extrabold leading-none sm:h-5 sm:text-[10px] ${
+                    inMonth ? "text-calendar-ink" : "text-transparent"
                   }`}
                 >
                   <span className="absolute inset-0 flex items-center justify-center">
                     {format(day, "d")}
                   </span>
-                  {has && (
-                    <span className="absolute bottom-0 left-1/2 h-0.5 w-0.5 -translate-x-1/2 rounded-full bg-gold" />
-                  )}
                 </div>
               );
             }
@@ -129,16 +133,16 @@ export function RoomCalendar({
                 type="button"
                 onClick={() => inMonth && setSelected(day)}
                 disabled={!inMonth}
-                className={`relative aspect-square rounded-full text-center text-sm transition ${
-                  inMonth ? "text-foreground" : "text-transparent"
+                className={`relative h-10 rounded-md text-center font-display text-sm font-bold transition ${
+                  inMonth ? "text-calendar-ink" : "text-transparent"
                 } ${
                   isSelected
                     ? "bg-gold text-gold-foreground"
                     : isToday
-                      ? "bg-gold/20 font-semibold text-gold"
+                      ? "bg-gold/20 text-calendar-ink"
                       : has
-                        ? "bg-secondary/60 font-semibold hover:bg-secondary"
-                        : "hover:bg-secondary/40"
+                        ? "bg-gold/10 hover:bg-gold/20"
+                        : "hover:bg-calendar-rule/40"
                 }`}
                 aria-label={inMonth ? format(day, "PPP") : undefined}
               >
@@ -158,7 +162,7 @@ export function RoomCalendar({
 
   if (expandedMonth !== null) {
     return (
-      <section className="rounded-2xl bg-background p-5 shadow-card sm:p-8">
+      <section className="mx-auto w-full max-w-4xl bg-calendar-paper px-6 py-8 text-calendar-ink shadow-card sm:px-10 sm:py-12">
         <header className="mb-6 flex items-center justify-between gap-3">
           <button
             type="button"
@@ -166,32 +170,28 @@ export function RoomCalendar({
               setExpandedMonth(null);
               setSelected(null);
             }}
-            className="inline-flex items-center gap-1 text-xs uppercase tracking-[0.25em] text-muted-foreground hover:text-foreground"
+            className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-[0.25em] text-calendar-muted-ink hover:text-calendar-ink"
             aria-label="Back to year"
           >
             <ChevronLeft className="h-4 w-4" />
             {year}
           </button>
-          <h2 className="font-display text-3xl font-bold tracking-tight sm:text-5xl">
+          <h2 className="font-display text-3xl font-extrabold tracking-tight sm:text-5xl">
             {MONTH_LABELS[expandedMonth]}
           </h2>
           <div className="flex gap-1">
             <button
               type="button"
-              onClick={() =>
-                setExpandedMonth((m) => (m === null ? null : (m + 11) % 12))
-              }
-              className="rounded-md p-1.5 text-muted-foreground hover:bg-secondary"
+              onClick={() => setExpandedMonth((m) => (m === null ? null : (m + 11) % 12))}
+              className="rounded-md p-1.5 text-calendar-muted-ink hover:bg-calendar-rule/40"
               aria-label="Previous month"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
             <button
               type="button"
-              onClick={() =>
-                setExpandedMonth((m) => (m === null ? null : (m + 1) % 12))
-              }
-              className="rounded-md p-1.5 text-muted-foreground hover:bg-secondary"
+              onClick={() => setExpandedMonth((m) => (m === null ? null : (m + 1) % 12))}
+              className="rounded-md p-1.5 text-calendar-muted-ink hover:bg-calendar-rule/40"
               aria-label="Next month"
             >
               <ChevronRight className="h-4 w-4" />
@@ -203,23 +203,21 @@ export function RoomCalendar({
 
         {selected && (
           <div
-            className="mt-6 rounded-xl border border-border/60 bg-background/40 p-4"
+            className="mt-8 border border-calendar-rule bg-calendar-paper p-4"
             aria-live="polite"
           >
             <div className="mb-3 flex items-center justify-between">
-              <h4 className="font-display text-lg">
-                {format(selected, "EEEE, MMMM d")}
-              </h4>
+              <h4 className="font-display text-lg">{format(selected, "EEEE, MMMM d")}</h4>
               <button
                 type="button"
                 onClick={() => setSelected(null)}
-                className="text-xs text-muted-foreground hover:text-foreground"
+                className="text-xs font-bold text-calendar-muted-ink hover:text-calendar-ink"
               >
                 Close
               </button>
             </div>
             {selectedBookings.length === 0 ? (
-              <p className="text-xs italic text-muted-foreground">
+              <p className="text-xs italic text-calendar-muted-ink">
                 No bookings on this day. Choose a room below to reserve a time.
               </p>
             ) : (
@@ -233,7 +231,7 @@ export function RoomCalendar({
                       className={`flex items-center justify-between rounded-md border px-3 py-2 text-xs ${
                         mine
                           ? "border-gold/40 bg-gold/10"
-                          : "border-border bg-secondary/40"
+                          : "border-calendar-rule bg-calendar-rule/20"
                       }`}
                     >
                       <div className="min-w-0">
@@ -267,30 +265,30 @@ export function RoomCalendar({
   }
 
   return (
-    <section className="rounded-2xl bg-background p-5 shadow-card sm:p-10">
-      <header className="mb-8 flex items-center justify-between gap-3">
+    <section className="mx-auto aspect-[3/4] w-full max-w-5xl bg-calendar-paper px-5 py-8 text-calendar-ink shadow-card sm:px-16 sm:py-14">
+      <header className="mb-6 flex items-center justify-between gap-3 sm:mb-10">
         <button
           type="button"
           onClick={() => setYear((y) => y - 1)}
-          className="rounded-md p-2 text-muted-foreground hover:bg-secondary"
+          className="rounded-md p-2 text-calendar-muted-ink hover:bg-calendar-rule/40"
           aria-label="Previous year"
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
-        <h2 className="font-display text-6xl font-extrabold tracking-tight text-foreground sm:text-8xl">
+        <h2 className="font-display text-5xl font-extrabold tracking-tight text-calendar-ink sm:text-8xl">
           {year}
         </h2>
         <button
           type="button"
           onClick={() => setYear((y) => y + 1)}
-          className="rounded-md p-2 text-muted-foreground hover:bg-secondary"
+          className="rounded-md p-2 text-calendar-muted-ink hover:bg-calendar-rule/40"
           aria-label="Next year"
         >
           <ChevronRight className="h-5 w-5" />
         </button>
       </header>
 
-      <div className="grid grid-cols-1 gap-x-8 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-3 gap-x-5 gap-y-6 sm:gap-x-16 sm:gap-y-10">
         {MONTH_LABELS.map((label, mIdx) => (
           <button
             key={label}
@@ -299,10 +297,10 @@ export function RoomCalendar({
               setExpandedMonth(mIdx);
               setSelected(null);
             }}
-            className="group rounded-lg p-2 text-left transition hover:bg-secondary/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+            className="group text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-gold"
             aria-label={`Open ${label}`}
           >
-            <h3 className="mb-3 font-display text-2xl font-bold tracking-tight group-hover:text-gold">
+            <h3 className="mb-2 text-center font-display text-base font-extrabold tracking-tight text-calendar-ink group-hover:text-gold sm:mb-3 sm:text-3xl">
               {label}
             </h3>
             {renderMonthGrid(mIdx, { large: false })}
