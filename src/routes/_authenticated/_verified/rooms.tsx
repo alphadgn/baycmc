@@ -78,12 +78,8 @@ function RoomsPage() {
 
     // Notify the user immediately if they lost access while on this page.
     const prev = prevAccessRef.current;
-    if (prev) {
-      if (prev.bayc && !bayc) {
-        toast.error("BAYC/MAYC verification lost — bookings are disabled.");
-      } else if (prev.op && !op) {
-        toast.error("Otherpage / Lifer token no longer detected — Lifer rooms hidden.");
-      }
+    if (prev && prev.bayc && !bayc) {
+      toast.error("BAYC/MAYC verification lost — bookings are disabled.");
     }
     prevAccessRef.current = { bayc, op };
 
@@ -126,13 +122,6 @@ function RoomsPage() {
           is restored. Reconnect or refresh your wallet to try again.
         </div>
       )}
-      {!loading && canBook && !otherpageVerified && (
-        <div className="glass mb-6 rounded-2xl border border-gold/30 bg-gold/5 p-3 text-xs text-muted-foreground font-sans-display">
-          Lifer rooms are hidden — no Otherpage / Lifer token detected in
-          your wallet.
-        </div>
-      )}
-
       {loading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[...Array(6)].map((_, i) => (
