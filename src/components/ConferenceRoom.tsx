@@ -11,12 +11,12 @@ import {
 import {
   LiveKitRoom,
   RoomAudioRenderer,
-  VideoConference,
   useLocalParticipant,
   useMediaDeviceSelect,
   useParticipants,
   useRoomContext,
 } from "@livekit/components-react";
+import { AmaConference } from "@/components/AmaConference";
 import "@livekit/components-styles";
 import { toast } from "sonner";
 import {
@@ -45,6 +45,8 @@ interface ConferenceRoomProps {
   ambience?: string | null;
   backgroundImage?: string | null;
   kind?: "conference" | "game";
+  /** Booking owner of the currently-active slot, or null for free-use sessions. */
+  hostUserId?: string | null;
 }
 
 type JoinState =
@@ -64,6 +66,7 @@ export function ConferenceRoom({
   ambience = null,
   backgroundImage = null,
   kind = "conference",
+  hostUserId = null,
 }: ConferenceRoomProps) {
   const [state, setState] = useState<JoinState>({ phase: "idle" });
   const getToken = useServerFn(getLivekitToken);
@@ -187,7 +190,12 @@ export function ConferenceRoom({
             />
           }
         >
-          <VideoArea backgroundImage={backgroundImage} kind={kind} roomName={roomName} />
+          <VideoArea
+            backgroundImage={backgroundImage}
+            kind={kind}
+            roomName={roomName}
+            hostUserId={hostUserId}
+          />
           <RoomAudioRenderer />
         </RoomsShell>
       </LiveKitRoom>
@@ -428,10 +436,12 @@ function VideoArea({
   backgroundImage,
   kind,
   roomName,
+  hostUserId,
 }: {
   backgroundImage: string | null;
   kind: "conference" | "game";
   roomName: string;
+  hostUserId: string | null;
 }) {
   const wrapperStyle: React.CSSProperties = backgroundImage
     ? {
@@ -447,7 +457,15 @@ function VideoArea({
       style={{ ...wrapperStyle, minHeight: "60vh" }}
     >
       <div className="h-full min-h-[60vh] bg-background/30 backdrop-blur-sm">
-        {kind === "game" ? <GameRoomScaffold roomName={roomName} /> : <VideoConference />}
+        {kind === "game" ? (
+          <GameRoomScaffold roomName={roomName} />
+        ) : (
+          <AmaConference
+            roomName={roomName}
+            hostUserId={hostUserId}
+            backgroundImage={backgroundImage}
+          />
+        )}
       </div>
     </div>
   );

@@ -133,7 +133,7 @@ export function RoomsShell({
         />
 
         <div className="flex min-h-0 flex-1 gap-0 overflow-hidden">
-          <main className="min-w-0 flex-1 overflow-y-auto px-4 pb-28 pt-4 sm:px-6 sm:pt-6">
+          <main className="scrollbar-modern min-w-0 flex-1 overflow-y-auto px-4 pb-28 pt-4 sm:px-6 sm:pt-6">
             <div className="mb-5">
               <h1 className="font-display text-2xl text-gradient-gold sm:text-4xl">
                 {title}
@@ -149,7 +149,7 @@ export function RoomsShell({
 
           {rightRail && (
             <aside
-              className="hidden w-72 shrink-0 overflow-y-auto border-l border-border/60 bg-card/40 px-3 pb-28 pt-4 xl:block"
+              className="scrollbar-modern hidden w-72 shrink-0 overflow-y-auto border-l border-border/60 bg-card/40 px-3 pb-28 pt-4 xl:block"
               aria-label="Room panels"
             >
               {rightRail}

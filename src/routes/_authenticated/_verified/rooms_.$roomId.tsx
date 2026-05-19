@@ -11,26 +11,49 @@ interface RoomMeta {
   kind: "conference" | "game";
 }
 
-export const Route = createFileRoute("/_authenticated/_verified/rooms/$roomId")({
+export const Route = createFileRoute("/_authenticated/_verified/rooms_/$roomId")({
   component: RoomDetail,
 });
 
 function RoomDetail() {
   const { roomId } = Route.useParams();
   const [meta, setMeta] = useState<RoomMeta | null>(null);
+  const [hostUserId, setHostUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     void (async () => {
       setLoading(true);
-      const { data } = await supabase
-        .from("rooms")
-        .select("name,tier,theme,kind")
-        .eq("id", roomId)
-        .maybeSingle();
-      setMeta((data as RoomMeta | null) ?? null);
+      const nowIso = new Date().toISOString();
+      const [{ data: m }, { data: b }] = await Promise.all([
+        supabase
+          .from("rooms")
+          .select("name,tier,theme,kind")
+          .eq("id", roomId)
+          .maybeSingle(),
+        // The currently-active booking decides who occupies the host tile.
+        // Only the booking owner (not admins) gets the host slot per the
+        // grilling decision — admins keep moderation powers but sit in the
+        // audience visually.
+        supabase
+          .from("room_bookings")
+          .select("user_id")
+          .eq("room_id", roomId)
+          .lte("starts_at", nowIso)
+          .gte("ends_at", nowIso)
+          .order("starts_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
+      if (cancelled) return;
+      setMeta((m as RoomMeta | null) ?? null);
+      setHostUserId((b?.user_id as string | undefined) ?? null);
       setLoading(false);
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [roomId]);
 
   if (loading) {
@@ -61,6 +84,7 @@ function RoomDetail() {
       ambience={getRoomThemeAmbience(meta.theme)}
       backgroundImage={getRoomThemeImage(meta.theme)}
       kind={meta.kind}
+      hostUserId={hostUserId}
     />
   );
 }

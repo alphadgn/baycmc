@@ -30,7 +30,7 @@ import { Route as AuthenticatedVerifiedRoomsRouteImport } from './routes/_authen
 import { Route as AuthenticatedVerifiedMessagesRouteImport } from './routes/_authenticated/_verified/messages'
 import { Route as AuthenticatedVerifiedFeedRouteImport } from './routes/_authenticated/_verified/feed'
 import { Route as AuthenticatedVerifiedApeRidesRouteImport } from './routes/_authenticated/_verified/ape-rides'
-import { Route as AuthenticatedVerifiedRoomsRoomIdRouteImport } from './routes/_authenticated/_verified/rooms.$roomId'
+import { Route as AuthenticatedVerifiedRoomsRoomIdRouteImport } from './routes/_authenticated/_verified/rooms_.$roomId'
 import { Route as AuthenticatedVerifiedApeRidesRideIdRouteImport } from './routes/_authenticated/_verified/ape-rides.$rideId'
 
 const DiagnosticsRoute = DiagnosticsRouteImport.update({
@@ -146,9 +146,9 @@ const AuthenticatedVerifiedApeRidesRoute =
   } as any)
 const AuthenticatedVerifiedRoomsRoomIdRoute =
   AuthenticatedVerifiedRoomsRoomIdRouteImport.update({
-    id: '/$roomId',
-    path: '/$roomId',
-    getParentRoute: () => AuthenticatedVerifiedRoomsRoute,
+    id: '/rooms_/$roomId',
+    path: '/rooms/$roomId',
+    getParentRoute: () => AuthenticatedVerifiedRoute,
   } as any)
 const AuthenticatedVerifiedApeRidesRideIdRoute =
   AuthenticatedVerifiedApeRidesRideIdRouteImport.update({
@@ -169,7 +169,7 @@ export interface FileRoutesByFullPath {
   '/ape-rides': typeof AuthenticatedVerifiedApeRidesRouteWithChildren
   '/feed': typeof AuthenticatedVerifiedFeedRoute
   '/messages': typeof AuthenticatedVerifiedMessagesRoute
-  '/rooms': typeof AuthenticatedVerifiedRoomsRouteWithChildren
+  '/rooms': typeof AuthenticatedVerifiedRoomsRoute
   '/admin/lumina': typeof AuthenticatedAdminLuminaRoute
   '/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
@@ -190,7 +190,7 @@ export interface FileRoutesByTo {
   '/ape-rides': typeof AuthenticatedVerifiedApeRidesRouteWithChildren
   '/feed': typeof AuthenticatedVerifiedFeedRoute
   '/messages': typeof AuthenticatedVerifiedMessagesRoute
-  '/rooms': typeof AuthenticatedVerifiedRoomsRouteWithChildren
+  '/rooms': typeof AuthenticatedVerifiedRoomsRoute
   '/admin/lumina': typeof AuthenticatedAdminLuminaRoute
   '/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
@@ -216,7 +216,7 @@ export interface FileRoutesById {
   '/_authenticated/_verified/ape-rides': typeof AuthenticatedVerifiedApeRidesRouteWithChildren
   '/_authenticated/_verified/feed': typeof AuthenticatedVerifiedFeedRoute
   '/_authenticated/_verified/messages': typeof AuthenticatedVerifiedMessagesRoute
-  '/_authenticated/_verified/rooms': typeof AuthenticatedVerifiedRoomsRouteWithChildren
+  '/_authenticated/_verified/rooms': typeof AuthenticatedVerifiedRoomsRoute
   '/_authenticated/admin/lumina': typeof AuthenticatedAdminLuminaRoute
   '/_authenticated/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
@@ -225,7 +225,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/lifers/': typeof AuthenticatedLifersIndexRoute
   '/_authenticated/_verified/ape-rides/$rideId': typeof AuthenticatedVerifiedApeRidesRideIdRoute
-  '/_authenticated/_verified/rooms/$roomId': typeof AuthenticatedVerifiedRoomsRoomIdRoute
+  '/_authenticated/_verified/rooms_/$roomId': typeof AuthenticatedVerifiedRoomsRoomIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -296,7 +296,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/'
     | '/_authenticated/lifers/'
     | '/_authenticated/_verified/ape-rides/$rideId'
-    | '/_authenticated/_verified/rooms/$roomId'
+    | '/_authenticated/_verified/rooms_/$roomId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -454,12 +454,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedVerifiedApeRidesRouteImport
       parentRoute: typeof AuthenticatedVerifiedRoute
     }
-    '/_authenticated/_verified/rooms/$roomId': {
-      id: '/_authenticated/_verified/rooms/$roomId'
-      path: '/$roomId'
+    '/_authenticated/_verified/rooms_/$roomId': {
+      id: '/_authenticated/_verified/rooms_/$roomId'
+      path: '/rooms/$roomId'
       fullPath: '/rooms/$roomId'
       preLoaderRoute: typeof AuthenticatedVerifiedRoomsRoomIdRouteImport
-      parentRoute: typeof AuthenticatedVerifiedRoomsRoute
+      parentRoute: typeof AuthenticatedVerifiedRoute
     }
     '/_authenticated/_verified/ape-rides/$rideId': {
       id: '/_authenticated/_verified/ape-rides/$rideId'
@@ -486,26 +486,12 @@ const AuthenticatedVerifiedApeRidesRouteWithChildren =
     AuthenticatedVerifiedApeRidesRouteChildren,
   )
 
-interface AuthenticatedVerifiedRoomsRouteChildren {
-  AuthenticatedVerifiedRoomsRoomIdRoute: typeof AuthenticatedVerifiedRoomsRoomIdRoute
-}
-
-const AuthenticatedVerifiedRoomsRouteChildren: AuthenticatedVerifiedRoomsRouteChildren =
-  {
-    AuthenticatedVerifiedRoomsRoomIdRoute:
-      AuthenticatedVerifiedRoomsRoomIdRoute,
-  }
-
-const AuthenticatedVerifiedRoomsRouteWithChildren =
-  AuthenticatedVerifiedRoomsRoute._addFileChildren(
-    AuthenticatedVerifiedRoomsRouteChildren,
-  )
-
 interface AuthenticatedVerifiedRouteChildren {
   AuthenticatedVerifiedApeRidesRoute: typeof AuthenticatedVerifiedApeRidesRouteWithChildren
   AuthenticatedVerifiedFeedRoute: typeof AuthenticatedVerifiedFeedRoute
   AuthenticatedVerifiedMessagesRoute: typeof AuthenticatedVerifiedMessagesRoute
-  AuthenticatedVerifiedRoomsRoute: typeof AuthenticatedVerifiedRoomsRouteWithChildren
+  AuthenticatedVerifiedRoomsRoute: typeof AuthenticatedVerifiedRoomsRoute
+  AuthenticatedVerifiedRoomsRoomIdRoute: typeof AuthenticatedVerifiedRoomsRoomIdRoute
 }
 
 const AuthenticatedVerifiedRouteChildren: AuthenticatedVerifiedRouteChildren = {
@@ -513,7 +499,8 @@ const AuthenticatedVerifiedRouteChildren: AuthenticatedVerifiedRouteChildren = {
     AuthenticatedVerifiedApeRidesRouteWithChildren,
   AuthenticatedVerifiedFeedRoute: AuthenticatedVerifiedFeedRoute,
   AuthenticatedVerifiedMessagesRoute: AuthenticatedVerifiedMessagesRoute,
-  AuthenticatedVerifiedRoomsRoute: AuthenticatedVerifiedRoomsRouteWithChildren,
+  AuthenticatedVerifiedRoomsRoute: AuthenticatedVerifiedRoomsRoute,
+  AuthenticatedVerifiedRoomsRoomIdRoute: AuthenticatedVerifiedRoomsRoomIdRoute,
 }
 
 const AuthenticatedVerifiedRouteWithChildren =
