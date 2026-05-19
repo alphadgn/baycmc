@@ -8,12 +8,18 @@ export interface RoomPreferences {
   cameraEnabled: boolean;
   /** Apply these preferences to every room (otherwise prompt per room). */
   applyToAll: boolean;
+  /** Last-used audio input device id. null = system default. */
+  audioInputDeviceId: string | null;
+  /** Last-used video input device id. null = system default. */
+  videoInputDeviceId: string | null;
 }
 
 const DEFAULT_PREFS: RoomPreferences = {
   micEnabled: true,
   cameraEnabled: true,
   applyToAll: true,
+  audioInputDeviceId: null,
+  videoInputDeviceId: null,
 };
 
 function storageKey(userId: string | null | undefined) {
@@ -30,6 +36,8 @@ function readPrefs(userId: string | null | undefined): RoomPreferences {
       micEnabled: parsed.micEnabled ?? DEFAULT_PREFS.micEnabled,
       cameraEnabled: parsed.cameraEnabled ?? DEFAULT_PREFS.cameraEnabled,
       applyToAll: parsed.applyToAll ?? DEFAULT_PREFS.applyToAll,
+      audioInputDeviceId: parsed.audioInputDeviceId ?? DEFAULT_PREFS.audioInputDeviceId,
+      videoInputDeviceId: parsed.videoInputDeviceId ?? DEFAULT_PREFS.videoInputDeviceId,
     };
   } catch {
     return DEFAULT_PREFS;

@@ -100,7 +100,7 @@ export function RoomsShell({
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   return (
-    <div className="flex min-h-[100dvh] bg-background">
+    <div className="flex h-[100dvh] bg-background">
       {/* Sidebar (lg+) */}
       <Sidebar
         className="hidden w-56 shrink-0 border-r border-border/60 bg-card/60 lg:flex"
@@ -365,32 +365,35 @@ export function RoomsIdleBottomBar() {
         <Lock className="h-3.5 w-3.5" /> Room Settings
       </span>
 
-      <div className="flex flex-1 items-center justify-center gap-2 sm:gap-3">
+      <div className="flex flex-1 items-center justify-center gap-3 sm:gap-5">
         <BottomIcon
           label="Mic"
           icon={prefs.micEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
-          active={prefs.micEnabled}
+          tone={prefs.micEnabled ? "active" : "off"}
           onClick={() => setPrefs({ micEnabled: !prefs.micEnabled })}
         />
         <BottomIcon
           label="Cam"
           icon={prefs.cameraEnabled ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
-          active={prefs.cameraEnabled}
+          tone={prefs.cameraEnabled ? "active" : "off"}
           onClick={() => setPrefs({ cameraEnabled: !prefs.cameraEnabled })}
         />
         <BottomIcon
           label="Screen"
           icon={<Monitor className="h-4 w-4" />}
+          tone="neutral"
           onClick={() => hintNotJoined("Screen share")}
         />
         <BottomIcon
           label="Chat"
           icon={<MessageCircle className="h-4 w-4" />}
+          tone="neutral"
           onClick={() => hintNotJoined("Chat")}
         />
         <BottomIcon
           label="Participants"
           icon={<Users className="h-4 w-4" />}
+          tone="neutral"
           onClick={() => hintNotJoined("Participants list")}
         />
       </div>
@@ -406,29 +409,31 @@ function BottomIcon({
   label,
   icon,
   disabled,
-  active,
+  tone = "neutral",
   onClick,
 }: {
   label: string;
   icon: ReactNode;
   disabled?: boolean;
-  active?: boolean;
+  tone?: "active" | "off" | "neutral";
   onClick?: () => void;
 }) {
+  const toneClass = disabled
+    ? "cursor-not-allowed border-border/40 bg-secondary/20 text-muted-foreground/60"
+    : tone === "active"
+      ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-300 shadow-[0_0_18px_-6px_rgba(16,185,129,0.7)]"
+      : tone === "off"
+        ? "border-destructive/60 bg-destructive/10 text-destructive"
+        : "border-border bg-secondary/50 text-foreground hover:bg-secondary";
+
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
-      aria-pressed={active}
-      className={`flex h-12 w-14 flex-col items-center justify-center rounded-md text-[10px] font-medium transition ${
-        disabled
-          ? "cursor-not-allowed border border-border/40 bg-secondary/20 text-muted-foreground/60"
-          : active
-            ? "border border-gold/40 bg-gold/10 text-gold"
-            : "border border-border bg-secondary/50 text-foreground hover:bg-secondary"
-      }`}
+      aria-pressed={tone === "active"}
+      className={`flex h-12 w-14 flex-col items-center justify-center rounded-md border text-[10px] font-medium transition ${toneClass}`}
     >
       <span aria-hidden>{icon}</span>
       <span className="mt-0.5 truncate">{label}</span>

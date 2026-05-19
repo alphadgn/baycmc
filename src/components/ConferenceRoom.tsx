@@ -13,6 +13,7 @@ import {
   RoomAudioRenderer,
   VideoConference,
   useLocalParticipant,
+  useMediaDeviceSelect,
   useParticipants,
   useRoomContext,
 } from "@livekit/components-react";
@@ -20,6 +21,8 @@ import "@livekit/components-styles";
 import { toast } from "sonner";
 import {
   AlertTriangle,
+  Check,
+  ChevronUp,
   Loader2,
   Lock,
   LogOut,
@@ -406,11 +409,11 @@ function PreLiveBottomBar({ onLeave }: { onLeave: () => void }) {
       onLeave={onLeave}
       controls={
         <>
-          <BottomIcon label="Mic" icon={<Mic className="h-4 w-4" />} disabled />
-          <BottomIcon label="Cam" icon={<VideoIcon className="h-4 w-4" />} disabled />
-          <BottomIcon label="Screen" icon={<Monitor className="h-4 w-4" />} disabled />
-          <BottomIcon label="Chat" icon={<MessageCircle className="h-4 w-4" />} disabled />
-          <BottomIcon label="Participants" icon={<Users className="h-4 w-4" />} disabled />
+          <BottomControl label="Mic" tone="neutral" icon={<Mic className="h-4 w-4" />} disabled />
+          <BottomControl label="Cam" tone="neutral" icon={<VideoIcon className="h-4 w-4" />} disabled />
+          <BottomControl label="Screen" tone="neutral" icon={<Monitor className="h-4 w-4" />} disabled />
+          <BottomControl label="Chat" tone="neutral" icon={<MessageCircle className="h-4 w-4" />} disabled />
+          <BottomControl label="Participants" tone="neutral" icon={<Users className="h-4 w-4" />} disabled />
         </>
       }
     />
@@ -481,6 +484,25 @@ function LiveBottomBar({ onLeave }: { onLeave: () => void }) {
   const { prefs, setPrefs } = useRoomPreferences();
   const [screenOn, setScreenOn] = useState(false);
 
+  const mic = useMediaDeviceSelect({ kind: "audioinput", room: room ?? undefined });
+  const cam = useMediaDeviceSelect({ kind: "videoinput", room: room ?? undefined });
+
+  // Restore the persisted device choice once the device list is populated.
+  // Browsers only label devices after a permission grant, so this often
+  // re-runs after the first toggle.
+  useEffect(() => {
+    if (!prefs.audioInputDeviceId) return;
+    if (!mic.devices.some((d) => d.deviceId === prefs.audioInputDeviceId)) return;
+    if (mic.activeDeviceId === prefs.audioInputDeviceId) return;
+    void mic.setActiveMediaDevice(prefs.audioInputDeviceId);
+  }, [mic.devices, mic.activeDeviceId, prefs.audioInputDeviceId, mic]);
+  useEffect(() => {
+    if (!prefs.videoInputDeviceId) return;
+    if (!cam.devices.some((d) => d.deviceId === prefs.videoInputDeviceId)) return;
+    if (cam.activeDeviceId === prefs.videoInputDeviceId) return;
+    void cam.setActiveMediaDevice(prefs.videoInputDeviceId);
+  }, [cam.devices, cam.activeDeviceId, prefs.videoInputDeviceId, cam]);
+
   async function toggleMic() {
     const v = !prefs.micEnabled;
     setPrefs({ micEnabled: v });
@@ -509,6 +531,22 @@ function LiveBottomBar({ onLeave }: { onLeave: () => void }) {
       console.warn("toggleScreen", e);
     }
   }
+  async function selectMic(id: string) {
+    setPrefs({ audioInputDeviceId: id });
+    try {
+      await mic.setActiveMediaDevice(id);
+    } catch (e) {
+      console.warn("selectMic", e);
+    }
+  }
+  async function selectCam(id: string) {
+    setPrefs({ videoInputDeviceId: id });
+    try {
+      await cam.setActiveMediaDevice(id);
+    } catch (e) {
+      console.warn("selectCam", e);
+    }
+  }
 
   return (
     <BottomBarShell
@@ -519,15 +557,18 @@ function LiveBottomBar({ onLeave }: { onLeave: () => void }) {
       participants={participants.length}
       controls={
         <>
-          <BottomIcon
+          <BottomControl
             label="Mic"
-            active={prefs.micEnabled}
+            tone={prefs.micEnabled ? "active" : "off"}
             icon={prefs.micEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
             onClick={() => void toggleMic()}
+            devices={mic.devices}
+            activeDeviceId={mic.activeDeviceId}
+            onSelectDevice={(id) => void selectMic(id)}
           />
-          <BottomIcon
+          <BottomControl
             label="Cam"
-            active={prefs.cameraEnabled}
+            tone={prefs.cameraEnabled ? "active" : "off"}
             icon={
               prefs.cameraEnabled ? (
                 <VideoIcon className="h-4 w-4" />
@@ -536,20 +577,25 @@ function LiveBottomBar({ onLeave }: { onLeave: () => void }) {
               )
             }
             onClick={() => void toggleCam()}
+            devices={cam.devices}
+            activeDeviceId={cam.activeDeviceId}
+            onSelectDevice={(id) => void selectCam(id)}
           />
-          <BottomIcon
+          <BottomControl
             label="Screen"
-            active={screenOn}
+            tone={screenOn ? "active" : "neutral"}
             icon={<Monitor className="h-4 w-4" />}
             onClick={() => void toggleScreen()}
           />
-          <BottomIcon
+          <BottomControl
             label="Chat"
+            tone="neutral"
             icon={<MessageCircle className="h-4 w-4" />}
             disabled
           />
-          <BottomIcon
+          <BottomControl
             label={`Participants${participants.length ? ` (${participants.length})` : ""}`}
+            tone="neutral"
             icon={<Users className="h-4 w-4" />}
           />
         </>
@@ -841,7 +887,7 @@ function BottomBarShell({
         <Lock className="h-3.5 w-3.5" /> Room Settings
       </span>
 
-      <div className="flex flex-1 items-center justify-center gap-2 sm:gap-3">{controls}</div>
+      <div className="flex flex-1 items-center justify-center gap-3 sm:gap-5">{controls}</div>
 
       <div className="flex items-center gap-2">
         {typeof participants === "number" && (
@@ -861,35 +907,117 @@ function BottomBarShell({
   );
 }
 
-function BottomIcon({
+/**
+ * Bottom-bar control: icon button + optional caret that opens a device-picker
+ * dropdown. Tone reflects state — green (active), red (muted/off), or neutral.
+ * The caret only appears when a non-empty `devices` list is supplied; mic and
+ * cam get it, screen-share doesn't (browser handles source selection on start).
+ */
+function BottomControl({
   label,
   icon,
+  tone,
   disabled,
-  active,
   onClick,
+  devices,
+  activeDeviceId,
+  onSelectDevice,
 }: {
   label: string;
   icon: React.ReactNode;
+  tone: "active" | "off" | "neutral";
   disabled?: boolean;
-  active?: boolean;
   onClick?: () => void;
+  devices?: MediaDeviceInfo[];
+  activeDeviceId?: string;
+  onSelectDevice?: (id: string) => void;
 }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  const hasPicker = !!(devices && devices.length > 0 && onSelectDevice && !disabled);
+
+  const toneClasses = disabled
+    ? "border-border/40 bg-secondary/20 text-muted-foreground/60 cursor-not-allowed"
+    : tone === "active"
+      ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-300 shadow-[0_0_18px_-6px_rgba(16,185,129,0.7)]"
+      : tone === "off"
+        ? "border-destructive/60 bg-destructive/10 text-destructive"
+        : "border-border bg-secondary/50 text-foreground hover:bg-secondary";
+
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={label}
-      className={`flex h-12 w-14 flex-col items-center justify-center rounded-md text-[10px] font-medium transition ${
-        disabled
-          ? "cursor-not-allowed border border-border/40 bg-secondary/20 text-muted-foreground/60"
-          : active
-            ? "border border-gold/40 bg-gold/10 text-gold"
-            : "border border-border bg-secondary/50 text-foreground hover:bg-secondary"
-      }`}
-    >
-      <span aria-hidden>{icon}</span>
-      <span className="mt-0.5 truncate">{label}</span>
-    </button>
+    <div ref={wrapRef} className="relative inline-flex items-stretch">
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        aria-label={label}
+        aria-pressed={tone === "active"}
+        className={`flex h-12 w-14 flex-col items-center justify-center border text-[10px] font-medium transition ${
+          hasPicker ? "rounded-l-md border-r-0" : "rounded-md"
+        } ${toneClasses}`}
+      >
+        <span aria-hidden>{icon}</span>
+        <span className="mt-0.5 truncate">{label}</span>
+      </button>
+      {hasPicker && (
+        <>
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-label={`${label} options`}
+            aria-haspopup="menu"
+            aria-expanded={open}
+            className={`flex h-12 w-5 items-center justify-center rounded-r-md border transition ${toneClasses}`}
+          >
+            <ChevronUp className="h-3 w-3" />
+          </button>
+          {open && (
+            <ul
+              role="menu"
+              className="absolute bottom-[calc(100%+6px)] left-0 z-50 max-h-64 w-64 overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-lg"
+            >
+              {devices!.map((d) => {
+                const checked = d.deviceId === activeDeviceId;
+                return (
+                  <li key={d.deviceId}>
+                    <button
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={checked}
+                      onClick={() => {
+                        onSelectDevice!(d.deviceId);
+                        setOpen(false);
+                      }}
+                      className={`flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-[11px] ${
+                        checked
+                          ? "bg-gold/10 text-gold"
+                          : "text-foreground hover:bg-secondary"
+                      }`}
+                    >
+                      <span className="truncate">
+                        {d.label || `${label} device`}
+                      </span>
+                      {checked && <Check className="h-3 w-3 shrink-0" />}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </>
+      )}
+    </div>
   );
 }
