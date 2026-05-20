@@ -274,7 +274,7 @@ function Sidebar({
         )}
       </div>
 
-      <ul className="flex-1 space-y-1 p-3">
+      <ul className="scrollbar-modern flex min-h-0 flex-1 flex-col space-y-1 overflow-y-auto p-3">
         {items.map((item) => {
           const active = item.match
             ? location.pathname.startsWith(item.match)

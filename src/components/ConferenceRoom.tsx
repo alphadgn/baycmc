@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import {
   AlertTriangle,
   Check,
+  ChevronDown,
   ChevronUp,
   Loader2,
   Lock,
@@ -72,6 +73,7 @@ export function ConferenceRoom({
   const getToken = useServerFn(getLivekitToken);
   const revalidateAccess = useServerFn(revalidateLivekitRoomAccess);
   const navigate = useNavigate();
+  const { prefs } = useRoomPreferences();
 
   const progressTimer = useRef<number | null>(null);
 
@@ -164,6 +166,11 @@ export function ConferenceRoom({
         token={state.token}
         serverUrl={state.url}
         connect
+        // Auto-publish mic/cam tracks based on saved prefs the moment we
+        // connect — otherwise users had to toggle each control off-then-on
+        // before LiveKit would acquire the device.
+        audio={prefs.micEnabled}
+        video={prefs.cameraEnabled}
         data-lk-theme="default"
         onDisconnected={() => setState({ phase: "idle" })}
         // We render the LiveKit toolbar ourselves so the bottom bar matches
@@ -174,7 +181,14 @@ export function ConferenceRoom({
           title={roomName}
           subtitle={ambience ?? undefined}
           backgroundImage={backgroundImage}
-          rightRail={<LiveRightRail roomId={roomId} isHost={state.isHost} connecting={false} />}
+          rightRail={
+            <LiveRightRail
+              roomId={roomId}
+              isHost={state.isHost}
+              connecting={false}
+              hostUserId={hostUserId}
+            />
+          }
           bottomBar={
             <LiveBottomBar
               onLeave={() => {
@@ -509,11 +523,19 @@ function LiveRightRail({
   roomId,
   isHost,
   connecting,
+  hostUserId,
 }: {
   roomId: string;
   isHost: boolean;
   connecting: boolean;
+  hostUserId: string | null;
 }) {
+  // We surface a compact "no host booked" status card here when no host is
+  // present in the room — the big central HostTile has been hidden so the
+  // user's own video sits in the centre of the page without scrolling.
+  const participants = useParticipants();
+  const hostPresent = hostUserId ? participants.some((p) => p.identity === hostUserId) : false;
+
   return (
     <div className="space-y-3">
       {connecting && (
@@ -525,6 +547,15 @@ function LiveRightRail({
       )}
       <LivePreferencesPanel />
       {isHost && <HostControlsPanel roomId={roomId} />}
+      {!hostPresent && (
+        <Panel title="Session Status">
+          <p className="text-[11px] text-muted-foreground">
+            {hostUserId
+              ? "Host hasn't joined yet — they'll appear here when they do."
+              : "Open session — no host booked for this slot."}
+          </p>
+        </Panel>
+      )}
     </div>
   );
 }
@@ -941,27 +972,91 @@ function BottomBarShell({
   controls: React.ReactNode;
   participants?: number;
 }) {
+  // The "Room Settings" label used to be static. Now it's a toggle: click it
+  // (or its chevron) to reveal a small help panel above the bar explaining
+  // what each control does. Closed by default so the bar stays compact.
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-3 sm:px-6">
-      <span className="inline-flex items-center gap-2 text-[11px] uppercase tracking-widest text-muted-foreground">
-        <Lock className="h-3.5 w-3.5" /> Room Settings
-      </span>
+    <div className="relative">
+      {settingsOpen && (
+        <div className="absolute bottom-full left-0 right-0 border-t border-border/60 bg-background/95 px-3 py-3 backdrop-blur sm:px-6">
+          <div className="flex items-start justify-between gap-3">
+            <div className="text-[11px] text-muted-foreground font-sans-display">
+              <p className="mb-1 font-semibold uppercase tracking-widest text-foreground">
+                What you can do here
+              </p>
+              <ul className="space-y-1">
+                <li>
+                  <strong className="text-foreground">Mic</strong> · mute or un-mute yourself. Use
+                  the caret to switch microphones.
+                </li>
+                <li>
+                  <strong className="text-foreground">Cam</strong> · turn your camera on or off. The
+                  caret lets you pick a webcam.
+                </li>
+                <li>
+                  <strong className="text-foreground">Screen</strong> · share a window or your full
+                  screen with the room.
+                </li>
+                <li>
+                  <strong className="text-foreground">Chat</strong> · open the in-room chat thread.
+                </li>
+                <li>
+                  <strong className="text-foreground">Participants</strong> · see everyone in the
+                  room.
+                </li>
+                <li>
+                  <strong className="text-foreground">Leave Room</strong> · disconnect and return to
+                  the room list.
+                </li>
+              </ul>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(false)}
+              aria-label="Close room settings"
+              className="rounded-md border border-border bg-secondary/40 px-2 py-1 text-[10px] uppercase tracking-widest text-muted-foreground transition hover:bg-secondary"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
 
-      <div className="flex flex-1 items-center justify-center gap-3 sm:gap-5">{controls}</div>
-
-      <div className="flex items-center gap-2">
-        {typeof participants === "number" && (
-          <span className="hidden text-[11px] text-muted-foreground sm:inline">
-            {participants} in room
-          </span>
-        )}
+      <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-3 sm:px-6">
         <button
           type="button"
-          onClick={onLeave}
-          className="inline-flex items-center gap-2 rounded-md bg-destructive px-4 py-2 text-[11px] font-semibold text-destructive-foreground hover:opacity-90"
+          onClick={() => setSettingsOpen((v) => !v)}
+          aria-expanded={settingsOpen}
+          aria-label="Toggle room settings help"
+          className="inline-flex items-center gap-2 rounded-md px-1.5 py-1 text-[11px] uppercase tracking-widest text-muted-foreground transition hover:bg-secondary/40 hover:text-foreground"
         >
-          <LogOut className="h-3.5 w-3.5" /> Leave Room
+          <Lock className="h-3.5 w-3.5" />
+          <span>Room Settings</span>
+          {settingsOpen ? (
+            <ChevronDown className="h-3.5 w-3.5" />
+          ) : (
+            <ChevronUp className="h-3.5 w-3.5" />
+          )}
         </button>
+
+        <div className="flex flex-1 items-center justify-center gap-3 sm:gap-5">{controls}</div>
+
+        <div className="flex items-center gap-2">
+          {typeof participants === "number" && (
+            <span className="hidden text-[11px] text-muted-foreground sm:inline">
+              {participants} in room
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={onLeave}
+            className="inline-flex items-center gap-2 rounded-md bg-destructive px-4 py-2 text-[11px] font-semibold text-destructive-foreground hover:opacity-90"
+          >
+            <LogOut className="h-3.5 w-3.5" /> Leave Room
+          </button>
+        </div>
       </div>
     </div>
   );

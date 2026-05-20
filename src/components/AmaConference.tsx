@@ -34,19 +34,13 @@ const MAX_AUDIENCE_TILES = 25;
  * Host = the booking owner of the currently-active slot. Without a booking
  * (or before the booking owner joins) the host slot shows the room wallpaper.
  */
-export function AmaConference({
-  roomName,
-  hostUserId,
-  backgroundImage,
-}: AmaConferenceProps) {
+export function AmaConference({ roomName, hostUserId, backgroundImage }: AmaConferenceProps) {
   const participants = useParticipants();
 
   // Two queries: every participant's camera track (with placeholders so we
   // can still render a tile when their cam is off) and any active screen
   // share. The screen-share list drives the layout flip.
-  const cameraTracks = useTracks([
-    { source: Track.Source.Camera, withPlaceholder: true },
-  ]);
+  const cameraTracks = useTracks([{ source: Track.Source.Camera, withPlaceholder: true }]);
   const screenShareTracks = useTracks([
     { source: Track.Source.ScreenShare, withPlaceholder: false },
   ]);
@@ -54,18 +48,13 @@ export function AmaConference({
   const profiles = useParticipantProfiles(participants);
 
   const hostParticipant = useMemo(
-    () =>
-      hostUserId
-        ? participants.find((p) => p.identity === hostUserId) ?? null
-        : null,
+    () => (hostUserId ? (participants.find((p) => p.identity === hostUserId) ?? null) : null),
     [participants, hostUserId],
   );
 
   const audienceParticipants = useMemo(() => {
     if (!hostParticipant) return participants;
-    return participants.filter(
-      (p) => p.identity !== hostParticipant.identity,
-    );
+    return participants.filter((p) => p.identity !== hostParticipant.identity);
   }, [participants, hostParticipant]);
 
   const activeScreenShare = screenShareTracks.find(isTrackReference) ?? null;
@@ -138,15 +127,23 @@ function AmaGridLayout({
             ? 4
             : 5;
 
+  // When there's no host present, drop the big host tile entirely so the
+  // audience grid (where the user sees themselves) fills the visible area.
+  // A compact "no host booked" indicator surfaces in the right rail instead
+  // — handled by LiveRightRail in ConferenceRoom.tsx.
+  const showHostTile = hostParticipant !== null;
+
   return (
     <div className="flex h-full min-h-[60vh] flex-col gap-4 p-4 sm:p-6">
-      <HostTile
-        participant={hostParticipant}
-        cameraTracks={cameraTracks}
-        profiles={profiles}
-        backgroundImage={backgroundImage}
-        hasActiveBooking={hasActiveBooking}
-      />
+      {showHostTile && (
+        <HostTile
+          participant={hostParticipant}
+          cameraTracks={cameraTracks}
+          profiles={profiles}
+          backgroundImage={backgroundImage}
+          hasActiveBooking={hasActiveBooking}
+        />
+      )}
 
       <div className="flex min-h-0 flex-1 flex-col gap-2">
         {visibleCount === 0 ? (
@@ -170,11 +167,7 @@ function AmaGridLayout({
           </div>
         )}
         {overflowCount > 0 && (
-          <OverflowStrip
-            overflow={overflow}
-            profiles={profiles}
-            count={overflowCount}
-          />
+          <OverflowStrip overflow={overflow} profiles={profiles} count={overflowCount} />
         )}
       </div>
     </div>
@@ -227,18 +220,9 @@ function ScreenShareLayout({
         className="scrollbar-modern hidden w-56 shrink-0 flex-col gap-2 overflow-y-auto sm:flex"
         aria-label="Participants strip"
       >
-        {hostParticipant ? (
+        {hostParticipant && (
           <HostTile
             participant={hostParticipant}
-            cameraTracks={cameraTracks}
-            profiles={profiles}
-            backgroundImage={backgroundImage}
-            hasActiveBooking={hasActiveBooking}
-            compact
-          />
-        ) : (
-          <HostTile
-            participant={null}
             cameraTracks={cameraTracks}
             profiles={profiles}
             backgroundImage={backgroundImage}
@@ -326,11 +310,7 @@ interface AudienceTileProps {
   profile: ProfileMini | null;
 }
 
-function AudienceTile({
-  participant,
-  cameraTracks,
-  profile,
-}: AudienceTileProps) {
+function AudienceTile({ participant, cameraTracks, profile }: AudienceTileProps) {
   return (
     <ParticipantVideoTile
       participant={participant}
@@ -359,19 +339,13 @@ function ParticipantVideoTile({
   variant: "host" | "host-compact" | "audience";
 }) {
   const isSpeaking = useIsSpeaking(participant);
-  const camTrack = cameraTracks.find(
-    (t) => t.participant.identity === participant.identity,
-  );
+  const camTrack = cameraTracks.find((t) => t.participant.identity === participant.identity);
   const camOn =
-    camTrack !== undefined &&
-    isTrackReference(camTrack) &&
-    !camTrack.publication.isMuted;
+    camTrack !== undefined && isTrackReference(camTrack) && !camTrack.publication.isMuted;
   const micOn = participant.isMicrophoneEnabled;
 
   const displayName =
-    profile?.username ||
-    participant.name ||
-    `${participant.identity.slice(0, 6)}…`;
+    profile?.username || participant.name || `${participant.identity.slice(0, 6)}…`;
 
   const sizeClasses =
     variant === "host"
@@ -391,16 +365,9 @@ function ParticipantVideoTile({
       className={`relative shrink-0 overflow-hidden rounded-2xl border-2 bg-card/40 ${sizeClasses} ${ringClasses}`}
     >
       {camOn && camTrack && isTrackReference(camTrack) ? (
-        <VideoTrack
-          trackRef={camTrack}
-          className="absolute inset-0 h-full w-full object-cover"
-        />
+        <VideoTrack trackRef={camTrack} className="absolute inset-0 h-full w-full object-cover" />
       ) : (
-        <NoCamPlaceholder
-          profile={profile}
-          displayName={displayName}
-          large={variant === "host"}
-        />
+        <NoCamPlaceholder profile={profile} displayName={displayName} large={variant === "host"} />
       )}
 
       {variant === "host" && (
@@ -416,16 +383,10 @@ function ParticipantVideoTile({
         <span
           aria-label={micOn ? "Microphone on" : "Microphone muted"}
           className={`inline-flex h-6 w-6 items-center justify-center rounded-full backdrop-blur ${
-            micOn
-              ? "bg-emerald-500/20 text-emerald-300"
-              : "bg-destructive/20 text-destructive"
+            micOn ? "bg-emerald-500/20 text-emerald-300" : "bg-destructive/20 text-destructive"
           }`}
         >
-          {micOn ? (
-            <Mic className="h-3 w-3" />
-          ) : (
-            <MicOff className="h-3 w-3" />
-          )}
+          {micOn ? <Mic className="h-3 w-3" /> : <MicOff className="h-3 w-3" />}
         </span>
       </div>
     </div>
@@ -458,13 +419,7 @@ function NoCamPlaceholder({
   );
 }
 
-function ApeSilhouette({
-  className,
-  initials,
-}: {
-  className: string;
-  initials: string;
-}) {
+function ApeSilhouette({ className, initials }: { className: string; initials: string }) {
   // Stylized BAYC-themed placeholder: gold gradient circle with the user's
   // initials. Cheap, on-brand, and avoids shipping an SVG asset we don't have.
   return (
@@ -508,10 +463,7 @@ function OverflowStrip({
       <ul className="flex shrink-0 items-center gap-2">
         {overflow.slice(0, 12).map((p) => {
           const prof = profiles.get(p.identity);
-          const name =
-            prof?.username ||
-            p.name ||
-            `${p.identity.slice(0, 6)}…`;
+          const name = prof?.username || p.name || `${p.identity.slice(0, 6)}…`;
           return (
             <li key={p.identity} title={name} className="shrink-0">
               {prof?.avatar_url ? (
@@ -530,9 +482,7 @@ function OverflowStrip({
         })}
       </ul>
       {count > 12 && (
-        <span className="shrink-0 text-[10px] font-semibold text-gold">
-          +{count - 12} more
-        </span>
+        <span className="shrink-0 text-[10px] font-semibold text-gold">+{count - 12} more</span>
       )}
     </div>
   );
@@ -542,9 +492,7 @@ function EmptyAudience({ roomName }: { roomName: string }) {
   return (
     <div className="flex h-full min-h-[160px] flex-1 items-center justify-center rounded-2xl border border-dashed border-border/40 bg-background/30 px-4 text-center">
       <div>
-        <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
-          {roomName}
-        </p>
+        <p className="text-[10px] uppercase tracking-widest text-muted-foreground">{roomName}</p>
         <h4 className="mt-1 font-display text-lg text-foreground sm:text-xl">
           No one else here yet
         </h4>
@@ -565,12 +513,8 @@ function EmptyAudience({ roomName }: { roomName: string }) {
  * IDs in a ref so participant churn (re-render of the participants array)
  * doesn't trigger duplicate requests.
  */
-function useParticipantProfiles(
-  participants: Participant[],
-): Map<string, ProfileMini> {
-  const [profiles, setProfiles] = useState<Map<string, ProfileMini>>(
-    () => new Map(),
-  );
+function useParticipantProfiles(participants: Participant[]): Map<string, ProfileMini> {
+  const [profiles, setProfiles] = useState<Map<string, ProfileMini>>(() => new Map());
   const fetchedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -606,4 +550,3 @@ function useParticipantProfiles(
 
   return profiles;
 }
-
