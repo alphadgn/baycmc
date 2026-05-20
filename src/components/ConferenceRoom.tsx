@@ -569,7 +569,10 @@ function LiveRightRail({
 
 /** Connection-quality readout — signal bars + label for the local user. */
 function ConnectionPanel() {
-  const { quality } = useConnectionQualityIndicator();
+  // Pass the local participant explicitly: the rail isn't wrapped in a
+  // ParticipantContext, so the no-arg form would throw.
+  const { localParticipant } = useLocalParticipant();
+  const { quality } = useConnectionQualityIndicator({ participant: localParticipant });
 
   const meta: Record<ConnectionQuality, { bars: number; label: string; tone: string }> = {
     [ConnectionQuality.Excellent]: {
