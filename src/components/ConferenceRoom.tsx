@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -16,6 +16,7 @@ import {
   useMediaDeviceSelect,
   useParticipants,
   useRoomContext,
+  useRoomInfo,
 } from "@livekit/components-react";
 import { ConnectionQuality } from "livekit-client";
 import { AmaConference } from "@/components/AmaConference";
@@ -193,6 +194,7 @@ export function ConferenceRoom({
           }
           bottomBar={
             <LiveBottomBar
+              isHost={state.isHost}
               onLeave={() => {
                 setState({ phase: "idle" });
                 goBack();
@@ -485,6 +487,24 @@ function PreLiveBottomBar({ onLeave }: { onLeave: () => void }) {
 // LIVE views (inside LiveKitRoom — can use room context hooks)
 // ────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Reads the room-wide mic lock the host sets via "Mute all". While true,
+ * non-host members can't un-mute their microphone. Driven by LiveKit room
+ * metadata so it stays in sync across every connected client.
+ */
+function useMicLock(): boolean {
+  const { metadata } = useRoomInfo();
+  return useMemo(() => {
+    if (!metadata) return false;
+    try {
+      const parsed = JSON.parse(metadata) as { micLock?: boolean };
+      return !!parsed.micLock;
+    } catch {
+      return false;
+    }
+  }, [metadata]);
+}
+
 function VideoArea({
   backgroundImage,
   kind,
@@ -550,7 +570,7 @@ function LiveRightRail({
           </div>
         </Panel>
       )}
-      <LivePreferencesPanel />
+      <LivePreferencesPanel isHost={isHost} />
       {isHost && <HostControlsPanel roomId={roomId} />}
       {!hostPresent && (
         <Panel title="Session Status">
@@ -611,12 +631,15 @@ function SignalBars({ active, tone }: { active: number; tone: string }) {
   );
 }
 
-function LiveBottomBar({ onLeave }: { onLeave: () => void }) {
+function LiveBottomBar({ onLeave, isHost }: { onLeave: () => void; isHost: boolean }) {
   const local = useLocalParticipant();
   const room = useRoomContext();
   const participants = useParticipants();
   const { prefs, setPrefs } = useRoomPreferences();
   const [screenOn, setScreenOn] = useState(false);
+  const micLock = useMicLock();
+  // Host keeps full mic control even while the room-wide lock is on.
+  const micLocked = micLock && !isHost;
 
   const mic = useMediaDeviceSelect({ kind: "audioinput", room: room ?? undefined });
   const cam = useMediaDeviceSelect({ kind: "videoinput", room: room ?? undefined });
@@ -639,6 +662,10 @@ function LiveBottomBar({ onLeave }: { onLeave: () => void }) {
 
   async function toggleMic() {
     const v = !prefs.micEnabled;
+    if (v && micLocked) {
+      toast.error("The host has muted the room — you can't unmute until they lift it.");
+      return;
+    }
     setPrefs({ micEnabled: v });
     try {
       await local.localParticipant.setMicrophoneEnabled(v);
@@ -692,10 +719,17 @@ function LiveBottomBar({ onLeave }: { onLeave: () => void }) {
       controls={
         <>
           <BottomControl
-            label="Mic"
-            tone={prefs.micEnabled ? "active" : "off"}
-            icon={prefs.micEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
+            label={micLocked ? "Muted" : "Mic"}
+            tone={micLocked ? "off" : prefs.micEnabled ? "active" : "off"}
+            icon={
+              prefs.micEnabled && !micLocked ? (
+                <Mic className="h-4 w-4" />
+              ) : (
+                <MicOff className="h-4 w-4" />
+              )
+            }
             onClick={() => void toggleMic()}
+            disabled={micLocked}
             devices={mic.devices}
             activeDeviceId={mic.activeDeviceId}
             onSelectDevice={(id) => void selectMic(id)}
@@ -830,11 +864,17 @@ function PreferencesPanel() {
   );
 }
 
-function LivePreferencesPanel() {
+function LivePreferencesPanel({ isHost }: { isHost: boolean }) {
   const { prefs, setPrefs } = useRoomPreferences();
   const local = useLocalParticipant();
+  const micLock = useMicLock();
+  const micLocked = micLock && !isHost;
 
   async function toggleMic(v: boolean) {
+    if (v && micLocked) {
+      toast.error("The host has muted the room — you can't unmute until they lift it.");
+      return;
+    }
     setPrefs({ micEnabled: v });
     try {
       await local.localParticipant.setMicrophoneEnabled(v);
@@ -861,9 +901,15 @@ function LivePreferencesPanel() {
         />
         <ToggleRow
           label="Microphone"
-          checked={prefs.micEnabled}
+          checked={prefs.micEnabled && !micLocked}
+          disabled={micLocked}
           onChange={(v) => void toggleMic(v)}
         />
+        {micLocked && (
+          <p className="pt-0.5 text-[10px] text-destructive">
+            Host muted the room — unmute is locked.
+          </p>
+        )}
         <label className="flex cursor-pointer items-start gap-2 pt-1 text-[10px] text-muted-foreground">
           <input
             type="checkbox"
@@ -899,6 +945,14 @@ function HostControlsPanel({ roomId }: { roomId: string }) {
   const kickFn = useServerFn(kickRoomParticipant);
   const muteAllFn = useServerFn(muteAllRoomParticipants);
 
+  // "Mute all" is a toggle: the first click force-mutes the room and locks
+  // un-muting; clicking again lifts the lock. We mirror the authoritative
+  // room-metadata flag so the button reflects the real state even after a
+  // reconnect or if another host toggled it.
+  const micLock = useMicLock();
+  const [allMuted, setAllMuted] = useState(micLock);
+  useEffect(() => setAllMuted(micLock), [micLock]);
+
   const localId = room?.localParticipant.identity;
   const others = participants.filter((p) => p.identity !== localId);
 
@@ -911,12 +965,18 @@ function HostControlsPanel({ roomId }: { roomId: string }) {
     toast.success(locked ? "Room unlocked" : "Room locked — new joins blocked");
   }
 
-  async function muteAll() {
+  async function toggleMuteAll() {
+    const next = !allMuted;
     setBusy("mute");
-    const res = await muteAllFn({ data: { roomId, muted: true } });
+    const res = await muteAllFn({ data: { roomId, muted: next } });
     setBusy(null);
     if (!res.ok) return toast.error(res.error);
-    toast.success(`Muted ${res.affected} mic(s)`);
+    setAllMuted(next);
+    if (next) {
+      toast.success(`Muted ${res.affected} mic(s) — members can't unmute until you lift it`);
+    } else {
+      toast.success("Room unmuted — members can speak again");
+    }
   }
 
   async function kick(identity: string, displayName: string) {
@@ -934,10 +994,16 @@ function HostControlsPanel({ roomId }: { roomId: string }) {
         <button
           type="button"
           disabled={busy === "mute"}
-          onClick={() => void muteAll()}
-          className="flex w-full items-center justify-center gap-2 rounded-md border border-border bg-secondary/50 px-3 py-2 text-[11px] font-semibold text-foreground hover:bg-secondary disabled:opacity-50"
+          onClick={() => void toggleMuteAll()}
+          aria-pressed={allMuted}
+          className={`flex w-full items-center justify-center gap-2 rounded-md px-3 py-2 text-[11px] font-semibold disabled:opacity-50 ${
+            allMuted
+              ? "border border-gold/40 bg-gold/10 text-gold hover:bg-gold/20"
+              : "border border-border bg-secondary/50 text-foreground hover:bg-secondary"
+          }`}
         >
-          <MicOff className="h-3.5 w-3.5" /> Mute all
+          {allMuted ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
+          {allMuted ? "Unmute all" : "Mute all"}
         </button>
         <button
           type="button"
@@ -987,20 +1053,23 @@ function ToggleRow({
   label,
   checked,
   onChange,
+  disabled = false,
 }: {
   label: string;
   checked: boolean;
   onChange: (v: boolean) => void;
+  disabled?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between">
+    <div className={`flex items-center justify-between ${disabled ? "opacity-60" : ""}`}>
       <span className="text-foreground">{label}</span>
       <button
         type="button"
         role="switch"
         aria-checked={checked}
+        disabled={disabled}
         onClick={() => onChange(!checked)}
-        className={`relative h-5 w-9 rounded-full transition ${checked ? "bg-gradient-gold" : "bg-secondary"}`}
+        className={`relative h-5 w-9 rounded-full transition disabled:cursor-not-allowed ${checked ? "bg-gradient-gold" : "bg-secondary"}`}
       >
         <span
           className={`absolute top-0.5 h-4 w-4 rounded-full bg-background shadow transition ${checked ? "left-4" : "left-0.5"}`}

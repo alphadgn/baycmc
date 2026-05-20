@@ -33,7 +33,6 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/feed", label: "Feed", tier: "verified" },
   { to: "/rooms", label: "Conference Rooms", tier: "verified" },
   { to: "/ape-rides", label: "Ape Rides", tier: "verified" },
-  { to: "/lifers", label: "Lifer Lounge", tier: "lifer" },
   { to: "/lifers/messages", label: "Lifer Chat", tier: "lifer" },
   { to: "/activity", label: "My Activity", tier: "all" },
   { to: "/profile", label: "Profile", tier: "all" },

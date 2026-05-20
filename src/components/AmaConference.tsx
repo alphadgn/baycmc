@@ -23,13 +23,18 @@ interface AmaConferenceProps {
   backgroundImage: string | null;
 }
 
-const MAX_AUDIENCE_TILES = 25;
+// Audience grid is a fixed 4 across × 5 down = 20 tiles; everyone past that
+// folds into the "Also in room" overflow strip.
+const AUDIENCE_COLS = 4;
+const AUDIENCE_ROWS = 5;
+const MAX_AUDIENCE_TILES = AUDIENCE_COLS * AUDIENCE_ROWS;
 
 /**
- * Custom Discord-AMA layout — single host tile up top, adaptive audience grid
- * (2x2 → 5x5) underneath, overflow strip past 25. When any participant starts
- * a screen share the layout flips into a takeover view: shared screen fills
- * the main area, participants collapse into a vertical strip on the right.
+ * Custom Discord-AMA layout — single host tile affixed to the top, a fixed
+ * 4-across × 5-down audience grid underneath, overflow strip past 20. When
+ * any participant starts a screen share the layout flips into a takeover
+ * view: shared screen fills the main area, participants collapse into a
+ * vertical strip on the right.
  *
  * Host = the booking owner of the currently-active slot. Without a booking
  * (or before the booking owner joins) the host slot shows the room wallpaper.
@@ -115,67 +120,40 @@ function AmaGridLayout({
   const visible = audienceParticipants.slice(0, visibleCount);
   const overflow = audienceParticipants.slice(visibleCount);
 
-  // Adaptive columns: 1 → 1, 2-4 → 2, 5-9 → 3, 10-16 → 4, 17-25 → 5.
-  const cols =
-    visibleCount <= 1
-      ? 1
-      : visibleCount <= 4
-        ? 2
-        : visibleCount <= 9
-          ? 3
-          : visibleCount <= 16
-            ? 4
-            : 5;
-
-  // When there's no host present, drop the big host tile entirely so the
-  // audience grid (where the user sees themselves) fills the visible area.
-  // A compact "no host booked" indicator surfaces in the right rail instead
-  // — handled by LiveRightRail in ConferenceRoom.tsx.
+  // The host tile is rendered when a host participant is present. A compact
+  // "no host booked" indicator surfaces in the right rail otherwise —
+  // handled by LiveRightRail in ConferenceRoom.tsx.
   const showHostTile = hostParticipant !== null;
 
-  // With only a handful of people (and no host stage), a full-width grid
-  // blows a single tile up to a giant square. Instead, cap each tile and
-  // centre them so the video stays a sensible size on desktop and mobile.
-  const sparse = !showHostTile && visibleCount > 0 && visibleCount <= 2;
-  const sparseTileWidth = visibleCount === 1 ? "max-w-md" : "max-w-xs";
-
   return (
-    <div
-      className={`flex h-full flex-col gap-4 p-4 sm:p-6 ${
-        sparse ? "min-h-[36vh]" : "min-h-[60vh]"
-      }`}
-    >
+    <div className="flex min-h-[60vh] flex-col gap-4 p-4 sm:p-6">
+      {/* Host stays affixed to the top of the room while the audience grid
+          scrolls beneath it (the RoomsShell <main> is the scroll container).
+          The translucent strip keeps audience tiles from peeking through the
+          gap as they slide under. */}
       {showHostTile && (
-        <HostTile
-          participant={hostParticipant}
-          cameraTracks={cameraTracks}
-          profiles={profiles}
-          backgroundImage={backgroundImage}
-          hasActiveBooking={hasActiveBooking}
-        />
+        <div className="sticky top-0 z-10 -mx-4 bg-background/80 px-4 pb-3 pt-1 backdrop-blur sm:-mx-6 sm:px-6">
+          <HostTile
+            participant={hostParticipant}
+            cameraTracks={cameraTracks}
+            profiles={profiles}
+            backgroundImage={backgroundImage}
+            hasActiveBooking={hasActiveBooking}
+          />
+        </div>
       )}
 
-      <div className="flex min-h-0 flex-1 flex-col gap-2">
+      <div className="flex flex-col gap-2">
         {visibleCount === 0 ? (
           <EmptyAudience roomName={roomName} />
-        ) : sparse ? (
-          <div className="flex min-h-0 flex-1 flex-wrap items-center justify-center gap-3">
-            {visible.map((p) => (
-              <div key={p.identity} className={`w-full ${sparseTileWidth}`}>
-                <AudienceTile
-                  participant={p}
-                  cameraTracks={cameraTracks}
-                  profile={profiles.get(p.identity) ?? null}
-                />
-              </div>
-            ))}
-          </div>
         ) : (
+          // Fixed 4 across × 5 down. Tiles size to one quarter of the row,
+          // keeping each attendee's pfp container small enough that the full
+          // grid fits without the tiles ballooning.
           <div
-            className="grid min-h-0 flex-1 gap-2 sm:gap-3"
+            className="grid gap-2 sm:gap-3"
             style={{
-              gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-              gridAutoRows: "1fr",
+              gridTemplateColumns: `repeat(${AUDIENCE_COLS}, minmax(0, 1fr))`,
             }}
           >
             {visible.map((p) => (
@@ -424,19 +402,27 @@ function NoCamPlaceholder({
   displayName: string;
   large: boolean;
 }) {
-  const sizeCls = large ? "h-24 w-24 text-3xl" : "h-14 w-14 text-base";
-
-  return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-secondary/60 to-background/80">
-      {profile?.avatar_url ? (
+  // Camera off → the member's pfp fills the whole tile container (cover),
+  // not a small centred circle, so the placeholder reads as "them". A light
+  // bottom gradient keeps the name pill and mic badge legible over it.
+  if (profile?.avatar_url) {
+    return (
+      <div className="absolute inset-0">
         <img
           src={profile.avatar_url}
           alt={displayName}
-          className={`shrink-0 overflow-hidden rounded-full border-2 border-gold/40 object-cover ${sizeCls}`}
+          className="absolute inset-0 h-full w-full object-cover"
         />
-      ) : (
-        <ApeSilhouette className={sizeCls} initials={initialsFor(displayName)} />
-      )}
+        <div className="absolute inset-0 bg-gradient-to-t from-background/60 via-transparent to-transparent" />
+      </div>
+    );
+  }
+
+  // No pfp on file → on-brand gold initials chip.
+  const sizeCls = large ? "h-24 w-24 text-3xl" : "h-14 w-14 text-base";
+  return (
+    <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-secondary/60 to-background/80">
+      <ApeSilhouette className={sizeCls} initials={initialsFor(displayName)} />
     </div>
   );
 }

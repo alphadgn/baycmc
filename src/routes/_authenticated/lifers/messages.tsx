@@ -28,6 +28,7 @@ function LiferMessages() {
         emptyText="The Lifer thread is quiet. Be the first to break it."
         placeholder="Speak, Lifer…"
         accentClassName="bg-gradient-gold text-gold-foreground"
+        backgroundImage="/bar.png"
       />
     </main>
   );

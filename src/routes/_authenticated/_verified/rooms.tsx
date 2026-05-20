@@ -129,7 +129,16 @@ function RoomsPage() {
 
   // Show themed rooms only — the new visual model is per-room ambience and
   // older rows (Boardroom, Atrium, Penthouse, etc.) don't have an image yet.
-  const visibleRooms = useMemo(() => rooms.filter((r) => r.theme), [rooms]);
+  // All non-lifer conference rooms are listed first, with lifer rooms after;
+  // sort() is stable so the existing display_order/name order is preserved
+  // within each group.
+  const visibleRooms = useMemo(
+    () =>
+      rooms
+        .filter((r) => r.theme)
+        .sort((a, b) => (a.tier === "lifer" ? 1 : 0) - (b.tier === "lifer" ? 1 : 0)),
+    [rooms],
+  );
 
   // Verified BAYC/MAYC OR an elevated role can create bookings. Lifer rooms
   // are already filtered out above when the user isn't dual-verified.

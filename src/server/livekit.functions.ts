@@ -319,28 +319,54 @@ export const muteAllRoomParticipants = createServerFn({ method: "POST" })
 
     const client = new RoomServiceClient(cfg.url, cfg.apiKey, cfg.apiSecret);
 
+    // Muting force-mutes every live mic; un-muting only LIFTS the lock (via
+    // the metadata flag below) and lets each member choose to speak again —
+    // we deliberately don't force every mic back on, so anyone who muted
+    // themselves voluntarily stays muted.
     let affected = 0;
-    try {
-      const participants = await client.listParticipants(room.livekit_room);
-      for (const p of participants) {
-        // Don't mute the host themselves.
-        if (p.identity === userId) continue;
-        for (const track of p.tracks) {
-          if (track.source === TrackSource.MICROPHONE && track.muted !== data.muted) {
-            await client
-              .mutePublishedTrack(room.livekit_room, p.identity, track.sid, data.muted)
-              .catch(() => {
-                /* skip individual track errors */
-              });
-            affected += 1;
+    if (data.muted) {
+      try {
+        const participants = await client.listParticipants(room.livekit_room);
+        for (const p of participants) {
+          // Don't mute the host themselves.
+          if (p.identity === userId) continue;
+          for (const track of p.tracks) {
+            if (track.source === TrackSource.MICROPHONE && !track.muted) {
+              await client
+                .mutePublishedTrack(room.livekit_room, p.identity, track.sid, true)
+                .catch(() => {
+                  /* skip individual track errors */
+                });
+              affected += 1;
+            }
           }
         }
+      } catch (e) {
+        return {
+          ok: false as const,
+          error: e instanceof Error ? e.message : "Mute failed",
+        };
       }
+    }
+
+    // Broadcast a room-wide mic lock via room metadata. While `micLock` is
+    // true every client disables its un-mute control, so a muted member
+    // can't simply turn their mic back on until the host lifts it. We merge
+    // into any existing metadata so unrelated keys survive.
+    try {
+      let meta: Record<string, unknown> = {};
+      const [existing] = await client.listRooms([room.livekit_room]).catch(() => []);
+      if (existing?.metadata) {
+        try {
+          meta = JSON.parse(existing.metadata) as Record<string, unknown>;
+        } catch {
+          /* corrupt metadata — overwrite */
+        }
+      }
+      meta.micLock = data.muted;
+      await client.updateRoomMetadata(room.livekit_room, JSON.stringify(meta));
     } catch (e) {
-      return {
-        ok: false as const,
-        error: e instanceof Error ? e.message : "Mute failed",
-      };
+      console.warn("updateRoomMetadata micLock failed", e);
     }
 
     await supabaseAdmin.from("audit_logs").insert({
