@@ -460,7 +460,7 @@ function PreLiveBottomBar({ onLeave }: { onLeave: () => void }) {
             onClick={() => setPrefs({ cameraEnabled: !prefs.cameraEnabled })}
           />
           <BottomControl
-            label="Screen"
+            label="Share Screen"
             tone="neutral"
             icon={<Monitor className="h-4 w-4" />}
             disabled
@@ -472,7 +472,8 @@ function PreLiveBottomBar({ onLeave }: { onLeave: () => void }) {
             disabled
           />
           <BottomControl
-            label="Participants"
+            label="0"
+            ariaLabel="Participants"
             tone="neutral"
             icon={<Users className="h-4 w-4" />}
             disabled
@@ -682,12 +683,25 @@ function LiveBottomBar({ onLeave, isHost }: { onLeave: () => void; isHost: boole
       console.warn("toggleCam", e);
     }
   }
+  // Mobile web browsers (iOS Safari, Android Chrome) don't expose
+  // getDisplayMedia, so screen sharing is physically unavailable there —
+  // detect it up front and tell the user instead of failing silently.
+  const screenShareSupported =
+    typeof navigator !== "undefined" &&
+    typeof navigator.mediaDevices?.getDisplayMedia === "function";
+
   async function toggleScreen() {
+    if (!screenShareSupported) {
+      toast.error("Screen sharing isn't available on this browser. Use a desktop browser to share your screen.");
+      return;
+    }
     const next = !screenOn;
     setScreenOn(next);
     try {
       await local.localParticipant.setScreenShareEnabled(next);
     } catch (e) {
+      // Reverting here also covers the case where the user dismisses the
+      // browser's screen-picker (getDisplayMedia rejects).
       setScreenOn(!next);
       console.warn("toggleScreen", e);
     }
@@ -750,7 +764,7 @@ function LiveBottomBar({ onLeave, isHost }: { onLeave: () => void; isHost: boole
             onSelectDevice={(id) => void selectCam(id)}
           />
           <BottomControl
-            label="Screen"
+            label="Share Screen"
             tone={screenOn ? "active" : "neutral"}
             icon={<Monitor className="h-4 w-4" />}
             onClick={() => void toggleScreen()}
@@ -762,7 +776,8 @@ function LiveBottomBar({ onLeave, isHost }: { onLeave: () => void; isHost: boole
             disabled
           />
           <BottomControl
-            label={`Participants${participants.length ? ` (${participants.length})` : ""}`}
+            label={String(participants.length)}
+            ariaLabel={`Participants: ${participants.length}`}
             tone="neutral"
             icon={<Users className="h-4 w-4" />}
           />
@@ -1190,6 +1205,7 @@ function BottomBarShell({
  */
 function BottomControl({
   label,
+  ariaLabel,
   icon,
   tone,
   disabled,
@@ -1199,6 +1215,8 @@ function BottomControl({
   onSelectDevice,
 }: {
   label: string;
+  /** Accessible name when the visible label is terse (e.g. a bare count). */
+  ariaLabel?: string;
   icon: React.ReactNode;
   tone: "active" | "off" | "neutral";
   disabled?: boolean;
@@ -1237,14 +1255,14 @@ function BottomControl({
         type="button"
         onClick={onClick}
         disabled={disabled}
-        aria-label={label}
+        aria-label={ariaLabel ?? label}
         aria-pressed={tone === "active"}
-        className={`flex h-12 w-14 flex-col items-center justify-center border text-[10px] font-medium transition ${
+        className={`flex h-12 w-14 flex-col items-center justify-center gap-0.5 border px-0.5 text-[10px] font-medium leading-none transition ${
           hasPicker ? "rounded-l-md border-r-0" : "rounded-md"
         } ${toneClasses}`}
       >
         <span aria-hidden>{icon}</span>
-        <span className="mt-0.5 truncate">{label}</span>
+        <span className="w-full text-center leading-tight">{label}</span>
       </button>
       {hasPicker && (
         <>
