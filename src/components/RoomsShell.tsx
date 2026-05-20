@@ -148,8 +148,10 @@ export function RoomsShell({
 
       {/* Right side: top welcome strip, then content row, then bottom bar.
           The faded backdrop is painted here so it only covers the main area
-          (the sidebar keeps its solid glass look). */}
-      <div className="relative flex min-w-0 flex-1 flex-col">
+          (the sidebar keeps its solid glass look). `min-h-0` at every level
+          of this flex column is required so the inner <main> can become a
+          real scroll container instead of growing to fit its content. */}
+      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
         {backgroundImage && (
           <div className="pointer-events-none absolute inset-0 overflow-hidden">
             <img
@@ -162,7 +164,7 @@ export function RoomsShell({
           </div>
         )}
 
-        <div className="relative flex min-w-0 flex-1 flex-col">
+        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
           <WelcomeStrip title={title} onOpenMobileNav={() => setMobileNavOpen(true)} />
 
           <div className="flex min-h-0 flex-1 gap-0 overflow-hidden">
