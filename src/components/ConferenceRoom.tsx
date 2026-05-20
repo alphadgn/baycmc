@@ -496,37 +496,31 @@ function VideoArea({
   roomName: string;
   hostUserId: string | null;
 }) {
-  const wrapperStyle: React.CSSProperties = backgroundImage
-    ? {
-        // Light vignette only — the room theme image should read clearly
-        // through the video area, matching the room card on the list page.
-        backgroundImage: `linear-gradient(rgba(8,8,12,0.35), rgba(8,8,12,0.55)), url(${backgroundImage})`,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-      }
-    : {};
-
-  // Game rooms keep a fixed-tall stage; conference rooms let the AMA layout
-  // size itself so a single participant doesn't reserve a huge video area.
-  const isGame = kind === "game";
+  // Game rooms keep a framed stage with their own background. Conference
+  // rooms render the video tiles directly on top of the page-level room
+  // backdrop painted by RoomsShell — no duplicate layer, no inner shadow.
+  if (kind === "game") {
+    const wrapperStyle: React.CSSProperties = backgroundImage
+      ? {
+          backgroundImage: `linear-gradient(rgba(8,8,12,0.35), rgba(8,8,12,0.55)), url(${backgroundImage})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }
+      : {};
+    return (
+      <div
+        className="overflow-hidden rounded-2xl border border-border/60 shadow-card"
+        style={{ ...wrapperStyle, minHeight: "60vh" }}
+      >
+        <div className="h-full min-h-[60vh] bg-background/30 backdrop-blur-sm">
+          <GameRoomScaffold roomName={roomName} />
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div
-      className="overflow-hidden rounded-2xl border border-border/60 shadow-card"
-      style={{ ...wrapperStyle, ...(isGame ? { minHeight: "60vh" } : {}) }}
-    >
-      <div className={`bg-background/30 backdrop-blur-sm ${isGame ? "h-full min-h-[60vh]" : ""}`}>
-        {kind === "game" ? (
-          <GameRoomScaffold roomName={roomName} />
-        ) : (
-          <AmaConference
-            roomName={roomName}
-            hostUserId={hostUserId}
-            backgroundImage={backgroundImage}
-          />
-        )}
-      </div>
-    </div>
+    <AmaConference roomName={roomName} hostUserId={hostUserId} backgroundImage={backgroundImage} />
   );
 }
 
