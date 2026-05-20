@@ -133,8 +133,18 @@ function AmaGridLayout({
   // — handled by LiveRightRail in ConferenceRoom.tsx.
   const showHostTile = hostParticipant !== null;
 
+  // With only a handful of people (and no host stage), a full-width grid
+  // blows a single tile up to a giant square. Instead, cap each tile and
+  // centre them so the video stays a sensible size on desktop and mobile.
+  const sparse = !showHostTile && visibleCount > 0 && visibleCount <= 2;
+  const sparseTileWidth = visibleCount === 1 ? "max-w-md" : "max-w-xs";
+
   return (
-    <div className="flex h-full min-h-[60vh] flex-col gap-4 p-4 sm:p-6">
+    <div
+      className={`flex h-full flex-col gap-4 p-4 sm:p-6 ${
+        sparse ? "min-h-[36vh]" : "min-h-[60vh]"
+      }`}
+    >
       {showHostTile && (
         <HostTile
           participant={hostParticipant}
@@ -148,6 +158,18 @@ function AmaGridLayout({
       <div className="flex min-h-0 flex-1 flex-col gap-2">
         {visibleCount === 0 ? (
           <EmptyAudience roomName={roomName} />
+        ) : sparse ? (
+          <div className="flex min-h-0 flex-1 flex-wrap items-center justify-center gap-3">
+            {visible.map((p) => (
+              <div key={p.identity} className={`w-full ${sparseTileWidth}`}>
+                <AudienceTile
+                  participant={p}
+                  cameraTracks={cameraTracks}
+                  profile={profiles.get(p.identity) ?? null}
+                />
+              </div>
+            ))}
+          </div>
         ) : (
           <div
             className="grid min-h-0 flex-1 gap-2 sm:gap-3"

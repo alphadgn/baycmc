@@ -11,11 +11,13 @@ import {
 import {
   LiveKitRoom,
   RoomAudioRenderer,
+  useConnectionQualityIndicator,
   useLocalParticipant,
   useMediaDeviceSelect,
   useParticipants,
   useRoomContext,
 } from "@livekit/components-react";
+import { ConnectionQuality } from "livekit-client";
 import { AmaConference } from "@/components/AmaConference";
 import "@livekit/components-styles";
 import { toast } from "sonner";
@@ -499,12 +501,16 @@ function VideoArea({
       }
     : {};
 
+  // Game rooms keep a fixed-tall stage; conference rooms let the AMA layout
+  // size itself so a single participant doesn't reserve a huge video area.
+  const isGame = kind === "game";
+
   return (
     <div
       className="overflow-hidden rounded-2xl border border-border/60 shadow-card"
-      style={{ ...wrapperStyle, minHeight: "60vh" }}
+      style={{ ...wrapperStyle, ...(isGame ? { minHeight: "60vh" } : {}) }}
     >
-      <div className="h-full min-h-[60vh] bg-background/30 backdrop-blur-sm">
+      <div className={`bg-background/30 backdrop-blur-sm ${isGame ? "h-full min-h-[60vh]" : ""}`}>
         {kind === "game" ? (
           <GameRoomScaffold roomName={roomName} />
         ) : (
@@ -556,7 +562,50 @@ function LiveRightRail({
           </p>
         </Panel>
       )}
+      <ConnectionPanel />
     </div>
+  );
+}
+
+/** Connection-quality readout — signal bars + label for the local user. */
+function ConnectionPanel() {
+  const { quality } = useConnectionQualityIndicator();
+
+  const meta: Record<ConnectionQuality, { bars: number; label: string; tone: string }> = {
+    [ConnectionQuality.Excellent]: {
+      bars: 4,
+      label: "Excellent",
+      tone: "text-emerald-300",
+    },
+    [ConnectionQuality.Good]: { bars: 3, label: "Good", tone: "text-emerald-300" },
+    [ConnectionQuality.Poor]: { bars: 2, label: "Poor", tone: "text-amber-300" },
+    [ConnectionQuality.Lost]: { bars: 0, label: "Disconnected", tone: "text-destructive" },
+    [ConnectionQuality.Unknown]: { bars: 1, label: "Checking…", tone: "text-muted-foreground" },
+  };
+  const { bars, label, tone } = meta[quality] ?? meta[ConnectionQuality.Unknown];
+
+  return (
+    <Panel title="Connection">
+      <div className="flex items-center gap-2.5">
+        <SignalBars active={bars} tone={tone} />
+        <span className={`text-[11px] font-medium ${tone}`}>{label}</span>
+      </div>
+    </Panel>
+  );
+}
+
+/** Four-bar wifi/signal-strength glyph. `active` bars are lit, rest are dim. */
+function SignalBars({ active, tone }: { active: number; tone: string }) {
+  const heights = ["h-1.5", "h-2.5", "h-3.5", "h-4"];
+  return (
+    <span className="inline-flex items-end gap-0.5" aria-hidden>
+      {heights.map((h, i) => (
+        <span
+          key={i}
+          className={`w-1 rounded-sm ${h} ${i < active ? `${tone} bg-current` : "bg-border/60"}`}
+        />
+      ))}
+    </span>
   );
 }
 
