@@ -112,8 +112,22 @@ export function RoomsShell({
   // pushed off-screen by the inline-below panel. xl+ ignores this flag.
   const [railOpen, setRailOpen] = useState(false);
 
+  // Lock body scroll while the shell is mounted. Combined with the `fixed`
+  // outer wrapper this guarantees the sidebar and right rail can't move,
+  // even if the rest of the document grows taller than the viewport.
+  useEffect(() => {
+    const prevHtml = document.documentElement.style.overflow;
+    const prevBody = document.body.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.documentElement.style.overflow = prevHtml;
+      document.body.style.overflow = prevBody;
+    };
+  }, []);
+
   return (
-    <div className="flex h-[100dvh] bg-background">
+    <div className="fixed inset-0 z-0 flex bg-background">
       {/* Sidebar (lg+) */}
       <Sidebar className="hidden w-56 shrink-0 border-r border-border/60 bg-card/60 lg:flex" />
 

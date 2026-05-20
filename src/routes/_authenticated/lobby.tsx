@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { Lock } from "lucide-react";
 import { toast } from "sonner";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
@@ -47,6 +48,19 @@ function triggerVerify() {
 function LobbyPage() {
   const { isVerifiedHolder, loading: verifLoading } = useVerificationStatus();
   const showVerifyCta = !verifLoading && !isVerifiedHolder;
+
+  // Lock body scroll while the lobby is mounted so the page can't scroll
+  // behind the hero — only the chat thread's own scroll container moves.
+  useEffect(() => {
+    const prevHtml = document.documentElement.style.overflow;
+    const prevBody = document.body.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.documentElement.style.overflow = prevHtml;
+      document.body.style.overflow = prevBody;
+    };
+  }, []);
 
   return (
     <main className="relative flex h-[calc(100dvh-4rem)] flex-col overflow-hidden">

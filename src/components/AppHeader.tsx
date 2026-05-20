@@ -83,11 +83,15 @@ export function AppHeader() {
   const showHamburger = isAuthenticated;
   const showBack = isAuthenticated && !HOME_ROUTES.has(location.pathname);
 
-  // The /rooms* routes ship their own app-shell (sidebar + top welcome
-  // strip + right rail + bottom bar) that matches the conf.png mockup,
-  // so the global hamburger header would double up. Suppress it there.
-  const isRoomsRoute = location.pathname === "/rooms" || location.pathname.startsWith("/rooms/");
-  if (isRoomsRoute) return null;
+  // The /rooms* and /calendar routes ship their own app-shell (sidebar +
+  // top welcome strip + right rail + bottom bar) that matches the conf.png
+  // mockup, so the global hamburger header would double up. Suppress it
+  // there — the RoomsShell sidebar already covers navigation + sign-out.
+  const usesRoomsShell =
+    location.pathname === "/rooms" ||
+    location.pathname.startsWith("/rooms/") ||
+    location.pathname === "/calendar";
+  if (usesRoomsShell) return null;
 
   return (
     <>
