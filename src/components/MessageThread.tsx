@@ -17,7 +17,7 @@ interface Profile {
 }
 
 interface MessageThreadProps {
-  table: "messages" | "lifer_messages";
+  table: "lifer_messages";
   channelName: string;
   emptyText?: string;
   placeholder?: string;
@@ -75,15 +75,11 @@ export function MessageThread({
   useEffect(() => {
     const channel = supabase
       .channel(channelName)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table },
-        async (payload) => {
-          const m = payload.new as Message;
-          setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
-          await hydrateProfiles([m]);
-        },
-      )
+      .on("postgres_changes", { event: "INSERT", schema: "public", table }, async (payload) => {
+        const m = payload.new as Message;
+        setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
+        await hydrateProfiles([m]);
+      })
       .subscribe();
     return () => {
       void supabase.removeChannel(channel);
@@ -96,9 +92,7 @@ export function MessageThread({
   }, [messages.length]);
 
   async function hydrateProfiles(msgs: Message[]) {
-    const missing = Array.from(
-      new Set(msgs.map((m) => m.user_id).filter((id) => !profiles[id])),
-    );
+    const missing = Array.from(new Set(msgs.map((m) => m.user_id).filter((id) => !profiles[id])));
     if (!missing.length) return;
     const { data } = await supabase
       .from("profiles")
@@ -155,13 +149,15 @@ export function MessageThread({
                 ? `${profile.wallet_address.slice(0, 6)}…${profile.wallet_address.slice(-4)}`
                 : "anon");
             return (
-              <div
-                key={m.id}
-                className={`flex flex-col ${mine ? "items-end" : "items-start"}`}
-              >
+              <div key={m.id} className={`flex flex-col ${mine ? "items-end" : "items-start"}`}>
                 <div className="mb-0.5 flex items-baseline gap-2 text-[11px] text-muted-foreground">
                   <span className={mine ? "text-gold" : ""}>{name}</span>
-                  <span>{new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                  <span>
+                    {new Date(m.created_at).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
                 </div>
                 <div
                   className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${

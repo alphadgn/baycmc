@@ -16,7 +16,6 @@ interface NavItem {
     | "/"
     | "/lobby"
     | "/feed"
-    | "/messages"
     | "/rooms"
     | "/ape-rides"
     | "/profile"
@@ -33,7 +32,6 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/lobby", label: "Lobby", tier: "all" },
   { to: "/feed", label: "Feed", tier: "verified" },
   { to: "/rooms", label: "Conference Rooms", tier: "verified" },
-  { to: "/messages", label: "Commons", tier: "verified" },
   { to: "/ape-rides", label: "Ape Rides", tier: "verified" },
   { to: "/lifers", label: "Lifer Lounge", tier: "lifer" },
   { to: "/lifers/messages", label: "Lifer Chat", tier: "lifer" },
@@ -67,10 +65,7 @@ export function AppHeader() {
     }
     let cancelled = false;
     (async () => {
-      const { data } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user.id);
+      const { data } = await supabase.from("user_roles").select("role").eq("user_id", user.id);
       if (cancelled) return;
       const roles = (data ?? []).map((r) => r.role);
       setIsSuperAdmin(roles.includes("super_admin"));
@@ -91,11 +86,8 @@ export function AppHeader() {
   // The /rooms* routes ship their own app-shell (sidebar + top welcome
   // strip + right rail + bottom bar) that matches the conf.png mockup,
   // so the global hamburger header would double up. Suppress it there.
-  const isRoomsRoute =
-    location.pathname === "/rooms" || location.pathname.startsWith("/rooms/");
+  const isRoomsRoute = location.pathname === "/rooms" || location.pathname.startsWith("/rooms/");
   if (isRoomsRoute) return null;
-
-
 
   return (
     <>
@@ -165,12 +157,9 @@ export function AppHeader() {
                       if (item.tier === "admin") return isAdmin;
                       return true;
                     }).map((item) => {
-                      const isAdminTier =
-                        item.tier === "admin" || item.tier === "super_admin";
+                      const isAdminTier = item.tier === "admin" || item.tier === "super_admin";
                       const sharedClass = `flex items-center justify-between rounded-md px-3 py-3 text-sm font-medium transition hover:bg-secondary/60 ${
-                        item.tier === "lifer" || isAdminTier
-                          ? "text-gold"
-                          : "text-foreground"
+                        item.tier === "lifer" || isAdminTier ? "text-gold" : "text-foreground"
                       }`;
                       return (
                         <Link

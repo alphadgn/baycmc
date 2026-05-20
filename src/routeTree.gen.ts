@@ -27,8 +27,8 @@ import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAdminOtherpageRouteImport } from './routes/_authenticated/admin.otherpage'
 import { Route as AuthenticatedAdminLuminaRouteImport } from './routes/_authenticated/admin.lumina'
 import { Route as AuthenticatedVerifiedRoomsRouteImport } from './routes/_authenticated/_verified/rooms'
-import { Route as AuthenticatedVerifiedMessagesRouteImport } from './routes/_authenticated/_verified/messages'
 import { Route as AuthenticatedVerifiedFeedRouteImport } from './routes/_authenticated/_verified/feed'
+import { Route as AuthenticatedVerifiedCalendarRouteImport } from './routes/_authenticated/_verified/calendar'
 import { Route as AuthenticatedVerifiedApeRidesRouteImport } from './routes/_authenticated/_verified/ape-rides'
 import { Route as AuthenticatedVerifiedRoomsRoomIdRouteImport } from './routes/_authenticated/_verified/rooms_.$roomId'
 import { Route as AuthenticatedVerifiedApeRidesRideIdRouteImport } from './routes/_authenticated/_verified/ape-rides.$rideId'
@@ -126,16 +126,16 @@ const AuthenticatedVerifiedRoomsRoute =
     path: '/rooms',
     getParentRoute: () => AuthenticatedVerifiedRoute,
   } as any)
-const AuthenticatedVerifiedMessagesRoute =
-  AuthenticatedVerifiedMessagesRouteImport.update({
-    id: '/messages',
-    path: '/messages',
-    getParentRoute: () => AuthenticatedVerifiedRoute,
-  } as any)
 const AuthenticatedVerifiedFeedRoute =
   AuthenticatedVerifiedFeedRouteImport.update({
     id: '/feed',
     path: '/feed',
+    getParentRoute: () => AuthenticatedVerifiedRoute,
+  } as any)
+const AuthenticatedVerifiedCalendarRoute =
+  AuthenticatedVerifiedCalendarRouteImport.update({
+    id: '/calendar',
+    path: '/calendar',
     getParentRoute: () => AuthenticatedVerifiedRoute,
   } as any)
 const AuthenticatedVerifiedApeRidesRoute =
@@ -167,8 +167,8 @@ export interface FileRoutesByFullPath {
   '/profile': typeof AuthenticatedProfileRoute
   '/super-admin': typeof AuthenticatedSuperAdminRoute
   '/ape-rides': typeof AuthenticatedVerifiedApeRidesRouteWithChildren
+  '/calendar': typeof AuthenticatedVerifiedCalendarRoute
   '/feed': typeof AuthenticatedVerifiedFeedRoute
-  '/messages': typeof AuthenticatedVerifiedMessagesRoute
   '/rooms': typeof AuthenticatedVerifiedRoomsRoute
   '/admin/lumina': typeof AuthenticatedAdminLuminaRoute
   '/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
@@ -188,8 +188,8 @@ export interface FileRoutesByTo {
   '/profile': typeof AuthenticatedProfileRoute
   '/super-admin': typeof AuthenticatedSuperAdminRoute
   '/ape-rides': typeof AuthenticatedVerifiedApeRidesRouteWithChildren
+  '/calendar': typeof AuthenticatedVerifiedCalendarRoute
   '/feed': typeof AuthenticatedVerifiedFeedRoute
-  '/messages': typeof AuthenticatedVerifiedMessagesRoute
   '/rooms': typeof AuthenticatedVerifiedRoomsRoute
   '/admin/lumina': typeof AuthenticatedAdminLuminaRoute
   '/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
@@ -214,8 +214,8 @@ export interface FileRoutesById {
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/super-admin': typeof AuthenticatedSuperAdminRoute
   '/_authenticated/_verified/ape-rides': typeof AuthenticatedVerifiedApeRidesRouteWithChildren
+  '/_authenticated/_verified/calendar': typeof AuthenticatedVerifiedCalendarRoute
   '/_authenticated/_verified/feed': typeof AuthenticatedVerifiedFeedRoute
-  '/_authenticated/_verified/messages': typeof AuthenticatedVerifiedMessagesRoute
   '/_authenticated/_verified/rooms': typeof AuthenticatedVerifiedRoomsRoute
   '/_authenticated/admin/lumina': typeof AuthenticatedAdminLuminaRoute
   '/_authenticated/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
@@ -239,8 +239,8 @@ export interface FileRouteTypes {
     | '/profile'
     | '/super-admin'
     | '/ape-rides'
+    | '/calendar'
     | '/feed'
-    | '/messages'
     | '/rooms'
     | '/admin/lumina'
     | '/admin/otherpage'
@@ -260,8 +260,8 @@ export interface FileRouteTypes {
     | '/profile'
     | '/super-admin'
     | '/ape-rides'
+    | '/calendar'
     | '/feed'
-    | '/messages'
     | '/rooms'
     | '/admin/lumina'
     | '/admin/otherpage'
@@ -285,8 +285,8 @@ export interface FileRouteTypes {
     | '/_authenticated/profile'
     | '/_authenticated/super-admin'
     | '/_authenticated/_verified/ape-rides'
+    | '/_authenticated/_verified/calendar'
     | '/_authenticated/_verified/feed'
-    | '/_authenticated/_verified/messages'
     | '/_authenticated/_verified/rooms'
     | '/_authenticated/admin/lumina'
     | '/_authenticated/admin/otherpage'
@@ -433,18 +433,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedVerifiedRoomsRouteImport
       parentRoute: typeof AuthenticatedVerifiedRoute
     }
-    '/_authenticated/_verified/messages': {
-      id: '/_authenticated/_verified/messages'
-      path: '/messages'
-      fullPath: '/messages'
-      preLoaderRoute: typeof AuthenticatedVerifiedMessagesRouteImport
-      parentRoute: typeof AuthenticatedVerifiedRoute
-    }
     '/_authenticated/_verified/feed': {
       id: '/_authenticated/_verified/feed'
       path: '/feed'
       fullPath: '/feed'
       preLoaderRoute: typeof AuthenticatedVerifiedFeedRouteImport
+      parentRoute: typeof AuthenticatedVerifiedRoute
+    }
+    '/_authenticated/_verified/calendar': {
+      id: '/_authenticated/_verified/calendar'
+      path: '/calendar'
+      fullPath: '/calendar'
+      preLoaderRoute: typeof AuthenticatedVerifiedCalendarRouteImport
       parentRoute: typeof AuthenticatedVerifiedRoute
     }
     '/_authenticated/_verified/ape-rides': {
@@ -488,8 +488,8 @@ const AuthenticatedVerifiedApeRidesRouteWithChildren =
 
 interface AuthenticatedVerifiedRouteChildren {
   AuthenticatedVerifiedApeRidesRoute: typeof AuthenticatedVerifiedApeRidesRouteWithChildren
+  AuthenticatedVerifiedCalendarRoute: typeof AuthenticatedVerifiedCalendarRoute
   AuthenticatedVerifiedFeedRoute: typeof AuthenticatedVerifiedFeedRoute
-  AuthenticatedVerifiedMessagesRoute: typeof AuthenticatedVerifiedMessagesRoute
   AuthenticatedVerifiedRoomsRoute: typeof AuthenticatedVerifiedRoomsRoute
   AuthenticatedVerifiedRoomsRoomIdRoute: typeof AuthenticatedVerifiedRoomsRoomIdRoute
 }
@@ -497,8 +497,8 @@ interface AuthenticatedVerifiedRouteChildren {
 const AuthenticatedVerifiedRouteChildren: AuthenticatedVerifiedRouteChildren = {
   AuthenticatedVerifiedApeRidesRoute:
     AuthenticatedVerifiedApeRidesRouteWithChildren,
+  AuthenticatedVerifiedCalendarRoute: AuthenticatedVerifiedCalendarRoute,
   AuthenticatedVerifiedFeedRoute: AuthenticatedVerifiedFeedRoute,
-  AuthenticatedVerifiedMessagesRoute: AuthenticatedVerifiedMessagesRoute,
   AuthenticatedVerifiedRoomsRoute: AuthenticatedVerifiedRoomsRoute,
   AuthenticatedVerifiedRoomsRoomIdRoute: AuthenticatedVerifiedRoomsRoomIdRoute,
 }
@@ -572,13 +572,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

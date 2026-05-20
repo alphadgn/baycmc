@@ -1,13 +1,16 @@
-import { Link, useLocation } from "@tanstack/react-router";
-import { useState, type ReactNode } from "react";
+import { Link, useLocation, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import {
   Bell,
   Calendar as CalendarIcon,
+  ChevronLeft,
+  ChevronRight,
   Home,
   HelpCircle,
   LifeBuoy,
   Lock,
+  LogOut,
   Menu,
   MessageCircle,
   Mic,
@@ -21,16 +24,17 @@ import {
   VideoOff,
   X,
 } from "lucide-react";
-import { useAuth } from "@/lib/auth/useAuth";
+import { signOut, useAuth } from "@/lib/auth/useAuth";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import { useRoomPreferences } from "@/lib/baycmc/useRoomPreferences";
+import { supabase } from "@/integrations/supabase/client";
 
 type NavTarget =
   | "/"
   | "/lobby"
   | "/feed"
   | "/rooms"
-  | "/messages"
+  | "/calendar"
   | "/profile"
   | "/admin"
   | "/activity"
@@ -55,13 +59,13 @@ const NAV_ITEMS: NavItem[] = [
     icon: <Video className="h-4 w-4" />,
     match: "/rooms",
   },
-  { to: "/activity", label: "Calendar", tier: "all", icon: <CalendarIcon className="h-4 w-4" /> },
   {
-    to: "/messages",
-    label: "Messages",
+    to: "/calendar",
+    label: "Calendar",
     tier: "verified",
-    icon: <MessageCircle className="h-4 w-4" />,
+    icon: <CalendarIcon className="h-4 w-4" />,
   },
+  { to: "/activity", label: "My Activity", tier: "all", icon: <Sparkles className="h-4 w-4" /> },
   { to: "/profile", label: "Profile", tier: "all", icon: <User className="h-4 w-4" /> },
   { to: "/admin", label: "Admin", tier: "admin", icon: <Shield className="h-4 w-4" /> },
   { to: "/lifers", label: "Support", tier: "lifer", icon: <LifeBuoy className="h-4 w-4" /> },
@@ -78,6 +82,11 @@ interface RoomsShellProps {
   rightRail?: ReactNode;
   /** Persistent bottom control bar (Room Settings · controls · Leave Room). */
   bottomBar?: ReactNode;
+  /**
+   * Faded backdrop painted behind the main content area (not the sidebar).
+   * Pass the room/lobby image; renders at ~10% opacity beneath a dark gradient.
+   */
+  backgroundImage?: string | null;
 }
 
 /**
@@ -96,23 +105,21 @@ export function RoomsShell({
   children,
   rightRail,
   bottomBar,
+  backgroundImage,
 }: RoomsShellProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  // Right-rail starts collapsed below xl so the room/lobby content isn't
+  // pushed off-screen by the inline-below panel. xl+ ignores this flag.
+  const [railOpen, setRailOpen] = useState(false);
 
   return (
     <div className="flex h-[100dvh] bg-background">
       {/* Sidebar (lg+) */}
-      <Sidebar
-        className="hidden w-56 shrink-0 border-r border-border/60 bg-card/60 lg:flex"
-      />
+      <Sidebar className="hidden w-56 shrink-0 border-r border-border/60 bg-card/60 lg:flex" />
 
       {/* Mobile drawer */}
       {mobileNavOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex lg:hidden"
-        >
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex lg:hidden">
           <div
             className="flex-1 bg-background/70 backdrop-blur"
             onClick={() => setMobileNavOpen(false)}
@@ -125,55 +132,85 @@ export function RoomsShell({
         </div>
       )}
 
-      {/* Right side: top welcome strip, then content row, then bottom bar */}
-      <div className="flex min-w-0 flex-1 flex-col">
-        <WelcomeStrip
-          title={title}
-          onOpenMobileNav={() => setMobileNavOpen(true)}
-        />
+      {/* Right side: top welcome strip, then content row, then bottom bar.
+          The faded backdrop is painted here so it only covers the main area
+          (the sidebar keeps its solid glass look). */}
+      <div className="relative flex min-w-0 flex-1 flex-col">
+        {backgroundImage && (
+          <div className="pointer-events-none absolute inset-0 overflow-hidden">
+            <img
+              src={backgroundImage}
+              alt=""
+              aria-hidden
+              className="h-full w-full object-cover opacity-10"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-background/80 via-background/70 to-background/95" />
+          </div>
+        )}
 
-        <div className="flex min-h-0 flex-1 gap-0 overflow-hidden">
-          <main className="scrollbar-modern min-w-0 flex-1 overflow-y-auto px-4 pb-28 pt-4 sm:px-6 sm:pt-6">
-            <div className="mb-5">
-              <h1 className="font-display text-2xl text-gradient-gold sm:text-4xl">
-                {title}
-              </h1>
-              {subtitle && (
-                <p className="mt-1 text-xs text-muted-foreground font-sans-display sm:text-sm">
-                  {subtitle}
-                </p>
+        <div className="relative flex min-w-0 flex-1 flex-col">
+          <WelcomeStrip title={title} onOpenMobileNav={() => setMobileNavOpen(true)} />
+
+          <div className="flex min-h-0 flex-1 gap-0 overflow-hidden">
+            <main className="scrollbar-modern min-w-0 flex-1 overflow-y-auto px-4 pb-28 pt-4 sm:px-6 sm:pt-6">
+              <div className="mb-5">
+                <h1 className="font-display text-2xl text-gradient-gold sm:text-4xl">{title}</h1>
+                {subtitle && (
+                  <p className="mt-1 text-xs text-muted-foreground font-sans-display sm:text-sm">
+                    {subtitle}
+                  </p>
+                )}
+              </div>
+              {children}
+            </main>
+
+            {rightRail && (
+              <aside
+                className="scrollbar-modern hidden w-72 shrink-0 overflow-y-auto border-l border-border/60 bg-card/40 px-3 pb-28 pt-4 xl:block"
+                aria-label="Room panels"
+              >
+                {rightRail}
+              </aside>
+            )}
+          </div>
+
+          {/* Below xl the right rail collapses to an inline section under the
+              main grid. Starts hidden so the video / hero isn't obscured;
+              the chevron tab toggles it. */}
+          {rightRail && (
+            <div className="xl:hidden border-t border-border/60 bg-card/40">
+              <button
+                type="button"
+                onClick={() => setRailOpen((v) => !v)}
+                aria-expanded={railOpen}
+                aria-controls="rooms-shell-mobile-rail"
+                className="flex w-full items-center justify-between gap-2 px-4 py-2 text-[11px] uppercase tracking-widest text-muted-foreground transition hover:bg-secondary/40 sm:px-6"
+              >
+                <span>Room panels</span>
+                {railOpen ? (
+                  <ChevronLeft className="h-3.5 w-3.5 rotate-90" />
+                ) : (
+                  <ChevronRight className="h-3.5 w-3.5 rotate-90" />
+                )}
+              </button>
+              {railOpen && (
+                <div id="rooms-shell-mobile-rail" className="px-4 pb-4 sm:px-6">
+                  {rightRail}
+                </div>
               )}
             </div>
-            {children}
-          </main>
+          )}
 
-          {rightRail && (
-            <aside
-              className="scrollbar-modern hidden w-72 shrink-0 overflow-y-auto border-l border-border/60 bg-card/40 px-3 pb-28 pt-4 xl:block"
-              aria-label="Room panels"
+          {bottomBar && (
+            <div
+              className="sticky bottom-0 left-0 right-0 border-t border-border/60 bg-background/95 backdrop-blur"
+              role="toolbar"
+              aria-label="Room controls"
             >
-              {rightRail}
-            </aside>
+              {bottomBar}
+            </div>
           )}
         </div>
-
-        {/* Right rail collapsed to inline below sm when xl breakpoint is off.
-            Renders below the main grid so all panels remain accessible. */}
-        {rightRail && (
-          <div className="xl:hidden border-t border-border/60 bg-card/40 px-4 py-4 sm:px-6">
-            {rightRail}
-          </div>
-        )}
-
-        {bottomBar && (
-          <div
-            className="sticky bottom-0 left-0 right-0 border-t border-border/60 bg-background/95 backdrop-blur"
-            role="toolbar"
-            aria-label="Room controls"
-          >
-            {bottomBar}
-          </div>
-        )}
       </div>
     </div>
   );
@@ -189,8 +226,16 @@ function Sidebar({
   onClose?: () => void;
 }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const { isVerifiedHolder, isLifer, isAdmin } = useVerificationStatus();
+
+  async function handleSignOut() {
+    await signOut();
+    toast.success("Signed out");
+    onNavigate?.();
+    void navigate({ to: "/" });
+  }
 
   // Filter nav by access. Admins see every item; Lifer-only items hide for
   // non-Lifers (admins are treated as Lifers by useVerificationStatus).
@@ -205,11 +250,7 @@ function Sidebar({
   return (
     <nav className={`flex flex-col ${className ?? ""}`} aria-label="Primary">
       <div className="flex h-16 items-center justify-between border-b border-border/60 px-4">
-        <Link
-          to="/"
-          onClick={onNavigate}
-          className="flex items-center gap-2 font-display text-sm"
-        >
+        <Link to="/" onClick={onNavigate} className="flex items-center gap-2 font-display text-sm">
           <span className="flex h-7 w-7 items-center justify-center rounded-md bg-gradient-gold font-display text-base font-bold text-gold-foreground shadow-gold">
             B
           </span>
@@ -250,9 +291,7 @@ function Sidebar({
                     : "text-foreground/80 hover:bg-secondary/50 hover:text-foreground"
                 }`}
               >
-                <span className={active ? "text-gold" : "text-muted-foreground"}>
-                  {item.icon}
-                </span>
+                <span className={active ? "text-gold" : "text-muted-foreground"}>{item.icon}</span>
                 <span className="truncate">{item.label}</span>
               </Link>
             </li>
@@ -260,13 +299,22 @@ function Sidebar({
         })}
       </ul>
 
+      {isAuthenticated && (
+        <div className="border-t border-border/60 p-3">
+          <button
+            type="button"
+            onClick={() => void handleSignOut()}
+            className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-[13px] font-medium text-destructive transition hover:bg-destructive/10 font-sans-display"
+          >
+            <LogOut className="h-4 w-4" />
+            <span className="truncate">Sign out</span>
+          </button>
+        </div>
+      )}
+
       <div className="mt-auto border-t border-border/60 p-3">
         <div className="flex items-center gap-2 rounded-md bg-background/50 px-3 py-2">
-          <span
-            className={`relative inline-flex h-2 w-2 ${
-              isAuthenticated ? "" : "opacity-40"
-            }`}
-          >
+          <span className={`relative inline-flex h-2 w-2 ${isAuthenticated ? "" : "opacity-40"}`}>
             <span
               className={`absolute inset-0 rounded-full ${
                 isAuthenticated ? "animate-ping bg-emerald-400" : "bg-muted-foreground"
@@ -290,19 +338,48 @@ function Sidebar({
   );
 }
 
-function WelcomeStrip({
-  title,
-  onOpenMobileNav,
-}: {
-  title: string;
-  onOpenMobileNav: () => void;
-}) {
+function sliceWallet(addr: string) {
+  if (!addr || addr.length < 12) return addr;
+  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+}
+
+function WelcomeStrip({ title, onOpenMobileNav }: { title: string; onOpenMobileNav: () => void }) {
   const { user } = useAuth();
-  // Pull a short display label — username/email/wallet truncation handled
-  // gracefully; falls back to "Welcome".
+  const [profile, setProfile] = useState<{
+    username: string | null;
+    wallet_address: string | null;
+  } | null>(null);
+
+  // Pull profile.username (the canonical source set on the Profile page) so
+  // the welcome shows the user's chosen handle. Falls back to a truncated
+  // wallet address — the same identity treatment used by the WalletPill.
+  useEffect(() => {
+    if (!user) {
+      setProfile(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("username,wallet_address")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (cancelled) return;
+      setProfile(
+        data
+          ? { username: data.username ?? null, wallet_address: data.wallet_address ?? null }
+          : null,
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
   const userLabel =
-    (user?.user_metadata as { username?: string } | undefined)?.username ||
-    (user?.email ? user.email.split("@")[0] : null);
+    profile?.username?.trim() ||
+    (profile?.wallet_address ? sliceWallet(profile.wallet_address) : null);
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-2 border-b border-border/60 bg-background/95 px-4 backdrop-blur sm:px-6">
@@ -354,7 +431,8 @@ export function RoomsIdleBottomBar() {
 
   function hintNotJoined(feature: string) {
     toast.message(`${feature} activates inside a room`, {
-      description: "Click a room above to join — your camera and mic settings will be applied automatically.",
+      description:
+        "Click a room above to join — your camera and mic settings will be applied automatically.",
       duration: 4500,
     });
   }
@@ -374,7 +452,9 @@ export function RoomsIdleBottomBar() {
         />
         <BottomIcon
           label="Cam"
-          icon={prefs.cameraEnabled ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
+          icon={
+            prefs.cameraEnabled ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />
+          }
           tone={prefs.cameraEnabled ? "active" : "off"}
           onClick={() => setPrefs({ cameraEnabled: !prefs.cameraEnabled })}
         />

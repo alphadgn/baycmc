@@ -90,8 +90,7 @@ export function ConferenceRoom({
       const res = await getToken({ data: { roomId } });
       if (!res.ok) {
         const accessLoss =
-          "code" in res &&
-          (res.code === "bayc_revoked" || res.code === "otherpage_revoked");
+          "code" in res && (res.code === "bayc_revoked" || res.code === "otherpage_revoked");
         if (accessLoss) {
           toast.error("Exclusive room locked", { description: res.error, duration: 8000 });
         } else if ("code" in res && res.code === "room_locked") {
@@ -174,13 +173,8 @@ export function ConferenceRoom({
         <RoomsShell
           title={roomName}
           subtitle={ambience ?? undefined}
-          rightRail={
-            <LiveRightRail
-              roomId={roomId}
-              isHost={state.isHost}
-              connecting={false}
-            />
-          }
+          backgroundImage={backgroundImage}
+          rightRail={<LiveRightRail roomId={roomId} isHost={state.isHost} connecting={false} />}
           bottomBar={
             <LiveBottomBar
               onLeave={() => {
@@ -207,6 +201,7 @@ export function ConferenceRoom({
     <RoomsShell
       title={roomName}
       subtitle={ambience ?? undefined}
+      backgroundImage={backgroundImage}
       rightRail={<PreLiveRightRail state={state} onRetry={() => void join()} />}
       bottomBar={<PreLiveBottomBar onLeave={goBack} />}
     >
@@ -251,7 +246,9 @@ function PreLivePanel({
       className="relative flex min-h-[60vh] items-center justify-center overflow-hidden rounded-2xl border border-border/60 p-6 shadow-card sm:p-10"
       style={bgStyle}
     >
-      {state.phase === "connecting" && <ConnectingHero progress={state.progress} roomName={roomName} />}
+      {state.phase === "connecting" && (
+        <ConnectingHero progress={state.progress} roomName={roomName} />
+      )}
       {state.phase === "error" && (
         <ErrorHero
           roomName={roomName}
@@ -261,9 +258,7 @@ function PreLivePanel({
           onRetry={onRetry}
         />
       )}
-      {state.phase === "idle" && (
-        <IdleHero roomName={roomName} kind={kind} onJoin={onRetry} />
-      )}
+      {state.phase === "idle" && <IdleHero roomName={roomName} kind={kind} onJoin={onRetry} />}
     </div>
   );
 }
@@ -369,17 +364,15 @@ function ErrorHero({
   );
 }
 
-function PreLiveRightRail({
-  state,
-  onRetry,
-}: {
-  state: JoinState;
-  onRetry: () => void;
-}) {
+function PreLiveRightRail({ state, onRetry }: { state: JoinState; onRetry: () => void }) {
   return (
     <div className="space-y-3">
       {state.phase === "error" && (
-        <Panel tone="destructive" title="Connection Failed" icon={<AlertTriangle className="h-3.5 w-3.5" />}>
+        <Panel
+          tone="destructive"
+          title="Connection Failed"
+          icon={<AlertTriangle className="h-3.5 w-3.5" />}
+        >
           <p className="text-[11px] text-muted-foreground">{state.message}</p>
           {state.recoverable && (
             <button
@@ -401,7 +394,11 @@ function PreLiveRightRail({
             />
           </div>
           <p className="mt-1.5 text-[10px] uppercase tracking-widest text-muted-foreground">
-            {state.progress < 30 ? "Verifying holder…" : state.progress < 60 ? "Minting token…" : "Opening room…"}
+            {state.progress < 30
+              ? "Verifying holder…"
+              : state.progress < 60
+                ? "Minting token…"
+                : "Opening room…"}
           </p>
         </Panel>
       )}
@@ -412,16 +409,53 @@ function PreLiveRightRail({
 }
 
 function PreLiveBottomBar({ onLeave }: { onLeave: () => void }) {
+  // Pre-join mic/cam buttons mirror the saved preference (same state the
+  // right-rail PreferencesPanel writes to). Clicking flips that preference,
+  // so the user can stage their join-state from either control. The actual
+  // LiveKit track only attaches once they join — the prefs are applied at
+  // that point.
+  const { prefs, setPrefs } = useRoomPreferences();
   return (
     <BottomBarShell
       onLeave={onLeave}
       controls={
         <>
-          <BottomControl label="Mic" tone="neutral" icon={<Mic className="h-4 w-4" />} disabled />
-          <BottomControl label="Cam" tone="neutral" icon={<VideoIcon className="h-4 w-4" />} disabled />
-          <BottomControl label="Screen" tone="neutral" icon={<Monitor className="h-4 w-4" />} disabled />
-          <BottomControl label="Chat" tone="neutral" icon={<MessageCircle className="h-4 w-4" />} disabled />
-          <BottomControl label="Participants" tone="neutral" icon={<Users className="h-4 w-4" />} disabled />
+          <BottomControl
+            label="Mic"
+            tone={prefs.micEnabled ? "active" : "off"}
+            icon={prefs.micEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
+            onClick={() => setPrefs({ micEnabled: !prefs.micEnabled })}
+          />
+          <BottomControl
+            label="Cam"
+            tone={prefs.cameraEnabled ? "active" : "off"}
+            icon={
+              prefs.cameraEnabled ? (
+                <VideoIcon className="h-4 w-4" />
+              ) : (
+                <VideoOff className="h-4 w-4" />
+              )
+            }
+            onClick={() => setPrefs({ cameraEnabled: !prefs.cameraEnabled })}
+          />
+          <BottomControl
+            label="Screen"
+            tone="neutral"
+            icon={<Monitor className="h-4 w-4" />}
+            disabled
+          />
+          <BottomControl
+            label="Chat"
+            tone="neutral"
+            icon={<MessageCircle className="h-4 w-4" />}
+            disabled
+          />
+          <BottomControl
+            label="Participants"
+            tone="neutral"
+            icon={<Users className="h-4 w-4" />}
+            disabled
+          />
         </>
       }
     />
@@ -738,8 +772,16 @@ function LivePreferencesPanel() {
   return (
     <Panel title="Your Preferences">
       <div className="space-y-2 text-xs">
-        <ToggleRow label="Camera" checked={prefs.cameraEnabled} onChange={(v) => void toggleCam(v)} />
-        <ToggleRow label="Microphone" checked={prefs.micEnabled} onChange={(v) => void toggleMic(v)} />
+        <ToggleRow
+          label="Camera"
+          checked={prefs.cameraEnabled}
+          onChange={(v) => void toggleCam(v)}
+        />
+        <ToggleRow
+          label="Microphone"
+          checked={prefs.micEnabled}
+          onChange={(v) => void toggleMic(v)}
+        />
         <label className="flex cursor-pointer items-start gap-2 pt-1 text-[10px] text-muted-foreground">
           <input
             type="checkbox"
@@ -758,8 +800,8 @@ function HostControlsPlaceholder() {
   return (
     <Panel title="Host Controls" icon={<Lock className="h-3.5 w-3.5" />}>
       <p className="text-[11px] text-muted-foreground">
-        Host controls (mute all, lock, kick) appear here once you're connected as the room's
-        active host.
+        Host controls (mute all, lock, kick) appear here once you're connected as the room's active
+        host.
       </p>
     </Panel>
   );
@@ -1019,14 +1061,10 @@ function BottomControl({
                         setOpen(false);
                       }}
                       className={`flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-[11px] ${
-                        checked
-                          ? "bg-gold/10 text-gold"
-                          : "text-foreground hover:bg-secondary"
+                        checked ? "bg-gold/10 text-gold" : "text-foreground hover:bg-secondary"
                       }`}
                     >
-                      <span className="truncate">
-                        {d.label || `${label} device`}
-                      </span>
+                      <span className="truncate">{d.label || `${label} device`}</span>
                       {checked && <Check className="h-3 w-3 shrink-0" />}
                     </button>
                   </li>
