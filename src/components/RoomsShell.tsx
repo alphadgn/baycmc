@@ -154,13 +154,10 @@ export function RoomsShell({
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
         {backgroundImage && (
           <div className="pointer-events-none absolute inset-0 overflow-hidden">
-            <img
-              src={backgroundImage}
-              alt=""
-              aria-hidden
-              className="h-full w-full object-cover opacity-10"
-            />
-            <div className="absolute inset-0 bg-gradient-to-b from-background/80 via-background/70 to-background/95" />
+            <img src={backgroundImage} alt="" aria-hidden className="h-full w-full object-cover" />
+            {/* Subtle vignette so welcome strip + bottom bar text stay legible,
+                but the room scene itself reads through clearly. */}
+            <div className="absolute inset-0 bg-gradient-to-b from-background/70 via-background/30 to-background/80" />
           </div>
         )}
 

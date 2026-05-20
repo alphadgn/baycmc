@@ -251,7 +251,10 @@ function PreLivePanel({
 }) {
   const bgStyle: React.CSSProperties = backgroundImage
     ? {
-        backgroundImage: `linear-gradient(rgba(8,8,12,0.7), rgba(8,8,12,0.88)), url(${backgroundImage})`,
+        // Pre-live panel keeps a slightly stronger vignette than the live
+        // video area so the join button and copy stay legible while the
+        // room atmosphere still reads.
+        backgroundImage: `linear-gradient(rgba(8,8,12,0.45), rgba(8,8,12,0.7)), url(${backgroundImage})`,
         backgroundSize: "cover",
         backgroundPosition: "center",
       }
@@ -495,7 +498,9 @@ function VideoArea({
 }) {
   const wrapperStyle: React.CSSProperties = backgroundImage
     ? {
-        backgroundImage: `linear-gradient(rgba(8,8,12,0.78), rgba(8,8,12,0.92)), url(${backgroundImage})`,
+        // Light vignette only — the room theme image should read clearly
+        // through the video area, matching the room card on the list page.
+        backgroundImage: `linear-gradient(rgba(8,8,12,0.35), rgba(8,8,12,0.55)), url(${backgroundImage})`,
         backgroundSize: "cover",
         backgroundPosition: "center",
       }
