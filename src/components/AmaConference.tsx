@@ -148,7 +148,11 @@ function AmaGridLayout({
           gap as they slide under. */}
       {showHostTile && (
         <div className="sticky top-0 z-10 -mx-4 bg-background/80 px-4 pb-3 pt-1 backdrop-blur sm:-mx-6 sm:px-6">
-          <div className={hostSolo ? "mx-auto w-full max-w-2xl" : undefined}>
+          {/* Solo host (alone in the room) keeps the big self-view. With an
+              audience present the host card is halved — centered at 50%
+              width — so it stays the focal point without dominating the
+              attendee thumbnails below it. */}
+          <div className={hostSolo ? "mx-auto w-full max-w-2xl" : "mx-auto w-1/2"}>
             <HostTile
               participant={hostParticipant}
               cameraTracks={cameraTracks}

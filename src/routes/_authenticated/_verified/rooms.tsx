@@ -8,7 +8,7 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { Calendar, Lock, Plus, Users, Gamepad2 } from "lucide-react";
 import { RoomCalendar } from "@/components/RoomCalendar";
-import { RoomsShell, RoomsIdleBottomBar } from "@/components/RoomsShell";
+import { RoomsShell } from "@/components/RoomsShell";
 import { getRoomThemeImage, getRoomThemeAmbience } from "@/lib/baycmc/roomThemes";
 import { useRoomPreferences } from "@/lib/baycmc/useRoomPreferences";
 import { useVerificationRevalidation } from "@/hooks/useVerificationRevalidation";
@@ -169,7 +169,6 @@ function RoomsPage() {
       title="Conference Rooms"
       subtitle="Choose a room to join and connect with others in real time."
       rightRail={rightRail}
-      bottomBar={<RoomsIdleBottomBar />}
     >
       <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
         <button

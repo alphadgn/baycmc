@@ -95,7 +95,7 @@ interface RoomsShellProps {
 /**
  * App-shell layout used by every /rooms* page. Replaces the global AppHeader
  * here so the layout matches the conf.png mockup pixel-for-pixel: vertical
- * left nav with a "Bot Status: online" footer, top welcome strip with the
+ * left nav with an "AI Assistant: online" footer, top welcome strip with the
  * 24/7 badge, central content, a right rail of panels, and a persistent
  * bottom control bar.
  *
@@ -343,7 +343,7 @@ function Sidebar({
             />
           </span>
           <span className="text-[11px] text-muted-foreground">
-            Bot Status:{" "}
+            AI Assistant:{" "}
             <span className={isAuthenticated ? "text-emerald-400" : "text-muted-foreground"}>
               {isAuthenticated ? "online" : "offline"}
             </span>

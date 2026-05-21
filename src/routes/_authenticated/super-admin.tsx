@@ -124,10 +124,12 @@ function UsersTab() {
     setLoading(false);
   }, [list, search]);
 
+  // Live search — re-query (debounced) as you type so results narrow in
+  // place instead of waiting for Enter / the Search button.
   useEffect(() => {
-    void run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const t = window.setTimeout(() => void run(), 250);
+    return () => window.clearTimeout(t);
+  }, [run]);
 
   async function toggleRole(u: UserRow, role: Role) {
     const has = u.roles.includes(role);

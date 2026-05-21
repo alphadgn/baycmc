@@ -55,10 +55,16 @@ function AdminUsersPage() {
   }, [list, search]);
 
   useEffect(() => {
-    void run();
     void myCtx({ data: {} as never }).then((r) => setIsSuper(r.isSuperAdmin));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Live search — re-query (debounced) as the admin types so the results
+  // narrow in place instead of waiting for Enter / the Search button.
+  useEffect(() => {
+    const t = window.setTimeout(() => void run(), 250);
+    return () => window.clearTimeout(t);
+  }, [run]);
 
   async function toggleVerify(u: UserRow, key: "bayc_verified" | "otherpage_verified") {
     setBusy(u.id);
