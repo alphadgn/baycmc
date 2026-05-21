@@ -4,7 +4,6 @@ import { Lock } from "lucide-react";
 import { toast } from "sonner";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import { LobbyChat } from "@/components/LobbyChat";
-import { LobbyOnlineAvatars } from "@/components/LobbyOnlineAvatars";
 
 // Lazy, optional asset import — Vite resolves the file at build time only if
 // it exists, so the lobby falls back to a gold gradient until the operator
@@ -80,13 +79,11 @@ function LobbyPage() {
       )}
 
       <div className="relative flex min-h-0 flex-1 flex-col">
-        {/* Slim presence strip directly under the nav bar — the old hero
-            (image + "Lobby" title + blurb) is gone so the chat sits flush
-            against the top. We keep just the live online-members row and,
-            for unverified users, the verify CTA. */}
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-4 py-2 sm:px-6">
-          <LobbyOnlineAvatars />
-          {showVerifyCta && (
+        {/* The chat sits flush under the nav bar. The only thing that can
+            appear above it is a thin verify banner, and only for users who
+            haven't verified a BAYC/MAYC yet. */}
+        {showVerifyCta && (
+          <div className="flex shrink-0 flex-wrap items-center gap-2 px-4 py-2 sm:px-6">
             <div className="flex flex-wrap items-center gap-2 rounded-md border border-gold/30 bg-background/70 px-3 py-1.5 text-xs backdrop-blur">
               <span className="flex items-center gap-2 text-gold">
                 <Lock className="h-3.5 w-3.5" />
@@ -100,8 +97,8 @@ function LobbyPage() {
                 Verify holder
               </button>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         <div className="flex min-h-0 flex-1 flex-col">
           <LobbyChat channelName="lobby" />
