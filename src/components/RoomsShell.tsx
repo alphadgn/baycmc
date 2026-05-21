@@ -27,6 +27,8 @@ import {
 import { signOut, useAuth } from "@/lib/auth/useAuth";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import { useRoomPreferences } from "@/lib/baycmc/useRoomPreferences";
+import { useNotificationPrefs } from "@/lib/baycmc/useNotificationPrefs";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { supabase } from "@/integrations/supabase/client";
 
 type NavTarget =
@@ -38,7 +40,8 @@ type NavTarget =
   | "/profile"
   | "/admin"
   | "/activity"
-  | "/lifers";
+  | "/lifers"
+  | "/support";
 
 interface NavItem {
   to: NavTarget;
@@ -68,7 +71,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/activity", label: "My Activity", tier: "all", icon: <Sparkles className="h-4 w-4" /> },
   { to: "/profile", label: "Profile", tier: "all", icon: <User className="h-4 w-4" /> },
   { to: "/admin", label: "Admin", tier: "admin", icon: <Shield className="h-4 w-4" /> },
-  { to: "/lifers", label: "Support", tier: "lifer", icon: <LifeBuoy className="h-4 w-4" /> },
+  { to: "/support", label: "Support", tier: "all", icon: <LifeBuoy className="h-4 w-4" /> },
 ];
 
 interface RoomsShellProps {
@@ -414,13 +417,7 @@ function WelcomeStrip({ title, onOpenMobileNav }: { title: string; onOpenMobileN
         <span className="hidden text-[12px] text-muted-foreground sm:inline">
           {userLabel ? `Welcome, ${userLabel}` : "Welcome"}
         </span>
-        <button
-          type="button"
-          aria-label="Notifications"
-          className="relative inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-secondary/40 text-foreground transition hover:bg-secondary"
-        >
-          <Bell className="h-4 w-4" />
-        </button>
+        <NotificationSettingsButton />
         <span
           className="inline-flex items-center gap-1.5 rounded-full border border-destructive/40 bg-destructive/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-destructive"
           title="24/7 live clubhouse"
@@ -430,6 +427,110 @@ function WelcomeStrip({ title, onOpenMobileNav }: { title: string; onOpenMobileN
         </span>
       </div>
     </header>
+  );
+}
+
+/**
+ * Bell button in the welcome strip → opens a small popover with the
+ * user's notification preferences. The prefs are persisted per user via
+ * useNotificationPrefs so the choices survive logout/login.
+ */
+function NotificationSettingsButton() {
+  const { prefs, setPrefs } = useNotificationPrefs();
+  const allOff = !prefs.toastsEnabled;
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label="Notification settings"
+          title="Notification settings"
+          className={`relative inline-flex h-9 w-9 items-center justify-center rounded-md border bg-secondary/40 transition hover:bg-secondary ${
+            allOff
+              ? "border-destructive/40 text-destructive"
+              : "border-border text-foreground"
+          }`}
+        >
+          <Bell className="h-4 w-4" />
+          {allOff && (
+            <span
+              className="absolute right-1 top-1 inline-block h-1.5 w-1.5 rounded-full bg-destructive"
+              aria-hidden
+            />
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        sideOffset={8}
+        className="w-72 border-gold/20 bg-popover p-4"
+      >
+        <p className="font-display text-sm uppercase tracking-wider text-gold">
+          Notification settings
+        </p>
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          Saved to this device for your account. Survives sign-out.
+        </p>
+        <div className="mt-3 space-y-2 text-xs">
+          <NotifToggleRow
+            label="Toast notifications"
+            description="In-app alerts in the bottom-right."
+            checked={prefs.toastsEnabled}
+            onChange={(v) => setPrefs({ toastsEnabled: v })}
+          />
+          <NotifToggleRow
+            label="Room activity"
+            description="Join / leave hints when you're in a room."
+            checked={prefs.roomActivityEnabled}
+            onChange={(v) => setPrefs({ roomActivityEnabled: v })}
+          />
+          <NotifToggleRow
+            label="Sound"
+            description="Audible chirp on new toasts."
+            checked={prefs.soundEnabled}
+            onChange={(v) => setPrefs({ soundEnabled: v })}
+          />
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function NotifToggleRow({
+  label,
+  description,
+  checked,
+  onChange,
+}: {
+  label: string;
+  description: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <p className="text-foreground">{label}</p>
+        <p className="mt-0.5 text-[10px] text-muted-foreground">{description}</p>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        onClick={() => onChange(!checked)}
+        className={`relative mt-0.5 h-5 w-9 shrink-0 rounded-full transition ${
+          checked ? "bg-gradient-gold" : "bg-secondary"
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 h-4 w-4 rounded-full bg-background shadow transition ${
+            checked ? "left-4" : "left-0.5"
+          }`}
+        />
+      </button>
+    </div>
   );
 }
 

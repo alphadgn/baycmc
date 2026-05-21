@@ -7,6 +7,7 @@ import { InactivityWatcher } from "@/components/InactivityWatcher";
 import { AuthRedirectWatcher } from "@/components/AuthRedirectWatcher";
 import { Toaster } from "@/components/ui/sonner";
 import { installDiagnostics } from "@/lib/diagnostics";
+import { useNotificationPrefs } from "@/lib/baycmc/useNotificationPrefs";
 
 import appCss from "../styles.css?url";
 
@@ -77,6 +78,18 @@ function RootShell({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * Wraps the global Sonner toaster behind the user's notification prefs —
+ * when "Toast notifications" is off we unmount the Toaster entirely so no
+ * toast surfaces, no matter what code calls `toast.*()`. The pref is
+ * persisted per user via useNotificationPrefs.
+ */
+function GatedToaster() {
+  const { prefs } = useNotificationPrefs();
+  if (!prefs.toastsEnabled) return null;
+  return <Toaster />;
+}
+
 function RootComponent() {
   useEffect(() => {
     installDiagnostics();
@@ -87,7 +100,7 @@ function RootComponent() {
       <div className="min-h-screen grain">
         <AppHeader />
         <Outlet />
-        <Toaster />
+        <GatedToaster />
         <InactivityWatcher />
         <AuthRedirectWatcher />
       </div>

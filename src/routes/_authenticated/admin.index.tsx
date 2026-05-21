@@ -1,4 +1,4 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -79,11 +79,21 @@ function AdminPage() {
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-      <header className="mb-6">
-        <h1 className="font-display text-3xl text-gradient-gold sm:text-5xl">Admin · Audit Logs</h1>
-        <p className="mt-1 text-xs text-muted-foreground font-sans-display sm:text-sm">
-          Role changes, verifications, bookings, room joins
-        </p>
+      <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="font-display text-3xl text-gradient-gold sm:text-5xl">
+            Admin · Audit Logs
+          </h1>
+          <p className="mt-1 text-xs text-muted-foreground font-sans-display sm:text-sm">
+            Role changes, verifications, bookings, room joins
+          </p>
+        </div>
+        <Link
+          to="/admin/support"
+          className="inline-flex items-center gap-2 rounded-md border border-gold/40 bg-gold/10 px-3 py-2 text-xs font-semibold text-gold transition hover:bg-gold/20"
+        >
+          Support inbox →
+        </Link>
       </header>
 
       <div className="glass mb-4 flex flex-wrap items-end gap-3 rounded-2xl p-4 shadow-card">

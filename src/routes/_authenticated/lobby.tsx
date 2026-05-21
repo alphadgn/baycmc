@@ -4,6 +4,7 @@ import { Lock } from "lucide-react";
 import { toast } from "sonner";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import { LobbyChat } from "@/components/LobbyChat";
+import { LobbyOnlineAvatars } from "@/components/LobbyOnlineAvatars";
 
 // Lazy, optional asset import — Vite resolves the file at build time only if
 // it exists, so the lobby falls back to a gold gradient until the operator
@@ -93,7 +94,14 @@ function LobbyPage() {
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/40 to-background/10" />
 
-          <div className="relative flex h-full flex-col justify-end px-4 pb-4 sm:px-6 sm:pb-6">
+          <div className="relative flex h-full flex-col justify-between px-4 pt-3 pb-4 sm:px-6 sm:pt-4 sm:pb-6">
+            {/* Live presence row — fills the empty header strip with a
+                row of avatars for every signed-in user currently in the
+                lobby. */}
+            <div className="flex w-full justify-start">
+              <LobbyOnlineAvatars />
+            </div>
+            <div>
             <h1 className="font-display text-3xl text-gradient-gold sm:text-5xl">Lobby</h1>
             <p className="mt-1 max-w-2xl text-xs text-muted-foreground font-sans-display sm:text-sm">
               Where every member lands. Say hi, see who's around, and verify your BAYC or MAYC to
@@ -115,6 +123,7 @@ function LobbyPage() {
                 </button>
               </div>
             )}
+            </div>
           </div>
         </section>
 

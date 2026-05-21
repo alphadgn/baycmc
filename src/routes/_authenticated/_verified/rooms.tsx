@@ -98,11 +98,10 @@ function RoomsPage() {
     // Lifer-only rooms without holding tokens.
     const seesLiferRooms = (bayc && op) || admin;
 
-    // Notify the user immediately if they lost access while on this page.
-    const prev = prevAccessRef.current;
-    if (prev && prev.bayc && !bayc && !admin) {
-      toast.error("BAYC/MAYC verification lost — bookings are disabled.");
-    }
+    // We used to fire a toast here when bayc flipped from true → false, but
+    // transient revalidation gaps (e.g. when returning from a room) made it
+    // fire on almost every leave. The destructive banner below the calendar
+    // already covers the case clearly, so the toast was pure noise.
     prevAccessRef.current = { bayc, op };
 
     setBaycVerified(bayc);

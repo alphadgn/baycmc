@@ -22,6 +22,7 @@ interface NavItem {
     | "/activity"
     | "/lifers"
     | "/lifers/messages"
+    | "/support"
     | "/admin"
     | "/super-admin";
   label: string;
@@ -34,6 +35,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/rooms", label: "Conference Rooms", tier: "verified" },
   { to: "/ape-rides", label: "Ape Rides", tier: "verified" },
   { to: "/lifers/messages", label: "Lifer Chat", tier: "lifer" },
+  { to: "/support", label: "Support", tier: "all" },
   { to: "/activity", label: "My Activity", tier: "all" },
   { to: "/profile", label: "Profile", tier: "all" },
   { to: "/admin", label: "Administrator", tier: "admin" },
