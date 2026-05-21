@@ -124,6 +124,21 @@ function AmaGridLayout({
   // "no host booked" indicator surfaces in the right rail otherwise —
   // handled by LiveRightRail in ConferenceRoom.tsx.
   const showHostTile = hostParticipant !== null;
+  // Host is alone (no audience) → blow the host card up to a Discord-style
+  // self-view so the user can actually see themselves on mobile.
+  const hostSolo = showHostTile && visibleCount === 0;
+
+  // Adaptive responsive columns. The original spec is 4 across × 5 down as
+  // the room fills up, but with only a handful of people we drop to 2–3
+  // columns (and one big centered card when there's a single tile) so a
+  // lone attendee doesn't get rendered at thumbnail size on mobile. Tops
+  // out at the 4-col / 20-tile cap from MAX_AUDIENCE_TILES.
+  const gridColsClass =
+    visibleCount <= 4
+      ? "grid-cols-2"
+      : visibleCount <= 9
+        ? "grid-cols-2 sm:grid-cols-3"
+        : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4";
 
   return (
     <div className="flex min-h-[60vh] flex-col gap-4 p-4 sm:p-6">
@@ -133,29 +148,38 @@ function AmaGridLayout({
           gap as they slide under. */}
       {showHostTile && (
         <div className="sticky top-0 z-10 -mx-4 bg-background/80 px-4 pb-3 pt-1 backdrop-blur sm:-mx-6 sm:px-6">
-          <HostTile
-            participant={hostParticipant}
-            cameraTracks={cameraTracks}
-            profiles={profiles}
-            backgroundImage={backgroundImage}
-            hasActiveBooking={hasActiveBooking}
-          />
+          <div className={hostSolo ? "mx-auto w-full max-w-2xl" : undefined}>
+            <HostTile
+              participant={hostParticipant}
+              cameraTracks={cameraTracks}
+              profiles={profiles}
+              backgroundImage={backgroundImage}
+              hasActiveBooking={hasActiveBooking}
+              solo={hostSolo}
+            />
+          </div>
         </div>
       )}
 
       <div className="flex flex-col gap-2">
         {visibleCount === 0 ? (
-          <EmptyAudience roomName={roomName} />
+          // Hide the "no one else here yet" copy when the host is alone —
+          // their big solo card already speaks for itself.
+          hostSolo ? null : <EmptyAudience roomName={roomName} />
+        ) : visibleCount === 1 ? (
+          // Discord-style solo card for the lone occupant. Fills the column
+          // on mobile (3:4 portrait so the face is actually visible), caps
+          // at max-w-2xl on desktop so it doesn't span the page.
+          <div className="mx-auto w-full max-w-2xl">
+            <ParticipantVideoTile
+              participant={visible[0]}
+              cameraTracks={cameraTracks}
+              profile={profiles.get(visible[0].identity) ?? null}
+              variant="solo"
+            />
+          </div>
         ) : (
-          // Fixed 4 across × 5 down. Tiles size to one quarter of the row,
-          // keeping each attendee's pfp container small enough that the full
-          // grid fits without the tiles ballooning.
-          <div
-            className="grid gap-2 sm:gap-3"
-            style={{
-              gridTemplateColumns: `repeat(${AUDIENCE_COLS}, minmax(0, 1fr))`,
-            }}
-          >
+          <div className={`grid gap-2 sm:gap-3 ${gridColsClass}`}>
             {visible.map((p) => (
               <AudienceTile
                 key={p.identity}
@@ -254,6 +278,8 @@ interface HostTileProps {
   backgroundImage: string | null;
   hasActiveBooking: boolean;
   compact?: boolean;
+  /** True when the host is the only participant — get a bigger Discord-style card. */
+  solo?: boolean;
 }
 
 function HostTile({
@@ -263,6 +289,7 @@ function HostTile({
   backgroundImage,
   hasActiveBooking,
   compact = false,
+  solo = false,
 }: HostTileProps) {
   // No host present → wallpaper fallback with status copy.
   if (!participant) {
@@ -299,7 +326,7 @@ function HostTile({
       participant={participant}
       cameraTracks={cameraTracks}
       profile={profiles.get(participant.identity) ?? null}
-      variant={compact ? "host-compact" : "host"}
+      variant={compact ? "host-compact" : solo ? "host-solo" : "host"}
     />
   );
 }
@@ -336,7 +363,7 @@ function ParticipantVideoTile({
   participant: Participant;
   cameraTracks: TrackReferenceOrPlaceholder[];
   profile: ProfileMini | null;
-  variant: "host" | "host-compact" | "audience";
+  variant: "host" | "host-compact" | "host-solo" | "audience" | "solo";
 }) {
   const isSpeaking = useIsSpeaking(participant);
   const camTrack = cameraTracks.find((t) => t.participant.identity === participant.identity);
@@ -347,18 +374,30 @@ function ParticipantVideoTile({
   const displayName =
     profile?.username || participant.name || `${participant.identity.slice(0, 6)}…`;
 
+  // "solo" / "host-solo" → Discord-style self-view when only one tile is on
+  // screen: tall on mobile (aspect 3:4), banner on desktop (16:9). Plain
+  // "host" stays 16:9 so the host strip never dominates when an audience
+  // grid renders below it. "audience" / "host-compact" keep the square
+  // thumbnail used by the dense grid.
   const sizeClasses =
     variant === "host"
-      ? "h-[42%] min-h-[200px] w-full"
-      : variant === "host-compact"
-        ? "aspect-square w-full"
-        : "aspect-square w-full";
+      ? "aspect-video w-full"
+      : variant === "host-solo"
+        ? "aspect-[3/4] w-full sm:aspect-video"
+        : variant === "host-compact"
+          ? "aspect-square w-full"
+          : variant === "solo"
+            ? "aspect-[3/4] w-full sm:aspect-video"
+            : "aspect-square w-full";
 
   const ringClasses = isSpeaking
     ? "border-gold shadow-[0_0_22px_-4px_rgba(212,175,55,0.7)]"
     : variant.startsWith("host")
       ? "border-gold/40"
       : "border-border/60";
+
+  const isHostVariant = variant === "host" || variant === "host-solo";
+  const isLargeNoCam = isHostVariant || variant === "solo";
 
   return (
     <div
@@ -367,10 +406,10 @@ function ParticipantVideoTile({
       {camOn && camTrack && isTrackReference(camTrack) ? (
         <VideoTrack trackRef={camTrack} className="absolute inset-0 h-full w-full object-cover" />
       ) : (
-        <NoCamPlaceholder profile={profile} displayName={displayName} large={variant === "host"} />
+        <NoCamPlaceholder profile={profile} displayName={displayName} large={isLargeNoCam} />
       )}
 
-      {variant === "host" && (
+      {isHostVariant && (
         <div className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full border border-gold/60 bg-background/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest text-gold backdrop-blur">
           Host
         </div>
