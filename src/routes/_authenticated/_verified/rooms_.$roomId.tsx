@@ -86,7 +86,7 @@ function RoomDetail() {
         roomName={meta.name}
         ambience={getRoomThemeAmbience(meta.theme)}
         backgroundImage={getRoomThemeImage(meta.theme)}
-        kind={isKaraoke ? "conference" : meta.kind}
+        kind={meta.kind === "game" ? "game" : "conference"}
         hostUserId={hostUserId}
       />
       {isKaraoke && <KaraokeMusicBoard />}
