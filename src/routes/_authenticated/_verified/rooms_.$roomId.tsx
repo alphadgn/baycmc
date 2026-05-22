@@ -78,14 +78,18 @@ function RoomDetail() {
     );
   }
 
+  const isKaraoke = meta.kind === "karaoke";
   return (
-    <ConferenceRoom
-      roomId={roomId}
-      roomName={meta.name}
-      ambience={getRoomThemeAmbience(meta.theme)}
-      backgroundImage={getRoomThemeImage(meta.theme)}
-      kind={meta.kind}
-      hostUserId={hostUserId}
-    />
+    <>
+      <ConferenceRoom
+        roomId={roomId}
+        roomName={meta.name}
+        ambience={getRoomThemeAmbience(meta.theme)}
+        backgroundImage={getRoomThemeImage(meta.theme)}
+        kind={isKaraoke ? "conference" : meta.kind}
+        hostUserId={hostUserId}
+      />
+      {isKaraoke && <KaraokeMusicBoard />}
+    </>
   );
 }
