@@ -2,13 +2,14 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ConferenceRoom } from "@/components/ConferenceRoom";
+import { KaraokeMusicBoard } from "@/components/KaraokeMusicBoard";
 import { getRoomThemeImage, getRoomThemeAmbience } from "@/lib/baycmc/roomThemes";
 
 interface RoomMeta {
   name: string;
   tier: "token_proof" | "lifer";
   theme: string | null;
-  kind: "conference" | "game";
+  kind: "conference" | "game" | "karaoke";
 }
 
 export const Route = createFileRoute("/_authenticated/_verified/rooms_/$roomId")({
