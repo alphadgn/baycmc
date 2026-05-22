@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ConferenceRoom } from "@/components/ConferenceRoom";
 import { KaraokeMusicBoard } from "@/components/KaraokeMusicBoard";
+import { useAuth } from "@/lib/auth/useAuth";
 import { getRoomThemeImage, getRoomThemeAmbience } from "@/lib/baycmc/roomThemes";
 
 interface RoomMeta {
@@ -18,6 +19,7 @@ export const Route = createFileRoute("/_authenticated/_verified/rooms_/$roomId")
 
 function RoomDetail() {
   const { roomId } = Route.useParams();
+  const { user } = useAuth();
   const [meta, setMeta] = useState<RoomMeta | null>(null);
   const [hostUserId, setHostUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -89,7 +91,9 @@ function RoomDetail() {
         kind={meta.kind === "game" ? "game" : "conference"}
         hostUserId={hostUserId}
       />
-      {isKaraoke && <KaraokeMusicBoard />}
+      {isKaraoke && (
+        <KaraokeMusicBoard isMyTurn={!!user && !!hostUserId && user.id === hostUserId} />
+      )}
     </>
   );
 }
