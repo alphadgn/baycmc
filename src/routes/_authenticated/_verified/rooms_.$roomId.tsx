@@ -2,13 +2,14 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ConferenceRoom } from "@/components/ConferenceRoom";
+import { KaraokeMusicBoard } from "@/components/KaraokeMusicBoard";
 import { getRoomThemeImage, getRoomThemeAmbience } from "@/lib/baycmc/roomThemes";
 
 interface RoomMeta {
   name: string;
   tier: "token_proof" | "lifer";
   theme: string | null;
-  kind: "conference" | "game";
+  kind: "conference" | "game" | "karaoke";
 }
 
 export const Route = createFileRoute("/_authenticated/_verified/rooms_/$roomId")({
@@ -77,14 +78,18 @@ function RoomDetail() {
     );
   }
 
+  const isKaraoke = meta.kind === "karaoke";
   return (
-    <ConferenceRoom
-      roomId={roomId}
-      roomName={meta.name}
-      ambience={getRoomThemeAmbience(meta.theme)}
-      backgroundImage={getRoomThemeImage(meta.theme)}
-      kind={meta.kind}
-      hostUserId={hostUserId}
-    />
+    <>
+      <ConferenceRoom
+        roomId={roomId}
+        roomName={meta.name}
+        ambience={getRoomThemeAmbience(meta.theme)}
+        backgroundImage={getRoomThemeImage(meta.theme)}
+        kind={meta.kind === "game" ? "game" : "conference"}
+        hostUserId={hostUserId}
+      />
+      {isKaraoke && <KaraokeMusicBoard />}
+    </>
   );
 }
