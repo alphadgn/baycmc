@@ -23,7 +23,7 @@ interface Room {
   theme: string | null;
   display_order: number | null;
   is_locked: boolean;
-  kind: "conference" | "game";
+  kind: "conference" | "game" | "karaoke";
 }
 interface Booking {
   id: string;
