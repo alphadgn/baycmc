@@ -91,7 +91,9 @@ function RoomDetail() {
         kind={meta.kind === "game" ? "game" : "conference"}
         hostUserId={hostUserId}
       />
-      {isKaraoke && <KaraokeMusicBoard />}
+      {isKaraoke && (
+        <KaraokeMusicBoard isMyTurn={!!user && !!hostUserId && user.id === hostUserId} />
+      )}
     </>
   );
 }
