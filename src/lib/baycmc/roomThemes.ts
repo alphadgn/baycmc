@@ -15,6 +15,7 @@ export type RoomTheme =
   | "pool-deck"
   | "studio-a"
   | "studio-b"
+  | "karaoke"
   | "game-room";
 
 const THEME_IMAGE: Record<RoomTheme, string> = {
@@ -28,6 +29,7 @@ const THEME_IMAGE: Record<RoomTheme, string> = {
   "pool-deck": "/pool.png",
   "studio-a": "/studio.png",
   "studio-b": "/mic.png",
+  karaoke: "/karaoke.png",
   "game-room": "/gameroom.png",
 };
 
@@ -42,6 +44,7 @@ const THEME_AMBIENCE: Record<RoomTheme, string> = {
   "pool-deck": "Pool deck · palms after dark",
   "studio-a": "Studio A · foam walls, live mic",
   "studio-b": "Studio B · blue-lit booth",
+  karaoke: "Karaoke lounge · grab the mic",
   "game-room": "Game room · PvP arcade",
 };
 
