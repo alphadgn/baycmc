@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ConferenceRoom } from "@/components/ConferenceRoom";
 import { KaraokeMusicBoard } from "@/components/KaraokeMusicBoard";
+import { useAuth } from "@/lib/auth/useAuth";
 import { getRoomThemeImage, getRoomThemeAmbience } from "@/lib/baycmc/roomThemes";
 
 interface RoomMeta {
