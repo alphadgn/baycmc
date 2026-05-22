@@ -336,7 +336,7 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
       }}
       className="shrink-0 cursor-pointer rounded-md bg-gradient-gold px-3 py-2 text-xs font-semibold text-gold-foreground shadow-gold transition hover:opacity-90 disabled:cursor-wait disabled:opacity-70 sm:px-4 sm:text-sm"
     >
-      {isBooting ? "Loading…" : "Entrance"}
+      {isBooting ? "Loading…" : "VIP"}
     </button>
   );
 }

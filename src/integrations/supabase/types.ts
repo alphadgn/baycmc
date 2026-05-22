@@ -730,6 +730,10 @@ export type Database = {
         Returns: boolean
       }
       is_lifer: { Args: { _user_id: string }; Returns: boolean }
+      is_room_host: {
+        Args: { _room_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_token_proof_verified: { Args: { _user_id: string }; Returns: boolean }
       is_verified_holder: { Args: { _user_id: string }; Returns: boolean }
       log_audit_event: {

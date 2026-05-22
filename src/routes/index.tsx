@@ -71,12 +71,12 @@ function Index() {
                   Enter BAYCMC →
                 </Link>
               ) : (
-                <a
-                  href="#verify"
+                <Link
+                  to="/login"
                   className="rounded-md bg-gradient-gold px-3 py-1.5 text-sm font-semibold text-gold-foreground shadow-gold transition hover:opacity-90"
                 >
-                  Verify Access
-                </a>
+                  Main Entrance
+                </Link>
               )}
               <a
                 href="#features"
