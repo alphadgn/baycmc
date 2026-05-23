@@ -42,8 +42,20 @@ export function KaraokeMusicBoard({
   activeQuery,
   onChangeTrack,
   onEndSong,
+  paused = false,
+  onPauseToggle,
 }: KaraokeMusicBoardProps) {
   const [open, setOpen] = useState(true);
+  // When a video is playing the machine collapses to just the screen +
+  // transport. The performer can re-expand to access search / pads.
+  const [forceExpanded, setForceExpanded] = useState(false);
+  const isPlaying = !!videoId && !paused;
+  const minimized = isPlaying && !forceExpanded;
+  // Clear forceExpanded once playback stops so next play minimizes again.
+  useEffect(() => {
+    if (!videoId) setForceExpanded(false);
+  }, [videoId]);
+
   const [query, setQuery] = useState("");
   const [urlInput, setUrlInput] = useState("");
   const [results, setResults] = useState<SongHit[] | null>(null);
@@ -51,6 +63,20 @@ export function KaraokeMusicBoard({
   const [searchError, setSearchError] = useState<string | null>(null);
   const [searchSource, setSearchSource] = useState<"catalog" | "web" | null>(null);
   const runSongSearch = useServerFn(searchKaraokeSongs);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+
+  function postToPlayer(func: "playVideo" | "pauseVideo" | "stopVideo") {
+    const win = iframeRef.current?.contentWindow;
+    if (!win) return;
+    win.postMessage(JSON.stringify({ event: "command", func, args: [] }), "*");
+  }
+
+  // Drive the iframe via YT IFrame API postMessage whenever paused flips.
+  useEffect(() => {
+    if (!videoId) return;
+    postToPlayer(paused ? "pauseVideo" : "playVideo");
+  }, [paused, videoId]);
+
 
   // Drag state — bottom-right anchor, offsets in CSS pixels.
   const [pos, setPos] = useState<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
