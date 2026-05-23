@@ -49,6 +49,27 @@ function ApeRidesPage() {
   const [rides, setRides] = useState<Ride[]>([]);
   const [requests, setRequests] = useState<RideRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [arOpen, setArOpen] = useState(false);
+  const [pfpUrl, setPfpUrl] = useState<string | null>(null);
+
+  // Load the verified BAYC PFP URL from user_verifications.
+  useEffect(() => {
+    if (!user) return;
+    void (async () => {
+      const { data } = await supabase
+        .from("user_verifications")
+        .select("bayc_token_ids,bayc_collection")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      const tokenId = data?.bayc_token_ids?.[0];
+      if (tokenId == null) return;
+      const contract =
+        data?.bayc_collection === "MAYC"
+          ? "0x60E4d786628Fea6478F785A6d7e704777c86a7c6"
+          : "0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D";
+      setPfpUrl(`https://img.seadn.io/files/${contract.toLowerCase()}/${tokenId}.png?w=512`);
+    })();
+  }, [user]);
 
   const startRide = useServerFn(startApeRide);
   const endRide = useServerFn(endApeRide);
