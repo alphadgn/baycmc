@@ -306,6 +306,11 @@
  *                        wheel / touch / keyboard
  * WebKit + Firefox covered.
  * ────────────────────────────────────────────────────────────────────────── */
+html,
+body {
+  overflow-x: hidden;
+  max-width: 100%;
+}
 html {
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
