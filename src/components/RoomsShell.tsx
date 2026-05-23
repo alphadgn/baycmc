@@ -52,7 +52,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: "/", label: "Home", tier: "all", icon: <Home className="h-4 w-4" /> },
+  { to: "/lobby", label: "Home", tier: "all", icon: <Home className="h-4 w-4" /> },
   { to: "/lobby", label: "Public Lobby", tier: "all", icon: <Users className="h-4 w-4" /> },
   { to: "/feed", label: "Holders Chat", tier: "verified", icon: <Sparkles className="h-4 w-4" /> },
   {
