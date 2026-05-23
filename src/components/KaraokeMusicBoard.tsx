@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { GripVertical, Lock, Music, Play, Search, X } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { GripVertical, Loader2, Lock, Music, Play, Search, X } from "lucide-react";
+import { searchKaraokeSongs, type SongHit } from "@/lib/karaoke.functions";
 
 interface KaraokeMusicBoardProps {
   /**
@@ -40,6 +42,11 @@ export function KaraokeMusicBoard({
   const [open, setOpen] = useState(true);
   const [query, setQuery] = useState("");
   const [urlInput, setUrlInput] = useState("");
+  const [results, setResults] = useState<SongHit[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [searchSource, setSearchSource] = useState<"catalog" | "web" | null>(null);
+  const runSongSearch = useServerFn(searchKaraokeSongs);
 
   // Drag state — bottom-right anchor, offsets in CSS pixels.
   const [pos, setPos] = useState<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
