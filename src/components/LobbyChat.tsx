@@ -484,7 +484,7 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
                       key={p.id}
                       className="flex items-center gap-3 rounded-lg p-2 transition hover:bg-secondary/60"
                     >
-                      <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full border border-border bg-gradient-gold">
+                      <div className="h-20 w-20 shrink-0 overflow-hidden rounded-full border border-border bg-gradient-gold">
                         {p.avatar_url ? (
                           <img
                             src={p.avatar_url}
@@ -1053,7 +1053,7 @@ function MessageRow({
           transition: dragX === 0 ? "transform 180ms ease-out" : "none",
         }}
       >
-        <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full border border-border bg-gradient-gold">
+        <div className="h-20 w-20 shrink-0 overflow-hidden rounded-full border border-border bg-gradient-gold">
           {author?.avatar_url ? (
             <img src={author.avatar_url} alt={name} className="h-full w-full object-cover" />
           ) : (

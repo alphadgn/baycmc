@@ -127,18 +127,18 @@ export function LobbyOnlineAvatars({ max = 12 }: LobbyOnlineAvatarsProps) {
             <li
               key={m.user_id}
               title={name}
-              className="inline-flex h-7 w-7 items-center justify-center overflow-hidden rounded-full border border-background bg-gradient-gold ring-1 ring-gold/40"
+              className="inline-flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border border-background bg-gradient-gold ring-1 ring-gold/40"
             >
               {m.avatar_url ? (
                 <img src={m.avatar_url} alt={name} className="h-full w-full object-cover" />
               ) : (
-                <span className="text-[10px] font-semibold text-gold-foreground">{initials}</span>
+                <span className="text-sm font-semibold text-gold-foreground">{initials}</span>
               )}
             </li>
           );
         })}
         {overflow > 0 && (
-          <li className="inline-flex h-7 min-w-[1.75rem] items-center justify-center rounded-full border border-background bg-secondary px-1.5 text-[10px] font-semibold text-foreground ring-1 ring-border">
+          <li className="inline-flex h-20 min-w-[5rem] items-center justify-center rounded-full border border-background bg-secondary px-2 text-sm font-semibold text-foreground ring-1 ring-border">
             +{overflow}
           </li>
         )}

@@ -147,7 +147,7 @@ function AdminSupport() {
                           : "hover:bg-secondary/40"
                       }`}
                     >
-                      <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 overflow-hidden rounded-full border border-border bg-gradient-gold">
+                      <span className="mt-0.5 inline-flex h-20 w-20 shrink-0 overflow-hidden rounded-full border border-border bg-gradient-gold">
                         {t.profile?.avatar_url ? (
                           <img
                             src={t.profile.avatar_url}
@@ -155,7 +155,7 @@ function AdminSupport() {
                             className="h-full w-full object-cover"
                           />
                         ) : (
-                          <span className="flex h-full w-full items-center justify-center text-[10px] font-semibold text-gold-foreground">
+                          <span className="flex h-full w-full items-center justify-center text-sm font-semibold text-gold-foreground">
                             {(name ?? "??").slice(0, 2).toUpperCase()}
                           </span>
                         )}
