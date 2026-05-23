@@ -568,7 +568,7 @@ export function KaraokeMusicBoard({
             </div>
 
             {(results !== null || searchError) && (
-              <div className="max-h-40 overflow-y-auto rounded-sm border border-gold/20 bg-black/50 p-1 text-[8px]">
+              <div className="max-h-40 overflow-x-hidden overflow-y-auto rounded-sm border border-gold/20 bg-black/50 p-1 text-[8px]">
                 {searchSource && results && results.length > 0 && (
                   <div className="px-1 pb-1 text-[7px] uppercase tracking-widest text-gold/50">
                     {searchSource === "catalog" ? "From music machine" : "From the web"}
