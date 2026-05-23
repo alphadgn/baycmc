@@ -248,6 +248,16 @@ export function KaraokeMusicBoard({
               <Lock className="h-2 w-2" /> Locked
             </span>
           )}
+          {videoId && (
+            <button
+              type="button"
+              aria-label={minimized ? "Expand music machine" : "Collapse music machine"}
+              onClick={() => setForceExpanded((v) => !v)}
+              className="rounded-md p-0.5 text-gold/70 transition hover:bg-gold/10 hover:text-gold"
+            >
+              <Maximize2 className="h-2.5 w-2.5" />
+            </button>
+          )}
           <button
             type="button"
             aria-label="Close music machine"
