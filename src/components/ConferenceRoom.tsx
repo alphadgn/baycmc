@@ -1356,3 +1356,118 @@ function BottomControl({
     </div>
   );
 }
+
+/**
+ * Karaoke music → LiveKit bridge.
+ *
+ * The YouTube iframe plays locally on every viewer's device. That alone
+ * fails three goals: (1) LiveKit recordings never see the music,
+ * (2) anyone whose iframe is muted (mobile autoplay policy, non-performer
+ * mute) hears silence, (3) viewers drift out of sync.
+ *
+ * Fix: when the active performer starts a song, they share their tab's
+ * audio via getDisplayMedia, and we publish that as a
+ * `ScreenShareAudio` LiveKit track. Every other participant then receives
+ * the music through LiveKit (RoomAudioRenderer handles playback) and
+ * recordings capture it natively. Non-performer iframes mute themselves
+ * (see KaraokeMusicBoard) so users hear the music exactly once.
+ *
+ * Listens for:
+ *   - "karaoke:publish-music"   { detail: { play: boolean } }
+ *   - "karaoke:unpublish-music"
+ */
+function KaraokeMusicAudioBridge() {
+  const room = useRoomContext();
+  const trackRef = useRef<LocalAudioTrack | null>(null);
+  const sourceStreamRef = useRef<MediaStream | null>(null);
+
+  useEffect(() => {
+    async function publish() {
+      if (!room) return;
+      if (trackRef.current) return; // already publishing
+      if (
+        typeof navigator === "undefined" ||
+        typeof navigator.mediaDevices?.getDisplayMedia !== "function"
+      ) {
+        toast.error(
+          "Tab-audio sharing isn't supported on this browser. Open the room in desktop Chrome/Edge to broadcast music.",
+        );
+        return;
+      }
+      try {
+        // Some browsers reject audio-only getDisplayMedia, so request video too,
+        // then discard the video track. Audio quality is preserved.
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+          video: true,
+          audio: {
+            // Music quality settings — no AEC/NS so the audio is broadcast clean.
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+          },
+        });
+        const audioTrack = stream.getAudioTracks()[0];
+        stream.getVideoTracks().forEach((t) => t.stop());
+        if (!audioTrack) {
+          toast.error(
+            "No tab audio was captured. In the share dialog, pick 'This tab' and toggle 'Share tab audio' on.",
+          );
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        const localTrack = new LocalAudioTrack(audioTrack, undefined, false);
+        await room.localParticipant.publishTrack(localTrack, {
+          source: Track.Source.ScreenShareAudio,
+          name: "karaoke-music",
+        });
+        trackRef.current = localTrack;
+        sourceStreamRef.current = stream;
+        // If the user stops sharing via the browser's chrome UI, clean up.
+        audioTrack.addEventListener("ended", () => {
+          void unpublish();
+        });
+        toast.success("Music is now playing for everyone in the room.");
+      } catch (e) {
+        console.warn("[karaoke] publish music failed", e);
+        toast.error(
+          "Couldn't share tab audio. Allow the browser prompt and pick the tab playing the music.",
+        );
+      }
+    }
+
+    async function unpublish() {
+      const t = trackRef.current;
+      trackRef.current = null;
+      const s = sourceStreamRef.current;
+      sourceStreamRef.current = null;
+      if (t && room) {
+        try {
+          await room.localParticipant.unpublishTrack(t, true);
+        } catch (e) {
+          console.warn("[karaoke] unpublish music failed", e);
+        }
+      }
+      s?.getTracks().forEach((tr) => tr.stop());
+    }
+
+    function onPublish(e: Event) {
+      const play = !!(e as CustomEvent<{ play: boolean }>).detail?.play;
+      if (play) void publish();
+      else void unpublish();
+    }
+    function onUnpublish() {
+      void unpublish();
+    }
+
+    window.addEventListener("karaoke:publish-music", onPublish as EventListener);
+    window.addEventListener("karaoke:unpublish-music", onUnpublish as EventListener);
+    return () => {
+      window.removeEventListener("karaoke:publish-music", onPublish as EventListener);
+      window.removeEventListener("karaoke:unpublish-music", onUnpublish as EventListener);
+      void unpublish();
+    };
+  }, [room]);
+
+  return null;
+}
+
