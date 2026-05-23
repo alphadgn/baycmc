@@ -133,11 +133,38 @@
     cursor: not-allowed;
   }
 
+  *,
+  *::before,
+  *::after {
+    min-width: 0;
+  }
+
   html, body {
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-body);
     -webkit-font-smoothing: antialiased;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+    overscroll-behavior-x: none;
+    touch-action: pan-y;
+  }
+
+  img,
+  video,
+  canvas,
+  svg,
+  iframe {
+    max-width: 100%;
+  }
+
+  pre {
+    max-width: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
   }
 
   /* iOS Safari auto-zooms inputs whose computed font-size is < 16px. Force
@@ -310,6 +337,8 @@ html,
 body {
   overflow-x: hidden;
   max-width: 100%;
+  overscroll-behavior-x: none;
+  touch-action: pan-y;
 }
 html {
   scrollbar-width: thin;
