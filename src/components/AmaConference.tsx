@@ -187,10 +187,10 @@ function AmaGridLayout({
           // Hide the "no one else here yet" copy when the host is alone —
           // their big solo card already speaks for itself.
           hostSolo ? null : <EmptyAudience roomName={roomName} />
-        ) : karaoke ? (
-          // Karaoke: render every attendee at the same w-1/4 footprint as
-          // the host pfp so the stage stays consistent regardless of how
-          // many people are in the room.
+        ) : (
+          // Every room (conference + karaoke): render attendees at a fixed
+          // 80px (w-20) footprint, wrapping naturally on mobile, so no
+          // square/rectangle pfp ever exceeds the reference avatar size.
           <div className="flex flex-wrap justify-center gap-2 sm:gap-3">
             {visible.map((p) => (
               <div key={p.identity} className="w-20 min-w-0">
@@ -202,34 +202,12 @@ function AmaGridLayout({
               </div>
             ))}
           </div>
-        ) : visibleCount === 1 ? (
-          // Discord-style solo card for the lone occupant. Fills the column
-          // on mobile (3:4 portrait so the face is actually visible), caps
-          // at max-w-2xl on desktop so it doesn't span the page.
-          <div className="mx-auto w-full max-w-2xl">
-            <ParticipantVideoTile
-              participant={visible[0]}
-              cameraTracks={cameraTracks}
-              profile={profiles.get(visible[0].identity) ?? null}
-              variant="solo"
-            />
-          </div>
-        ) : (
-          <div className={`grid gap-2 sm:gap-3 ${gridColsClass}`}>
-            {visible.map((p) => (
-              <AudienceTile
-                key={p.identity}
-                participant={p}
-                cameraTracks={cameraTracks}
-                profile={profiles.get(p.identity) ?? null}
-              />
-            ))}
-          </div>
         )}
         {overflowCount > 0 && (
           <OverflowStrip overflow={overflow} profiles={profiles} count={overflowCount} />
         )}
       </div>
+
     </div>
   );
 }
