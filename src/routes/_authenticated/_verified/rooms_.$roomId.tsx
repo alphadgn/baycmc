@@ -18,7 +18,6 @@ export const Route = createFileRoute("/_authenticated/_verified/rooms_/$roomId")
 
 function RoomDetail() {
   const { roomId } = Route.useParams();
-  const { user } = useAuth();
   const [meta, setMeta] = useState<RoomMeta | null>(null);
   const [hostUserId, setHostUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
