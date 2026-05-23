@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Mic, Users } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { GripVertical, Mic, Users } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
@@ -231,14 +231,49 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
   const performerName =
     performerProfile?.username ?? short(performerProfile?.wallet_address) ?? "—";
 
+  // Drag state — anchored top-left, offsets in CSS pixels.
+  const [pos, setPos] = useState<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
+  const dragRef = useRef<{ startX: number; startY: number; baseDx: number; baseDy: number } | null>(
+    null,
+  );
+  function onDragPointerDown(e: React.PointerEvent) {
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    dragRef.current = { startX: e.clientX, startY: e.clientY, baseDx: pos.dx, baseDy: pos.dy };
+  }
+  function onDragPointerMove(e: React.PointerEvent) {
+    if (!dragRef.current) return;
+    const { startX, startY, baseDx, baseDy } = dragRef.current;
+    setPos({ dx: baseDx + (e.clientX - startX), dy: baseDy + (e.clientY - startY) });
+  }
+  function onDragPointerUp(e: React.PointerEvent) {
+    if (!dragRef.current) return;
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {
+      /* noop */
+    }
+    dragRef.current = null;
+  }
+
   return (
     <>
-      {/* Queue + status strip (top-left, doesn't fight with the music machine) */}
-      <div className="fixed left-4 top-20 z-40 w-[min(90vw,18rem)] rounded-xl border border-gold/30 bg-background/85 p-3 text-xs shadow-gold backdrop-blur">
-        <div className="flex items-center gap-1.5 text-gold">
+      {/* Queue + status strip — draggable from the top handle */}
+      <div
+        className="fixed left-4 top-20 z-40 w-[min(90vw,18rem)] overflow-hidden rounded-xl border border-gold/30 bg-background/85 text-xs shadow-gold backdrop-blur"
+        style={{ transform: `translate(${pos.dx}px, ${pos.dy}px)` }}
+      >
+        <div
+          onPointerDown={onDragPointerDown}
+          onPointerMove={onDragPointerMove}
+          onPointerUp={onDragPointerUp}
+          onPointerCancel={onDragPointerUp}
+          className="flex cursor-grab touch-none select-none items-center gap-1.5 border-b border-gold/15 bg-gradient-to-b from-[#1a1a1a]/60 to-transparent px-3 py-1.5 text-gold active:cursor-grabbing"
+        >
+          <GripVertical className="h-3 w-3 text-gold/60" />
           <Mic className="h-3.5 w-3.5" />
           <span className="font-display text-[10px] uppercase tracking-[0.25em]">On stage</span>
         </div>
+        <div className="p-3 pt-2">
         <div className="mt-1 truncate text-sm font-semibold text-foreground">
           {effectivePerformerId ? performerName : "Nobody — first in line goes up"}
           {bookingHostUserId && (
@@ -247,6 +282,7 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
             </span>
           )}
         </div>
+
 
         {!bookingHostUserId && (
           <>
