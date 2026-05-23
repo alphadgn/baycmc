@@ -5,6 +5,8 @@ import {
   Loader2,
   Lock,
   Maximize2,
+  Mic,
+  MicOff,
   Music,
   Pause,
   Play,
@@ -77,8 +79,53 @@ export function KaraokeMusicBoard({
     postToPlayer(paused ? "pauseVideo" : "playVideo");
   }, [paused, videoId]);
 
+  // Mic state — broadcast a custom event to the LiveKit-aware parent
+  // (ConferenceRoom) which actually toggles localParticipant.setMicrophoneEnabled.
+  // Parent echoes the real state back via "karaoke:mic-state".
+  const [micOn, setMicOn] = useState(false);
+  useEffect(() => {
+    function onState(e: Event) {
+      setMicOn(!!(e as CustomEvent<{ enabled: boolean }>).detail?.enabled);
+    }
+    window.addEventListener("karaoke:mic-state", onState as EventListener);
+    return () =>
+      window.removeEventListener("karaoke:mic-state", onState as EventListener);
+  }, []);
+  function toggleMic() {
+    window.dispatchEvent(
+      new CustomEvent("karaoke:toggle-mic", { detail: { enabled: !micOn } }),
+    );
+  }
 
-  // Drag state — bottom-right anchor, offsets in CSS pixels.
+  // Mobile hint: first time the music machine opens on a small screen, show
+  // a one-time overlay explaining the transport controls. Dismissable.
+  const [showHint, setShowHint] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.innerWidth >= 768) return;
+    if (sessionStorage.getItem("mm-hint-seen")) return;
+    setShowHint(true);
+    const t = setTimeout(() => {
+      setShowHint(false);
+      sessionStorage.setItem("mm-hint-seen", "1");
+    }, 8000);
+    return () => clearTimeout(t);
+  }, []);
+  function dismissHint() {
+    setShowHint(false);
+    if (typeof window !== "undefined") sessionStorage.setItem("mm-hint-seen", "1");
+  }
+
+  // Stage-level "Show all panels" reset — reopen and expand.
+  useEffect(() => {
+    function onReset() {
+      setOpen(true);
+      setForceExpanded(true);
+    }
+    window.addEventListener("karaoke:reset-panels", onReset);
+    return () => window.removeEventListener("karaoke:reset-panels", onReset);
+  }, []);
+
   const [pos, setPos] = useState<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
   const dragRef = useRef<{ startX: number; startY: number; baseDx: number; baseDy: number } | null>(
     null,
@@ -308,7 +355,7 @@ export function KaraokeMusicBoard({
 
       {/* Transport controls — always visible whenever a track is loaded */}
       {videoId && (
-        <div className="flex items-center justify-center gap-2 border-b border-gold/10 bg-[#0a0a0a] px-2 py-2">
+        <div className="flex flex-wrap items-center justify-center gap-2 border-b border-gold/10 bg-[#0a0a0a] px-2 py-2">
           <button
             type="button"
             onClick={handlePause}
@@ -326,8 +373,42 @@ export function KaraokeMusicBoard({
           >
             <Square className="h-3 w-3" /> Stop
           </button>
+          <button
+            type="button"
+            onClick={toggleMic}
+            aria-label={micOn ? "Mute mic" : "Unmute mic"}
+            className={`inline-flex items-center gap-1 rounded-sm border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider transition ${
+              micOn
+                ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"
+                : "border-gold/40 bg-gold/10 text-gold hover:bg-gold/20"
+            }`}
+          >
+            {micOn ? <Mic className="h-3 w-3" /> : <MicOff className="h-3 w-3" />}
+            {micOn ? "Mic Live" : "Mic Off"}
+          </button>
         </div>
       )}
+
+      {/* Mobile-only one-time hint overlay */}
+      {showHint && (
+        <div className="border-b border-gold/20 bg-gradient-to-b from-gold/15 to-transparent p-2 text-[10px] text-gold sm:hidden">
+          <div className="flex items-start justify-between gap-2">
+            <p className="leading-snug">
+              <strong>Music Machine tips:</strong> tap a song or pad to play ·
+              use Pause / Stop above the screen · tap the Mic button to be
+              heard by the room · drag the top bar to move · × closes.
+            </p>
+            <button
+              type="button"
+              onClick={dismissHint}
+              className="shrink-0 rounded-sm border border-gold/40 bg-gold/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-gold hover:bg-gold/25"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
+
 
       {/* Everything below collapses while the video is actively playing */}
       {!minimized && (

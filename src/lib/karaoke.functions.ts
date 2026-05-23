@@ -233,8 +233,18 @@ export const seedKaraokeCatalog = createServerFn({ method: "POST" })
     }
 
     if (collected.length === 0) {
-      return { inserted: 0, total: 0 };
+      return { inserted: 0, skipped: 0, total: 0, lastSeededAt: null as string | null };
     }
+
+    // Count pre-existing rows so we can report skipped duplicates accurately.
+    const normalizedKeys = collected.map((s) => normalize(s.title));
+    const { data: existing } = await supabaseAdmin
+      .from("karaoke_songs")
+      .select("normalized_title,artist")
+      .in("normalized_title", normalizedKeys);
+    const existingSet = new Set(
+      (existing ?? []).map((r) => `${r.normalized_title}|${normalize(r.artist ?? "")}`),
+    );
 
     const rows = collected.slice(0, 1000).map((s, i) => ({
       title: s.title,
@@ -244,10 +254,70 @@ export const seedKaraokeCatalog = createServerFn({ method: "POST" })
       rank: i + 1,
     }));
 
+    const skipped = rows.filter((r) =>
+      existingSet.has(`${r.normalized_title}|${normalize(r.artist ?? "")}`),
+    ).length;
+    const inserted = rows.length - skipped;
+
     const { error } = await supabaseAdmin
       .from("karaoke_songs")
       .upsert(rows, { onConflict: "normalized_title,artist" });
     if (error) throw new Error(error.message);
 
-    return { inserted: rows.length, total: collected.length };
+    const lastSeededAt = new Date().toISOString();
+    await supabaseAdmin.from("app_settings").upsert(
+      {
+        key: "karaoke_catalog_seed",
+        value: {
+          last_seeded_at: lastSeededAt,
+          last_inserted: inserted,
+          last_skipped: skipped,
+          last_total_collected: collected.length,
+        },
+        updated_by: userId,
+        updated_at: lastSeededAt,
+      },
+      { onConflict: "key" },
+    );
+
+    return { inserted, skipped, total: collected.length, lastSeededAt };
+  });
+
+/**
+ * Admin-only: stats summary for the karaoke catalog seed page.
+ */
+export const getKaraokeCatalogStats = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { userId } = context;
+    const { data: roles } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId);
+    if (!roles?.some((r) => r.role === "admin" || r.role === "super_admin")) {
+      throw new Error("Admin only");
+    }
+    const [{ count }, { data: settings }] = await Promise.all([
+      supabaseAdmin
+        .from("karaoke_songs")
+        .select("id", { count: "exact", head: true }),
+      supabaseAdmin
+        .from("app_settings")
+        .select("value,updated_at")
+        .eq("key", "karaoke_catalog_seed")
+        .maybeSingle(),
+    ]);
+    const v = (settings?.value ?? {}) as {
+      last_seeded_at?: string;
+      last_inserted?: number;
+      last_skipped?: number;
+      last_total_collected?: number;
+    };
+    return {
+      totalSongs: count ?? 0,
+      lastSeededAt: v.last_seeded_at ?? settings?.updated_at ?? null,
+      lastInserted: v.last_inserted ?? null,
+      lastSkipped: v.last_skipped ?? null,
+      lastTotalCollected: v.last_total_collected ?? null,
+    };
   });
