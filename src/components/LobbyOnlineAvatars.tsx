@@ -132,7 +132,7 @@ export function LobbyOnlineAvatars({ max = 12 }: LobbyOnlineAvatarsProps) {
               {m.avatar_url ? (
                 <img src={m.avatar_url} alt={name} className="h-full w-full object-cover" />
               ) : (
-                <span className="text-sm font-semibold text-gold-foreground">{initials}</span>
+                <span className="text-[10px] font-semibold text-gold-foreground">{initials}</span>
               )}
             </li>
           );
