@@ -1,20 +1,26 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Pencil, Trash2, X } from "lucide-react";
+import { Check, Image as ImageIcon, Loader2, Pencil, Sticker, Trash2, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
 import { toast } from "sonner";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { GifPicker } from "@/components/GifPicker";
+import type { GifResult } from "@/server/giphy.functions";
 
 interface Message {
   id: string;
   user_id: string;
-  body: string;
+  body: string | null;
+  image_url: string | null;
+  gif_url: string | null;
   created_at: string;
 }
 
 interface Profile {
   id: string;
   username: string | null;
-  wallet_address: string;
+  wallet_address: string | null;
+  avatar_url: string | null;
 }
 
 interface MessageThreadProps {
@@ -23,16 +29,9 @@ interface MessageThreadProps {
   emptyText?: string;
   placeholder?: string;
   accentClassName?: string;
-  /** Optional image painted behind the thread (dimmed for legibility). */
   backgroundImage?: string | null;
 }
 
-/**
- * Realtime message thread bound to a single Supabase table. RLS on the
- * table enforces who can read or post — any member with access can respond,
- * and authors can edit or delete their own messages (the table's owner-only
- * UPDATE/DELETE policies back this up server-side).
- */
 export function MessageThread({
   table,
   channelName,
@@ -45,27 +44,27 @@ export function MessageThread({
   const [messages, setMessages] = useState<Message[]>([]);
   const [profiles, setProfiles] = useState<Record<string, Profile>>({});
   const [input, setInput] = useState("");
+  const [pendingImage, setPendingImage] = useState<File | null>(null);
+  const [pendingImagePreview, setPendingImagePreview] = useState<string | null>(null);
+  const [gifOpen, setGifOpen] = useState(false);
   const [posting, setPosting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [denied, setDenied] = useState(false);
-  // Id of the message currently being edited (its body is loaded into the
-  // composer). Null when composing a brand-new message.
   const [editingId, setEditingId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Initial load
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       const { data, error } = await supabase
         .from(table)
-        .select("id,user_id,body,created_at")
+        .select("id,user_id,body,image_url,gif_url,created_at")
         .order("created_at", { ascending: true })
         .limit(200);
       if (cancelled) return;
       if (error) {
-        // Most common reason: RLS denies the user. Treat as access denied.
         setDenied(true);
         setLoading(false);
         return;
@@ -80,7 +79,6 @@ export function MessageThread({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [table]);
 
-  // Realtime — inserts, edits, and deletes all reconcile into local state.
   useEffect(() => {
     const channel = supabase
       .channel(channelName)
@@ -109,12 +107,22 @@ export function MessageThread({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages.length]);
 
+  useEffect(() => {
+    if (!pendingImage) {
+      setPendingImagePreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(pendingImage);
+    setPendingImagePreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [pendingImage]);
+
   async function hydrateProfiles(msgs: Message[]) {
     const missing = Array.from(new Set(msgs.map((m) => m.user_id).filter((id) => !profiles[id])));
     if (!missing.length) return;
     const { data } = await supabase
       .from("profiles")
-      .select("id,username,wallet_address")
+      .select("id,username,wallet_address,avatar_url")
       .in("id", missing);
     if (data) {
       setProfiles((prev) => {
@@ -125,13 +133,28 @@ export function MessageThread({
     }
   }
 
-  async function send() {
-    if (!user || !input.trim()) return;
-    const body = input.trim().slice(0, 2000);
-    setPosting(true);
+  async function uploadPendingImage(): Promise<string | null> {
+    if (!pendingImage || !user) return null;
+    const ext = pendingImage.name.split(".").pop()?.toLowerCase() || "png";
+    const path = `${user.id}/lifer-${Date.now()}.${ext}`;
+    const { error } = await supabase.storage
+      .from("chat-attachments")
+      .upload(path, pendingImage, { upsert: false, contentType: pendingImage.type });
+    if (error) throw error;
+    const { data } = supabase.storage.from("chat-attachments").getPublicUrl(path);
+    return data.publicUrl;
+  }
 
-    // Edit branch — update an existing message the user owns.
+  async function send(opts: { gifUrl?: string } = {}) {
+    if (!user) return;
+    const body = input.trim().slice(0, 2000);
+
     if (editingId) {
+      if (!body) {
+        toast.error("Message can't be empty.");
+        return;
+      }
+      setPosting(true);
       const { error } = await supabase
         .from(table)
         .update({ body })
@@ -142,25 +165,38 @@ export function MessageThread({
         toast.error(error.message);
         return;
       }
-      // Optimistic local update so the change shows before realtime echoes.
       setMessages((prev) => prev.map((m) => (m.id === editingId ? { ...m, body } : m)));
       setEditingId(null);
       setInput("");
       return;
     }
 
-    const { error } = await supabase.from(table).insert({ user_id: user.id, body });
-    setPosting(false);
-    if (error) {
-      toast.error(error.message);
-      return;
+    const hasContent = !!body || !!pendingImage || !!opts.gifUrl;
+    if (!hasContent) return;
+    setPosting(true);
+    try {
+      let imageUrl: string | null = null;
+      if (pendingImage) imageUrl = await uploadPendingImage();
+      const { error } = await supabase.from(table).insert({
+        user_id: user.id,
+        body: body || null,
+        image_url: imageUrl,
+        gif_url: opts.gifUrl ?? null,
+      });
+      if (error) throw error;
+      setInput("");
+      setPendingImage(null);
+      if (fileRef.current) fileRef.current.value = "";
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't send message");
+    } finally {
+      setPosting(false);
     }
-    setInput("");
   }
 
   function beginEdit(m: Message) {
     setEditingId(m.id);
-    setInput(m.body);
+    setInput(m.body ?? "");
     setTimeout(() => inputRef.current?.focus(), 0);
   }
 
@@ -172,11 +208,15 @@ export function MessageThread({
   async function deleteMessage(m: Message) {
     if (!user) return;
     if (!window.confirm("Delete this message?")) return;
-    // Optimistic removal; realtime DELETE will confirm for other clients.
     setMessages((prev) => prev.filter((x) => x.id !== m.id));
     if (editingId === m.id) cancelEdit();
     const { error } = await supabase.from(table).delete().eq("id", m.id).eq("user_id", user.id);
     if (error) toast.error(error.message);
+  }
+
+  function handleGifPick(gif: GifResult) {
+    setGifOpen(false);
+    void send({ gifUrl: gif.url });
   }
 
   if (denied) {
@@ -226,23 +266,45 @@ export function MessageThread({
                 </div>
                 <div className={`flex max-w-full items-center gap-1.5 ${mine ? "flex-row-reverse" : ""}`}>
                   <div
-                    className={`max-w-[75%] whitespace-pre-wrap break-words rounded-2xl px-3 py-2 text-sm [overflow-wrap:anywhere] ${
+                    className={`flex max-w-[75%] flex-col gap-2 rounded-2xl px-3 py-2 text-sm ${
                       mine ? `${accentClassName} shadow-gold` : "border border-border bg-background/40"
                     }`}
                   >
-                    {m.body}
+                    {m.body && (
+                      <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+                        {m.body}
+                      </p>
+                    )}
+                    {m.image_url && (
+                      <a href={m.image_url} target="_blank" rel="noreferrer">
+                        <img
+                          src={m.image_url}
+                          alt="attachment"
+                          className="max-h-72 max-w-full rounded-lg object-cover"
+                        />
+                      </a>
+                    )}
+                    {m.gif_url && (
+                      <img
+                        src={m.gif_url}
+                        alt="gif"
+                        className="max-h-72 max-w-full rounded-lg object-cover"
+                      />
+                    )}
                   </div>
                   {mine && (
                     <div className="flex shrink-0 items-center gap-1 opacity-0 transition group-hover:opacity-100">
-                      <button
-                        type="button"
-                        onClick={() => beginEdit(m)}
-                        aria-label="Edit message"
-                        title="Edit"
-                        className="rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
+                      {m.body && (
+                        <button
+                          type="button"
+                          onClick={() => beginEdit(m)}
+                          aria-label="Edit message"
+                          title="Edit"
+                          className="rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => void deleteMessage(m)}
@@ -278,13 +340,78 @@ export function MessageThread({
         </div>
       )}
 
+      {pendingImagePreview && !editingId && (
+        <div className="relative flex items-center gap-3 border-t border-border/60 bg-background/40 px-3 py-2">
+          <img src={pendingImagePreview} alt="preview" className="h-14 w-14 rounded object-cover" />
+          <span className="flex-1 truncate text-xs text-muted-foreground">
+            {pendingImage?.name}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setPendingImage(null);
+              if (fileRef.current) fileRef.current.value = "";
+            }}
+            className="rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
+            aria-label="Remove attachment"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       <form
         onSubmit={(e) => {
           e.preventDefault();
           void send();
         }}
-        className="relative flex min-w-0 gap-2 border-t border-border/60 p-3"
+        className="relative flex min-w-0 items-center gap-2 border-t border-border/60 p-3"
       >
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (!f) return;
+            if (f.size > 8 * 1024 * 1024) {
+              toast.error("Image is too large — max 8 MB.");
+              return;
+            }
+            setPendingImage(f);
+          }}
+        />
+        {!editingId && (
+          <>
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={!user || posting}
+              className="shrink-0 rounded-md border border-border bg-secondary/40 p-2 text-muted-foreground transition hover:bg-secondary hover:text-foreground disabled:opacity-50"
+              aria-label="Attach image"
+              title="Attach image"
+            >
+              <ImageIcon className="h-4 w-4" />
+            </button>
+            <Popover open={gifOpen} onOpenChange={setGifOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  disabled={!user || posting}
+                  className="shrink-0 rounded-md border border-border bg-secondary/40 p-2 text-muted-foreground transition hover:bg-secondary hover:text-foreground disabled:opacity-50"
+                  aria-label="Add GIF"
+                  title="Add GIF"
+                >
+                  <Sticker className="h-4 w-4" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[20rem] p-0" align="end" side="top">
+                <GifPicker onPick={handleGifPick} />
+              </PopoverContent>
+            </Popover>
+          </>
+        )}
         <input
           ref={inputRef}
           value={input}
@@ -302,11 +429,11 @@ export function MessageThread({
         />
         <button
           type="submit"
-          disabled={!user || posting || !input.trim()}
+          disabled={!user || posting || (!input.trim() && !pendingImage && !editingId)}
           aria-label={editingId ? "Save edit" : "Send"}
           className={`inline-flex shrink-0 items-center gap-1.5 rounded-md px-4 py-2 text-sm font-semibold shadow-gold disabled:opacity-50 ${accentClassName}`}
         >
-          {editingId ? <Check className="h-4 w-4" /> : null}
+          {posting ? <Loader2 className="h-4 w-4 animate-spin" /> : editingId ? <Check className="h-4 w-4" /> : null}
           {editingId ? "Save" : "Send"}
         </button>
       </form>
