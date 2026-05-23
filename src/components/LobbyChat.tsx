@@ -903,9 +903,6 @@ function ActionItem({
   );
 }
 
-// Swipe-left threshold: dragging the row this many px past zero fires
-// onReply. Same value Discord ships on iOS.
-const REPLY_SWIPE_TRIGGER = 64;
 const LONG_PRESS_MS = 380;
 
 function MessageRow({
@@ -945,7 +942,6 @@ function MessageRow({
   // Gesture state. We keep the translate value in React (so the icon can
   // fade in proportionally), but pointer bookkeeping lives in refs so we
   // don't re-render on every move event.
-  const [dragX, setDragX] = useState(0);
   const dragRef = useRef<{
     startX: number;
     startY: number;
@@ -997,7 +993,6 @@ function MessageRow({
     }
     if (d.decided === "scroll") return;
     e.preventDefault();
-    setDragX(0);
     return;
   }
 
@@ -1005,13 +1000,11 @@ function MessageRow({
     const d = dragRef.current;
     if (!d) return;
     clearLongPress();
-    setDragX(0);
     dragRef.current = null;
   }
 
   function onTouchCancel() {
     clearLongPress();
-    setDragX(0);
     dragRef.current = null;
   }
 
@@ -1020,8 +1013,6 @@ function MessageRow({
     e.preventDefault();
     onLongPress();
   }
-
-  const replyHintOpacity = Math.min(1, Math.abs(dragX) / REPLY_SWIPE_TRIGGER);
 
   return (
     <div
