@@ -113,7 +113,6 @@ export function KaraokeMusicBoard({
   }
 
   async function runSearch(q: string) {
-    if (!isMyTurn) return;
     const trimmed = q.trim();
     if (!trimmed) return;
     setSearching(true);
@@ -134,7 +133,6 @@ export function KaraokeMusicBoard({
   }
 
   function pickHit(hit: SongHit) {
-    if (!isMyTurn) return;
     if (hit.youtubeId) {
       onChangeTrack({ videoId: hit.youtubeId, activeQuery: null });
     } else if (hit.url) {
@@ -145,7 +143,6 @@ export function KaraokeMusicBoard({
   }
 
   function playUrl() {
-    if (!isMyTurn) return;
     const id = extractYouTubeId(urlInput);
     if (id) onChangeTrack({ videoId: id, activeQuery: null });
   }
