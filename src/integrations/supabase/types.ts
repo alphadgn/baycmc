@@ -363,23 +363,29 @@ export type Database = {
       }
       lifer_messages: {
         Row: {
-          body: string
+          body: string | null
           created_at: string
+          gif_url: string | null
           id: string
+          image_url: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
-          body: string
+          body?: string | null
           created_at?: string
+          gif_url?: string | null
           id?: string
+          image_url?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
-          body?: string
+          body?: string | null
           created_at?: string
+          gif_url?: string | null
           id?: string
+          image_url?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -635,7 +641,7 @@ export type Database = {
           id: string
           updated_at: string
           username: string | null
-          wallet_address: string
+          wallet_address: string | null
         }
         Insert: {
           avatar_url?: string | null
@@ -644,7 +650,7 @@ export type Database = {
           id: string
           updated_at?: string
           username?: string | null
-          wallet_address: string
+          wallet_address?: string | null
         }
         Update: {
           avatar_url?: string | null
@@ -653,7 +659,7 @@ export type Database = {
           id?: string
           updated_at?: string
           username?: string | null
-          wallet_address?: string
+          wallet_address?: string | null
         }
         Relationships: []
       }

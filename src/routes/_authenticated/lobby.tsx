@@ -82,27 +82,6 @@ function LobbyPage() {
       )}
 
       <div className="relative flex min-h-0 flex-1 flex-col">
-        {/* The chat sits flush under the nav bar. The only thing that can
-            appear above it is a thin verify banner, and only for users who
-            haven't verified a BAYC/MAYC yet. */}
-        {showVerifyCta && (
-          <div className="flex shrink-0 flex-wrap items-center gap-2 px-4 py-2 sm:px-6">
-            <div className="flex flex-wrap items-center gap-2 rounded-md border border-gold/30 bg-background/70 px-3 py-1.5 text-xs backdrop-blur">
-              <span className="flex items-center gap-2 text-gold">
-                <Lock className="h-3.5 w-3.5" />
-                Verify your BAYC/MAYC to unlock the clubhouse.
-              </span>
-              <button
-                type="button"
-                onClick={triggerVerify}
-                className="inline-flex items-center gap-1.5 rounded-md bg-gradient-gold px-3 py-1 text-[11px] font-semibold text-gold-foreground shadow-gold transition hover:opacity-90"
-              >
-                Verify holder
-              </button>
-            </div>
-          </div>
-        )}
-
         <div className="flex min-h-0 flex-1 flex-col">
           <LobbyChat channelName="lobby" />
         </div>
