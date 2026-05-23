@@ -270,12 +270,40 @@ export function KaraokeMusicBoard({
           <button
             type="button"
             onClick={() => runSearch(query)}
-            disabled={!isMyTurn || !query.trim()}
+            disabled={!isMyTurn || !query.trim() || searching}
             className="inline-flex items-center gap-0.5 rounded-sm bg-gradient-gold px-1.5 py-1 text-[8px] font-semibold text-gold-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            <Search className="h-2.5 w-2.5" /> Find
+            {searching ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Search className="h-2.5 w-2.5" />} Find
           </button>
         </div>
+
+        {/* Inline search results — stays in-app */}
+        {(results !== null || searchError) && (
+          <div className="max-h-40 overflow-y-auto rounded-sm border border-gold/20 bg-black/50 p-1 text-[8px]">
+            {searchSource && results && results.length > 0 && (
+              <div className="px-1 pb-1 text-[7px] uppercase tracking-widest text-gold/50">
+                {searchSource === "catalog" ? "From music machine" : "From the web"}
+              </div>
+            )}
+            {results?.map((h, i) => (
+              <button
+                key={`${h.id ?? h.url ?? i}`}
+                type="button"
+                onClick={() => pickHit(h)}
+                disabled={!h.youtubeId && !extractYouTubeId(h.url ?? "")}
+                className="flex w-full items-center justify-between gap-1 rounded-sm px-1.5 py-1 text-left text-gold/90 transition hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <span className="truncate">
+                  <span className="font-semibold">{h.title}</span>
+                  {h.artist && <span className="text-gold/60"> · {h.artist}</span>}
+                </span>
+                <Play className="h-2 w-2 shrink-0 text-gold/70" />
+              </button>
+            ))}
+            {searchError && <div className="px-1 py-1 text-rose-300">{searchError}</div>}
+          </div>
+        )}
+
         <div className="flex gap-1">
           <input
             value={urlInput}
