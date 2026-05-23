@@ -282,13 +282,21 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
   }, [isPlaying]);
   const waitlistHidden = isPlaying && !forceWaitlistVisible;
 
-  function resetAllPanels() {
+  const resetAllPanels = useCallback(() => {
     setPos({ dx: 0, dy: 0 });
     setForceWaitlistVisible(true);
     setPaused(false);
     // Tell the music machine to reopen + expand.
     window.dispatchEvent(new CustomEvent("karaoke:reset-panels"));
-  }
+  }, []);
+  // Expose so any other panel (or a future affordance) can request a reset
+  // now that the dedicated "Show all panels" button has been removed in
+  // favour of the Participants pill.
+  useEffect(() => {
+    function onReq() { resetAllPanels(); }
+    window.addEventListener("karaoke:request-reset-panels", onReq);
+    return () => window.removeEventListener("karaoke:request-reset-panels", onReq);
+  }, [resetAllPanels]);
 
   return (
     <>
