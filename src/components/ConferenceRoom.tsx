@@ -541,7 +541,12 @@ function VideoArea({
   }
 
   return (
-    <AmaConference roomName={roomName} hostUserId={hostUserId} backgroundImage={backgroundImage} />
+    <AmaConference
+      roomName={roomName}
+      hostUserId={hostUserId}
+      backgroundImage={backgroundImage}
+      karaoke={kind === "karaoke"}
+    />
   );
 }
 
