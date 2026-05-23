@@ -195,7 +195,7 @@ export function MessageThread({
           <div className="absolute inset-0 bg-background/85" />
         </div>
       )}
-      <div ref={scrollRef} className="relative flex-1 space-y-3 overflow-y-auto p-4 sm:p-6">
+      <div ref={scrollRef} className="relative flex-1 space-y-3 overflow-x-hidden overflow-y-auto p-4 sm:p-6">
         {loading ? (
           <div className="space-y-2">
             {[1, 2, 3].map((i) => (
@@ -214,8 +214,8 @@ export function MessageThread({
                 ? `${profile.wallet_address.slice(0, 6)}…${profile.wallet_address.slice(-4)}`
                 : "anon");
             return (
-              <div key={m.id} className={`group flex flex-col ${mine ? "items-end" : "items-start"}`}>
-                <div className="mb-0.5 flex items-baseline gap-2 text-[11px] text-muted-foreground">
+              <div key={m.id} className={`group flex max-w-full flex-col ${mine ? "items-end" : "items-start"}`}>
+                <div className="mb-0.5 flex max-w-full flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
                   <span className={mine ? "text-gold" : ""}>{name}</span>
                   <span>
                     {new Date(m.created_at).toLocaleTimeString([], {
@@ -224,9 +224,9 @@ export function MessageThread({
                     })}
                   </span>
                 </div>
-                <div className={`flex items-center gap-1.5 ${mine ? "flex-row-reverse" : ""}`}>
+                <div className={`flex max-w-full items-center gap-1.5 ${mine ? "flex-row-reverse" : ""}`}>
                   <div
-                    className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${
+                    className={`max-w-[75%] whitespace-pre-wrap break-words rounded-2xl px-3 py-2 text-sm [overflow-wrap:anywhere] ${
                       mine ? `${accentClassName} shadow-gold` : "border border-border bg-background/40"
                     }`}
                   >
@@ -283,7 +283,7 @@ export function MessageThread({
           e.preventDefault();
           void send();
         }}
-        className="relative flex gap-2 border-t border-border/60 p-3"
+        className="relative flex min-w-0 gap-2 border-t border-border/60 p-3"
       >
         <input
           ref={inputRef}
@@ -297,14 +297,14 @@ export function MessageThread({
           }}
           maxLength={2000}
           placeholder={placeholder}
-          className="flex-1 rounded-md border border-border bg-input px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          className="min-w-0 flex-1 rounded-md border border-border bg-input px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           disabled={!user || posting}
         />
         <button
           type="submit"
           disabled={!user || posting || !input.trim()}
           aria-label={editingId ? "Save edit" : "Send"}
-          className={`inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-semibold shadow-gold disabled:opacity-50 ${accentClassName}`}
+          className={`inline-flex shrink-0 items-center gap-1.5 rounded-md px-4 py-2 text-sm font-semibold shadow-gold disabled:opacity-50 ${accentClassName}`}
         >
           {editingId ? <Check className="h-4 w-4" /> : null}
           {editingId ? "Save" : "Send"}
