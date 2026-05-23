@@ -179,7 +179,7 @@ export function SocialFeed({ liferOnly = false }: SocialFeedProps) {
           return (
             <article key={p.id} className="glass rounded-2xl p-5 shadow-card">
               <header className="flex items-center gap-3">
-                <div className="h-20 w-20 rounded-full bg-gradient-gold" />
+                <div className="h-9 w-9 rounded-full bg-gradient-gold" />
                 <div>
                   <div className="text-sm font-semibold font-sans-display">{name}</div>
                   <div className="text-[11px] text-muted-foreground">
