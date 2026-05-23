@@ -325,7 +325,7 @@ export function KaraokeMusicBoard({
           <button
             type="button"
             onClick={playUrl}
-            disabled={(!extractYouTubeId(urlInput)}
+            disabled={!extractYouTubeId(urlInput)}
             className="inline-flex items-center gap-0.5 rounded-sm border border-gold/30 bg-black/60 px-1.5 py-1 text-[8px] font-semibold text-gold transition hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Play className="h-2.5 w-2.5" /> Cue
