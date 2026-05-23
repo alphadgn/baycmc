@@ -255,7 +255,7 @@ function ScreenShareLayout({
       </div>
 
       <aside
-        className="scrollbar-modern hidden w-56 shrink-0 flex-col gap-2 overflow-y-auto sm:flex"
+        className="scrollbar-modern hidden w-56 shrink-0 flex-col gap-2 overflow-x-hidden overflow-y-auto sm:flex"
         aria-label="Participants strip"
       >
         {hostParticipant && (
