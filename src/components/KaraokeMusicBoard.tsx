@@ -325,7 +325,7 @@ export function KaraokeMusicBoard({
         <div className="flex items-center gap-1.5">
           <GripVertical className="h-3 w-3 text-gold/60" />
           <span className="font-display text-[9px] uppercase tracking-[0.25em] text-gold">
-            Maschine · Karaoke
+            Karaoke Machine
           </span>
         </div>
         <div className="flex items-center gap-1">
