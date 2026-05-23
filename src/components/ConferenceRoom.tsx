@@ -1461,12 +1461,45 @@ function KaraokeMusicAudioBridge() {
 
     window.addEventListener("karaoke:publish-music", onPublish as EventListener);
     window.addEventListener("karaoke:unpublish-music", onUnpublish as EventListener);
+
+    // Broadcast room-wide "is any music track live?" state so the
+    // KaraokeMusicBoard can mute the local iframe for non-performers.
+    function broadcastState() {
+      if (!room) return;
+      const anyMusic = Array.from(room.remoteParticipants.values()).some((p) =>
+        Array.from(p.trackPublications.values()).some(
+          (pub) => pub.source === Track.Source.ScreenShareAudio,
+        ),
+      ) || !!trackRef.current;
+      window.dispatchEvent(
+        new CustomEvent("karaoke:music-shared", { detail: { shared: anyMusic } }),
+      );
+    }
+    broadcastState();
+    if (room) {
+      room.on("trackPublished", broadcastState);
+      room.on("trackUnpublished", broadcastState);
+      room.on("trackSubscribed", broadcastState);
+      room.on("trackUnsubscribed", broadcastState);
+      room.on("participantConnected", broadcastState);
+      room.on("participantDisconnected", broadcastState);
+    }
+
     return () => {
       window.removeEventListener("karaoke:publish-music", onPublish as EventListener);
       window.removeEventListener("karaoke:unpublish-music", onUnpublish as EventListener);
+      if (room) {
+        room.off("trackPublished", broadcastState);
+        room.off("trackUnpublished", broadcastState);
+        room.off("trackSubscribed", broadcastState);
+        room.off("trackUnsubscribed", broadcastState);
+        room.off("participantConnected", broadcastState);
+        room.off("participantDisconnected", broadcastState);
+      }
       void unpublish();
     };
   }, [room]);
+
 
   return null;
 }
