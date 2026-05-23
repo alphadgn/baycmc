@@ -512,7 +512,7 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
         <div
           ref={scrollRef}
           onScroll={handleScroll}
-          className="flex-1 space-y-2 overflow-y-auto p-2 sm:p-4"
+          className="flex-1 space-y-2 overflow-x-hidden overflow-y-auto p-2 sm:p-4"
         >
           {loading ? (
             <div className="space-y-2">
@@ -996,8 +996,8 @@ function MessageRow({
       clearLongPress();
     }
     if (d.decided === "scroll") return;
-    // Horizontal movement disabled — long-press still opens the action sheet
-    // (which includes Reply). Just consume the gesture without translating.
+    e.preventDefault();
+    setDragX(0);
     return;
   }
 
@@ -1005,9 +1005,6 @@ function MessageRow({
     const d = dragRef.current;
     if (!d) return;
     clearLongPress();
-    if (d.decided === "swipe" && dragX <= -REPLY_SWIPE_TRIGGER) {
-      onReply();
-    }
     setDragX(0);
     dragRef.current = null;
   }
@@ -1028,25 +1025,15 @@ function MessageRow({
 
   return (
     <div
-      className="relative"
+      className="relative max-w-full overflow-x-hidden touch-pan-y"
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
       onTouchCancel={onTouchCancel}
       onContextMenu={onContextMenu}
     >
-      {/* Reply hint that slides in from the right edge as the user swipes. */}
       <div
-        aria-hidden
-        className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3"
-        style={{ opacity: replyHintOpacity }}
-      >
-        <div className="rounded-full bg-gold/20 p-2 text-gold">
-          <Reply className="h-4 w-4" />
-        </div>
-      </div>
-      <div
-        className="group flex items-start gap-2.5 rounded-lg px-2 py-1.5 transition hover:bg-secondary/30 sm:gap-3"
+        className="group flex max-w-full items-start gap-2.5 rounded-lg px-2 py-1.5 transition hover:bg-secondary/30 sm:gap-3"
       >
         <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full border border-border bg-gradient-gold">
           {author?.avatar_url ? (
@@ -1082,7 +1069,7 @@ function MessageRow({
             </div>
           )}
           {message.body && (
-            <p className="mt-0.5 whitespace-pre-wrap break-words text-sm leading-relaxed">
+            <p className="mt-0.5 max-w-full whitespace-pre-wrap break-words text-sm leading-relaxed [overflow-wrap:anywhere]">
               {message.body}
             </p>
           )}
@@ -1091,7 +1078,7 @@ function MessageRow({
               href={message.image_url}
               target="_blank"
               rel="noreferrer"
-              className="mt-1.5 inline-block max-w-[260px] overflow-hidden rounded-lg border border-border sm:max-w-xs"
+              className="mt-1.5 inline-block max-w-full overflow-hidden rounded-lg border border-border sm:max-w-[260px]"
             >
               <img
                 src={message.image_url}
@@ -1104,7 +1091,7 @@ function MessageRow({
             </a>
           )}
           {message.gif_url && (
-            <div className="mt-1.5 inline-block max-w-[260px] overflow-hidden rounded-lg border border-border sm:max-w-xs">
+            <div className="mt-1.5 inline-block max-w-full overflow-hidden rounded-lg border border-border sm:max-w-[260px]">
               <img
                 src={message.gif_url}
                 alt="gif"
