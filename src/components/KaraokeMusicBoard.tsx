@@ -277,7 +277,7 @@ export function KaraokeMusicBoard({
           <button
             type="button"
             onClick={() => runSearch(query)}
-            disabled={(!query.trim() || searching}
+            disabled={!query.trim() || searching}
             className="inline-flex items-center gap-0.5 rounded-sm bg-gradient-gold px-1.5 py-1 text-[8px] font-semibold text-gold-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {searching ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Search className="h-2.5 w-2.5" />} Find
