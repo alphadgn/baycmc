@@ -176,10 +176,11 @@ export function KaraokeMusicBoard({
       ? `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(activeQuery)}&autoplay=1&rel=0&modestbranding=1`
       : null;
 
-  // Original width was 26rem; 40% smaller ≈ 15.6rem. Use 15.5rem.
+  // Wider on mobile so all controls are usable (was 15.5rem and clipping
+  // the search/url inputs and pad grid on small Android/iOS screens).
   return (
     <div
-      className="fixed bottom-4 right-4 z-40 w-[min(96vw,15.5rem)] overflow-hidden rounded-xl border border-gold/40 bg-[#0a0a0a] shadow-gold"
+      className="fixed bottom-4 right-4 z-40 max-h-[85vh] w-[min(96vw,22rem)] overflow-y-auto overflow-x-hidden rounded-xl border border-gold/40 bg-[#0a0a0a] shadow-gold"
       style={{ transform: `translate(${-pos.dx}px, ${-pos.dy}px)` }}
     >
       {/* Top chassis bar — also the drag handle */}
