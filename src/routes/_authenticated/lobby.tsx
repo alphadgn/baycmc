@@ -1,9 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { Lock } from "lucide-react";
-import { toast } from "sonner";
-import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import { LobbyChat } from "@/components/LobbyChat";
+
 
 // Lazy, optional asset import — Vite resolves the file at build time only if
 // it exists, so the lobby falls back to a gold gradient until the operator
@@ -36,18 +34,7 @@ export const Route = createFileRoute("/_authenticated/lobby")({
   component: LobbyPage,
 });
 
-function triggerVerify() {
-  window.dispatchEvent(new Event("baycmc:privy-bridge-retry"));
-  toast.message("Re-checking BAYC/MAYC ownership…", {
-    description:
-      "Approve the signature in your wallet — we'll unlock the verified areas the moment it confirms.",
-    duration: 5000,
-  });
-}
-
 function LobbyPage() {
-  const { isVerifiedHolder, loading: verifLoading } = useVerificationStatus();
-  const showVerifyCta = !verifLoading && !isVerifiedHolder;
 
   // Lock body scroll while the lobby is mounted so the page can't scroll
   // behind the hero — only the chat thread's own scroll container moves.
@@ -82,27 +69,6 @@ function LobbyPage() {
       )}
 
       <div className="relative flex min-h-0 flex-1 flex-col">
-        {/* The chat sits flush under the nav bar. The only thing that can
-            appear above it is a thin verify banner, and only for users who
-            haven't verified a BAYC/MAYC yet. */}
-        {showVerifyCta && (
-          <div className="flex shrink-0 flex-wrap items-center gap-2 px-4 py-2 sm:px-6">
-            <div className="flex flex-wrap items-center gap-2 rounded-md border border-gold/30 bg-background/70 px-3 py-1.5 text-xs backdrop-blur">
-              <span className="flex items-center gap-2 text-gold">
-                <Lock className="h-3.5 w-3.5" />
-                Verify your BAYC/MAYC to unlock the clubhouse.
-              </span>
-              <button
-                type="button"
-                onClick={triggerVerify}
-                className="inline-flex items-center gap-1.5 rounded-md bg-gradient-gold px-3 py-1 text-[11px] font-semibold text-gold-foreground shadow-gold transition hover:opacity-90"
-              >
-                Verify holder
-              </button>
-            </div>
-          </div>
-        )}
-
         <div className="flex min-h-0 flex-1 flex-col">
           <LobbyChat channelName="lobby" />
         </div>

@@ -269,72 +269,16 @@ function ApeRidesPage() {
         )}
       </section>
 
-      {/* Live rides */}
-      <section className="mb-8">
-        <h2 className="mb-3 font-display text-2xl">Live now</h2>
-        {loading ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
-        ) : rides.length === 0 ? (
-          <p className="rounded-md border border-dashed border-border bg-secondary/30 p-6 text-center text-sm text-muted-foreground">
-            No Ape Rides are live right now. Check back soon.
-          </p>
-        ) : (
-          <ul className="grid gap-3 sm:grid-cols-2">
-            {rides.map((r) => {
-              const isMine = r.host_id === user?.id;
-              const myReq = requests.find((q) => q.ride_id === r.id);
-              return (
-                <li
-                  key={r.id}
-                  className="glass flex items-center justify-between rounded-xl p-4 shadow-card"
-                >
-                  <div>
-                    <p className="font-display text-lg">{r.title}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Started {new Date(r.started_at).toLocaleTimeString()}
-                    </p>
-                    {myReq && (
-                      <p className="mt-1 text-[11px] text-gold">
-                        Your request: {myReq.status}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {isMine ? (
-                      <Link
-                        to="/ape-rides/$rideId"
-                        params={{ rideId: r.id }}
-                        className="rounded-md bg-gradient-gold px-3 py-2 text-xs font-semibold text-gold-foreground shadow-gold"
-                      >
-                        Open
-                      </Link>
-                    ) : myReq?.status === "accepted" ? (
-                      <Link
-                        to="/ape-rides/$rideId"
-                        params={{ rideId: r.id }}
-                        className="rounded-md bg-gradient-gold px-3 py-2 text-xs font-semibold text-gold-foreground shadow-gold"
-                      >
-                        Watch
-                      </Link>
-                    ) : myReq?.status === "pending" ? (
-                      <span className="rounded-md border border-border px-3 py-2 text-xs text-muted-foreground">
-                        Waiting…
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => handleRequest(r.id)}
-                        className="rounded-md border border-gold/40 bg-gold/10 px-3 py-2 text-xs font-semibold text-gold hover:bg-gold/20"
-                      >
-                        Request pairing
-                      </button>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
+      {/* ApeRides Checkpoint — unified chronological feed of ride signups
+          (hosts going live) and pairing requests. */}
+      <ApeRidesCheckpoint
+        rides={rides}
+        requests={requests}
+        currentUserId={user?.id}
+        loading={loading}
+        onRequest={handleRequest}
+        onEnd={handleEnd}
+      />
 
       {/* Host request inbox */}
       {myActiveRide && (
@@ -344,6 +288,146 @@ function ApeRidesPage() {
         />
       )}
     </div>
+  );
+}
+
+interface CheckpointProps {
+  rides: Ride[];
+  requests: RideRequest[];
+  currentUserId: string | undefined;
+  loading: boolean;
+  onRequest: (rideId: string) => void;
+  onEnd: (rideId: string) => void;
+}
+
+function ApeRidesCheckpoint({
+  rides,
+  requests,
+  currentUserId,
+  loading,
+  onRequest,
+  onEnd,
+}: CheckpointProps) {
+  type Entry =
+    | { kind: "ride"; at: string; ride: Ride }
+    | { kind: "request"; at: string; request: RideRequest };
+
+  const entries: Entry[] = [
+    ...rides.map((r) => ({ kind: "ride" as const, at: r.started_at, ride: r })),
+    ...requests.map((r) => ({ kind: "request" as const, at: r.created_at, request: r })),
+  ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+
+  return (
+    <section className="glass mt-2 mb-8 rounded-2xl p-6 shadow-card">
+      <div className="mb-4 flex items-baseline justify-between gap-3">
+        <h2 className="font-display text-2xl">ApeRides Checkpoint</h2>
+        <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
+          Signups · chronological
+        </span>
+      </div>
+
+      {loading ? (
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      ) : entries.length === 0 ? (
+        <p className="rounded-md border border-dashed border-border bg-secondary/30 p-6 text-center text-sm text-muted-foreground">
+          No ride signups or pairing requests yet.
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {entries.map((e) => {
+            if (e.kind === "ride") {
+              const r = e.ride;
+              const isMine = r.host_id === currentUserId;
+              const myReq = requests.find((q) => q.ride_id === r.id);
+              return (
+                <li
+                  key={`ride-${r.id}`}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gold/20 bg-background/40 p-3"
+                >
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-gold">
+                      Ride host · {isMine ? "you" : "live"}
+                    </p>
+                    <p className="font-display text-base">{r.title}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      Started {new Date(r.started_at).toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {isMine ? (
+                      <>
+                        <Link
+                          to="/ape-rides/$rideId"
+                          params={{ rideId: r.id }}
+                          className="rounded-md bg-gradient-gold px-3 py-1.5 text-xs font-semibold text-gold-foreground shadow-gold"
+                        >
+                          Open
+                        </Link>
+                        <button
+                          onClick={() => onEnd(r.id)}
+                          className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-xs text-destructive hover:bg-destructive/20"
+                        >
+                          End
+                        </button>
+                      </>
+                    ) : myReq?.status === "accepted" ? (
+                      <Link
+                        to="/ape-rides/$rideId"
+                        params={{ rideId: r.id }}
+                        className="rounded-md bg-gradient-gold px-3 py-1.5 text-xs font-semibold text-gold-foreground shadow-gold"
+                      >
+                        Watch
+                      </Link>
+                    ) : myReq?.status === "pending" ? (
+                      <span className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground">
+                        Waiting…
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => onRequest(r.id)}
+                        className="rounded-md border border-gold/40 bg-gold/10 px-3 py-1.5 text-xs font-semibold text-gold hover:bg-gold/20"
+                      >
+                        Request pairing
+                      </button>
+                    )}
+                  </div>
+                </li>
+              );
+            }
+            const q = e.request;
+            const ride = rides.find((r) => r.id === q.ride_id);
+            return (
+              <li
+                key={`req-${q.id}`}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-background/40 p-3"
+              >
+                <div className="min-w-0">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Pairing request
+                  </p>
+                  <p className="text-sm">
+                    {ride?.title ?? "Ride"}{" "}
+                    <span className="text-muted-foreground">· {q.status}</span>
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {new Date(q.created_at).toLocaleString()}
+                  </p>
+                </div>
+                {q.status === "accepted" && ride && (
+                  <Link
+                    to="/ape-rides/$rideId"
+                    params={{ rideId: ride.id }}
+                    className="shrink-0 rounded-md bg-gradient-gold px-3 py-1.5 text-xs font-semibold text-gold-foreground shadow-gold"
+                  >
+                    Watch
+                  </Link>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }
 

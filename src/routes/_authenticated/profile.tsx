@@ -101,13 +101,19 @@ function ProfilePage() {
   async function saveProfile() {
     if (!user) return;
     setSaving(true);
-    // Use .select() so we can detect RLS silently dropping the update:
-    // a blocked write returns { data: [], error: null }, which used to
-    // surface as a fake "Profile saved" toast.
+    // Upsert so email-only users (with no profile row yet) can still save.
     const { data, error } = await supabase
       .from("profiles")
-      .update({ username: username || null, bio: bio || null })
-      .eq("id", user.id)
+      .upsert(
+        {
+          id: user.id,
+          username: username || null,
+          bio: bio || null,
+          // Preserve wallet if already linked; otherwise leave null.
+          ...(profile?.wallet_address ? { wallet_address: profile.wallet_address } : {}),
+        },
+        { onConflict: "id" },
+      )
       .select("id");
     setSaving(false);
     if (error) {
@@ -115,9 +121,7 @@ function ProfilePage() {
       return;
     }
     if (!data || data.length === 0) {
-      toast.error(
-        "Couldn't save — your account isn't allowed to update this row. Check RLS policies on `profiles`.",
-      );
+      toast.error("Couldn't save your profile. Please try again.");
       return;
     }
     toast.success("Profile saved");
@@ -143,16 +147,21 @@ function ProfilePage() {
       if (upErr) throw upErr;
       const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
       const publicUrl = pub.publicUrl;
+      // Upsert so users without a profile row yet still get one created.
       const { data: rows, error: updErr } = await supabase
         .from("profiles")
-        .update({ avatar_url: publicUrl })
-        .eq("id", user.id)
+        .upsert(
+          {
+            id: user.id,
+            avatar_url: publicUrl,
+            ...(profile?.wallet_address ? { wallet_address: profile.wallet_address } : {}),
+          },
+          { onConflict: "id" },
+        )
         .select("id");
       if (updErr) throw updErr;
       if (!rows || rows.length === 0) {
-        throw new Error(
-          "Upload succeeded but the database row wasn't updated — RLS policies on `profiles` are blocking the write.",
-        );
+        throw new Error("Couldn't save your avatar. Please try again.");
       }
       setAvatarUrl(publicUrl);
       toast.success("Avatar updated");
