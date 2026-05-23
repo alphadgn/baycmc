@@ -201,7 +201,7 @@ function ProfilePage() {
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploadingAvatar}
-                className="group relative h-20 w-20 cursor-pointer overflow-hidden rounded-full border-4 border-background bg-gradient-gold shadow-gold transition hover:opacity-90 disabled:cursor-wait"
+                className="group relative h-24 w-24 cursor-pointer overflow-hidden rounded-2xl border-4 border-background bg-gradient-gold shadow-gold transition hover:opacity-90 disabled:cursor-wait"
                 aria-label="Change avatar"
               >
                 {avatarUrl ? (
