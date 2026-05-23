@@ -292,20 +292,13 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
 
   return (
     <>
-      {/* Floating "Show all panels" restore button — bottom-positioned so it
-          sits in the LiveKit bottom-bar area (per design ref IMG_2961) and is
-          always reachable above the mobile browser chrome. */}
-      <button
-        type="button"
-        onClick={resetAllPanels}
-        style={{
-          bottom: "calc(env(safe-area-inset-bottom, 0px) + 0.5rem)",
-          right: "calc(env(safe-area-inset-right, 0px) + 0.75rem)",
-        }}
-        className="fixed z-[55] rounded-full border border-gold/50 bg-background/80 px-2.5 py-1 text-[10px] font-semibold text-gold shadow-gold backdrop-blur hover:bg-gold/15"
-      >
-        Show all panels
-      </button>
+      {/* "Show all panels" was previously here. Per design update IMG_2966
+          it has been replaced by the room Participants pill, which now
+          lives in the same bottom-right slot (rendered from LiveBottomBar
+          since it needs LiveKit room context). Panel-reset is still
+          available via the waiting-list "On stage" handle.
+          We expose resetAllPanels on window so any panel that needs an
+          escape hatch can still call it. */}
 
       {/* Queue + status strip — draggable from the top handle.
           Slides off to the left edge while the song is playing. */}
