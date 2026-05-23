@@ -556,10 +556,10 @@ function OverflowStrip({
                 <img
                   src={prof.avatar_url}
                   alt={name}
-                  className="h-7 w-7 rounded-full border border-gold/40 object-cover"
+                  className="h-20 w-20 rounded-full border border-gold/40 object-cover"
                 />
               ) : (
-                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gradient-gold text-[10px] font-bold text-gold-foreground">
+                <span className="inline-flex h-20 w-20 items-center justify-center rounded-full bg-gradient-gold text-sm font-bold text-gold-foreground">
                   {initialsFor(name)}
                 </span>
               )}
