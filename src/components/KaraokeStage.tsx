@@ -282,8 +282,30 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
   }, [isPlaying]);
   const waitlistHidden = isPlaying && !forceWaitlistVisible;
 
+  function resetAllPanels() {
+    setPos({ dx: 0, dy: 0 });
+    setForceWaitlistVisible(true);
+    setPaused(false);
+    // Tell the music machine to reopen + expand.
+    window.dispatchEvent(new CustomEvent("karaoke:reset-panels"));
+  }
+
   return (
     <>
+      {/* Floating "Show all panels" restore button — always reachable so the
+          user can never lose access to a hidden container. */}
+      <button
+        type="button"
+        onClick={resetAllPanels}
+        style={{
+          top: "calc(env(safe-area-inset-top, 0px) + 4.5rem)",
+          right: "calc(env(safe-area-inset-right, 0px) + 0.75rem)",
+        }}
+        className="fixed z-[55] rounded-full border border-gold/50 bg-background/80 px-2.5 py-1 text-[10px] font-semibold text-gold shadow-gold backdrop-blur hover:bg-gold/15"
+      >
+        Show all panels
+      </button>
+
       {/* Queue + status strip — draggable from the top handle.
           Slides off to the left edge while the song is playing. */}
       <div
