@@ -118,6 +118,17 @@ export function KaraokeMusicBoard({
       setMusicShared(false);
     }
   }, [videoId, paused, musicShared]);
+  // Listen to room-wide music-shared state — non-performers use this to
+  // mute their local iframe so they hear music exactly once (via LiveKit).
+  useEffect(() => {
+    function onShared(e: Event) {
+      setMusicShared(!!(e as CustomEvent<{ shared: boolean }>).detail?.shared);
+    }
+    window.addEventListener("karaoke:music-shared", onShared as EventListener);
+    return () =>
+      window.removeEventListener("karaoke:music-shared", onShared as EventListener);
+  }, []);
+
 
 
   // Mobile hint: first time the music machine opens on a small screen, show
