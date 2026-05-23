@@ -97,6 +97,29 @@ export function KaraokeMusicBoard({
     );
   }
 
+  // Music broadcast state — the performer publishes their tab audio to LiveKit
+  // so every viewer (and any recording) hears the music. Non-performers mute
+  // their own iframe so they hear the music exactly once via LiveKit.
+  const [musicShared, setMusicShared] = useState(false);
+  function shareMusicToRoom() {
+    window.dispatchEvent(
+      new CustomEvent("karaoke:publish-music", { detail: { play: true } }),
+    );
+    setMusicShared(true);
+  }
+  function stopSharingMusic() {
+    window.dispatchEvent(new CustomEvent("karaoke:unpublish-music"));
+    setMusicShared(false);
+  }
+  // Auto-stop sharing when the track ends or playback stops.
+  useEffect(() => {
+    if (musicShared && (!videoId || paused)) {
+      window.dispatchEvent(new CustomEvent("karaoke:unpublish-music"));
+      setMusicShared(false);
+    }
+  }, [videoId, paused, musicShared]);
+
+
   // Mobile hint: first time the music machine opens on a small screen, show
   // a one-time overlay explaining the transport controls. Dismissable.
   const [showHint, setShowHint] = useState(false);
