@@ -48,7 +48,7 @@ interface ConferenceRoomProps {
   roomName: string;
   ambience?: string | null;
   backgroundImage?: string | null;
-  kind?: "conference" | "game";
+  kind?: "conference" | "game" | "karaoke";
   /** Booking owner of the currently-active slot, or null for free-use sessions. */
   hostUserId?: string | null;
 }
@@ -246,7 +246,7 @@ function PreLivePanel({
   onRetry,
 }: {
   state: JoinState;
-  kind: "conference" | "game";
+  kind: "conference" | "game" | "karaoke";
   backgroundImage: string | null;
   roomName: string;
   onRetry: () => void;
@@ -290,7 +290,7 @@ function IdleHero({
   onJoin,
 }: {
   roomName: string;
-  kind: "conference" | "game";
+  kind: "conference" | "game" | "karaoke";
   onJoin: () => void;
 }) {
   return (
@@ -513,7 +513,7 @@ function VideoArea({
   hostUserId,
 }: {
   backgroundImage: string | null;
-  kind: "conference" | "game";
+  kind: "conference" | "game" | "karaoke";
   roomName: string;
   hostUserId: string | null;
 }) {
@@ -541,7 +541,12 @@ function VideoArea({
   }
 
   return (
-    <AmaConference roomName={roomName} hostUserId={hostUserId} backgroundImage={backgroundImage} />
+    <AmaConference
+      roomName={roomName}
+      hostUserId={hostUserId}
+      backgroundImage={backgroundImage}
+      karaoke={kind === "karaoke"}
+    />
   );
 }
 

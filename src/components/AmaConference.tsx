@@ -21,6 +21,12 @@ interface AmaConferenceProps {
   roomName: string;
   hostUserId: string | null;
   backgroundImage: string | null;
+  /**
+   * Karaoke rooms shrink the host pfp tile to half its conference size and
+   * render audience tiles at the same reduced footprint, so the stage stays
+   * focused on the music machine rather than the camera grid.
+   */
+  karaoke?: boolean;
 }
 
 // Audience grid is a fixed 4 across × 5 down = 20 tiles; everyone past that
@@ -39,7 +45,7 @@ const MAX_AUDIENCE_TILES = AUDIENCE_COLS * AUDIENCE_ROWS;
  * Host = the booking owner of the currently-active slot. Without a booking
  * (or before the booking owner joins) the host slot shows the room wallpaper.
  */
-export function AmaConference({ roomName, hostUserId, backgroundImage }: AmaConferenceProps) {
+export function AmaConference({ roomName, hostUserId, backgroundImage, karaoke = false }: AmaConferenceProps) {
   const participants = useParticipants();
 
   // Two queries: every participant's camera track (with placeholders so we
@@ -87,6 +93,7 @@ export function AmaConference({ roomName, hostUserId, backgroundImage }: AmaConf
       profiles={profiles}
       backgroundImage={backgroundImage}
       hasActiveBooking={hostUserId !== null}
+      karaoke={karaoke}
     />
   );
 }
@@ -103,6 +110,7 @@ interface AmaGridLayoutProps {
   profiles: Map<string, ProfileMini>;
   backgroundImage: string | null;
   hasActiveBooking: boolean;
+  karaoke?: boolean;
 }
 
 function AmaGridLayout({
@@ -113,6 +121,7 @@ function AmaGridLayout({
   profiles,
   backgroundImage,
   hasActiveBooking,
+  karaoke = false,
 }: AmaGridLayoutProps) {
   const total = audienceParticipants.length;
   const visibleCount = Math.min(total, MAX_AUDIENCE_TILES);
@@ -125,8 +134,10 @@ function AmaGridLayout({
   // handled by LiveRightRail in ConferenceRoom.tsx.
   const showHostTile = hostParticipant !== null;
   // Host is alone (no audience) → blow the host card up to a Discord-style
-  // self-view so the user can actually see themselves on mobile.
-  const hostSolo = showHostTile && visibleCount === 0;
+  // self-view so the user can actually see themselves on mobile. In karaoke
+  // rooms we keep the host card at its halved footprint even when solo so
+  // there's always room for the music machine on top of the stage.
+  const hostSolo = showHostTile && visibleCount === 0 && !karaoke;
 
   // Adaptive responsive columns. The original spec is 4 across × 5 down as
   // the room fills up, but with only a handful of people we drop to 2–3
@@ -140,6 +151,15 @@ function AmaGridLayout({
         ? "grid-cols-2 sm:grid-cols-3"
         : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4";
 
+  // Karaoke mode: host pfp tile is halved from the conference w-1/2 down to
+  // w-1/4, and every audience tile renders at the same w-1/4 footprint so
+  // every member's pfp tile matches the host's size on stage.
+  const hostWrapperClass = karaoke
+    ? "mx-auto w-1/4"
+    : hostSolo
+      ? "mx-auto w-full max-w-2xl"
+      : "mx-auto w-1/2";
+
   return (
     <div className="flex min-h-[60vh] flex-col gap-4 p-4 sm:p-6">
       {/* Host stays affixed to the top of the room while the audience grid
@@ -152,7 +172,7 @@ function AmaGridLayout({
               audience present the host card is halved — centered at 50%
               width — so it stays the focal point without dominating the
               attendee thumbnails below it. */}
-          <div className={hostSolo ? "mx-auto w-full max-w-2xl" : "mx-auto w-1/2"}>
+          <div className={hostWrapperClass}>
             <HostTile
               participant={hostParticipant}
               cameraTracks={cameraTracks}
@@ -170,6 +190,21 @@ function AmaGridLayout({
           // Hide the "no one else here yet" copy when the host is alone —
           // their big solo card already speaks for itself.
           hostSolo ? null : <EmptyAudience roomName={roomName} />
+        ) : karaoke ? (
+          // Karaoke: render every attendee at the same w-1/4 footprint as
+          // the host pfp so the stage stays consistent regardless of how
+          // many people are in the room.
+          <div className="flex flex-wrap justify-center gap-2 sm:gap-3">
+            {visible.map((p) => (
+              <div key={p.identity} className="w-1/4 min-w-0">
+                <AudienceTile
+                  participant={p}
+                  cameraTracks={cameraTracks}
+                  profile={profiles.get(p.identity) ?? null}
+                />
+              </div>
+            ))}
+          </div>
         ) : visibleCount === 1 ? (
           // Discord-style solo card for the lone occupant. Fills the column
           // on mobile (3:4 portrait so the face is actually visible), caps
