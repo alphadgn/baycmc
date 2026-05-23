@@ -155,10 +155,20 @@ export function KaraokeMusicBoard({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed bottom-4 right-4 z-40 inline-flex items-center gap-2 rounded-full border border-gold/40 bg-background/80 px-3 py-1.5 text-[11px] font-semibold text-gold shadow-gold backdrop-blur transition hover:bg-gold/10"
+        aria-label="Open music machine"
+        className="group fixed bottom-4 right-4 z-40 inline-flex items-center gap-2 rounded-full border border-gold/60 bg-background/80 px-3 py-1.5 text-[11px] font-semibold text-gold shadow-gold backdrop-blur transition hover:bg-gold/10"
       >
-        <Music className="h-3.5 w-3.5" />
-        Music Machine
+        {/* Pulsing rings — pure CSS, no extra deps */}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-0 rounded-full ring-2 ring-gold/60 animate-ping"
+        />
+        <span
+          aria-hidden
+          className="pointer-events-none absolute -inset-1 rounded-full bg-gold/20 blur-md animate-pulse"
+        />
+        <Music className="relative h-3.5 w-3.5 animate-pulse" />
+        <span className="relative">Music Machine</span>
       </button>
     );
   }
