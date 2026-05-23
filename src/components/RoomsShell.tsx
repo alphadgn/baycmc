@@ -52,7 +52,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: "/", label: "Home", tier: "all", icon: <Home className="h-4 w-4" /> },
+  { to: "/lobby", label: "Home", tier: "all", icon: <Home className="h-4 w-4" /> },
   { to: "/lobby", label: "Public Lobby", tier: "all", icon: <Users className="h-4 w-4" /> },
   { to: "/feed", label: "Holders Chat", tier: "verified", icon: <Sparkles className="h-4 w-4" /> },
   {
@@ -266,7 +266,7 @@ function Sidebar({
   return (
     <nav className={`flex flex-col ${className ?? ""}`} aria-label="Primary">
       <div className="flex h-16 items-center justify-between border-b border-border/60 px-4">
-        <Link to="/" onClick={onNavigate} className="flex items-center gap-2 font-display text-sm">
+        <Link to="/lobby" onClick={onNavigate} className="flex items-center gap-2 font-display text-sm">
           <span className="flex h-7 w-7 items-center justify-center rounded-md bg-gradient-gold font-display text-base font-bold text-gold-foreground shadow-gold">
             B
           </span>
