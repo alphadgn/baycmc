@@ -92,9 +92,25 @@ export function KaraokeMusicBoard({
       window.removeEventListener("karaoke:mic-state", onState as EventListener);
   }, []);
   function toggleMic() {
+    const next = !micOn;
     window.dispatchEvent(
-      new CustomEvent("karaoke:toggle-mic", { detail: { enabled: !micOn } }),
+      new CustomEvent("karaoke:toggle-mic", { detail: { enabled: next } }),
     );
+    // When the performer unmutes during playback, also broadcast the music
+    // track to the room so every participant (and the recording) hears both
+    // the singer AND the music simultaneously. On desktop this uses tab-audio
+    // capture via getDisplayMedia; on mobile that API is unavailable, so the
+    // ConferenceRoom bridge falls back to capturing the music acoustically
+    // through the (echo-cancellation-disabled) mic — keep the device speaker
+    // on so the mic picks it up.
+    if (isMyTurn && next && videoId && !paused) {
+      window.dispatchEvent(
+        new CustomEvent("karaoke:publish-music", { detail: { play: true } }),
+      );
+    }
+    if (isMyTurn && !next) {
+      window.dispatchEvent(new CustomEvent("karaoke:unpublish-music"));
+    }
   }
 
   // Music broadcast state — the performer publishes their tab audio to LiveKit
