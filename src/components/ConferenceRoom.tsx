@@ -898,10 +898,31 @@ function LivePreferencesPanel({ isHost }: { isHost: boolean }) {
     setPrefs({ micEnabled: v });
     try {
       await local.localParticipant.setMicrophoneEnabled(v);
+      window.dispatchEvent(
+        new CustomEvent("karaoke:mic-state", { detail: { enabled: v } }),
+      );
     } catch (e) {
       console.warn("toggleMic", e);
     }
   }
+
+  // Bridge: the karaoke music machine sits outside this LiveKit provider
+  // and dispatches "karaoke:toggle-mic" to ask us to flip the mic.
+  useEffect(() => {
+    function onReq(e: Event) {
+      const next = !!(e as CustomEvent<{ enabled: boolean }>).detail?.enabled;
+      void toggleMic(next);
+    }
+    window.addEventListener("karaoke:toggle-mic", onReq as EventListener);
+    // Broadcast initial state so the music machine shows correct mic status.
+    window.dispatchEvent(
+      new CustomEvent("karaoke:mic-state", { detail: { enabled: prefs.micEnabled } }),
+    );
+    return () =>
+      window.removeEventListener("karaoke:toggle-mic", onReq as EventListener);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefs.micEnabled, micLocked]);
+
   async function toggleCam(v: boolean) {
     setPrefs({ cameraEnabled: v });
     try {
