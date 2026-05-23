@@ -196,7 +196,7 @@ function AmaGridLayout({
           // many people are in the room.
           <div className="flex flex-wrap justify-center gap-2 sm:gap-3">
             {visible.map((p) => (
-              <div key={p.identity} className="w-1/4 min-w-0">
+              <div key={p.identity} className="w-20 min-w-0">
                 <AudienceTile
                   participant={p}
                   cameraTracks={cameraTracks}
