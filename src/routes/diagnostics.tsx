@@ -195,7 +195,7 @@ function DiagnosticsPage() {
                   </div>
                   <div className="mt-1 text-sm text-foreground">{e.message}</div>
                   {e.data && (
-                    <pre className="mt-1 overflow-auto rounded bg-background/40 px-2 py-1 font-mono text-[10px] text-muted-foreground">
+                    <pre className="mt-1 overflow-x-hidden overflow-y-auto rounded bg-background/40 px-2 py-1 font-mono text-[10px] text-muted-foreground">
                       {JSON.stringify(e.data, null, 2)}
                     </pre>
                   )}
@@ -235,7 +235,7 @@ function DiagnosticsPage() {
                     </div>
                   )}
                   {e.stack && (
-                    <pre className="mt-2 max-h-72 overflow-auto rounded-md bg-background/40 px-3 py-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
+                    <pre className="mt-2 max-h-72 overflow-x-hidden overflow-y-auto rounded-md bg-background/40 px-3 py-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
                       {e.stack}
                     </pre>
                   )}

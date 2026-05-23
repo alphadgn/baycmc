@@ -102,7 +102,7 @@ export function GifPicker({ onPick }: GifPickerProps) {
         // with `h-auto`, and `break-inside-avoid` stops a single thumb
         // from being split across columns. Replaces the prior grid of
         // fixed-height `object-cover` tiles, which cropped every GIF.
-        <div className="flex-1 overflow-y-auto p-2">
+        <div className="flex-1 overflow-x-hidden overflow-y-auto p-2">
           <div className="columns-2 gap-2 sm:columns-3 [&>*]:mb-2">
             {items.map((g) => (
               <button

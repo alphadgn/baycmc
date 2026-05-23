@@ -1103,7 +1103,7 @@ function HostControlsPanel({ roomId }: { roomId: string }) {
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
             Kick participant
           </p>
-          <ul className="mt-1 max-h-44 space-y-1 overflow-y-auto">
+          <ul className="mt-1 max-h-44 space-y-1 overflow-x-hidden overflow-y-auto">
             {others.length === 0 ? (
               <li className="text-[11px] italic text-muted-foreground">No other participants.</li>
             ) : (
@@ -1346,7 +1346,7 @@ function BottomControl({
           {open && (
             <ul
               role="menu"
-              className="absolute bottom-[calc(100%+6px)] left-0 z-50 max-h-64 w-64 overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-lg"
+              className="absolute bottom-[calc(100%+6px)] left-0 z-50 max-h-64 w-64 max-w-[calc(100vw-2rem)] overflow-x-hidden overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-lg"
             >
               {devices!.map((d) => {
                 const checked = d.deviceId === activeDeviceId;

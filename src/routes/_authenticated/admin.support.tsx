@@ -116,7 +116,7 @@ function AdminSupport() {
       </header>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 md:grid-cols-[280px,1fr]">
-        <aside className="glass min-h-0 overflow-y-auto rounded-2xl border border-border/60 p-2">
+        <aside className="glass min-h-0 overflow-x-hidden overflow-y-auto rounded-2xl border border-border/60 p-2">
           {loading ? (
             <div className="space-y-1.5 p-1">
               {[1, 2, 3].map((i) => (
