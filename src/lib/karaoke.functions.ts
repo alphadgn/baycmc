@@ -175,22 +175,56 @@ export const seedKaraokeCatalog = createServerFn({ method: "POST" })
     ];
 
     const collected: Array<{ title: string; artist: string | null }> = [];
+    const seen = new Set<string>();
+
     for (const url of sources) {
       try {
-        const r = await fc.scrape(url, { formats: ["markdown"], onlyMainContent: true });
-        const md =
-          (r as { markdown?: string }).markdown ??
-          (r as { data?: { markdown?: string } }).data?.markdown ??
-          "";
-        // KaraFun chart rows roughly look like "Song Title  —  Artist" in markdown
-        for (const line of md.split("\n")) {
-          const m = line.match(/^\s*\d+\.?\s+(.+?)\s+[-–—]\s+(.+?)\s*$/);
-          if (m) {
-            const title = m[1].replace(/\*\*/g, "").trim();
-            const artist = m[2].replace(/\*\*/g, "").trim();
-            if (title && artist && title.length < 200 && artist.length < 200) {
-              collected.push({ title, artist });
-            }
+        // Use Firecrawl JSON extraction — KaraFun's markdown layout is
+        // inconsistent across pages, so a regex over markdown produced 0
+        // hits. The JSON/prompt format reliably returns title+artist pairs.
+        const r = (await fc.scrape(url, {
+          formats: [
+            {
+              type: "json",
+              prompt:
+                "Extract every karaoke song listed on this KaraFun chart page as an array named 'songs'. Each item must have 'title' (song name only, no artist) and 'artist' (performer name). Do not invent songs. Return up to 200 songs from this page in chart order.",
+            },
+            "markdown",
+          ],
+          onlyMainContent: true,
+        })) as {
+          json?: { songs?: Array<{ title?: string; artist?: string }> };
+          data?: { json?: { songs?: Array<{ title?: string; artist?: string }> }; markdown?: string };
+          markdown?: string;
+        };
+
+        const songs = r.json?.songs ?? r.data?.json?.songs ?? [];
+        for (const s of songs) {
+          const title = (s.title ?? "").replace(/\s+/g, " ").trim();
+          const artist = (s.artist ?? "").replace(/\s+/g, " ").trim();
+          if (!title || !artist) continue;
+          if (title.length > 200 || artist.length > 200) continue;
+          const key = `${normalize(title)}|${normalize(artist)}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          collected.push({ title, artist });
+        }
+
+        // Fallback: also try parsing the markdown if JSON missed it.
+        const md = r.markdown ?? r.data?.markdown ?? "";
+        if (songs.length === 0 && md) {
+          for (const line of md.split("\n")) {
+            const m =
+              line.match(/^\s*\d+\.?\s+\**(.+?)\**\s+[-–—|]\s+\**(.+?)\**\s*$/) ||
+              line.match(/^\s*\[(.+?)\]\(.+?\)\s+[-–—|]\s+(.+?)\s*$/);
+            if (!m) continue;
+            const title = m[1].trim();
+            const artist = m[2].trim();
+            if (!title || !artist) continue;
+            const key = `${normalize(title)}|${normalize(artist)}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            collected.push({ title, artist });
           }
         }
       } catch (e) {
