@@ -112,11 +112,36 @@ export function KaraokeMusicBoard({
     return null;
   }
 
-  function runSearch(q: string) {
+  async function runSearch(q: string) {
     if (!isMyTurn) return;
     const trimmed = q.trim();
     if (!trimmed) return;
-    onChangeTrack({ videoId: null, activeQuery: `${trimmed} karaoke` });
+    setSearching(true);
+    setSearchError(null);
+    setResults(null);
+    try {
+      const res = await runSongSearch({ data: { query: trimmed } });
+      setResults(res.hits);
+      setSearchSource(res.source);
+      if (res.hits.length === 0) {
+        setSearchError("No tracks found. Try a different title or artist.");
+      }
+    } catch (e) {
+      setSearchError(e instanceof Error ? e.message : "Search failed");
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  function pickHit(hit: SongHit) {
+    if (!isMyTurn) return;
+    if (hit.youtubeId) {
+      onChangeTrack({ videoId: hit.youtubeId, activeQuery: null });
+    } else if (hit.url) {
+      const id = extractYouTubeId(hit.url);
+      if (id) onChangeTrack({ videoId: id, activeQuery: null });
+    }
+    setResults(null);
   }
 
   function playUrl() {
