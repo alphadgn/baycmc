@@ -335,7 +335,9 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
             </p>
           </>
         )}
+        </div>
       </div>
+
 
       <KaraokeMusicBoard
         isMyTurn={isMyTurn}
