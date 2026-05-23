@@ -127,7 +127,7 @@ export function LobbyOnlineAvatars({ max = 12 }: LobbyOnlineAvatarsProps) {
             <li
               key={m.user_id}
               title={name}
-              className="inline-flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border border-background bg-gradient-gold ring-1 ring-gold/40"
+              className="inline-flex h-7 w-7 items-center justify-center overflow-hidden rounded-full border border-background bg-gradient-gold ring-1 ring-gold/40"
             >
               {m.avatar_url ? (
                 <img src={m.avatar_url} alt={name} className="h-full w-full object-cover" />
