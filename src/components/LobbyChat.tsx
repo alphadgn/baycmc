@@ -1048,10 +1048,6 @@ function MessageRow({
       </div>
       <div
         className="group flex items-start gap-2.5 rounded-lg px-2 py-1.5 transition hover:bg-secondary/30 sm:gap-3"
-        style={{
-          transform: dragX !== 0 ? `translateX(${dragX}px)` : undefined,
-          transition: dragX === 0 ? "transform 180ms ease-out" : "none",
-        }}
       >
         <div className="h-20 w-20 shrink-0 overflow-hidden rounded-full border border-border bg-gradient-gold">
           {author?.avatar_url ? (
