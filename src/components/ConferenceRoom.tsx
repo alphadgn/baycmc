@@ -513,7 +513,7 @@ function VideoArea({
   hostUserId,
 }: {
   backgroundImage: string | null;
-  kind: "conference" | "game";
+  kind: "conference" | "game" | "karaoke";
   roomName: string;
   hostUserId: string | null;
 }) {
