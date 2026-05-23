@@ -65,7 +65,7 @@ function LobbyPage() {
   return (
     <main
       className="relative flex flex-col overflow-hidden"
-      style={{ height: "calc(100dvh - 4rem - env(safe-area-inset-top, 0px))" }}
+      style={{ height: "calc(100dvh - 4rem - max(env(safe-area-inset-top, 0px), 0.75rem))" }}
     >
       {/* Faded full-page backdrop using the same lobby image. Matches the
           treatment conference rooms get via RoomsShell. */}
