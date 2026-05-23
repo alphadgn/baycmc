@@ -355,7 +355,7 @@ export function KaraokeMusicBoard({
 
       {/* Transport controls — always visible whenever a track is loaded */}
       {videoId && (
-        <div className="flex items-center justify-center gap-2 border-b border-gold/10 bg-[#0a0a0a] px-2 py-2">
+        <div className="flex flex-wrap items-center justify-center gap-2 border-b border-gold/10 bg-[#0a0a0a] px-2 py-2">
           <button
             type="button"
             onClick={handlePause}
@@ -373,8 +373,42 @@ export function KaraokeMusicBoard({
           >
             <Square className="h-3 w-3" /> Stop
           </button>
+          <button
+            type="button"
+            onClick={toggleMic}
+            aria-label={micOn ? "Mute mic" : "Unmute mic"}
+            className={`inline-flex items-center gap-1 rounded-sm border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider transition ${
+              micOn
+                ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"
+                : "border-gold/40 bg-gold/10 text-gold hover:bg-gold/20"
+            }`}
+          >
+            {micOn ? <Mic className="h-3 w-3" /> : <MicOff className="h-3 w-3" />}
+            {micOn ? "Mic Live" : "Mic Off"}
+          </button>
         </div>
       )}
+
+      {/* Mobile-only one-time hint overlay */}
+      {showHint && (
+        <div className="border-b border-gold/20 bg-gradient-to-b from-gold/15 to-transparent p-2 text-[10px] text-gold sm:hidden">
+          <div className="flex items-start justify-between gap-2">
+            <p className="leading-snug">
+              <strong>Music Machine tips:</strong> tap a song or pad to play ·
+              use Pause / Stop above the screen · tap the Mic button to be
+              heard by the room · drag the top bar to move · × closes.
+            </p>
+            <button
+              type="button"
+              onClick={dismissHint}
+              className="shrink-0 rounded-sm border border-gold/40 bg-gold/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-gold hover:bg-gold/25"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
+
 
       {/* Everything below collapses while the video is actively playing */}
       {!minimized && (
