@@ -385,6 +385,8 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
         activeQuery={session.search_query}
         onChangeTrack={onChangeTrack}
         onEndSong={bookingHostUserId ? undefined : onEndSong}
+        paused={paused}
+        onPauseToggle={setPaused}
       />
     </>
   );
