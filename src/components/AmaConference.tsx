@@ -151,14 +151,11 @@ function AmaGridLayout({
         ? "grid-cols-2 sm:grid-cols-3"
         : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4";
 
-  // Karaoke mode: host pfp tile is halved from the conference w-1/2 down to
-  // w-1/4, and every audience tile renders at the same w-1/4 footprint so
-  // every member's pfp tile matches the host's size on stage.
-  const hostWrapperClass = karaoke
-    ? "mx-auto w-20"
-    : hostSolo
-      ? "mx-auto w-full max-w-2xl"
-      : "mx-auto w-1/2";
+  // All rooms (conference + karaoke): cap host pfp tile and every audience
+  // tile to a fixed 80px (w-20) footprint so video thumbnails never balloon
+  // beyond the avatar size shown in the reference screenshot.
+  const hostWrapperClass = "mx-auto w-20";
+
 
   return (
     <div className="flex min-h-[60vh] flex-col gap-4 p-4 sm:p-6">
