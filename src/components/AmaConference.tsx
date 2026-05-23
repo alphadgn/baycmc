@@ -45,7 +45,7 @@ const MAX_AUDIENCE_TILES = AUDIENCE_COLS * AUDIENCE_ROWS;
  * Host = the booking owner of the currently-active slot. Without a booking
  * (or before the booking owner joins) the host slot shows the room wallpaper.
  */
-export function AmaConference({ roomName, hostUserId, backgroundImage }: AmaConferenceProps) {
+export function AmaConference({ roomName, hostUserId, backgroundImage, karaoke = false }: AmaConferenceProps) {
   const participants = useParticipants();
 
   // Two queries: every participant's camera track (with placeholders so we
@@ -93,6 +93,7 @@ export function AmaConference({ roomName, hostUserId, backgroundImage }: AmaConf
       profiles={profiles}
       backgroundImage={backgroundImage}
       hasActiveBooking={hostUserId !== null}
+      karaoke={karaoke}
     />
   );
 }
