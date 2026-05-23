@@ -32,14 +32,27 @@ export function AuthRedirectWatcher() {
       const wasSignedIn = hadSessionRef.current === true;
       hadSessionRef.current = hasSession;
 
+      const current = router.state.location.pathname;
+
+      // On a fresh sign-in (transition from no-session → session), land
+      // the user at the top of the lobby. The lobby is the post-auth
+      // home page for every member. Skip if they're already deep in the
+      // app on an authenticated route.
+      if (hasSession && !wasSignedIn && event === "SIGNED_IN") {
+        if (current === "/" || current === "/login") {
+          void router.navigate({ to: "/lobby", replace: true });
+        }
+        return;
+      }
+
       // We only care about transitions to "no session" from a previously
       // signed-in state. SIGNED_OUT, USER_DELETED, and refresh failures
       // all emit a null session — we route them all to `/`.
       if (hasSession) return;
       if (!wasSignedIn) return;
 
-      const current = router.state.location.pathname;
       if (PUBLIC_ROUTES.has(current)) return;
+
 
       // Use `replace: true` so the back button doesn't take the user
       // straight back into a now-unauthorized route.

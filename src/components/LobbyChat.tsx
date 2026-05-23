@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { format, isSameDay } from "date-fns";
 import {
   Check,
+  ChevronDown,
   Copy,
   CornerDownLeft,
   Hash,
@@ -16,6 +17,7 @@ import {
   Users,
   X,
 } from "lucide-react";
+
 import { toast } from "sonner";
 import { supabase as typedSupabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
@@ -126,9 +128,11 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
   // Long-press / right-click on a message opens this bottom action sheet.
   // Stored as the full message object so the sheet can render context.
   const [actionTarget, setActionTarget] = useState<LobbyMessage | null>(null);
+  const [showJumpToBottom, setShowJumpToBottom] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+
 
   const hydrateProfiles = useCallback(
     async (msgs: LobbyMessage[]) => {
@@ -251,12 +255,33 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
     };
   }, [hydrateProfiles]);
 
-  // Scroll to bottom on new message
+  // Auto-scroll only when the user is already near the bottom, so users
+  // landing in the lobby stay at the top of the thread and can scroll
+  // down on their own. Track scroll position to toggle the jump button.
+  const nearBottomRef = useRef(false);
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    if (nearBottomRef.current) {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    }
   }, [messages.length]);
+
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const near = distance < 80;
+    nearBottomRef.current = near;
+    setShowJumpToBottom(!near && el.scrollHeight > el.clientHeight + 40);
+  }, []);
+
+  const scrollToBottom = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, []);
+
 
   const messageById = useMemo(() => {
     const m = new Map<string, LobbyMessage>();
@@ -483,49 +508,66 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
       </div>
 
       {/* Message stream */}
-      <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto p-2 sm:p-4">
-        {loading ? (
-          <div className="space-y-2">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-14 animate-pulse rounded-lg bg-muted/20" />
-            ))}
-          </div>
-        ) : messages.length === 0 ? (
-          <p className="py-12 text-center text-sm text-muted-foreground">
-            Welcome to the lobby. Say hi 👋
-          </p>
-        ) : (
-          enriched.map(({ msg, showDate, date }) => (
-            <div key={msg.id}>
-              {showDate && (
-                <div className="my-3 flex items-center gap-3 px-2 text-[10px] uppercase tracking-wider text-muted-foreground">
-                  <span className="h-px flex-1 bg-border/60" />
-                  <span>{format(date, "EEE, MMM d, yyyy")}</span>
-                  <span className="h-px flex-1 bg-border/60" />
-                </div>
-              )}
-              <MessageRow
-                message={msg}
-                author={profiles[msg.user_id]}
-                replyTarget={msg.reply_to_id ? (messageById.get(msg.reply_to_id) ?? null) : null}
-                replyTargetAuthor={
-                  msg.reply_to_id
-                    ? (profiles[messageById.get(msg.reply_to_id)?.user_id ?? ""] ?? null)
-                    : null
-                }
-                reactions={reactions[msg.id] ?? []}
-                currentUserId={user?.id ?? null}
-                onReply={() => {
-                  setReplyTo(msg);
-                  setEditing(null);
-                }}
-                onReact={(emoji) => toggleReaction(msg.id, emoji)}
-                onLongPress={() => setActionTarget(msg)}
-              />
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="flex-1 space-y-2 overflow-y-auto p-2 sm:p-4"
+        >
+          {loading ? (
+            <div className="space-y-2">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="h-14 animate-pulse rounded-lg bg-muted/20" />
+              ))}
             </div>
-          ))
+          ) : messages.length === 0 ? (
+            <p className="py-12 text-center text-sm text-muted-foreground">
+              Welcome to the lobby. Say hi 👋
+            </p>
+          ) : (
+            enriched.map(({ msg, showDate, date }) => (
+              <div key={msg.id}>
+                {showDate && (
+                  <div className="my-3 flex items-center gap-3 px-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+                    <span className="h-px flex-1 bg-border/60" />
+                    <span>{format(date, "EEE, MMM d, yyyy")}</span>
+                    <span className="h-px flex-1 bg-border/60" />
+                  </div>
+                )}
+                <MessageRow
+                  message={msg}
+                  author={profiles[msg.user_id]}
+                  replyTarget={msg.reply_to_id ? (messageById.get(msg.reply_to_id) ?? null) : null}
+                  replyTargetAuthor={
+                    msg.reply_to_id
+                      ? (profiles[messageById.get(msg.reply_to_id)?.user_id ?? ""] ?? null)
+                      : null
+                  }
+                  reactions={reactions[msg.id] ?? []}
+                  currentUserId={user?.id ?? null}
+                  onReply={() => {
+                    setReplyTo(msg);
+                    setEditing(null);
+                  }}
+                  onReact={(emoji) => toggleReaction(msg.id, emoji)}
+                  onLongPress={() => setActionTarget(msg)}
+                />
+              </div>
+            ))
+          )}
+        </div>
+        {showJumpToBottom && (
+          <button
+            type="button"
+            onClick={scrollToBottom}
+            aria-label="Jump to latest message"
+            className="absolute bottom-3 right-3 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full border border-gold/40 bg-background/90 text-gold shadow-gold backdrop-blur transition hover:bg-background"
+          >
+            <ChevronDown className="h-5 w-5" />
+          </button>
         )}
       </div>
+
 
       {replyTo && !editing && (
         <div className="flex items-center justify-between gap-2 border-t border-border/60 bg-muted/10 px-3 py-2 text-xs sm:px-4">
