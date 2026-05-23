@@ -996,10 +996,9 @@ function MessageRow({
       clearLongPress();
     }
     if (d.decided === "scroll") return;
-    // Only left-swipe counts. Clamp to a sane max so the row can't
-    // disappear off-screen.
-    const next = Math.max(-96, Math.min(0, dx));
-    setDragX(next);
+    // Horizontal movement disabled — long-press still opens the action sheet
+    // (which includes Reply). Just consume the gesture without translating.
+    return;
   }
 
   function onTouchEnd() {
