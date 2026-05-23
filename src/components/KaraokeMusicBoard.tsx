@@ -155,6 +155,7 @@ export function KaraokeMusicBoard({
     function onReset() {
       setOpen(true);
       setForceExpanded(true);
+      setPos({ dx: 0, dy: 0 });
     }
     window.addEventListener("karaoke:reset-panels", onReset);
     return () => window.removeEventListener("karaoke:reset-panels", onReset);
