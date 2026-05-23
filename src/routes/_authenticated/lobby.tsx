@@ -1,9 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { Lock } from "lucide-react";
-import { toast } from "sonner";
-import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import { LobbyChat } from "@/components/LobbyChat";
+
 
 // Lazy, optional asset import — Vite resolves the file at build time only if
 // it exists, so the lobby falls back to a gold gradient until the operator
@@ -36,18 +34,7 @@ export const Route = createFileRoute("/_authenticated/lobby")({
   component: LobbyPage,
 });
 
-function triggerVerify() {
-  window.dispatchEvent(new Event("baycmc:privy-bridge-retry"));
-  toast.message("Re-checking BAYC/MAYC ownership…", {
-    description:
-      "Approve the signature in your wallet — we'll unlock the verified areas the moment it confirms.",
-    duration: 5000,
-  });
-}
-
 function LobbyPage() {
-  const { isVerifiedHolder, loading: verifLoading } = useVerificationStatus();
-  const showVerifyCta = !verifLoading && !isVerifiedHolder;
 
   // Lock body scroll while the lobby is mounted so the page can't scroll
   // behind the hero — only the chat thread's own scroll container moves.
