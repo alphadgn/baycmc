@@ -138,7 +138,7 @@ export function LobbyOnlineAvatars({ max = 12 }: LobbyOnlineAvatarsProps) {
           );
         })}
         {overflow > 0 && (
-          <li className="inline-flex h-20 min-w-[5rem] items-center justify-center rounded-full border border-background bg-secondary px-2 text-sm font-semibold text-foreground ring-1 ring-border">
+          <li className="inline-flex h-7 min-w-[1.75rem] items-center justify-center rounded-full border border-background bg-secondary px-2 text-[10px] font-semibold text-foreground ring-1 ring-border">
             +{overflow}
           </li>
         )}
