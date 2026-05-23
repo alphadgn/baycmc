@@ -52,7 +52,6 @@ export function InactivityWatcher() {
       }
       clearWalletAuthLocalState();
       toast.info("Signed out after 5 minutes of inactivity.", {
-        description: "Re-enter through the wallet sign-in modal to continue.",
         duration: 8000,
       });
     };

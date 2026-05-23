@@ -30,8 +30,8 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: "/lobby", label: "Lobby", tier: "all" },
-  { to: "/feed", label: "Feed", tier: "verified" },
+  { to: "/lobby", label: "Public Lobby", tier: "all" },
+  { to: "/feed", label: "Holders Chat", tier: "verified" },
   { to: "/rooms", label: "Conference Rooms", tier: "verified" },
   { to: "/ape-rides", label: "Ape Rides", tier: "verified" },
   { to: "/lifers/messages", label: "Lifer Chat", tier: "lifer" },
