@@ -225,6 +225,9 @@ export function ConferenceRoom({
             roomName={roomName}
             hostUserId={hostUserId}
           />
+          {kind === "karaoke" && <KaraokeMusicAudioBridge />}
+          <RoomAudioRenderer />
+
           <RoomAudioRenderer />
         </RoomsShell>
       </LiveKitRoom>
