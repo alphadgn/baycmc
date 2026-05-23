@@ -29,6 +29,7 @@ import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAdminSupportRouteImport } from './routes/_authenticated/admin.support'
 import { Route as AuthenticatedAdminOtherpageRouteImport } from './routes/_authenticated/admin.otherpage'
 import { Route as AuthenticatedAdminLuminaRouteImport } from './routes/_authenticated/admin.lumina'
+import { Route as AuthenticatedAdminKaraokeRouteImport } from './routes/_authenticated/admin.karaoke'
 import { Route as AuthenticatedVerifiedRoomsRouteImport } from './routes/_authenticated/_verified/rooms'
 import { Route as AuthenticatedVerifiedFeedRouteImport } from './routes/_authenticated/_verified/feed'
 import { Route as AuthenticatedVerifiedCalendarRouteImport } from './routes/_authenticated/_verified/calendar'
@@ -139,6 +140,12 @@ const AuthenticatedAdminLuminaRoute =
     path: '/lumina',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminKaraokeRoute =
+  AuthenticatedAdminKaraokeRouteImport.update({
+    id: '/karaoke',
+    path: '/karaoke',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedVerifiedRoomsRoute =
   AuthenticatedVerifiedRoomsRouteImport.update({
     id: '/rooms',
@@ -191,6 +198,7 @@ export interface FileRoutesByFullPath {
   '/calendar': typeof AuthenticatedVerifiedCalendarRoute
   '/feed': typeof AuthenticatedVerifiedFeedRoute
   '/rooms': typeof AuthenticatedVerifiedRoomsRoute
+  '/admin/karaoke': typeof AuthenticatedAdminKaraokeRoute
   '/admin/lumina': typeof AuthenticatedAdminLuminaRoute
   '/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
   '/admin/support': typeof AuthenticatedAdminSupportRoute
@@ -215,6 +223,7 @@ export interface FileRoutesByTo {
   '/calendar': typeof AuthenticatedVerifiedCalendarRoute
   '/feed': typeof AuthenticatedVerifiedFeedRoute
   '/rooms': typeof AuthenticatedVerifiedRoomsRoute
+  '/admin/karaoke': typeof AuthenticatedAdminKaraokeRoute
   '/admin/lumina': typeof AuthenticatedAdminLuminaRoute
   '/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
   '/admin/support': typeof AuthenticatedAdminSupportRoute
@@ -244,6 +253,7 @@ export interface FileRoutesById {
   '/_authenticated/_verified/calendar': typeof AuthenticatedVerifiedCalendarRoute
   '/_authenticated/_verified/feed': typeof AuthenticatedVerifiedFeedRoute
   '/_authenticated/_verified/rooms': typeof AuthenticatedVerifiedRoomsRoute
+  '/_authenticated/admin/karaoke': typeof AuthenticatedAdminKaraokeRoute
   '/_authenticated/admin/lumina': typeof AuthenticatedAdminLuminaRoute
   '/_authenticated/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
   '/_authenticated/admin/support': typeof AuthenticatedAdminSupportRoute
@@ -272,6 +282,7 @@ export interface FileRouteTypes {
     | '/calendar'
     | '/feed'
     | '/rooms'
+    | '/admin/karaoke'
     | '/admin/lumina'
     | '/admin/otherpage'
     | '/admin/support'
@@ -296,6 +307,7 @@ export interface FileRouteTypes {
     | '/calendar'
     | '/feed'
     | '/rooms'
+    | '/admin/karaoke'
     | '/admin/lumina'
     | '/admin/otherpage'
     | '/admin/support'
@@ -324,6 +336,7 @@ export interface FileRouteTypes {
     | '/_authenticated/_verified/calendar'
     | '/_authenticated/_verified/feed'
     | '/_authenticated/_verified/rooms'
+    | '/_authenticated/admin/karaoke'
     | '/_authenticated/admin/lumina'
     | '/_authenticated/admin/otherpage'
     | '/_authenticated/admin/support'
@@ -485,6 +498,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminLuminaRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/karaoke': {
+      id: '/_authenticated/admin/karaoke'
+      path: '/karaoke'
+      fullPath: '/admin/karaoke'
+      preLoaderRoute: typeof AuthenticatedAdminKaraokeRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/_verified/rooms': {
       id: '/_authenticated/_verified/rooms'
       path: '/rooms'
@@ -568,6 +588,7 @@ const AuthenticatedVerifiedRouteWithChildren =
   )
 
 interface AuthenticatedAdminRouteChildren {
+  AuthenticatedAdminKaraokeRoute: typeof AuthenticatedAdminKaraokeRoute
   AuthenticatedAdminLuminaRoute: typeof AuthenticatedAdminLuminaRoute
   AuthenticatedAdminOtherpageRoute: typeof AuthenticatedAdminOtherpageRoute
   AuthenticatedAdminSupportRoute: typeof AuthenticatedAdminSupportRoute
@@ -576,6 +597,7 @@ interface AuthenticatedAdminRouteChildren {
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
+  AuthenticatedAdminKaraokeRoute: AuthenticatedAdminKaraokeRoute,
   AuthenticatedAdminLuminaRoute: AuthenticatedAdminLuminaRoute,
   AuthenticatedAdminOtherpageRoute: AuthenticatedAdminOtherpageRoute,
   AuthenticatedAdminSupportRoute: AuthenticatedAdminSupportRoute,

@@ -88,12 +88,20 @@ function AdminPage() {
             Role changes, verifications, bookings, room joins
           </p>
         </div>
-        <Link
-          to="/admin/support"
-          className="inline-flex items-center gap-2 rounded-md border border-gold/40 bg-gold/10 px-3 py-2 text-xs font-semibold text-gold transition hover:bg-gold/20"
-        >
-          Support inbox →
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            to="/admin/karaoke"
+            className="inline-flex items-center gap-2 rounded-md border border-gold/40 bg-gold/10 px-3 py-2 text-xs font-semibold text-gold transition hover:bg-gold/20"
+          >
+            Karaoke catalog →
+          </Link>
+          <Link
+            to="/admin/support"
+            className="inline-flex items-center gap-2 rounded-md border border-gold/40 bg-gold/10 px-3 py-2 text-xs font-semibold text-gold transition hover:bg-gold/20"
+          >
+            Support inbox →
+          </Link>
+        </div>
       </header>
 
       <div className="glass mb-4 flex flex-wrap items-end gap-3 rounded-2xl p-4 shadow-card">
