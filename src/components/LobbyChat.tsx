@@ -538,25 +538,36 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
                   message={msg}
                   author={profiles[msg.user_id]}
                   replyTarget={msg.reply_to_id ? (messageById.get(msg.reply_to_id) ?? null) : null}
-
-                replyTargetAuthor={
-                  msg.reply_to_id
-                    ? (profiles[messageById.get(msg.reply_to_id)?.user_id ?? ""] ?? null)
-                    : null
-                }
-                reactions={reactions[msg.id] ?? []}
-                currentUserId={user?.id ?? null}
-                onReply={() => {
-                  setReplyTo(msg);
-                  setEditing(null);
-                }}
-                onReact={(emoji) => toggleReaction(msg.id, emoji)}
-                onLongPress={() => setActionTarget(msg)}
-              />
-            </div>
-          ))
+                  replyTargetAuthor={
+                    msg.reply_to_id
+                      ? (profiles[messageById.get(msg.reply_to_id)?.user_id ?? ""] ?? null)
+                      : null
+                  }
+                  reactions={reactions[msg.id] ?? []}
+                  currentUserId={user?.id ?? null}
+                  onReply={() => {
+                    setReplyTo(msg);
+                    setEditing(null);
+                  }}
+                  onReact={(emoji) => toggleReaction(msg.id, emoji)}
+                  onLongPress={() => setActionTarget(msg)}
+                />
+              </div>
+            ))
+          )}
+        </div>
+        {showJumpToBottom && (
+          <button
+            type="button"
+            onClick={scrollToBottom}
+            aria-label="Jump to latest message"
+            className="absolute bottom-3 right-3 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full border border-gold/40 bg-background/90 text-gold shadow-gold backdrop-blur transition hover:bg-background"
+          >
+            <ChevronDown className="h-5 w-5" />
+          </button>
         )}
       </div>
+
 
       {replyTo && !editing && (
         <div className="flex items-center justify-between gap-2 border-t border-border/60 bg-muted/10 px-3 py-2 text-xs sm:px-4">
