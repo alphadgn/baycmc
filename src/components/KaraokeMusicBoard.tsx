@@ -161,9 +161,31 @@ export function KaraokeMusicBoard({
   }, []);
 
   const [pos, setPos] = useState<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{ startX: number; startY: number; baseDx: number; baseDy: number } | null>(
     null,
   );
+
+  // Clamp the drag offset so the chassis never leaves the viewport — the
+  // container is anchored bottom-right with a 16px margin and uses
+  // `translate(-dx, -dy)`, so positive dx moves it left and positive dy moves
+  // it up. We bound both so every edge stays at least 8px inside the visible
+  // area on phones (which previously let the controls slide off-screen).
+  function clampPos(dx: number, dy: number) {
+    const el = containerRef.current;
+    const vw = typeof window !== "undefined" ? window.innerWidth : 0;
+    const vh = typeof window !== "undefined" ? window.innerHeight : 0;
+    const rect = el?.getBoundingClientRect();
+    const w = rect?.width ?? 0;
+    const h = rect?.height ?? 0;
+    const margin = 16; // matches bottom-4 / right-4
+    const maxDx = Math.max(0, vw - w - margin - 8);
+    const maxDy = Math.max(0, vh - h - margin - 8);
+    return {
+      dx: Math.max(0, Math.min(dx, maxDx)),
+      dy: Math.max(0, Math.min(dy, maxDy)),
+    };
+  }
 
   function onDragPointerDown(e: React.PointerEvent) {
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -172,9 +194,9 @@ export function KaraokeMusicBoard({
   function onDragPointerMove(e: React.PointerEvent) {
     if (!dragRef.current) return;
     const { startX, startY, baseDx, baseDy } = dragRef.current;
-    // Anchored bottom-right → dragging right increases dx (panel moves right),
-    // dragging up increases dy (panel moves up).
-    setPos({ dx: baseDx - (e.clientX - startX), dy: baseDy - (e.clientY - startY) });
+    setPos(
+      clampPos(baseDx - (e.clientX - startX), baseDy - (e.clientY - startY)),
+    );
   }
   function onDragPointerUp(e: React.PointerEvent) {
     if (!dragRef.current) return;
@@ -184,7 +206,22 @@ export function KaraokeMusicBoard({
       /* noop */
     }
     dragRef.current = null;
+    setPos((p) => clampPos(p.dx, p.dy));
   }
+
+  // Re-clamp when viewport changes (rotation, mobile URL bar collapse) and
+  // whenever the chassis is re-opened so it can never end up off-screen.
+  useEffect(() => {
+    function reclamp() {
+      setPos((p) => clampPos(p.dx, p.dy));
+    }
+    window.addEventListener("resize", reclamp);
+    window.addEventListener("orientationchange", reclamp);
+    return () => {
+      window.removeEventListener("resize", reclamp);
+      window.removeEventListener("orientationchange", reclamp);
+    };
+  }, []);
 
   const padPresets: { label: string; query: string; hue: string }[] = [
     { label: "Pop Hits", query: "pop karaoke hits", hue: "from-rose-400 to-rose-600" },
