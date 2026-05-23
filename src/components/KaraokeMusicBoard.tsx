@@ -113,7 +113,6 @@ export function KaraokeMusicBoard({
   }
 
   async function runSearch(q: string) {
-    if (!isMyTurn) return;
     const trimmed = q.trim();
     if (!trimmed) return;
     setSearching(true);
@@ -134,7 +133,6 @@ export function KaraokeMusicBoard({
   }
 
   function pickHit(hit: SongHit) {
-    if (!isMyTurn) return;
     if (hit.youtubeId) {
       onChangeTrack({ videoId: hit.youtubeId, activeQuery: null });
     } else if (hit.url) {
@@ -145,7 +143,6 @@ export function KaraokeMusicBoard({
   }
 
   function playUrl() {
-    if (!isMyTurn) return;
     const id = extractYouTubeId(urlInput);
     if (id) onChangeTrack({ videoId: id, activeQuery: null });
   }
@@ -179,10 +176,11 @@ export function KaraokeMusicBoard({
       ? `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(activeQuery)}&autoplay=1&rel=0&modestbranding=1`
       : null;
 
-  // Original width was 26rem; 40% smaller ≈ 15.6rem. Use 15.5rem.
+  // Wider on mobile so all controls are usable (was 15.5rem and clipping
+  // the search/url inputs and pad grid on small Android/iOS screens).
   return (
     <div
-      className="fixed bottom-4 right-4 z-40 w-[min(96vw,15.5rem)] overflow-hidden rounded-xl border border-gold/40 bg-[#0a0a0a] shadow-gold"
+      className="fixed bottom-4 right-4 z-40 max-h-[85vh] w-[min(96vw,22rem)] overflow-y-auto overflow-x-hidden rounded-xl border border-gold/40 bg-[#0a0a0a] shadow-gold"
       style={{ transform: `translate(${-pos.dx}px, ${-pos.dy}px)` }}
     >
       {/* Top chassis bar — also the drag handle */}
@@ -273,14 +271,14 @@ export function KaraokeMusicBoard({
             onKeyDown={(e) => {
               if (e.key === "Enter") runSearch(query);
             }}
-            disabled={!isMyTurn}
+            disabled={false}
             placeholder={isMyTurn ? "Search song or artist…" : "Locked"}
             className="flex-1 rounded-sm border border-gold/20 bg-black/60 px-1.5 py-1 text-[9px] text-gold placeholder:text-gold/30 outline-none focus:border-gold/60 disabled:cursor-not-allowed disabled:opacity-50"
           />
           <button
             type="button"
             onClick={() => runSearch(query)}
-            disabled={!isMyTurn || !query.trim() || searching}
+            disabled={!query.trim() || searching}
             className="inline-flex items-center gap-0.5 rounded-sm bg-gradient-gold px-1.5 py-1 text-[8px] font-semibold text-gold-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {searching ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Search className="h-2.5 w-2.5" />} Find
@@ -321,14 +319,14 @@ export function KaraokeMusicBoard({
             onKeyDown={(e) => {
               if (e.key === "Enter") playUrl();
             }}
-            disabled={!isMyTurn}
+            disabled={false}
             placeholder="…or paste YouTube link"
             className="flex-1 rounded-sm border border-gold/10 bg-black/40 px-1.5 py-1 text-[8px] text-gold placeholder:text-gold/30 outline-none focus:border-gold/60 disabled:cursor-not-allowed disabled:opacity-50"
           />
           <button
             type="button"
             onClick={playUrl}
-            disabled={!isMyTurn || !extractYouTubeId(urlInput)}
+            disabled={!extractYouTubeId(urlInput)}
             className="inline-flex items-center gap-0.5 rounded-sm border border-gold/30 bg-black/60 px-1.5 py-1 text-[8px] font-semibold text-gold transition hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Play className="h-2.5 w-2.5" /> Cue
@@ -351,7 +349,7 @@ export function KaraokeMusicBoard({
           <button
             key={p.label}
             type="button"
-            disabled={!isMyTurn}
+            disabled={false}
             onClick={() => runSearch(p.query)}
             className={`relative aspect-square rounded-sm bg-gradient-to-br ${p.hue} text-[6px] font-bold uppercase leading-tight tracking-tight text-black/85 shadow-[inset_0_-2px_4px_rgba(0,0,0,0.35),0_0_6px_rgba(255,255,255,0.08)] transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-30 disabled:saturate-50`}
           >

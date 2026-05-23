@@ -118,7 +118,7 @@ export function AppHeader() {
               </button>
             )}
             <Link
-              to="/"
+              to={isAuthenticated ? "/lobby" : "/"}
               aria-label="BAYCMC"
               className="inline-flex min-w-0 shrink cursor-pointer items-center"
             >
