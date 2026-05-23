@@ -21,6 +21,12 @@ interface AmaConferenceProps {
   roomName: string;
   hostUserId: string | null;
   backgroundImage: string | null;
+  /**
+   * Karaoke rooms shrink the host pfp tile to half its conference size and
+   * render audience tiles at the same reduced footprint, so the stage stays
+   * focused on the music machine rather than the camera grid.
+   */
+  karaoke?: boolean;
 }
 
 // Audience grid is a fixed 4 across × 5 down = 20 tiles; everyone past that
