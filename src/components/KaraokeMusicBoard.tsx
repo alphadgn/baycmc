@@ -271,11 +271,19 @@ export function KaraokeMusicBoard({
     );
   }
 
+  // Non-performers mute their local iframe so the music they hear comes
+  // only from the LiveKit broadcast (no double-audio). The performer keeps
+  // their iframe unmuted — that's the source they're sharing to the room.
+  // If the performer hasn't shared yet, everyone unmutes the iframe so the
+  // music is at least audible locally even without LiveKit broadcast.
+  const muteLocalIframe = !isMyTurn && musicShared;
+  const ytParams = `autoplay=1&rel=0&modestbranding=1&enablejsapi=1&playsinline=1${muteLocalIframe ? "&mute=1" : ""}`;
   const screenSrc = videoId
-    ? `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&enablejsapi=1`
+    ? `https://www.youtube.com/embed/${videoId}?${ytParams}`
     : activeQuery
-      ? `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(activeQuery)}&autoplay=1&rel=0&modestbranding=1&enablejsapi=1`
+      ? `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(activeQuery)}&${ytParams}`
       : null;
+
 
   function handleStop() {
     postToPlayer("stopVideo");
