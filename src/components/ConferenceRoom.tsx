@@ -18,7 +18,7 @@ import {
   useRoomContext,
   useRoomInfo,
 } from "@livekit/components-react";
-import { ConnectionQuality } from "livekit-client";
+import { ConnectionQuality, LocalAudioTrack, Track } from "livekit-client";
 import { AmaConference } from "@/components/AmaConference";
 import "@livekit/components-styles";
 import { toast } from "sonner";
