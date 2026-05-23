@@ -299,7 +299,10 @@ export function KaraokeMusicBoard({
     return (
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setPos({ dx: 0, dy: 0 });
+          setOpen(true);
+        }}
         aria-label="Open music machine"
         style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 1rem)" }}
         className="group fixed right-4 z-50 inline-flex items-center gap-2 rounded-full border border-gold/60 bg-background/80 px-3 py-1.5 text-[11px] font-semibold text-gold shadow-gold backdrop-blur transition hover:bg-gold/10 relative"
@@ -314,7 +317,7 @@ export function KaraokeMusicBoard({
           className="pointer-events-none absolute -inset-1 rounded-full bg-gold/20 blur-md animate-pulse"
         />
         <Music className="relative h-3.5 w-3.5 animate-pulse" />
-        <span className="relative">Music Machine</span>
+        <span className="relative">Karaoke Machine</span>
       </button>
     );
   }
