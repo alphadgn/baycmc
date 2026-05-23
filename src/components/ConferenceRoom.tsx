@@ -1389,9 +1389,15 @@ function KaraokeMusicAudioBridge() {
         typeof navigator === "undefined" ||
         typeof navigator.mediaDevices?.getDisplayMedia !== "function"
       ) {
-        toast.error(
-          "Tab-audio sharing isn't supported on this browser. Open the room in desktop Chrome/Edge to broadcast music.",
-        );
+        // Mobile / iOS Safari path: tab-audio capture is unavailable. The
+        // performer's mic already has echo-cancellation/NS/AGC disabled
+        // (see audioCaptureDefaults above), so the device speaker → mic
+        // path carries both the music and the singer's voice into LiveKit
+        // and into recordings. Just nudge the user to keep volume up.
+        toast.message("Singing live", {
+          description:
+            "Keep your device speaker on — your mic will broadcast both your voice and the music to the room.",
+        });
         return;
       }
       try {
