@@ -428,8 +428,25 @@ export function KaraokeMusicBoard({
             {micOn ? <Mic className="h-3 w-3" /> : <MicOff className="h-3 w-3" />}
             {micOn ? "Mic Live" : "Mic Off"}
           </button>
+          {isMyTurn && (
+            <button
+              type="button"
+              onClick={musicShared ? stopSharingMusic : shareMusicToRoom}
+              aria-label={musicShared ? "Stop sharing music" : "Share music to room"}
+              title="Shares tab audio so everyone in the room (and recordings) hears the music"
+              className={`inline-flex items-center gap-1 rounded-sm border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider transition ${
+                musicShared
+                  ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"
+                  : "border-gold/40 bg-gold/10 text-gold hover:bg-gold/20"
+              }`}
+            >
+              <Music className="h-3 w-3" />
+              {musicShared ? "Sharing" : "Share Music"}
+            </button>
+          )}
         </div>
       )}
+
 
       {/* Mobile-only one-time hint overlay */}
       {showHint && (
