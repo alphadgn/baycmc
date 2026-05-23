@@ -155,7 +155,7 @@ function AmaGridLayout({
   // w-1/4, and every audience tile renders at the same w-1/4 footprint so
   // every member's pfp tile matches the host's size on stage.
   const hostWrapperClass = karaoke
-    ? "mx-auto w-1/4"
+    ? "mx-auto w-20"
     : hostSolo
       ? "mx-auto w-full max-w-2xl"
       : "mx-auto w-1/2";
@@ -196,7 +196,7 @@ function AmaGridLayout({
           // many people are in the room.
           <div className="flex flex-wrap justify-center gap-2 sm:gap-3">
             {visible.map((p) => (
-              <div key={p.identity} className="w-1/4 min-w-0">
+              <div key={p.identity} className="w-20 min-w-0">
                 <AudienceTile
                   participant={p}
                   cameraTracks={cameraTracks}
