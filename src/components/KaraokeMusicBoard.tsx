@@ -201,10 +201,19 @@ export function KaraokeMusicBoard({
   }
 
   const screenSrc = videoId
-    ? `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`
+    ? `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&enablejsapi=1`
     : activeQuery
-      ? `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(activeQuery)}&autoplay=1&rel=0&modestbranding=1`
+      ? `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(activeQuery)}&autoplay=1&rel=0&modestbranding=1&enablejsapi=1`
       : null;
+
+  function handleStop() {
+    postToPlayer("stopVideo");
+    onChangeTrack({ videoId: null, activeQuery: null });
+    onPauseToggle?.(false);
+  }
+  function handlePause() {
+    onPauseToggle?.(!paused);
+  }
 
   // Wider on mobile so all controls are usable (was 15.5rem and clipping
   // the search/url inputs and pad grid on small Android/iOS screens).
