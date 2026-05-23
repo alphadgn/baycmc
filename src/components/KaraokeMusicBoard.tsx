@@ -219,7 +219,9 @@ export function KaraokeMusicBoard({
   // the search/url inputs and pad grid on small Android/iOS screens).
   return (
     <div
-      className="fixed bottom-4 right-4 z-40 max-h-[85vh] w-[min(96vw,22rem)] overflow-y-auto overflow-x-hidden rounded-xl border border-gold/40 bg-[#0a0a0a] shadow-gold"
+      className={`fixed bottom-4 right-4 z-40 max-h-[85vh] overflow-y-auto overflow-x-hidden rounded-xl border border-gold/40 bg-[#0a0a0a] shadow-gold transition-[width] duration-300 ${
+        minimized ? "w-[min(96vw,18rem)]" : "w-[min(96vw,22rem)]"
+      }`}
       style={{ transform: `translate(${-pos.dx}px, ${-pos.dy}px)` }}
     >
       {/* Top chassis bar — also the drag handle */}
