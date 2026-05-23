@@ -269,6 +269,27 @@ export type Database = {
           },
         ]
       }
+      karaoke_search_cache: {
+        Row: {
+          fetched_at: string
+          id: string
+          query: string
+          results: Json
+        }
+        Insert: {
+          fetched_at?: string
+          id?: string
+          query: string
+          results?: Json
+        }
+        Update: {
+          fetched_at?: string
+          id?: string
+          query?: string
+          results?: Json
+        }
+        Relationships: []
+      }
       karaoke_sessions: {
         Row: {
           performer_user_id: string | null
@@ -300,6 +321,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      karaoke_songs: {
+        Row: {
+          artist: string | null
+          created_at: string
+          id: string
+          normalized_title: string
+          playable_url: string | null
+          rank: number | null
+          source: string
+          title: string
+          updated_at: string
+          youtube_id: string | null
+        }
+        Insert: {
+          artist?: string | null
+          created_at?: string
+          id?: string
+          normalized_title: string
+          playable_url?: string | null
+          rank?: number | null
+          source?: string
+          title: string
+          updated_at?: string
+          youtube_id?: string | null
+        }
+        Update: {
+          artist?: string | null
+          created_at?: string
+          id?: string
+          normalized_title?: string
+          playable_url?: string | null
+          rank?: number | null
+          source?: string
+          title?: string
+          updated_at?: string
+          youtube_id?: string | null
+        }
+        Relationships: []
       }
       lifer_messages: {
         Row: {
@@ -801,6 +861,8 @@ export type Database = {
         Args: { _event_type: string; _metadata?: Json; _target_id?: string }
         Returns: string
       }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
       ape_ride_request_status: "pending" | "accepted" | "declined" | "cancelled"
