@@ -270,14 +270,14 @@ export function KaraokeMusicBoard({
             onKeyDown={(e) => {
               if (e.key === "Enter") runSearch(query);
             }}
-            disabled={!isMyTurn}
+            disabled={false}
             placeholder={isMyTurn ? "Search song or artist…" : "Locked"}
             className="flex-1 rounded-sm border border-gold/20 bg-black/60 px-1.5 py-1 text-[9px] text-gold placeholder:text-gold/30 outline-none focus:border-gold/60 disabled:cursor-not-allowed disabled:opacity-50"
           />
           <button
             type="button"
             onClick={() => runSearch(query)}
-            disabled={!isMyTurn || !query.trim() || searching}
+            disabled={(!query.trim() || searching}
             className="inline-flex items-center gap-0.5 rounded-sm bg-gradient-gold px-1.5 py-1 text-[8px] font-semibold text-gold-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {searching ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Search className="h-2.5 w-2.5" />} Find
@@ -318,14 +318,14 @@ export function KaraokeMusicBoard({
             onKeyDown={(e) => {
               if (e.key === "Enter") playUrl();
             }}
-            disabled={!isMyTurn}
+            disabled={false}
             placeholder="…or paste YouTube link"
             className="flex-1 rounded-sm border border-gold/10 bg-black/40 px-1.5 py-1 text-[8px] text-gold placeholder:text-gold/30 outline-none focus:border-gold/60 disabled:cursor-not-allowed disabled:opacity-50"
           />
           <button
             type="button"
             onClick={playUrl}
-            disabled={!isMyTurn || !extractYouTubeId(urlInput)}
+            disabled={(!extractYouTubeId(urlInput)}
             className="inline-flex items-center gap-0.5 rounded-sm border border-gold/30 bg-black/60 px-1.5 py-1 text-[8px] font-semibold text-gold transition hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Play className="h-2.5 w-2.5" /> Cue
@@ -348,7 +348,7 @@ export function KaraokeMusicBoard({
           <button
             key={p.label}
             type="button"
-            disabled={!isMyTurn}
+            disabled={false}
             onClick={() => runSearch(p.query)}
             className={`relative aspect-square rounded-sm bg-gradient-to-br ${p.hue} text-[6px] font-bold uppercase leading-tight tracking-tight text-black/85 shadow-[inset_0_-2px_4px_rgba(0,0,0,0.35),0_0_6px_rgba(255,255,255,0.08)] transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-30 disabled:saturate-50`}
           >
