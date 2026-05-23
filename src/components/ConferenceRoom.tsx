@@ -48,7 +48,7 @@ interface ConferenceRoomProps {
   roomName: string;
   ambience?: string | null;
   backgroundImage?: string | null;
-  kind?: "conference" | "game";
+  kind?: "conference" | "game" | "karaoke";
   /** Booking owner of the currently-active slot, or null for free-use sessions. */
   hostUserId?: string | null;
 }
