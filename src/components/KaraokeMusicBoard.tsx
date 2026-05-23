@@ -92,9 +92,25 @@ export function KaraokeMusicBoard({
       window.removeEventListener("karaoke:mic-state", onState as EventListener);
   }, []);
   function toggleMic() {
+    const next = !micOn;
     window.dispatchEvent(
-      new CustomEvent("karaoke:toggle-mic", { detail: { enabled: !micOn } }),
+      new CustomEvent("karaoke:toggle-mic", { detail: { enabled: next } }),
     );
+    // When the performer unmutes during playback, also broadcast the music
+    // track to the room so every participant (and the recording) hears both
+    // the singer AND the music simultaneously. On desktop this uses tab-audio
+    // capture via getDisplayMedia; on mobile that API is unavailable, so the
+    // ConferenceRoom bridge falls back to capturing the music acoustically
+    // through the (echo-cancellation-disabled) mic — keep the device speaker
+    // on so the mic picks it up.
+    if (isMyTurn && next && videoId && !paused) {
+      window.dispatchEvent(
+        new CustomEvent("karaoke:publish-music", { detail: { play: true } }),
+      );
+    }
+    if (isMyTurn && !next) {
+      window.dispatchEvent(new CustomEvent("karaoke:unpublish-music"));
+    }
   }
 
   // Music broadcast state — the performer publishes their tab audio to LiveKit
@@ -155,15 +171,38 @@ export function KaraokeMusicBoard({
     function onReset() {
       setOpen(true);
       setForceExpanded(true);
+      setPos({ dx: 0, dy: 0 });
     }
     window.addEventListener("karaoke:reset-panels", onReset);
     return () => window.removeEventListener("karaoke:reset-panels", onReset);
   }, []);
 
   const [pos, setPos] = useState<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{ startX: number; startY: number; baseDx: number; baseDy: number } | null>(
     null,
   );
+
+  // Clamp the drag offset so the chassis never leaves the viewport — the
+  // container is anchored bottom-right with a 16px margin and uses
+  // `translate(-dx, -dy)`, so positive dx moves it left and positive dy moves
+  // it up. We bound both so every edge stays at least 8px inside the visible
+  // area on phones (which previously let the controls slide off-screen).
+  function clampPos(dx: number, dy: number) {
+    const el = containerRef.current;
+    const vw = typeof window !== "undefined" ? window.innerWidth : 0;
+    const vh = typeof window !== "undefined" ? window.innerHeight : 0;
+    const rect = el?.getBoundingClientRect();
+    const w = rect?.width ?? 0;
+    const h = rect?.height ?? 0;
+    const margin = 16; // matches bottom-4 / right-4
+    const maxDx = Math.max(0, vw - w - margin - 8);
+    const maxDy = Math.max(0, vh - h - margin - 8);
+    return {
+      dx: Math.max(0, Math.min(dx, maxDx)),
+      dy: Math.max(0, Math.min(dy, maxDy)),
+    };
+  }
 
   function onDragPointerDown(e: React.PointerEvent) {
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -172,9 +211,9 @@ export function KaraokeMusicBoard({
   function onDragPointerMove(e: React.PointerEvent) {
     if (!dragRef.current) return;
     const { startX, startY, baseDx, baseDy } = dragRef.current;
-    // Anchored bottom-right → dragging right increases dx (panel moves right),
-    // dragging up increases dy (panel moves up).
-    setPos({ dx: baseDx - (e.clientX - startX), dy: baseDy - (e.clientY - startY) });
+    setPos(
+      clampPos(baseDx - (e.clientX - startX), baseDy - (e.clientY - startY)),
+    );
   }
   function onDragPointerUp(e: React.PointerEvent) {
     if (!dragRef.current) return;
@@ -184,7 +223,22 @@ export function KaraokeMusicBoard({
       /* noop */
     }
     dragRef.current = null;
+    setPos((p) => clampPos(p.dx, p.dy));
   }
+
+  // Re-clamp when viewport changes (rotation, mobile URL bar collapse) and
+  // whenever the chassis is re-opened so it can never end up off-screen.
+  useEffect(() => {
+    function reclamp() {
+      setPos((p) => clampPos(p.dx, p.dy));
+    }
+    window.addEventListener("resize", reclamp);
+    window.addEventListener("orientationchange", reclamp);
+    return () => {
+      window.removeEventListener("resize", reclamp);
+      window.removeEventListener("orientationchange", reclamp);
+    };
+  }, []);
 
   const padPresets: { label: string; query: string; hue: string }[] = [
     { label: "Pop Hits", query: "pop karaoke hits", hue: "from-rose-400 to-rose-600" },
@@ -262,7 +316,10 @@ export function KaraokeMusicBoard({
     return (
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setPos({ dx: 0, dy: 0 });
+          setOpen(true);
+        }}
         aria-label="Open music machine"
         style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 1rem)" }}
         className="group fixed right-4 z-50 inline-flex items-center gap-2 rounded-full border border-gold/60 bg-background/80 px-3 py-1.5 text-[11px] font-semibold text-gold shadow-gold backdrop-blur transition hover:bg-gold/10 relative"
@@ -277,7 +334,7 @@ export function KaraokeMusicBoard({
           className="pointer-events-none absolute -inset-1 rounded-full bg-gold/20 blur-md animate-pulse"
         />
         <Music className="relative h-3.5 w-3.5 animate-pulse" />
-        <span className="relative">Music Machine</span>
+        <span className="relative">Karaoke Machine</span>
       </button>
     );
   }
@@ -309,6 +366,7 @@ export function KaraokeMusicBoard({
   // the search/url inputs and pad grid on small Android/iOS screens).
   return (
     <div
+      ref={containerRef}
       className={`fixed bottom-4 right-4 z-40 max-h-[85vh] overflow-y-auto overflow-x-hidden rounded-xl border border-gold/40 bg-[#0a0a0a] shadow-gold transition-[width] duration-300 ${
         minimized ? "w-[min(96vw,18rem)]" : "w-[min(96vw,22rem)]"
       }`}
@@ -325,7 +383,7 @@ export function KaraokeMusicBoard({
         <div className="flex items-center gap-1.5">
           <GripVertical className="h-3 w-3 text-gold/60" />
           <span className="font-display text-[9px] uppercase tracking-[0.25em] text-gold">
-            Maschine · Karaoke
+            Karaoke Machine
           </span>
         </div>
         <div className="flex items-center gap-1">
