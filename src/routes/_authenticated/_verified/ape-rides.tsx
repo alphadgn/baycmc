@@ -12,6 +12,7 @@ import { isInsideWynwood, WYNWOOD_RADIUS_METERS } from "@/lib/baycmc/wynwood";
 import { useAuth } from "@/lib/auth/useAuth";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
+import { ApeArFilter } from "@/components/ApeArFilter";
 
 type Ride = Database["public"]["Tables"]["ape_rides"]["Row"];
 type RideRequest = Database["public"]["Tables"]["ape_ride_requests"]["Row"];
