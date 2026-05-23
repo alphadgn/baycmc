@@ -246,7 +246,7 @@ function PreLivePanel({
   onRetry,
 }: {
   state: JoinState;
-  kind: "conference" | "game";
+  kind: "conference" | "game" | "karaoke";
   backgroundImage: string | null;
   roomName: string;
   onRetry: () => void;
