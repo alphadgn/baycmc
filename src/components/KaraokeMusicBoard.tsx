@@ -321,8 +321,8 @@ export function KaraokeMusicBoard({
           setOpen(true);
         }}
         aria-label="Open music machine"
-        style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 1rem)" }}
-        className="group fixed right-4 z-50 inline-flex items-center gap-2 rounded-full border border-gold/60 bg-background/80 px-3 py-1.5 text-[11px] font-semibold text-gold shadow-gold backdrop-blur transition hover:bg-gold/10 relative"
+        style={{ top: "calc(env(safe-area-inset-top, 0px) + 4.5rem)" }}
+        className="group fixed left-4 z-50 inline-flex items-center gap-2 rounded-full border border-gold/60 bg-background/80 px-3 py-1.5 text-[11px] font-semibold text-gold shadow-gold backdrop-blur transition hover:bg-gold/10 relative"
       >
         {/* Pulsing rings — pure CSS, no extra deps */}
         <span
