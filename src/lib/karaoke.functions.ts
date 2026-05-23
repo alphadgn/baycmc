@@ -137,7 +137,7 @@ export const searchKaraokeSongs = createServerFn({ method: "POST" })
       await supabaseAdmin
         .from("karaoke_search_cache")
         .upsert(
-          { query: cacheKey, results: hits as unknown as Record<string, unknown>[], fetched_at: new Date().toISOString() },
+          { query: cacheKey, results: JSON.parse(JSON.stringify(hits)), fetched_at: new Date().toISOString() },
           { onConflict: "query" },
         );
     }
