@@ -168,7 +168,7 @@ export function RoomsShell({
           <WelcomeStrip title={title} onOpenMobileNav={() => setMobileNavOpen(true)} />
 
           <div className="flex min-h-0 flex-1 gap-0 overflow-hidden">
-            <main className="scrollbar-modern min-w-0 flex-1 overflow-y-auto px-4 pb-28 pt-4 sm:px-6 sm:pt-6">
+            <main className="scrollbar-modern min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-4 pb-28 pt-4 sm:px-6 sm:pt-6">
               <div className="mb-5">
                 <h1 className="font-display text-2xl text-gradient-gold sm:text-4xl">{title}</h1>
                 {subtitle && (
@@ -182,7 +182,7 @@ export function RoomsShell({
 
             {rightRail && (
               <aside
-                className="scrollbar-modern hidden w-72 shrink-0 overflow-y-auto border-l border-border/60 bg-card/40 px-3 pb-28 pt-4 xl:block"
+                className="scrollbar-modern hidden w-72 shrink-0 overflow-x-hidden overflow-y-auto border-l border-border/60 bg-card/40 px-3 pb-28 pt-4 xl:block"
                 aria-label="Room panels"
               >
                 {rightRail}
@@ -290,7 +290,7 @@ function Sidebar({
         )}
       </div>
 
-      <ul className="scrollbar-modern flex min-h-0 flex-1 flex-col space-y-1 overflow-y-auto p-3">
+      <ul className="scrollbar-modern flex min-h-0 flex-1 flex-col space-y-1 overflow-x-hidden overflow-y-auto p-3">
         {items.map((item) => {
           const active = item.match
             ? location.pathname.startsWith(item.match)
