@@ -172,13 +172,23 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
   const meInQueue = !!user && queue.some((q) => q.user_id === user.id);
 
   // ---- Performer actions: change track, end song ----
+  // If the stage is free (no booking, no performer), the user auto-claims it
+  // when they hit play. Otherwise only the active performer can mutate.
   const onChangeTrack = useCallback(
     async (next: { videoId: string | null; activeQuery: string | null }) => {
-      if (!isMyTurn || !user) return;
+      if (!user) return;
+      const stageFree = !bookingHostUserId && !effectivePerformerId;
+      if (!isMyTurn && !stageFree) {
+        toast.message("Someone else is on stage", {
+          description: "Join the line to take your turn.",
+        });
+        return;
+      }
+      const performerId = isMyTurn ? effectivePerformerId : user.id;
       const { error } = await supabase.from("karaoke_sessions").upsert(
         {
           room_id: roomId,
-          performer_user_id: effectivePerformerId,
+          performer_user_id: performerId,
           video_id: next.videoId,
           search_query: next.activeQuery,
           updated_at: new Date().toISOString(),
@@ -187,7 +197,7 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
       );
       if (error) toast.error("Could not sync track", { description: error.message });
     },
-    [isMyTurn, user, roomId, effectivePerformerId],
+    [isMyTurn, user, roomId, effectivePerformerId, bookingHostUserId],
   );
 
   const onEndSong = useCallback(async () => {
