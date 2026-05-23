@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { GripVertical, Loader2, Lock, Music, Play, Search, X } from "lucide-react";
 import { searchKaraokeSongs, type SongHit } from "@/lib/karaoke.functions";
