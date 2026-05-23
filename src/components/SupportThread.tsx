@@ -233,7 +233,7 @@ export function SupportThread({
         )}
       </div>
 
-      <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto p-4 sm:p-6">
+      <div ref={scrollRef} className="flex-1 space-y-3 overflow-x-hidden overflow-y-auto p-4 sm:p-6">
         {loading ? (
           <div className="space-y-2">
             {[1, 2, 3].map((i) => (
@@ -260,9 +260,9 @@ export function SupportThread({
             return (
               <div
                 key={m.id}
-                className={`group flex flex-col ${mine ? "items-end" : "items-start"}`}
+                className={`group flex max-w-full flex-col ${mine ? "items-end" : "items-start"}`}
               >
-                <div className="mb-0.5 flex items-baseline gap-2 text-[11px] text-muted-foreground">
+                <div className="mb-0.5 flex max-w-full flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
                   <span className={mine ? "text-gold" : ""}>{name}</span>
                   {m.is_admin && !mine && (
                     <span className="inline-flex items-center gap-0.5 rounded-full border border-gold/40 bg-gold/10 px-1.5 text-[9px] font-semibold uppercase tracking-wider text-gold">
@@ -276,9 +276,9 @@ export function SupportThread({
                     })}
                   </span>
                 </div>
-                <div className={`flex items-center gap-1.5 ${mine ? "flex-row-reverse" : ""}`}>
+                <div className={`flex max-w-full items-center gap-1.5 ${mine ? "flex-row-reverse" : ""}`}>
                   <div
-                    className={`max-w-[80%] whitespace-pre-wrap break-words rounded-2xl px-3 py-2 text-sm ${
+                    className={`max-w-[80%] whitespace-pre-wrap break-words rounded-2xl px-3 py-2 text-sm [overflow-wrap:anywhere] ${
                       mine
                         ? "bg-gradient-gold text-gold-foreground shadow-gold"
                         : m.is_admin
