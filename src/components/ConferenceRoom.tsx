@@ -290,7 +290,7 @@ function IdleHero({
   onJoin,
 }: {
   roomName: string;
-  kind: "conference" | "game";
+  kind: "conference" | "game" | "karaoke";
   onJoin: () => void;
 }) {
   return (
