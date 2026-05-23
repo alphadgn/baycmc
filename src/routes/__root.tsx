@@ -37,7 +37,7 @@ export const Route = createRootRoute({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { title: "BAYCmc the mobile clubhouse experience 2nd to the real exper" },
       { name: "description", content: "An exclusive social and real-time platform for verified Bored Ape Yacht Club holders." },
       { property: "og:title", content: "BAYCmc the mobile clubhouse experience 2nd to the real exper" },
