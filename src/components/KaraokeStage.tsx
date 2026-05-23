@@ -265,13 +265,43 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
     dragRef.current = null;
   }
 
+  // Pause is a local UI signal — when the performer pauses, restore the
+  // waiting-list panel and expand the music machine. Reset whenever the
+  // track changes so the next song starts cleanly.
+  const [paused, setPaused] = useState(false);
+  useEffect(() => {
+    setPaused(false);
+  }, [session.video_id]);
+  const isPlaying = !!session.video_id && !paused;
+  // Slide the waiting list off to the left edge while playing, leaving
+  // ~32px peeking out as a tap-target. Clicking it brings it back without
+  // disturbing the pause state.
+  const [forceWaitlistVisible, setForceWaitlistVisible] = useState(false);
+  useEffect(() => {
+    if (!isPlaying) setForceWaitlistVisible(false);
+  }, [isPlaying]);
+  const waitlistHidden = isPlaying && !forceWaitlistVisible;
+
   return (
     <>
-      {/* Queue + status strip — draggable from the top handle */}
+      {/* Queue + status strip — draggable from the top handle.
+          Slides off to the left edge while the song is playing. */}
       <div
-        className="fixed left-4 top-20 z-40 w-[min(90vw,18rem)] overflow-hidden rounded-xl border border-gold/30 bg-background/85 text-xs shadow-gold backdrop-blur"
-        style={{ transform: `translate(${pos.dx}px, ${pos.dy}px)` }}
+        className="fixed left-4 top-20 z-40 w-[min(90vw,18rem)] overflow-hidden rounded-xl border border-gold/30 bg-background/85 text-xs shadow-gold backdrop-blur transition-transform duration-500 ease-out"
+        style={{
+          transform: waitlistHidden
+            ? `translate(calc(-100% + 28px), ${pos.dy}px)`
+            : `translate(${pos.dx}px, ${pos.dy}px)`,
+        }}
       >
+        {waitlistHidden && (
+          <button
+            type="button"
+            aria-label="Show waiting list"
+            onClick={() => setForceWaitlistVisible(true)}
+            className="absolute right-0 top-0 h-full w-[28px] cursor-pointer bg-gradient-to-l from-gold/30 to-transparent"
+          />
+        )}
         <div
           onPointerDown={onDragPointerDown}
           onPointerMove={onDragPointerMove}
@@ -355,6 +385,8 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
         activeQuery={session.search_query}
         onChangeTrack={onChangeTrack}
         onEndSong={bookingHostUserId ? undefined : onEndSong}
+        paused={paused}
+        onPauseToggle={setPaused}
       />
     </>
   );

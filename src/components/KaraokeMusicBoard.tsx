@@ -1,25 +1,29 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { GripVertical, Loader2, Lock, Music, Play, Search, X } from "lucide-react";
+import {
+  GripVertical,
+  Loader2,
+  Lock,
+  Maximize2,
+  Music,
+  Pause,
+  Play,
+  Search,
+  Square,
+  X,
+} from "lucide-react";
 import { searchKaraokeSongs, type SongHit } from "@/lib/karaoke.functions";
 
 interface KaraokeMusicBoardProps {
-  /**
-   * True only for the user who is currently the active performer (either
-   * the booking owner, or the front of the waiting line when nobody booked
-   * the room). When false the entire machine is render-locked.
-   */
   isMyTurn: boolean;
-  /** Current synchronized track state — comes from karaoke_sessions. */
   videoId: string | null;
   activeQuery: string | null;
-  /**
-   * Called only when isMyTurn — performer-driven changes write to
-   * karaoke_sessions so every other viewer sees the same screen.
-   */
   onChangeTrack: (next: { videoId: string | null; activeQuery: string | null }) => void;
-  /** Called only when isMyTurn — finishes the song and yields the stage. */
   onEndSong?: () => void;
+  /** Performer-controlled pause flag, lifted to the stage so the waiting
+   *  list can react and restore itself. */
+  paused?: boolean;
+  onPauseToggle?: (next: boolean) => void;
 }
 
 /**
@@ -38,8 +42,20 @@ export function KaraokeMusicBoard({
   activeQuery,
   onChangeTrack,
   onEndSong,
+  paused = false,
+  onPauseToggle,
 }: KaraokeMusicBoardProps) {
   const [open, setOpen] = useState(true);
+  // When a video is playing the machine collapses to just the screen +
+  // transport. The performer can re-expand to access search / pads.
+  const [forceExpanded, setForceExpanded] = useState(false);
+  const isPlaying = !!videoId && !paused;
+  const minimized = isPlaying && !forceExpanded;
+  // Clear forceExpanded once playback stops so next play minimizes again.
+  useEffect(() => {
+    if (!videoId) setForceExpanded(false);
+  }, [videoId]);
+
   const [query, setQuery] = useState("");
   const [urlInput, setUrlInput] = useState("");
   const [results, setResults] = useState<SongHit[] | null>(null);
@@ -47,6 +63,20 @@ export function KaraokeMusicBoard({
   const [searchError, setSearchError] = useState<string | null>(null);
   const [searchSource, setSearchSource] = useState<"catalog" | "web" | null>(null);
   const runSongSearch = useServerFn(searchKaraokeSongs);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+
+  function postToPlayer(func: "playVideo" | "pauseVideo" | "stopVideo") {
+    const win = iframeRef.current?.contentWindow;
+    if (!win) return;
+    win.postMessage(JSON.stringify({ event: "command", func, args: [] }), "*");
+  }
+
+  // Drive the iframe via YT IFrame API postMessage whenever paused flips.
+  useEffect(() => {
+    if (!videoId) return;
+    postToPlayer(paused ? "pauseVideo" : "playVideo");
+  }, [paused, videoId]);
+
 
   // Drag state — bottom-right anchor, offsets in CSS pixels.
   const [pos, setPos] = useState<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
@@ -171,16 +201,27 @@ export function KaraokeMusicBoard({
   }
 
   const screenSrc = videoId
-    ? `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`
+    ? `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&enablejsapi=1`
     : activeQuery
-      ? `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(activeQuery)}&autoplay=1&rel=0&modestbranding=1`
+      ? `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(activeQuery)}&autoplay=1&rel=0&modestbranding=1&enablejsapi=1`
       : null;
+
+  function handleStop() {
+    postToPlayer("stopVideo");
+    onChangeTrack({ videoId: null, activeQuery: null });
+    onPauseToggle?.(false);
+  }
+  function handlePause() {
+    onPauseToggle?.(!paused);
+  }
 
   // Wider on mobile so all controls are usable (was 15.5rem and clipping
   // the search/url inputs and pad grid on small Android/iOS screens).
   return (
     <div
-      className="fixed bottom-4 right-4 z-40 max-h-[85vh] w-[min(96vw,22rem)] overflow-y-auto overflow-x-hidden rounded-xl border border-gold/40 bg-[#0a0a0a] shadow-gold"
+      className={`fixed bottom-4 right-4 z-40 max-h-[85vh] overflow-y-auto overflow-x-hidden rounded-xl border border-gold/40 bg-[#0a0a0a] shadow-gold transition-[width] duration-300 ${
+        minimized ? "w-[min(96vw,18rem)]" : "w-[min(96vw,22rem)]"
+      }`}
       style={{ transform: `translate(${-pos.dx}px, ${-pos.dy}px)` }}
     >
       {/* Top chassis bar — also the drag handle */}
@@ -207,6 +248,16 @@ export function KaraokeMusicBoard({
               <Lock className="h-2 w-2" /> Locked
             </span>
           )}
+          {videoId && (
+            <button
+              type="button"
+              aria-label={minimized ? "Expand music machine" : "Collapse music machine"}
+              onClick={() => setForceExpanded((v) => !v)}
+              className="rounded-md p-0.5 text-gold/70 transition hover:bg-gold/10 hover:text-gold"
+            >
+              <Maximize2 className="h-2.5 w-2.5" />
+            </button>
+          )}
           <button
             type="button"
             aria-label="Close music machine"
@@ -218,11 +269,16 @@ export function KaraokeMusicBoard({
         </div>
       </div>
 
-      {/* Dual screens */}
-      <div className="grid grid-cols-2 gap-1 border-b border-gold/10 bg-[#050505] p-1.5">
+      {/* Screens — when playing, collapse to a single full-width video */}
+      <div
+        className={`gap-1 border-b border-gold/10 bg-[#050505] p-1.5 ${
+          minimized ? "grid grid-cols-1" : "grid grid-cols-2"
+        }`}
+      >
         <div className="aspect-video overflow-hidden rounded-sm border border-gold/20 bg-black">
           {screenSrc ? (
             <iframe
+              ref={iframeRef}
               key={screenSrc}
               src={screenSrc}
               title="Karaoke screen"
@@ -236,129 +292,155 @@ export function KaraokeMusicBoard({
             </div>
           )}
         </div>
-        <div className="flex aspect-video flex-col justify-between rounded-sm border border-gold/20 bg-gradient-to-br from-[#1a0a0a] to-black p-1.5">
-          <div className="text-[7px] uppercase tracking-widest text-gold/60">Now Playing</div>
-          <div className="truncate font-display text-[8px] text-gold">
-            {videoId ? `ID · ${videoId}` : (activeQuery ?? "—")}
+        {!minimized && (
+          <div className="flex aspect-video flex-col justify-between rounded-sm border border-gold/20 bg-gradient-to-br from-[#1a0a0a] to-black p-1.5">
+            <div className="text-[7px] uppercase tracking-widest text-gold/60">Now Playing</div>
+            <div className="truncate font-display text-[8px] text-gold">
+              {videoId ? `ID · ${videoId}` : (activeQuery ?? "—")}
+            </div>
+            <div className="text-[7px] uppercase tracking-widest text-gold/40">
+              {isMyTurn ? "Mic live" : "Audience"}
+            </div>
           </div>
-          <div className="text-[7px] uppercase tracking-widest text-gold/40">
-            {isMyTurn ? "Mic live" : "Audience"}
-          </div>
-        </div>
+        )}
       </div>
 
-      {/* Knob row */}
-      <div className="flex items-center justify-between border-b border-gold/10 bg-[#0a0a0a] px-2 py-1.5">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <div
-            key={i}
-            className="relative h-3 w-3 rounded-full border border-gold/30 bg-gradient-to-br from-[#2a2a2a] to-[#0a0a0a] shadow-inner"
-          >
-            <span
-              className="absolute left-1/2 top-1/2 block h-1.5 w-[1px] origin-bottom -translate-x-1/2 -translate-y-full bg-gold"
-              style={{ transform: `translate(-50%, -100%) rotate(${i * 30 - 90}deg)` }}
-            />
-          </div>
-        ))}
-      </div>
-
-      {/* Search bar */}
-      <div className="space-y-1 border-b border-gold/10 bg-[#0a0a0a] p-2">
-        <div className="flex gap-1">
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") runSearch(query);
-            }}
-            disabled={false}
-            placeholder={isMyTurn ? "Search song or artist…" : "Locked"}
-            className="flex-1 rounded-sm border border-gold/20 bg-black/60 px-1.5 py-1 text-[9px] text-gold placeholder:text-gold/30 outline-none focus:border-gold/60 disabled:cursor-not-allowed disabled:opacity-50"
-          />
+      {/* Transport controls — always visible whenever a track is loaded */}
+      {videoId && (
+        <div className="flex items-center justify-center gap-2 border-b border-gold/10 bg-[#0a0a0a] px-2 py-2">
           <button
             type="button"
-            onClick={() => runSearch(query)}
-            disabled={!query.trim() || searching}
-            className="inline-flex items-center gap-0.5 rounded-sm bg-gradient-gold px-1.5 py-1 text-[8px] font-semibold text-gold-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+            onClick={handlePause}
+            aria-label={paused ? "Play" : "Pause"}
+            className="inline-flex items-center gap-1 rounded-sm border border-gold/40 bg-gold/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-gold transition hover:bg-gold/20"
           >
-            {searching ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Search className="h-2.5 w-2.5" />} Find
+            {paused ? <Play className="h-3 w-3" /> : <Pause className="h-3 w-3" />}
+            {paused ? "Play" : "Pause"}
+          </button>
+          <button
+            type="button"
+            onClick={handleStop}
+            aria-label="Stop"
+            className="inline-flex items-center gap-1 rounded-sm border border-rose-400/50 bg-rose-500/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-rose-300 transition hover:bg-rose-500/20"
+          >
+            <Square className="h-3 w-3" /> Stop
           </button>
         </div>
+      )}
 
-        {/* Inline search results — stays in-app */}
-        {(results !== null || searchError) && (
-          <div className="max-h-40 overflow-y-auto rounded-sm border border-gold/20 bg-black/50 p-1 text-[8px]">
-            {searchSource && results && results.length > 0 && (
-              <div className="px-1 pb-1 text-[7px] uppercase tracking-widest text-gold/50">
-                {searchSource === "catalog" ? "From music machine" : "From the web"}
+      {/* Everything below collapses while the video is actively playing */}
+      {!minimized && (
+        <>
+          {/* Knob row */}
+          <div className="flex items-center justify-between border-b border-gold/10 bg-[#0a0a0a] px-2 py-1.5">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div
+                key={i}
+                className="relative h-3 w-3 rounded-full border border-gold/30 bg-gradient-to-br from-[#2a2a2a] to-[#0a0a0a] shadow-inner"
+              >
+                <span
+                  className="absolute left-1/2 top-1/2 block h-1.5 w-[1px] origin-bottom -translate-x-1/2 -translate-y-full bg-gold"
+                  style={{ transform: `translate(-50%, -100%) rotate(${i * 30 - 90}deg)` }}
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* Search bar */}
+          <div className="space-y-1 border-b border-gold/10 bg-[#0a0a0a] p-2">
+            <div className="flex gap-1">
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") runSearch(query);
+                }}
+                placeholder={isMyTurn ? "Search song or artist…" : "Locked"}
+                className="flex-1 rounded-sm border border-gold/20 bg-black/60 px-1.5 py-1 text-[9px] text-gold placeholder:text-gold/30 outline-none focus:border-gold/60 disabled:cursor-not-allowed disabled:opacity-50"
+              />
+              <button
+                type="button"
+                onClick={() => runSearch(query)}
+                disabled={!query.trim() || searching}
+                className="inline-flex items-center gap-0.5 rounded-sm bg-gradient-gold px-1.5 py-1 text-[8px] font-semibold text-gold-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {searching ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Search className="h-2.5 w-2.5" />} Find
+              </button>
+            </div>
+
+            {(results !== null || searchError) && (
+              <div className="max-h-40 overflow-y-auto rounded-sm border border-gold/20 bg-black/50 p-1 text-[8px]">
+                {searchSource && results && results.length > 0 && (
+                  <div className="px-1 pb-1 text-[7px] uppercase tracking-widest text-gold/50">
+                    {searchSource === "catalog" ? "From music machine" : "From the web"}
+                  </div>
+                )}
+                {results?.map((h, i) => (
+                  <button
+                    key={`${h.id ?? h.url ?? i}`}
+                    type="button"
+                    onClick={() => pickHit(h)}
+                    disabled={!h.youtubeId && !extractYouTubeId(h.url ?? "")}
+                    className="flex w-full items-center justify-between gap-1 rounded-sm px-1.5 py-1 text-left text-gold/90 transition hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <span className="truncate">
+                      <span className="font-semibold">{h.title}</span>
+                      {h.artist && <span className="text-gold/60"> · {h.artist}</span>}
+                    </span>
+                    <Play className="h-2 w-2 shrink-0 text-gold/70" />
+                  </button>
+                ))}
+                {searchError && <div className="px-1 py-1 text-rose-300">{searchError}</div>}
               </div>
             )}
-            {results?.map((h, i) => (
+
+            <div className="flex gap-1">
+              <input
+                value={urlInput}
+                onChange={(e) => setUrlInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") playUrl();
+                }}
+                placeholder="…or paste YouTube link"
+                className="flex-1 rounded-sm border border-gold/10 bg-black/40 px-1.5 py-1 text-[8px] text-gold placeholder:text-gold/30 outline-none focus:border-gold/60 disabled:cursor-not-allowed disabled:opacity-50"
+              />
               <button
-                key={`${h.id ?? h.url ?? i}`}
                 type="button"
-                onClick={() => pickHit(h)}
-                disabled={!h.youtubeId && !extractYouTubeId(h.url ?? "")}
-                className="flex w-full items-center justify-between gap-1 rounded-sm px-1.5 py-1 text-left text-gold/90 transition hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={playUrl}
+                disabled={!extractYouTubeId(urlInput)}
+                className="inline-flex items-center gap-0.5 rounded-sm border border-gold/30 bg-black/60 px-1.5 py-1 text-[8px] font-semibold text-gold transition hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                <span className="truncate">
-                  <span className="font-semibold">{h.title}</span>
-                  {h.artist && <span className="text-gold/60"> · {h.artist}</span>}
+                <Play className="h-2.5 w-2.5" /> Cue
+              </button>
+            </div>
+            {isMyTurn && onEndSong && (
+              <button
+                type="button"
+                onClick={onEndSong}
+                className="w-full rounded-sm border border-rose-500/40 bg-rose-500/10 px-1.5 py-1 text-[8px] font-semibold uppercase tracking-wider text-rose-300 transition hover:bg-rose-500/20"
+              >
+                End song · Next performer
+              </button>
+            )}
+          </div>
+
+          {/* 4x4 colored pad grid */}
+          <div className="grid grid-cols-4 gap-1 bg-[#050505] p-2">
+            {padPresets.map((p) => (
+              <button
+                key={p.label}
+                type="button"
+                onClick={() => runSearch(p.query)}
+                className={`relative aspect-square rounded-sm bg-gradient-to-br ${p.hue} text-[6px] font-bold uppercase leading-tight tracking-tight text-black/85 shadow-[inset_0_-2px_4px_rgba(0,0,0,0.35),0_0_6px_rgba(255,255,255,0.08)] transition active:scale-95`}
+              >
+                <span className="absolute inset-0 flex items-center justify-center px-0.5 text-center drop-shadow">
+                  {p.label}
                 </span>
-                <Play className="h-2 w-2 shrink-0 text-gold/70" />
               </button>
             ))}
-            {searchError && <div className="px-1 py-1 text-rose-300">{searchError}</div>}
           </div>
-        )}
-
-        <div className="flex gap-1">
-          <input
-            value={urlInput}
-            onChange={(e) => setUrlInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") playUrl();
-            }}
-            disabled={false}
-            placeholder="…or paste YouTube link"
-            className="flex-1 rounded-sm border border-gold/10 bg-black/40 px-1.5 py-1 text-[8px] text-gold placeholder:text-gold/30 outline-none focus:border-gold/60 disabled:cursor-not-allowed disabled:opacity-50"
-          />
-          <button
-            type="button"
-            onClick={playUrl}
-            disabled={!extractYouTubeId(urlInput)}
-            className="inline-flex items-center gap-0.5 rounded-sm border border-gold/30 bg-black/60 px-1.5 py-1 text-[8px] font-semibold text-gold transition hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <Play className="h-2.5 w-2.5" /> Cue
-          </button>
-        </div>
-        {isMyTurn && onEndSong && (
-          <button
-            type="button"
-            onClick={onEndSong}
-            className="w-full rounded-sm border border-rose-500/40 bg-rose-500/10 px-1.5 py-1 text-[8px] font-semibold uppercase tracking-wider text-rose-300 transition hover:bg-rose-500/20"
-          >
-            End song · Next performer
-          </button>
-        )}
-      </div>
-
-      {/* 4x4 colored pad grid */}
-      <div className="grid grid-cols-4 gap-1 bg-[#050505] p-2">
-        {padPresets.map((p) => (
-          <button
-            key={p.label}
-            type="button"
-            disabled={false}
-            onClick={() => runSearch(p.query)}
-            className={`relative aspect-square rounded-sm bg-gradient-to-br ${p.hue} text-[6px] font-bold uppercase leading-tight tracking-tight text-black/85 shadow-[inset_0_-2px_4px_rgba(0,0,0,0.35),0_0_6px_rgba(255,255,255,0.08)] transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-30 disabled:saturate-50`}
-          >
-            <span className="absolute inset-0 flex items-center justify-center px-0.5 text-center drop-shadow">
-              {p.label}
-            </span>
-          </button>
-        ))}
-      </div>
+        </>
+      )}
     </div>
   );
 }
