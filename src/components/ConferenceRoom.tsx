@@ -174,12 +174,22 @@ export function ConferenceRoom({
         // before LiveKit would acquire the device.
         audio={prefs.micEnabled}
         video={prefs.cameraEnabled}
+        // In karaoke rooms, disable browser echo-cancellation/NS/AGC on the
+        // mic so the singer's voice isn't suppressed while karaoke music
+        // plays from the same device. Conference/game rooms keep the
+        // browser defaults (AEC on) so meetings stay echo-free.
+        audioCaptureDefaults={
+          kind === "karaoke"
+            ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+            : undefined
+        }
         data-lk-theme="default"
         onDisconnected={() => setState({ phase: "idle" })}
         // We render the LiveKit toolbar ourselves so the bottom bar matches
         // the conf.png mockup; suppress the SDK's default UI.
         style={{ background: "transparent" }}
       >
+
         <RoomsShell
           title={roomName}
           subtitle={ambience ?? undefined}
