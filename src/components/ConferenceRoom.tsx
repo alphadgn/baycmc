@@ -178,11 +178,18 @@ export function ConferenceRoom({
         // mic so the singer's voice isn't suppressed while karaoke music
         // plays from the same device. Conference/game rooms keep the
         // browser defaults (AEC on) so meetings stay echo-free.
-        audioCaptureDefaults={
+        options={
           kind === "karaoke"
-            ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+            ? {
+                audioCaptureDefaults: {
+                  echoCancellation: false,
+                  noiseSuppression: false,
+                  autoGainControl: false,
+                },
+              }
             : undefined
         }
+
         data-lk-theme="default"
         onDisconnected={() => setState({ phase: "idle" })}
         // We render the LiveKit toolbar ourselves so the bottom bar matches
