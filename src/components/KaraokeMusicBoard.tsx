@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from "react";
-import { GripVertical, Lock, Music, Play, Search, X } from "lucide-react";
+import { useRef, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { GripVertical, Loader2, Lock, Music, Play, Search, X } from "lucide-react";
+import { searchKaraokeSongs, type SongHit } from "@/lib/karaoke.functions";
 
 interface KaraokeMusicBoardProps {
   /**
@@ -40,6 +42,11 @@ export function KaraokeMusicBoard({
   const [open, setOpen] = useState(true);
   const [query, setQuery] = useState("");
   const [urlInput, setUrlInput] = useState("");
+  const [results, setResults] = useState<SongHit[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [searchSource, setSearchSource] = useState<"catalog" | "web" | null>(null);
+  const runSongSearch = useServerFn(searchKaraokeSongs);
 
   // Drag state — bottom-right anchor, offsets in CSS pixels.
   const [pos, setPos] = useState<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
@@ -105,11 +112,36 @@ export function KaraokeMusicBoard({
     return null;
   }
 
-  function runSearch(q: string) {
+  async function runSearch(q: string) {
     if (!isMyTurn) return;
     const trimmed = q.trim();
     if (!trimmed) return;
-    onChangeTrack({ videoId: null, activeQuery: `${trimmed} karaoke` });
+    setSearching(true);
+    setSearchError(null);
+    setResults(null);
+    try {
+      const res = await runSongSearch({ data: { query: trimmed } });
+      setResults(res.hits);
+      setSearchSource(res.source);
+      if (res.hits.length === 0) {
+        setSearchError("No tracks found. Try a different title or artist.");
+      }
+    } catch (e) {
+      setSearchError(e instanceof Error ? e.message : "Search failed");
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  function pickHit(hit: SongHit) {
+    if (!isMyTurn) return;
+    if (hit.youtubeId) {
+      onChangeTrack({ videoId: hit.youtubeId, activeQuery: null });
+    } else if (hit.url) {
+      const id = extractYouTubeId(hit.url);
+      if (id) onChangeTrack({ videoId: id, activeQuery: null });
+    }
+    setResults(null);
   }
 
   function playUrl() {
@@ -238,12 +270,40 @@ export function KaraokeMusicBoard({
           <button
             type="button"
             onClick={() => runSearch(query)}
-            disabled={!isMyTurn || !query.trim()}
+            disabled={!isMyTurn || !query.trim() || searching}
             className="inline-flex items-center gap-0.5 rounded-sm bg-gradient-gold px-1.5 py-1 text-[8px] font-semibold text-gold-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            <Search className="h-2.5 w-2.5" /> Find
+            {searching ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Search className="h-2.5 w-2.5" />} Find
           </button>
         </div>
+
+        {/* Inline search results — stays in-app */}
+        {(results !== null || searchError) && (
+          <div className="max-h-40 overflow-y-auto rounded-sm border border-gold/20 bg-black/50 p-1 text-[8px]">
+            {searchSource && results && results.length > 0 && (
+              <div className="px-1 pb-1 text-[7px] uppercase tracking-widest text-gold/50">
+                {searchSource === "catalog" ? "From music machine" : "From the web"}
+              </div>
+            )}
+            {results?.map((h, i) => (
+              <button
+                key={`${h.id ?? h.url ?? i}`}
+                type="button"
+                onClick={() => pickHit(h)}
+                disabled={!h.youtubeId && !extractYouTubeId(h.url ?? "")}
+                className="flex w-full items-center justify-between gap-1 rounded-sm px-1.5 py-1 text-left text-gold/90 transition hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <span className="truncate">
+                  <span className="font-semibold">{h.title}</span>
+                  {h.artist && <span className="text-gold/60"> · {h.artist}</span>}
+                </span>
+                <Play className="h-2 w-2 shrink-0 text-gold/70" />
+              </button>
+            ))}
+            {searchError && <div className="px-1 py-1 text-rose-300">{searchError}</div>}
+          </div>
+        )}
+
         <div className="flex gap-1">
           <input
             value={urlInput}
