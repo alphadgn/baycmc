@@ -284,11 +284,24 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
 
   return (
     <>
-      {/* Queue + status strip — draggable from the top handle */}
+      {/* Queue + status strip — draggable from the top handle.
+          Slides off to the left edge while the song is playing. */}
       <div
-        className="fixed left-4 top-20 z-40 w-[min(90vw,18rem)] overflow-hidden rounded-xl border border-gold/30 bg-background/85 text-xs shadow-gold backdrop-blur"
-        style={{ transform: `translate(${pos.dx}px, ${pos.dy}px)` }}
+        className="fixed left-4 top-20 z-40 w-[min(90vw,18rem)] overflow-hidden rounded-xl border border-gold/30 bg-background/85 text-xs shadow-gold backdrop-blur transition-transform duration-500 ease-out"
+        style={{
+          transform: waitlistHidden
+            ? `translate(calc(-100% + 28px), ${pos.dy}px)`
+            : `translate(${pos.dx}px, ${pos.dy}px)`,
+        }}
       >
+        {waitlistHidden && (
+          <button
+            type="button"
+            aria-label="Show waiting list"
+            onClick={() => setForceWaitlistVisible(true)}
+            className="absolute right-0 top-0 h-full w-[28px] cursor-pointer bg-gradient-to-l from-gold/30 to-transparent"
+          />
+        )}
         <div
           onPointerDown={onDragPointerDown}
           onPointerMove={onDragPointerMove}
