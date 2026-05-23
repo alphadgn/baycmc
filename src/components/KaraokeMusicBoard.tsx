@@ -79,8 +79,53 @@ export function KaraokeMusicBoard({
     postToPlayer(paused ? "pauseVideo" : "playVideo");
   }, [paused, videoId]);
 
+  // Mic state — broadcast a custom event to the LiveKit-aware parent
+  // (ConferenceRoom) which actually toggles localParticipant.setMicrophoneEnabled.
+  // Parent echoes the real state back via "karaoke:mic-state".
+  const [micOn, setMicOn] = useState(false);
+  useEffect(() => {
+    function onState(e: Event) {
+      setMicOn(!!(e as CustomEvent<{ enabled: boolean }>).detail?.enabled);
+    }
+    window.addEventListener("karaoke:mic-state", onState as EventListener);
+    return () =>
+      window.removeEventListener("karaoke:mic-state", onState as EventListener);
+  }, []);
+  function toggleMic() {
+    window.dispatchEvent(
+      new CustomEvent("karaoke:toggle-mic", { detail: { enabled: !micOn } }),
+    );
+  }
 
-  // Drag state — bottom-right anchor, offsets in CSS pixels.
+  // Mobile hint: first time the music machine opens on a small screen, show
+  // a one-time overlay explaining the transport controls. Dismissable.
+  const [showHint, setShowHint] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.innerWidth >= 768) return;
+    if (sessionStorage.getItem("mm-hint-seen")) return;
+    setShowHint(true);
+    const t = setTimeout(() => {
+      setShowHint(false);
+      sessionStorage.setItem("mm-hint-seen", "1");
+    }, 8000);
+    return () => clearTimeout(t);
+  }, []);
+  function dismissHint() {
+    setShowHint(false);
+    if (typeof window !== "undefined") sessionStorage.setItem("mm-hint-seen", "1");
+  }
+
+  // Stage-level "Show all panels" reset — reopen and expand.
+  useEffect(() => {
+    function onReset() {
+      setOpen(true);
+      setForceExpanded(true);
+    }
+    window.addEventListener("karaoke:reset-panels", onReset);
+    return () => window.removeEventListener("karaoke:reset-panels", onReset);
+  }, []);
+
   const [pos, setPos] = useState<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
   const dragRef = useRef<{ startX: number; startY: number; baseDx: number; baseDy: number } | null>(
     null,
