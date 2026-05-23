@@ -92,7 +92,7 @@ export const searchKaraokeSongs = createServerFn({ method: "POST" })
     const fresh =
       cached && Date.now() - new Date(cached.fetched_at).getTime() < 7 * 24 * 3600 * 1000;
     if (fresh && Array.isArray(cached.results) && cached.results.length > 0) {
-      return { source: "web" as const, hits: cached.results as SongHit[] };
+      return { source: "web" as const, hits: cached.results as unknown as SongHit[] };
     }
 
     // 3) Firecrawl search
@@ -137,7 +137,7 @@ export const searchKaraokeSongs = createServerFn({ method: "POST" })
       await supabaseAdmin
         .from("karaoke_search_cache")
         .upsert(
-          { query: cacheKey, results: hits, fetched_at: new Date().toISOString() },
+          { query: cacheKey, results: hits as unknown as Record<string, unknown>[], fetched_at: new Date().toISOString() },
           { onConflict: "query" },
         );
     }
