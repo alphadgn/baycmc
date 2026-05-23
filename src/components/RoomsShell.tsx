@@ -399,8 +399,8 @@ function WelcomeStrip({ title, onOpenMobileNav }: { title: string; onOpenMobileN
 
   return (
     <header
-      className="sticky top-0 z-30 flex h-14 items-center justify-between gap-2 border-b border-border/60 bg-background/95 px-4 backdrop-blur sm:px-6"
-      style={{ paddingTop: "env(safe-area-inset-top, 0px)", height: "calc(3.5rem + env(safe-area-inset-top, 0px))" }}
+      className="sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-border/60 bg-background/95 px-4 backdrop-blur pl-safe pr-safe sm:px-6"
+      style={{ paddingTop: "max(env(safe-area-inset-top, 0px), 0.75rem)", minHeight: "calc(3.5rem + max(env(safe-area-inset-top, 0px), 0.75rem))" }}
     >
       <div className="flex min-w-0 items-center gap-2">
         <button
