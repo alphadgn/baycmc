@@ -1,40 +1,73 @@
-import { useState } from "react";
-import { Lock, Music, Play, Search, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { GripVertical, Lock, Music, Play, Search, X } from "lucide-react";
 
 interface KaraokeMusicBoardProps {
   /**
-   * True only for the user whose active booking owns the karaoke stage.
-   * When false the entire machine is render-locked — the panel still shows
-   * (so the audience can see what's queued) but every control is disabled.
+   * True only for the user who is currently the active performer (either
+   * the booking owner, or the front of the waiting line when nobody booked
+   * the room). When false the entire machine is render-locked.
    */
   isMyTurn: boolean;
+  /** Current synchronized track state — comes from karaoke_sessions. */
+  videoId: string | null;
+  activeQuery: string | null;
+  /**
+   * Called only when isMyTurn — performer-driven changes write to
+   * karaoke_sessions so every other viewer sees the same screen.
+   */
+  onChangeTrack: (next: { videoId: string | null; activeQuery: string | null }) => void;
+  /** Called only when isMyTurn — finishes the song and yields the stage. */
+  onEndSong?: () => void;
 }
 
 /**
  * Karaoke "Maschine"-style music machine.
  *
- * Visual likeness modeled after the Native Instruments Maschine controller:
- *   - dark chassis with gold trim,
- *   - twin display screens at the top (search / now-playing),
- *   - a row of rotary knob indicators,
- *   - a 4x4 grid of glowing pads acting as quick-pick result buttons.
+ * Sized 40% smaller than the original chassis and slides anywhere on the
+ * screen via the gold drag handle so the audience video stays visible.
  *
- * Search and playback are 100% in-app — we embed YouTube's built-in search
- * playlist via the IFrame Player (`listType=search&list=<query>`), so the
- * performer never leaves the clubhouse.
- *
- * Only the performer whose booking is currently active (`isMyTurn`) can
- * drive the machine; everyone else sees the locked chassis.
+ * `videoId` / `activeQuery` are CONTROLLED by the parent (KaraokeStage)
+ * so every viewer renders the same screen in real time. Only `isMyTurn`
+ * users can mutate them.
  */
-export function KaraokeMusicBoard({ isMyTurn }: KaraokeMusicBoardProps) {
+export function KaraokeMusicBoard({
+  isMyTurn,
+  videoId,
+  activeQuery,
+  onChangeTrack,
+  onEndSong,
+}: KaraokeMusicBoardProps) {
   const [open, setOpen] = useState(true);
   const [query, setQuery] = useState("");
-  const [activeQuery, setActiveQuery] = useState<string | null>(null);
-  const [videoId, setVideoId] = useState<string | null>(null);
   const [urlInput, setUrlInput] = useState("");
 
-  // Pre-loaded quick-pick pads — common karaoke genres mapped onto the 16
-  // colored pads, mirroring Maschine's pad layout.
+  // Drag state — bottom-right anchor, offsets in CSS pixels.
+  const [pos, setPos] = useState<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
+  const dragRef = useRef<{ startX: number; startY: number; baseDx: number; baseDy: number } | null>(
+    null,
+  );
+
+  function onDragPointerDown(e: React.PointerEvent) {
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    dragRef.current = { startX: e.clientX, startY: e.clientY, baseDx: pos.dx, baseDy: pos.dy };
+  }
+  function onDragPointerMove(e: React.PointerEvent) {
+    if (!dragRef.current) return;
+    const { startX, startY, baseDx, baseDy } = dragRef.current;
+    // Anchored bottom-right → dragging right increases dx (panel moves right),
+    // dragging up increases dy (panel moves up).
+    setPos({ dx: baseDx - (e.clientX - startX), dy: baseDy - (e.clientY - startY) });
+  }
+  function onDragPointerUp(e: React.PointerEvent) {
+    if (!dragRef.current) return;
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {
+      /* noop */
+    }
+    dragRef.current = null;
+  }
+
   const padPresets: { label: string; query: string; hue: string }[] = [
     { label: "Pop Hits", query: "pop karaoke hits", hue: "from-rose-400 to-rose-600" },
     { label: "80s", query: "80s karaoke", hue: "from-fuchsia-400 to-fuchsia-600" },
@@ -76,17 +109,13 @@ export function KaraokeMusicBoard({ isMyTurn }: KaraokeMusicBoardProps) {
     if (!isMyTurn) return;
     const trimmed = q.trim();
     if (!trimmed) return;
-    setVideoId(null);
-    setActiveQuery(`${trimmed} karaoke`);
+    onChangeTrack({ videoId: null, activeQuery: `${trimmed} karaoke` });
   }
 
   function playUrl() {
     if (!isMyTurn) return;
     const id = extractYouTubeId(urlInput);
-    if (id) {
-      setActiveQuery(null);
-      setVideoId(id);
-    }
+    if (id) onChangeTrack({ videoId: id, activeQuery: null });
   }
 
   if (!open) {
@@ -94,9 +123,9 @@ export function KaraokeMusicBoard({ isMyTurn }: KaraokeMusicBoardProps) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed bottom-4 right-4 z-40 inline-flex items-center gap-2 rounded-full border border-gold/40 bg-background/80 px-4 py-2 text-xs font-semibold text-gold shadow-gold backdrop-blur transition hover:bg-gold/10"
+        className="fixed bottom-4 right-4 z-40 inline-flex items-center gap-2 rounded-full border border-gold/40 bg-background/80 px-3 py-1.5 text-[11px] font-semibold text-gold shadow-gold backdrop-blur transition hover:bg-gold/10"
       >
-        <Music className="h-4 w-4" />
+        <Music className="h-3.5 w-3.5" />
         Music Machine
       </button>
     );
@@ -108,42 +137,50 @@ export function KaraokeMusicBoard({ isMyTurn }: KaraokeMusicBoardProps) {
       ? `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(activeQuery)}&autoplay=1&rel=0&modestbranding=1`
       : null;
 
+  // Original width was 26rem; 40% smaller ≈ 15.6rem. Use 15.5rem.
   return (
-    <div className="fixed bottom-4 right-4 z-40 w-[min(96vw,26rem)] overflow-hidden rounded-2xl border border-gold/40 bg-[#0a0a0a] shadow-gold">
-      {/* Top chassis bar */}
-      <div className="flex items-center justify-between border-b border-gold/20 bg-gradient-to-b from-[#1a1a1a] to-[#0a0a0a] px-3 py-2">
-        <div className="flex items-center gap-2">
-          <div className="flex h-5 w-5 items-center justify-center rounded-full border border-gold/50 text-gold">
-            <Music className="h-3 w-3" />
-          </div>
-          <span className="font-display text-xs uppercase tracking-[0.25em] text-gold">
+    <div
+      className="fixed bottom-4 right-4 z-40 w-[min(96vw,15.5rem)] overflow-hidden rounded-xl border border-gold/40 bg-[#0a0a0a] shadow-gold"
+      style={{ transform: `translate(${-pos.dx}px, ${-pos.dy}px)` }}
+    >
+      {/* Top chassis bar — also the drag handle */}
+      <div
+        onPointerDown={onDragPointerDown}
+        onPointerMove={onDragPointerMove}
+        onPointerUp={onDragPointerUp}
+        onPointerCancel={onDragPointerUp}
+        className="flex cursor-grab touch-none select-none items-center justify-between border-b border-gold/20 bg-gradient-to-b from-[#1a1a1a] to-[#0a0a0a] px-2 py-1.5 active:cursor-grabbing"
+      >
+        <div className="flex items-center gap-1.5">
+          <GripVertical className="h-3 w-3 text-gold/60" />
+          <span className="font-display text-[9px] uppercase tracking-[0.25em] text-gold">
             Maschine · Karaoke
           </span>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1">
           {isMyTurn ? (
-            <span className="rounded-sm bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-300">
+            <span className="rounded-sm bg-emerald-500/20 px-1 py-0.5 text-[7px] font-bold uppercase tracking-wider text-emerald-300">
               Your Turn
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 rounded-sm bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-300">
-              <Lock className="h-2.5 w-2.5" /> Locked
+            <span className="inline-flex items-center gap-0.5 rounded-sm bg-amber-500/15 px-1 py-0.5 text-[7px] font-bold uppercase tracking-wider text-amber-300">
+              <Lock className="h-2 w-2" /> Locked
             </span>
           )}
           <button
             type="button"
             aria-label="Close music machine"
             onClick={() => setOpen(false)}
-            className="rounded-md p-1 text-gold/70 transition hover:bg-gold/10 hover:text-gold"
+            className="rounded-md p-0.5 text-gold/70 transition hover:bg-gold/10 hover:text-gold"
           >
-            <X className="h-3.5 w-3.5" />
+            <X className="h-2.5 w-2.5" />
           </button>
         </div>
       </div>
 
       {/* Dual screens */}
-      <div className="grid grid-cols-2 gap-2 border-b border-gold/10 bg-[#050505] p-2">
-        <div className="aspect-video overflow-hidden rounded-md border border-gold/20 bg-black">
+      <div className="grid grid-cols-2 gap-1 border-b border-gold/10 bg-[#050505] p-1.5">
+        <div className="aspect-video overflow-hidden rounded-sm border border-gold/20 bg-black">
           {screenSrc ? (
             <iframe
               key={screenSrc}
@@ -154,31 +191,31 @@ export function KaraokeMusicBoard({ isMyTurn }: KaraokeMusicBoardProps) {
               className="h-full w-full"
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center text-[9px] uppercase tracking-widest text-gold/40">
+            <div className="flex h-full w-full items-center justify-center text-[7px] uppercase tracking-widest text-gold/40">
               No track
             </div>
           )}
         </div>
-        <div className="flex aspect-video flex-col justify-between rounded-md border border-gold/20 bg-gradient-to-br from-[#1a0a0a] to-black p-2">
-          <div className="text-[9px] uppercase tracking-widest text-gold/60">Now Playing</div>
-          <div className="truncate font-display text-[11px] text-gold">
-            {videoId ? `ID · ${videoId}` : activeQuery ?? "—"}
+        <div className="flex aspect-video flex-col justify-between rounded-sm border border-gold/20 bg-gradient-to-br from-[#1a0a0a] to-black p-1.5">
+          <div className="text-[7px] uppercase tracking-widest text-gold/60">Now Playing</div>
+          <div className="truncate font-display text-[8px] text-gold">
+            {videoId ? `ID · ${videoId}` : (activeQuery ?? "—")}
           </div>
-          <div className="text-[9px] uppercase tracking-widest text-gold/40">
-            {isMyTurn ? "Performer mic live" : "Awaiting performer"}
+          <div className="text-[7px] uppercase tracking-widest text-gold/40">
+            {isMyTurn ? "Mic live" : "Audience"}
           </div>
         </div>
       </div>
 
       {/* Knob row */}
-      <div className="flex items-center justify-between border-b border-gold/10 bg-[#0a0a0a] px-3 py-2">
+      <div className="flex items-center justify-between border-b border-gold/10 bg-[#0a0a0a] px-2 py-1.5">
         {Array.from({ length: 8 }).map((_, i) => (
           <div
             key={i}
-            className="relative h-5 w-5 rounded-full border border-gold/30 bg-gradient-to-br from-[#2a2a2a] to-[#0a0a0a] shadow-inner"
+            className="relative h-3 w-3 rounded-full border border-gold/30 bg-gradient-to-br from-[#2a2a2a] to-[#0a0a0a] shadow-inner"
           >
             <span
-              className="absolute left-1/2 top-1/2 block h-2 w-[1.5px] origin-bottom -translate-x-1/2 -translate-y-full bg-gold"
+              className="absolute left-1/2 top-1/2 block h-1.5 w-[1px] origin-bottom -translate-x-1/2 -translate-y-full bg-gold"
               style={{ transform: `translate(-50%, -100%) rotate(${i * 30 - 90}deg)` }}
             />
           </div>
@@ -186,8 +223,8 @@ export function KaraokeMusicBoard({ isMyTurn }: KaraokeMusicBoardProps) {
       </div>
 
       {/* Search bar */}
-      <div className="space-y-2 border-b border-gold/10 bg-[#0a0a0a] p-3">
-        <div className="flex gap-1.5">
+      <div className="space-y-1 border-b border-gold/10 bg-[#0a0a0a] p-2">
+        <div className="flex gap-1">
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -195,19 +232,19 @@ export function KaraokeMusicBoard({ isMyTurn }: KaraokeMusicBoardProps) {
               if (e.key === "Enter") runSearch(query);
             }}
             disabled={!isMyTurn}
-            placeholder={isMyTurn ? "Search any song or artist…" : "Music machine locked"}
-            className="flex-1 rounded-md border border-gold/20 bg-black/60 px-2 py-1.5 text-xs text-gold placeholder:text-gold/30 outline-none focus:border-gold/60 disabled:cursor-not-allowed disabled:opacity-50"
+            placeholder={isMyTurn ? "Search song or artist…" : "Locked"}
+            className="flex-1 rounded-sm border border-gold/20 bg-black/60 px-1.5 py-1 text-[9px] text-gold placeholder:text-gold/30 outline-none focus:border-gold/60 disabled:cursor-not-allowed disabled:opacity-50"
           />
           <button
             type="button"
             onClick={() => runSearch(query)}
             disabled={!isMyTurn || !query.trim()}
-            className="inline-flex items-center gap-1 rounded-md bg-gradient-gold px-2.5 py-1.5 text-[11px] font-semibold text-gold-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center gap-0.5 rounded-sm bg-gradient-gold px-1.5 py-1 text-[8px] font-semibold text-gold-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            <Search className="h-3 w-3" /> Find
+            <Search className="h-2.5 w-2.5" /> Find
           </button>
         </div>
-        <div className="flex gap-1.5">
+        <div className="flex gap-1">
           <input
             value={urlInput}
             onChange={(e) => setUrlInput(e.target.value)}
@@ -215,31 +252,40 @@ export function KaraokeMusicBoard({ isMyTurn }: KaraokeMusicBoardProps) {
               if (e.key === "Enter") playUrl();
             }}
             disabled={!isMyTurn}
-            placeholder="…or paste a YouTube link"
-            className="flex-1 rounded-md border border-gold/10 bg-black/40 px-2 py-1.5 text-[11px] text-gold placeholder:text-gold/30 outline-none focus:border-gold/60 disabled:cursor-not-allowed disabled:opacity-50"
+            placeholder="…or paste YouTube link"
+            className="flex-1 rounded-sm border border-gold/10 bg-black/40 px-1.5 py-1 text-[8px] text-gold placeholder:text-gold/30 outline-none focus:border-gold/60 disabled:cursor-not-allowed disabled:opacity-50"
           />
           <button
             type="button"
             onClick={playUrl}
             disabled={!isMyTurn || !extractYouTubeId(urlInput)}
-            className="inline-flex items-center gap-1 rounded-md border border-gold/30 bg-black/60 px-2 py-1.5 text-[11px] font-semibold text-gold transition hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center gap-0.5 rounded-sm border border-gold/30 bg-black/60 px-1.5 py-1 text-[8px] font-semibold text-gold transition hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            <Play className="h-3 w-3" /> Cue
+            <Play className="h-2.5 w-2.5" /> Cue
           </button>
         </div>
+        {isMyTurn && onEndSong && (
+          <button
+            type="button"
+            onClick={onEndSong}
+            className="w-full rounded-sm border border-rose-500/40 bg-rose-500/10 px-1.5 py-1 text-[8px] font-semibold uppercase tracking-wider text-rose-300 transition hover:bg-rose-500/20"
+          >
+            End song · Next performer
+          </button>
+        )}
       </div>
 
       {/* 4x4 colored pad grid */}
-      <div className="grid grid-cols-4 gap-1.5 bg-[#050505] p-3">
+      <div className="grid grid-cols-4 gap-1 bg-[#050505] p-2">
         {padPresets.map((p) => (
           <button
             key={p.label}
             type="button"
             disabled={!isMyTurn}
             onClick={() => runSearch(p.query)}
-            className={`relative aspect-square rounded-md bg-gradient-to-br ${p.hue} text-[8px] font-bold uppercase leading-tight tracking-tight text-black/85 shadow-[inset_0_-4px_8px_rgba(0,0,0,0.35),0_0_12px_rgba(255,255,255,0.08)] transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-30 disabled:saturate-50`}
+            className={`relative aspect-square rounded-sm bg-gradient-to-br ${p.hue} text-[6px] font-bold uppercase leading-tight tracking-tight text-black/85 shadow-[inset_0_-2px_4px_rgba(0,0,0,0.35),0_0_6px_rgba(255,255,255,0.08)] transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-30 disabled:saturate-50`}
           >
-            <span className="absolute inset-0 flex items-center justify-center px-1 text-center drop-shadow">
+            <span className="absolute inset-0 flex items-center justify-center px-0.5 text-center drop-shadow">
               {p.label}
             </span>
           </button>
