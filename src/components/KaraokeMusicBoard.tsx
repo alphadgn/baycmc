@@ -5,6 +5,8 @@ import {
   Loader2,
   Lock,
   Maximize2,
+  Mic,
+  MicOff,
   Music,
   Pause,
   Play,
