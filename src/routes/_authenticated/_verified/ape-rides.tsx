@@ -183,14 +183,29 @@ function ApeRidesPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
-      <header className="mb-6 sm:mb-8">
-        <h1 className="font-display text-3xl text-gradient-gold sm:text-4xl">Ape Rides</h1>
-        <p className="mt-2 text-xs text-muted-foreground sm:text-sm">
-          Pair with a member physically inside the Wynwood, FL clubhouse and
-          watch their live POV. Hosting is unlocked only when your GPS places
-          you inside the clubhouse geofence.
-        </p>
+      <header className="mb-6 sm:mb-8 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="font-display text-3xl text-gradient-gold sm:text-4xl">Ape Rides</h1>
+          <p className="mt-2 text-xs text-muted-foreground sm:text-sm">
+            Pair with a member physically inside the Wynwood, FL clubhouse and
+            watch their live POV. Hosting is unlocked only when your GPS places
+            you inside the clubhouse geofence.
+          </p>
+        </div>
+        {pfpUrl && (
+          <button
+            type="button"
+            onClick={() => setArOpen(true)}
+            className="self-start rounded-md border border-gold/40 bg-gold/10 px-4 py-2 text-sm font-semibold text-gold shadow-gold hover:bg-gold/20"
+          >
+            🦍 Try Ape AR
+          </button>
+        )}
       </header>
+      {arOpen && pfpUrl && (
+        <ApeArFilter pfpUrl={pfpUrl} onClose={() => setArOpen(false)} />
+      )}
+
 
       {/* Host panel */}
       <section className="glass mb-8 rounded-2xl p-6 shadow-card">

@@ -18,7 +18,7 @@ import {
   useRoomContext,
   useRoomInfo,
 } from "@livekit/components-react";
-import { ConnectionQuality } from "livekit-client";
+import { ConnectionQuality, LocalAudioTrack, Track } from "livekit-client";
 import { AmaConference } from "@/components/AmaConference";
 import "@livekit/components-styles";
 import { toast } from "sonner";
@@ -174,12 +174,29 @@ export function ConferenceRoom({
         // before LiveKit would acquire the device.
         audio={prefs.micEnabled}
         video={prefs.cameraEnabled}
+        // In karaoke rooms, disable browser echo-cancellation/NS/AGC on the
+        // mic so the singer's voice isn't suppressed while karaoke music
+        // plays from the same device. Conference/game rooms keep the
+        // browser defaults (AEC on) so meetings stay echo-free.
+        options={
+          kind === "karaoke"
+            ? {
+                audioCaptureDefaults: {
+                  echoCancellation: false,
+                  noiseSuppression: false,
+                  autoGainControl: false,
+                },
+              }
+            : undefined
+        }
+
         data-lk-theme="default"
         onDisconnected={() => setState({ phase: "idle" })}
         // We render the LiveKit toolbar ourselves so the bottom bar matches
         // the conf.png mockup; suppress the SDK's default UI.
         style={{ background: "transparent" }}
       >
+
         <RoomsShell
           title={roomName}
           subtitle={ambience ?? undefined}
@@ -208,6 +225,9 @@ export function ConferenceRoom({
             roomName={roomName}
             hostUserId={hostUserId}
           />
+          {kind === "karaoke" && <KaraokeMusicAudioBridge />}
+          <RoomAudioRenderer />
+
           <RoomAudioRenderer />
         </RoomsShell>
       </LiveKitRoom>
@@ -1336,3 +1356,151 @@ function BottomControl({
     </div>
   );
 }
+
+/**
+ * Karaoke music → LiveKit bridge.
+ *
+ * The YouTube iframe plays locally on every viewer's device. That alone
+ * fails three goals: (1) LiveKit recordings never see the music,
+ * (2) anyone whose iframe is muted (mobile autoplay policy, non-performer
+ * mute) hears silence, (3) viewers drift out of sync.
+ *
+ * Fix: when the active performer starts a song, they share their tab's
+ * audio via getDisplayMedia, and we publish that as a
+ * `ScreenShareAudio` LiveKit track. Every other participant then receives
+ * the music through LiveKit (RoomAudioRenderer handles playback) and
+ * recordings capture it natively. Non-performer iframes mute themselves
+ * (see KaraokeMusicBoard) so users hear the music exactly once.
+ *
+ * Listens for:
+ *   - "karaoke:publish-music"   { detail: { play: boolean } }
+ *   - "karaoke:unpublish-music"
+ */
+function KaraokeMusicAudioBridge() {
+  const room = useRoomContext();
+  const trackRef = useRef<LocalAudioTrack | null>(null);
+  const sourceStreamRef = useRef<MediaStream | null>(null);
+
+  useEffect(() => {
+    async function publish() {
+      if (!room) return;
+      if (trackRef.current) return; // already publishing
+      if (
+        typeof navigator === "undefined" ||
+        typeof navigator.mediaDevices?.getDisplayMedia !== "function"
+      ) {
+        toast.error(
+          "Tab-audio sharing isn't supported on this browser. Open the room in desktop Chrome/Edge to broadcast music.",
+        );
+        return;
+      }
+      try {
+        // Some browsers reject audio-only getDisplayMedia, so request video too,
+        // then discard the video track. Audio quality is preserved.
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+          video: true,
+          audio: {
+            // Music quality settings — no AEC/NS so the audio is broadcast clean.
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+          },
+        });
+        const audioTrack = stream.getAudioTracks()[0];
+        stream.getVideoTracks().forEach((t) => t.stop());
+        if (!audioTrack) {
+          toast.error(
+            "No tab audio was captured. In the share dialog, pick 'This tab' and toggle 'Share tab audio' on.",
+          );
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        const localTrack = new LocalAudioTrack(audioTrack, undefined, false);
+        await room.localParticipant.publishTrack(localTrack, {
+          source: Track.Source.ScreenShareAudio,
+          name: "karaoke-music",
+        });
+        trackRef.current = localTrack;
+        sourceStreamRef.current = stream;
+        // If the user stops sharing via the browser's chrome UI, clean up.
+        audioTrack.addEventListener("ended", () => {
+          void unpublish();
+        });
+        toast.success("Music is now playing for everyone in the room.");
+      } catch (e) {
+        console.warn("[karaoke] publish music failed", e);
+        toast.error(
+          "Couldn't share tab audio. Allow the browser prompt and pick the tab playing the music.",
+        );
+      }
+    }
+
+    async function unpublish() {
+      const t = trackRef.current;
+      trackRef.current = null;
+      const s = sourceStreamRef.current;
+      sourceStreamRef.current = null;
+      if (t && room) {
+        try {
+          await room.localParticipant.unpublishTrack(t, true);
+        } catch (e) {
+          console.warn("[karaoke] unpublish music failed", e);
+        }
+      }
+      s?.getTracks().forEach((tr) => tr.stop());
+    }
+
+    function onPublish(e: Event) {
+      const play = !!(e as CustomEvent<{ play: boolean }>).detail?.play;
+      if (play) void publish();
+      else void unpublish();
+    }
+    function onUnpublish() {
+      void unpublish();
+    }
+
+    window.addEventListener("karaoke:publish-music", onPublish as EventListener);
+    window.addEventListener("karaoke:unpublish-music", onUnpublish as EventListener);
+
+    // Broadcast room-wide "is any music track live?" state so the
+    // KaraokeMusicBoard can mute the local iframe for non-performers.
+    function broadcastState() {
+      if (!room) return;
+      const anyMusic = Array.from(room.remoteParticipants.values()).some((p) =>
+        Array.from(p.trackPublications.values()).some(
+          (pub) => pub.source === Track.Source.ScreenShareAudio,
+        ),
+      ) || !!trackRef.current;
+      window.dispatchEvent(
+        new CustomEvent("karaoke:music-shared", { detail: { shared: anyMusic } }),
+      );
+    }
+    broadcastState();
+    if (room) {
+      room.on("trackPublished", broadcastState);
+      room.on("trackUnpublished", broadcastState);
+      room.on("trackSubscribed", broadcastState);
+      room.on("trackUnsubscribed", broadcastState);
+      room.on("participantConnected", broadcastState);
+      room.on("participantDisconnected", broadcastState);
+    }
+
+    return () => {
+      window.removeEventListener("karaoke:publish-music", onPublish as EventListener);
+      window.removeEventListener("karaoke:unpublish-music", onUnpublish as EventListener);
+      if (room) {
+        room.off("trackPublished", broadcastState);
+        room.off("trackUnpublished", broadcastState);
+        room.off("trackSubscribed", broadcastState);
+        room.off("trackUnsubscribed", broadcastState);
+        room.off("participantConnected", broadcastState);
+        room.off("participantDisconnected", broadcastState);
+      }
+      void unpublish();
+    };
+  }, [room]);
+
+
+  return null;
+}
+

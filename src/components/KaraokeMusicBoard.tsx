@@ -97,6 +97,40 @@ export function KaraokeMusicBoard({
     );
   }
 
+  // Music broadcast state — the performer publishes their tab audio to LiveKit
+  // so every viewer (and any recording) hears the music. Non-performers mute
+  // their own iframe so they hear the music exactly once via LiveKit.
+  const [musicShared, setMusicShared] = useState(false);
+  function shareMusicToRoom() {
+    window.dispatchEvent(
+      new CustomEvent("karaoke:publish-music", { detail: { play: true } }),
+    );
+    setMusicShared(true);
+  }
+  function stopSharingMusic() {
+    window.dispatchEvent(new CustomEvent("karaoke:unpublish-music"));
+    setMusicShared(false);
+  }
+  // Auto-stop sharing when the track ends or playback stops.
+  useEffect(() => {
+    if (musicShared && (!videoId || paused)) {
+      window.dispatchEvent(new CustomEvent("karaoke:unpublish-music"));
+      setMusicShared(false);
+    }
+  }, [videoId, paused, musicShared]);
+  // Listen to room-wide music-shared state — non-performers use this to
+  // mute their local iframe so they hear music exactly once (via LiveKit).
+  useEffect(() => {
+    function onShared(e: Event) {
+      setMusicShared(!!(e as CustomEvent<{ shared: boolean }>).detail?.shared);
+    }
+    window.addEventListener("karaoke:music-shared", onShared as EventListener);
+    return () =>
+      window.removeEventListener("karaoke:music-shared", onShared as EventListener);
+  }, []);
+
+
+
   // Mobile hint: first time the music machine opens on a small screen, show
   // a one-time overlay explaining the transport controls. Dismissable.
   const [showHint, setShowHint] = useState(false);
@@ -248,11 +282,19 @@ export function KaraokeMusicBoard({
     );
   }
 
+  // Non-performers mute their local iframe so the music they hear comes
+  // only from the LiveKit broadcast (no double-audio). The performer keeps
+  // their iframe unmuted — that's the source they're sharing to the room.
+  // If the performer hasn't shared yet, everyone unmutes the iframe so the
+  // music is at least audible locally even without LiveKit broadcast.
+  const muteLocalIframe = !isMyTurn && musicShared;
+  const ytParams = `autoplay=1&rel=0&modestbranding=1&enablejsapi=1&playsinline=1${muteLocalIframe ? "&mute=1" : ""}`;
   const screenSrc = videoId
-    ? `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&enablejsapi=1`
+    ? `https://www.youtube.com/embed/${videoId}?${ytParams}`
     : activeQuery
-      ? `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(activeQuery)}&autoplay=1&rel=0&modestbranding=1&enablejsapi=1`
+      ? `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(activeQuery)}&${ytParams}`
       : null;
+
 
   function handleStop() {
     postToPlayer("stopVideo");
@@ -386,8 +428,25 @@ export function KaraokeMusicBoard({
             {micOn ? <Mic className="h-3 w-3" /> : <MicOff className="h-3 w-3" />}
             {micOn ? "Mic Live" : "Mic Off"}
           </button>
+          {isMyTurn && (
+            <button
+              type="button"
+              onClick={musicShared ? stopSharingMusic : shareMusicToRoom}
+              aria-label={musicShared ? "Stop sharing music" : "Share music to room"}
+              title="Shares tab audio so everyone in the room (and recordings) hears the music"
+              className={`inline-flex items-center gap-1 rounded-sm border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider transition ${
+                musicShared
+                  ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"
+                  : "border-gold/40 bg-gold/10 text-gold hover:bg-gold/20"
+              }`}
+            >
+              <Music className="h-3 w-3" />
+              {musicShared ? "Sharing" : "Share Music"}
+            </button>
+          )}
         </div>
       )}
+
 
       {/* Mobile-only one-time hint overlay */}
       {showHint && (
