@@ -96,7 +96,10 @@ export function AppHeader() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 glass">
+      <header
+        className="sticky top-0 z-50 glass"
+        style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
+      >
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-2 px-3 sm:px-6">
           <div className="flex min-w-0 shrink items-center gap-1.5 sm:gap-3">
             {showBack && (
