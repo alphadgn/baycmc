@@ -1,25 +1,29 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { GripVertical, Loader2, Lock, Music, Play, Search, X } from "lucide-react";
+import {
+  GripVertical,
+  Loader2,
+  Lock,
+  Maximize2,
+  Music,
+  Pause,
+  Play,
+  Search,
+  Square,
+  X,
+} from "lucide-react";
 import { searchKaraokeSongs, type SongHit } from "@/lib/karaoke.functions";
 
 interface KaraokeMusicBoardProps {
-  /**
-   * True only for the user who is currently the active performer (either
-   * the booking owner, or the front of the waiting line when nobody booked
-   * the room). When false the entire machine is render-locked.
-   */
   isMyTurn: boolean;
-  /** Current synchronized track state — comes from karaoke_sessions. */
   videoId: string | null;
   activeQuery: string | null;
-  /**
-   * Called only when isMyTurn — performer-driven changes write to
-   * karaoke_sessions so every other viewer sees the same screen.
-   */
   onChangeTrack: (next: { videoId: string | null; activeQuery: string | null }) => void;
-  /** Called only when isMyTurn — finishes the song and yields the stage. */
   onEndSong?: () => void;
+  /** Performer-controlled pause flag, lifted to the stage so the waiting
+   *  list can react and restore itself. */
+  paused?: boolean;
+  onPauseToggle?: (next: boolean) => void;
 }
 
 /**
