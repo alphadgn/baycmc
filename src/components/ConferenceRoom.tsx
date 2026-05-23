@@ -212,6 +212,7 @@ export function ConferenceRoom({
           bottomBar={
             <LiveBottomBar
               isHost={state.isHost}
+              karaoke={kind === "karaoke"}
               onLeave={() => {
                 setState({ phase: "idle" });
                 goBack();
@@ -657,7 +658,7 @@ function SignalBars({ active, tone }: { active: number; tone: string }) {
   );
 }
 
-function LiveBottomBar({ onLeave, isHost }: { onLeave: () => void; isHost: boolean }) {
+function LiveBottomBar({ onLeave, isHost, karaoke = false }: { onLeave: () => void; isHost: boolean; karaoke?: boolean }) {
   const local = useLocalParticipant();
   const room = useRoomContext();
   const participants = useParticipants();
@@ -800,12 +801,32 @@ function LiveBottomBar({ onLeave, isHost }: { onLeave: () => void; isHost: boole
             icon={<MessageCircle className="h-4 w-4" />}
             disabled
           />
-          <BottomControl
-            label={String(participants.length)}
-            ariaLabel={`Participants: ${participants.length}`}
-            tone="neutral"
-            icon={<Users className="h-4 w-4" />}
-          />
+          {!karaoke && (
+            <BottomControl
+              label={String(participants.length)}
+              ariaLabel={`Participants: ${participants.length}`}
+              tone="neutral"
+              icon={<Users className="h-4 w-4" />}
+            />
+          )}
+          {karaoke && (
+            // Karaoke: the Participants pill is relocated out of the
+            // wrap-prone controls strip into a fixed bottom-right slot
+            // (where "Show all panels" used to live) so it never clips
+            // off-screen on mobile. Same UI semantics: Users icon + count.
+            <button
+              type="button"
+              aria-label={`Participants: ${participants.length}`}
+              style={{
+                bottom: "calc(env(safe-area-inset-bottom, 0px) + 0.5rem)",
+                right: "calc(env(safe-area-inset-right, 0px) + 0.75rem)",
+              }}
+              className="fixed z-[55] inline-flex items-center gap-1.5 rounded-full border border-gold/50 bg-background/85 px-3 py-1.5 text-[11px] font-semibold text-gold shadow-gold backdrop-blur"
+            >
+              <Users className="h-3.5 w-3.5" />
+              <span className="tabular-nums">{participants.length}</span>
+            </button>
+          )}
         </>
       }
     />
