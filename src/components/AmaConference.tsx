@@ -542,11 +542,11 @@ function OverflowStrip({
   count: number;
 }) {
   return (
-    <div className="flex shrink-0 items-center gap-2 overflow-x-auto rounded-xl border border-border/40 bg-background/40 px-3 py-2 backdrop-blur">
+    <div className="flex shrink-0 flex-wrap items-center gap-2 rounded-xl border border-border/40 bg-background/40 px-3 py-2 backdrop-blur">
       <span className="shrink-0 text-[10px] uppercase tracking-widest text-muted-foreground">
         Also in room
       </span>
-      <ul className="flex shrink-0 items-center gap-2">
+      <ul className="flex flex-wrap items-center gap-2">
         {overflow.slice(0, 12).map((p) => {
           const prof = profiles.get(p.identity);
           const name = prof?.username || p.name || `${p.identity.slice(0, 6)}…`;

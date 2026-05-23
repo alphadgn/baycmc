@@ -192,7 +192,7 @@ function UsersTab() {
         </button>
       </div>
 
-      <div className="glass overflow-x-auto rounded-2xl shadow-card">
+      <div className="glass overflow-x-hidden rounded-2xl shadow-card">
         <table className="w-full text-left text-xs font-sans-display">
           <thead className="border-b border-border/60 text-[10px] uppercase tracking-wider text-muted-foreground">
             <tr>
