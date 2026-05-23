@@ -32,9 +32,9 @@ function Index() {
   }, [isAuthenticated, isVerifiedHolder, loading, verifLoading, navigate]);
 
   return (
-    <main>
+    <main className="max-w-full overflow-x-hidden">
       {/* Hero */}
-      <section className="relative overflow-hidden">
+      <section className="relative max-w-full overflow-x-hidden overflow-y-visible">
         <div
           className="absolute inset-0 -z-10 opacity-60"
           style={{ background: "var(--gradient-radial-gold)" }}
@@ -55,7 +55,7 @@ function Index() {
                 size="xl"
                 alt="Bored Apes"
                 clamp="clamp(6.5rem, 30vw, 15rem)"
-                className="mx-auto -mt-2 w-full sm:-mt-3"
+                 className="mx-auto -mt-2 w-full max-w-[calc(100vw-2rem)] sm:-mt-3"
               />
             </h1>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground sm:mt-3 sm:text-xl">
