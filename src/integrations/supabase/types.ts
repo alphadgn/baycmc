@@ -240,6 +240,67 @@ export type Database = {
         }
         Relationships: []
       }
+      karaoke_queue: {
+        Row: {
+          id: string
+          joined_at: string
+          room_id: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          joined_at?: string
+          room_id: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          joined_at?: string
+          room_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "karaoke_queue_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      karaoke_sessions: {
+        Row: {
+          performer_user_id: string | null
+          room_id: string
+          search_query: string | null
+          updated_at: string
+          video_id: string | null
+        }
+        Insert: {
+          performer_user_id?: string | null
+          room_id: string
+          search_query?: string | null
+          updated_at?: string
+          video_id?: string | null
+        }
+        Update: {
+          performer_user_id?: string | null
+          room_id?: string
+          search_query?: string | null
+          updated_at?: string
+          video_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "karaoke_sessions_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: true
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lifer_messages: {
         Row: {
           body: string
