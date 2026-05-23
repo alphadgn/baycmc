@@ -214,6 +214,22 @@
     border: 1px solid var(--glass-border);
   }
 
+  /* Safe-area helpers — always honor device inset with a small fallback
+     so content never butts up against status bars / nav bars even when
+     env() returns 0. */
+  .pt-safe {
+    padding-top: max(env(safe-area-inset-top, 0px), 0.25rem);
+  }
+  .pb-safe {
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 0.25rem);
+  }
+  .pl-safe {
+    padding-left: env(safe-area-inset-left, 0px);
+  }
+  .pr-safe {
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+
   .text-gradient-gold {
     background: var(--gradient-gold);
     -webkit-background-clip: text;
