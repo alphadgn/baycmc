@@ -45,6 +45,13 @@ const NAV_ITEMS: NavItem[] = [
 // Routes treated as "home" — no back arrow shown here.
 const HOME_ROUTES = new Set<string>(["/", "/lobby"]);
 
+// Tracks how many in-app navigations have happened since the tab opened.
+// `window.history.length` is unreliable (counts entries from before the SPA
+// loaded — e.g. the new-tab page), so a bare `history.back()` could land on
+// a blank page or an external site. We only call `history.back()` when we
+// know there's an internal entry to return to.
+let internalNavCount = 0;
+
 export function AppHeader() {
   const { isAuthenticated, user } = useAuth();
   const { isVerifiedHolder, isLifer } = useVerificationStatus();
