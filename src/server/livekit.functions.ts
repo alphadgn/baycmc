@@ -195,6 +195,15 @@ export const getLivekitToken = createServerFn({ method: "POST" })
     const cfg = getLivekitConfig();
     if (!cfg) return { ok: false as const, error: "LiveKit not configured" };
 
+  const activeParticipants = await listActiveParticipants(cfg, room.livekit_room);
+  if (activeParticipants !== null && activeParticipants >= room.capacity) {
+    return {
+      ok: false as const,
+      error: "This room is at capacity. Please wait for someone to leave before joining.",
+      code: "room_full" as const,
+    };
+  }
+
     // Display name = wallet short
     const { data: profile } = await supabase
       .from("profiles")
@@ -242,6 +251,20 @@ export const getLivekitToken = createServerFn({ method: "POST" })
       isLocked: room.is_locked,
     };
   });
+
+async function listActiveParticipants(
+  cfg: { apiKey: string; apiSecret: string; url: string },
+  livekitRoom: string,
+): Promise<number | null> {
+  const client = new RoomServiceClient(cfg.url, cfg.apiKey, cfg.apiSecret);
+  try {
+    const participants = await client.listParticipants(livekitRoom);
+    return participants.length;
+  } catch (e) {
+    console.warn("LiveKit participant count failed", e);
+    return null;
+  }
+}
 
 export const revalidateLivekitRoomAccess = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
