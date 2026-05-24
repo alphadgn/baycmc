@@ -65,6 +65,7 @@ export function AppHeader() {
   const [navOpen, setNavOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [karaokeRoomId, setKaraokeRoomId] = useState<string | null>(null);
   // pendingGatedRoute removed: gated nav entries are now hidden entirely
   // until verification completes, so there's no in-menu retry flow.
 
@@ -97,12 +98,43 @@ export function AppHeader() {
     };
   }, [user]);
 
+  // Resolve the active karaoke room id once so the menu entry can link
+  // straight into the room — avoids relying on a server-side beforeLoad
+  // redirect from /karaoke that intermittently no-ops for lobby users.
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setKaraokeRoomId(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const { data } = await supabase
+        .from("rooms")
+        .select("id")
+        .eq("kind", "karaoke")
+        .eq("active", true)
+        .order("display_order", { ascending: true, nullsFirst: false })
+        .limit(1)
+        .maybeSingle();
+      if (cancelled) return;
+      setKaraokeRoomId((data?.id as string | undefined) ?? null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated]);
+
   // Show the hamburger to every authenticated user — lobby visitors get to
   // browse the full clubhouse menu and see exactly what unlocks once they
   // verify a BAYC/MAYC. Gated items render with a lock icon and pop the
   // Privy signing modal on click.
   const showHamburger = isAuthenticated;
-  const showBack = isAuthenticated && !HOME_ROUTES.has(location.pathname);
+  // Normalize trailing slash so /lobby/ also counts as a home route, and
+  // hide the back chevron entirely on the lobby / landing pages so lobby
+  // visitors never see a back arrow when they have nowhere meaningful to
+  // go back to.
+  const normalizedPath = location.pathname.replace(/\/+$/, "") || "/";
+  const showBack = isAuthenticated && !HOME_ROUTES.has(normalizedPath);
 
   // The /rooms* and /calendar routes ship their own app-shell (sidebar +
   // top welcome strip + right rail + bottom bar) that matches the conf.png
