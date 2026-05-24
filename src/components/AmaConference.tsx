@@ -187,6 +187,7 @@ function AmaGridLayout({
               backgroundImage={backgroundImage}
               hasActiveBooking={hasActiveBooking}
               solo={hostSolo}
+              vipUserIds={vipUserIds}
             />
           </div>
         </div>
@@ -208,6 +209,7 @@ function AmaGridLayout({
                   participant={p}
                   cameraTracks={cameraTracks}
                   profile={profiles.get(p.identity) ?? null}
+                  isVip={vipUserIds.has(p.identity)}
                 />
               </div>
             ))}
