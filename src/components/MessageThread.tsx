@@ -1,11 +1,34 @@
-import { useEffect, useRef, useState } from "react";
-import { Check, Image as ImageIcon, Loader2, Pencil, Sticker, Trash2, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Check, Image as ImageIcon, Loader2, Pencil, Search, Sticker, Trash2, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
 import { toast } from "sonner";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { GifPicker } from "@/components/GifPicker";
 import type { GifResult } from "@/server/giphy.functions";
+
+/** Tokenize a message body, marking @mentions and #tags as clickable. */
+function renderTokens(body: string, onToken: (token: string) => void) {
+  const parts = body.split(/(\s+)/);
+  return parts.map((part, i) => {
+    const m = part.match(/^([@#])([A-Za-z0-9_-]+)$/);
+    if (!m) return <span key={i}>{part}</span>;
+    const token = part;
+    return (
+      <button
+        key={i}
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onToken(token);
+        }}
+        className="font-semibold text-gold underline-offset-2 hover:underline"
+      >
+        {token}
+      </button>
+    );
+  });
+}
 
 interface Message {
   id: string;
