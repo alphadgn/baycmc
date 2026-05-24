@@ -269,6 +269,54 @@ export type Database = {
           },
         ]
       }
+      karaoke_recordings: {
+        Row: {
+          created_at: string
+          duration_ms: number | null
+          has_instrumental: boolean
+          id: string
+          mime_type: string
+          performer_id: string
+          public_url: string
+          room_id: string
+          song_artist: string | null
+          song_title: string | null
+          storage_path: string
+          updated_at: string
+          youtube_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          duration_ms?: number | null
+          has_instrumental?: boolean
+          id?: string
+          mime_type?: string
+          performer_id: string
+          public_url: string
+          room_id: string
+          song_artist?: string | null
+          song_title?: string | null
+          storage_path: string
+          updated_at?: string
+          youtube_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          duration_ms?: number | null
+          has_instrumental?: boolean
+          id?: string
+          mime_type?: string
+          performer_id?: string
+          public_url?: string
+          room_id?: string
+          song_artist?: string | null
+          song_title?: string | null
+          storage_path?: string
+          updated_at?: string
+          youtube_id?: string | null
+        }
+        Relationships: []
+      }
       karaoke_search_cache: {
         Row: {
           fetched_at: string
