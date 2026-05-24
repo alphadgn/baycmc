@@ -394,11 +394,13 @@ function ParticipantVideoTile({
   cameraTracks,
   profile,
   variant,
+  isVip = false,
 }: {
   participant: Participant;
   cameraTracks: TrackReferenceOrPlaceholder[];
   profile: ProfileMini | null;
   variant: "host" | "host-compact" | "host-solo" | "audience" | "solo";
+  isVip?: boolean;
 }) {
   const isSpeaking = useIsSpeaking(participant);
   const camTrack = cameraTracks.find((t) => t.participant.identity === participant.identity);
