@@ -120,9 +120,10 @@ export function AppHeader() {
               <button
                 type="button"
                 onClick={() => {
-                  // history.back if there's something to go back to inside
-                  // this app; otherwise route to the lobby (the tier-1 home).
-                  if (window.history.length > 1) {
+                  // Only rewind when we know there's an in-app entry to
+                  // return to; otherwise fall back to the lobby so the user
+                  // never lands on a blank tab or an external page.
+                  if (internalNavCount > 1) {
                     router.history.back();
                   } else {
                     void router.navigate({ to: "/lobby" });
