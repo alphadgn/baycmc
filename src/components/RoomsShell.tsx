@@ -66,8 +66,7 @@ const NAV_ITEMS: NavItem[] = [
   // Single public karaoke room — open to all members. Holders see a VIP
   // badge inside the room; visibility is NOT gated.
   {
-    to: "/karaoke/$roomId",
-    params: { roomId: "b1b39696-8759-44da-b11f-e135a9f75ce8" },
+    to: "/karaoke",
     label: "Karaoke Room",
     tier: "all",
     icon: <Mic className="h-4 w-4" />,
