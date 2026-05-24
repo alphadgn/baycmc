@@ -9,7 +9,9 @@ type RoomRecord = {
   id: string;
   name: string;
   tier: "token_proof" | "lifer" | "public";
+  kind: string;
   livekit_room: string;
+  capacity: number;
   active: boolean;
   is_locked: boolean;
 };
@@ -22,6 +24,8 @@ type RoomAccessResult =
       code:
         | "room_unavailable"
         | "room_locked"
+        | "room_booked"
+        | "room_full"
         | "bayc_revoked"
         | "otherpage_revoked";
     };
@@ -29,11 +33,42 @@ type RoomAccessResult =
 async function validateRoomAccess(userId: string, roomId: string): Promise<RoomAccessResult> {
   const { data: room, error } = await supabaseAdmin
     .from("rooms")
-    .select("id,name,tier,kind,livekit_room,active,is_locked")
+    .select("id,name,tier,kind,livekit_room,capacity,active,is_locked")
     .eq("id", roomId)
     .maybeSingle();
   if (error || !room || !room.active) {
     return { ok: false, error: "Room not found or inactive", code: "room_unavailable" };
+  }
+
+  const isKaraoke = room.kind === "karaoke";
+  const isPublicRoom = room.tier === "public";
+
+  // Locked rooms still admit the active host (so they can unlock); everyone
+  // else gets a friendly error instead of an opaque LiveKit join failure.
+  if (room.is_locked) {
+    const host = await isRoomHost(userId, roomId);
+    if (!host) {
+      return {
+        ok: false,
+        error: "This room is locked by its host. Ask them to unlock it to join.",
+        code: "room_locked",
+      };
+    }
+  }
+
+  // Karaoke is open for drop-in participation except during an active booking;
+  // the booking owner/admin is treated as host and may still enter.
+  if (isKaraoke && (await hasActiveBooking(roomId)) && !(await isRoomHost(userId, roomId))) {
+    return {
+      ok: false,
+      error: "This karaoke room is currently reserved for a booked session. Try again after the booking ends.",
+      code: "room_booked",
+    };
+  }
+
+  // Public rooms (including Karaoke) must not run BAYC/Lumina/Otherpage gates.
+  if (isPublicRoom || isKaraoke) {
+    return { ok: true, room };
   }
 
   // Re-run on-chain BAYC/MAYC + delegate.cash and Otherpage checks at the
@@ -72,10 +107,7 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
   const bypassesBaycGate =
     isAdmin || !!roleRows?.some((r) => r.role === "verified_user");
 
-  // Karaoke rooms are open to any signed-in user (lobby tier). Holder gate
-  // applies only to non-karaoke rooms.
-  const isKaraoke = (room as { kind?: string }).kind === "karaoke";
-  if (!isKaraoke && !ver?.bayc_verified && !bypassesBaycGate) {
+  if (!ver?.bayc_verified && !bypassesBaycGate) {
     return {
       ok: false,
       error:
@@ -96,20 +128,20 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
     };
   }
 
-  // Locked rooms still admit the active host (so they can unlock); everyone
-  // else gets a friendly error instead of an opaque LiveKit join failure.
-  if (room.is_locked) {
-    const host = await isRoomHost(userId, roomId);
-    if (!host) {
-      return {
-        ok: false,
-        error: "This room is locked by its host. Ask them to unlock it to join.",
-        code: "room_locked",
-      };
-    }
-  }
-
   return { ok: true, room };
+}
+
+async function hasActiveBooking(roomId: string): Promise<boolean> {
+  const nowIso = new Date().toISOString();
+  const { data } = await supabaseAdmin
+    .from("room_bookings")
+    .select("id")
+    .eq("room_id", roomId)
+    .lte("starts_at", nowIso)
+    .gte("ends_at", nowIso)
+    .limit(1)
+    .maybeSingle();
+  return !!data;
 }
 
 async function isRoomHost(userId: string, roomId: string): Promise<boolean> {
@@ -163,6 +195,15 @@ export const getLivekitToken = createServerFn({ method: "POST" })
     const cfg = getLivekitConfig();
     if (!cfg) return { ok: false as const, error: "LiveKit not configured" };
 
+    const activeParticipants = await listActiveParticipants(cfg, room.livekit_room);
+    if (activeParticipants !== null && activeParticipants >= room.capacity) {
+      return {
+        ok: false as const,
+        error: "This room is at capacity. Please wait for someone to leave before joining.",
+        code: "room_full" as const,
+      };
+    }
+
     // Display name = wallet short
     const { data: profile } = await supabase
       .from("profiles")
@@ -210,6 +251,20 @@ export const getLivekitToken = createServerFn({ method: "POST" })
       isLocked: room.is_locked,
     };
   });
+
+async function listActiveParticipants(
+  cfg: { apiKey: string; apiSecret: string; url: string },
+  livekitRoom: string,
+): Promise<number | null> {
+  const client = new RoomServiceClient(cfg.url, cfg.apiKey, cfg.apiSecret);
+  try {
+    const participants = await client.listParticipants(livekitRoom);
+    return participants.length;
+  } catch (e) {
+    console.warn("LiveKit participant count failed", e);
+    return null;
+  }
+}
 
 export const revalidateLivekitRoomAccess = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
