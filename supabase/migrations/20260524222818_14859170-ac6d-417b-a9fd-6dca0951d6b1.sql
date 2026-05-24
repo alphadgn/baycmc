@@ -1,0 +1,1 @@
+UPDATE public.rooms SET tier = 'public' WHERE kind = 'karaoke';
