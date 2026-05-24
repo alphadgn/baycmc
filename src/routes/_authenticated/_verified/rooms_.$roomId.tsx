@@ -7,7 +7,7 @@ import { getRoomThemeImage, getRoomThemeAmbience } from "@/lib/baycmc/roomThemes
 
 interface RoomMeta {
   name: string;
-  tier: "token_proof" | "lifer";
+  tier: "token_proof" | "lifer" | "public";
   theme: string | null;
   kind: "conference" | "game" | "karaoke";
 }
