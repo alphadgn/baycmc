@@ -8,8 +8,10 @@ import {
   type TrackReferenceOrPlaceholder,
 } from "@livekit/components-react";
 import { Track, type Participant } from "livekit-client";
-import { Mic, MicOff } from "lucide-react";
+import { Crown, Mic, MicOff } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchVipUserIds } from "@/lib/karaoke/vip.functions";
 
 interface ProfileMini {
   id: string;
@@ -68,6 +70,10 @@ export function AmaConference({ roomName, hostUserId, backgroundImage, karaoke =
     return participants.filter((p) => p.identity !== hostParticipant.identity);
   }, [participants, hostParticipant]);
 
+  // In karaoke rooms, resolve which participants are verified BAYC/MAYC
+  // holders so we can crown their tiles. Non-karaoke rooms skip the call.
+  const vipUserIds = useVipUserIds(participants, karaoke);
+
   const activeScreenShare = screenShareTracks.find(isTrackReference) ?? null;
 
   if (activeScreenShare) {
@@ -80,6 +86,7 @@ export function AmaConference({ roomName, hostUserId, backgroundImage, karaoke =
         profiles={profiles}
         backgroundImage={backgroundImage}
         hasActiveBooking={hostUserId !== null}
+        vipUserIds={vipUserIds}
       />
     );
   }
@@ -94,6 +101,7 @@ export function AmaConference({ roomName, hostUserId, backgroundImage, karaoke =
       backgroundImage={backgroundImage}
       hasActiveBooking={hostUserId !== null}
       karaoke={karaoke}
+      vipUserIds={vipUserIds}
     />
   );
 }
@@ -111,6 +119,7 @@ interface AmaGridLayoutProps {
   backgroundImage: string | null;
   hasActiveBooking: boolean;
   karaoke?: boolean;
+  vipUserIds: Set<string>;
 }
 
 function AmaGridLayout({
@@ -122,6 +131,7 @@ function AmaGridLayout({
   backgroundImage,
   hasActiveBooking,
   karaoke = false,
+  vipUserIds,
 }: AmaGridLayoutProps) {
   const total = audienceParticipants.length;
   const visibleCount = Math.min(total, MAX_AUDIENCE_TILES);
@@ -177,6 +187,7 @@ function AmaGridLayout({
               backgroundImage={backgroundImage}
               hasActiveBooking={hasActiveBooking}
               solo={hostSolo}
+              vipUserIds={vipUserIds}
             />
           </div>
         </div>
@@ -198,6 +209,7 @@ function AmaGridLayout({
                   participant={p}
                   cameraTracks={cameraTracks}
                   profile={profiles.get(p.identity) ?? null}
+                  isVip={vipUserIds.has(p.identity)}
                 />
               </div>
             ))}
@@ -224,6 +236,7 @@ interface ScreenShareLayoutProps {
   profiles: Map<string, ProfileMini>;
   backgroundImage: string | null;
   hasActiveBooking: boolean;
+  vipUserIds: Set<string>;
 }
 
 function ScreenShareLayout({
@@ -234,6 +247,7 @@ function ScreenShareLayout({
   profiles,
   backgroundImage,
   hasActiveBooking,
+  vipUserIds,
 }: ScreenShareLayoutProps) {
   const sharerName =
     profiles.get(screenTrack.participant.identity)?.username ||
@@ -266,6 +280,7 @@ function ScreenShareLayout({
             backgroundImage={backgroundImage}
             hasActiveBooking={hasActiveBooking}
             compact
+            vipUserIds={vipUserIds}
           />
         )}
         {audienceParticipants.map((p) => (
@@ -274,6 +289,7 @@ function ScreenShareLayout({
             participant={p}
             cameraTracks={cameraTracks}
             profile={profiles.get(p.identity) ?? null}
+            isVip={vipUserIds.has(p.identity)}
           />
         ))}
       </aside>
@@ -294,6 +310,7 @@ interface HostTileProps {
   compact?: boolean;
   /** True when the host is the only participant — get a bigger Discord-style card. */
   solo?: boolean;
+  vipUserIds?: Set<string>;
 }
 
 function HostTile({
@@ -304,6 +321,7 @@ function HostTile({
   hasActiveBooking,
   compact = false,
   solo = false,
+  vipUserIds,
 }: HostTileProps) {
   // No host present → wallpaper fallback with status copy.
   if (!participant) {
@@ -341,6 +359,7 @@ function HostTile({
       cameraTracks={cameraTracks}
       profile={profiles.get(participant.identity) ?? null}
       variant={compact ? "host-compact" : solo ? "host-solo" : "host"}
+      isVip={vipUserIds?.has(participant.identity) ?? false}
     />
   );
 }
@@ -349,15 +368,17 @@ interface AudienceTileProps {
   participant: Participant;
   cameraTracks: TrackReferenceOrPlaceholder[];
   profile: ProfileMini | null;
+  isVip?: boolean;
 }
 
-function AudienceTile({ participant, cameraTracks, profile }: AudienceTileProps) {
+function AudienceTile({ participant, cameraTracks, profile, isVip = false }: AudienceTileProps) {
   return (
     <ParticipantVideoTile
       participant={participant}
       cameraTracks={cameraTracks}
       profile={profile}
       variant="audience"
+      isVip={isVip}
     />
   );
 }
@@ -373,11 +394,13 @@ function ParticipantVideoTile({
   cameraTracks,
   profile,
   variant,
+  isVip = false,
 }: {
   participant: Participant;
   cameraTracks: TrackReferenceOrPlaceholder[];
   profile: ProfileMini | null;
   variant: "host" | "host-compact" | "host-solo" | "audience" | "solo";
+  isVip?: boolean;
 }) {
   const isSpeaking = useIsSpeaking(participant);
   const camTrack = cameraTracks.find((t) => t.participant.identity === participant.identity);
@@ -426,6 +449,17 @@ function ParticipantVideoTile({
       {isHostVariant && (
         <div className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full border border-gold/60 bg-background/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest text-gold backdrop-blur">
           Host
+        </div>
+      )}
+
+      {isVip && (
+        <div
+          aria-label="Verified BAYC/MAYC holder"
+          title="VIP — verified BAYC/MAYC holder"
+          className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full border border-gold/70 bg-gradient-gold px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-gold-foreground shadow-gold"
+        >
+          <Crown className="h-2.5 w-2.5" />
+          VIP
         </div>
       )}
 
@@ -610,4 +644,44 @@ function useParticipantProfiles(participants: Participant[]): Map<string, Profil
   }, [participants]);
 
   return profiles;
+}
+
+/**
+ * Resolve which of the room's current participants are verified BAYC/MAYC
+ * holders. Only runs when `enabled` is true (karaoke rooms) so non-karaoke
+ * rooms don't issue any server calls.
+ */
+function useVipUserIds(participants: Participant[], enabled: boolean): Set<string> {
+  const fetchFn = useServerFn(fetchVipUserIds);
+  const [vipIds, setVipIds] = useState<Set<string>>(() => new Set());
+  const fetchedRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!enabled) return;
+    const toCheck = participants
+      .map((p) => p.identity)
+      .filter((id) => id && !fetchedRef.current.has(id));
+    if (toCheck.length === 0) return;
+    for (const id of toCheck) fetchedRef.current.add(id);
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetchFn({ data: { userIds: toCheck } });
+        if (cancelled) return;
+        setVipIds((prev) => {
+          const next = new Set(prev);
+          for (const id of res.vipUserIds) next.add(id);
+          return next;
+        });
+      } catch (e) {
+        console.warn("[karaoke] vip lookup failed", e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [participants, enabled, fetchFn]);
+
+  return vipIds;
 }
