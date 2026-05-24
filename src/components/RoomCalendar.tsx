@@ -22,7 +22,7 @@ interface Booking {
 interface Room {
   id: string;
   name: string;
-  tier: "token_proof" | "lifer";
+  tier: "token_proof" | "lifer" | "public";
 }
 
 interface RoomCalendarProps {
