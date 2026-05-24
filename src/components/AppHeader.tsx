@@ -184,6 +184,9 @@ export function AppHeader() {
                       if (item.tier === "lifer") return isLifer;
                       if (item.tier === "super_admin") return isSuperAdmin;
                       if (item.tier === "admin") return isAdmin;
+                      // Karaoke Room shortcut only for lobby visitors;
+                      // holders reach it via Conference Rooms.
+                      if (item.tier === "lobby_only") return !isVerifiedHolder;
                       return true;
                     }).map((item) => {
                       const isAdminTier = item.tier === "admin" || item.tier === "super_admin";
