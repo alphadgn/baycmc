@@ -45,6 +45,13 @@ const NAV_ITEMS: NavItem[] = [
 // Routes treated as "home" — no back arrow shown here.
 const HOME_ROUTES = new Set<string>(["/", "/lobby"]);
 
+// Tracks how many in-app navigations have happened since the tab opened.
+// `window.history.length` is unreliable (counts entries from before the SPA
+// loaded — e.g. the new-tab page), so a bare `history.back()` could land on
+// a blank page or an external site. We only call `history.back()` when we
+// know there's an internal entry to return to.
+let internalNavCount = 0;
+
 export function AppHeader() {
   const { isAuthenticated, user } = useAuth();
   const { isVerifiedHolder, isLifer } = useVerificationStatus();
@@ -57,6 +64,13 @@ export function AppHeader() {
 
   const router = useRouter();
   const location = useLocation();
+
+  // Count internal navigations so the back button never lands on a blank/
+  // external page. The first effect run is the route the user landed on;
+  // every subsequent change counts as a navigation we can rewind to.
+  useEffect(() => {
+    internalNavCount += 1;
+  }, [location.pathname]);
 
   useEffect(() => {
     if (!user) {
@@ -106,9 +120,10 @@ export function AppHeader() {
               <button
                 type="button"
                 onClick={() => {
-                  // history.back if there's something to go back to inside
-                  // this app; otherwise route to the lobby (the tier-1 home).
-                  if (window.history.length > 1) {
+                  // Only rewind when we know there's an in-app entry to
+                  // return to; otherwise fall back to the lobby so the user
+                  // never lands on a blank tab or an external page.
+                  if (internalNavCount > 1) {
                     router.history.back();
                   } else {
                     void router.navigate({ to: "/lobby" });
