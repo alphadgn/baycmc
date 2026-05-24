@@ -1,11 +1,34 @@
-import { useEffect, useRef, useState } from "react";
-import { Check, Image as ImageIcon, Loader2, Pencil, Sticker, Trash2, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Check, Image as ImageIcon, Loader2, Pencil, Search, Sticker, Trash2, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
 import { toast } from "sonner";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { GifPicker } from "@/components/GifPicker";
 import type { GifResult } from "@/server/giphy.functions";
+
+/** Tokenize a message body, marking @mentions and #tags as clickable. */
+function renderTokens(body: string, onToken: (token: string) => void) {
+  const parts = body.split(/(\s+)/);
+  return parts.map((part, i) => {
+    const m = part.match(/^([@#])([A-Za-z0-9_-]+)$/);
+    if (!m) return <span key={i}>{part}</span>;
+    const token = part;
+    return (
+      <button
+        key={i}
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onToken(token);
+        }}
+        className="font-semibold text-gold underline-offset-2 hover:underline"
+      >
+        {token}
+      </button>
+    );
+  });
+}
 
 interface Message {
   id: string;
@@ -58,6 +81,7 @@ export function MessageThread({
   // it replaces the old one on save.
   const [editingImageUrl, setEditingImageUrl] = useState<string | null>(null);
   const [editingGifUrl, setEditingGifUrl] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -274,6 +298,28 @@ export function MessageThread({
   const editShownImageUrl = pendingImagePreview ?? editingImageUrl;
   const editShownGifUrl = pendingGifUrl ?? editingGifUrl;
 
+  // Filter messages by free-text search. Supports:
+  //  - "@username" → only messages from users whose username/wallet matches
+  //  - "#tag"      → only messages whose body contains that hashtag
+  //  - plain text  → matches body OR author name (case-insensitive)
+  const filteredMessages = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return messages;
+    const isUser = q.startsWith("@");
+    const isTag = q.startsWith("#");
+    const needle = isUser || isTag ? q.slice(1) : q;
+    if (!needle) return messages;
+    return messages.filter((m) => {
+      const p = profiles[m.user_id];
+      const name = (p?.username ?? p?.wallet_address ?? "").toLowerCase();
+      const body = (m.body ?? "").toLowerCase();
+      if (isUser) return name.includes(needle);
+      if (isTag) return body.includes(`#${needle}`);
+      return body.includes(needle) || name.includes(needle);
+    });
+  }, [messages, profiles, query]);
+
+
   return (
     <div className="glass relative flex h-[70vh] flex-col overflow-hidden rounded-2xl shadow-card">
       {backgroundImage && (
@@ -282,6 +328,26 @@ export function MessageThread({
           <div className="absolute inset-0 bg-background/85" />
         </div>
       )}
+      <div className="relative flex items-center gap-2 border-b border-border/60 bg-background/40 px-3 py-2">
+        <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search messages, @user, #tag"
+          aria-label="Search messages"
+          className="min-w-0 flex-1 bg-transparent text-xs focus:outline-none placeholder:text-muted-foreground/70"
+        />
+        {query && (
+          <button
+            type="button"
+            onClick={() => setQuery("")}
+            className="rounded p-0.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
+            aria-label="Clear search"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
       <div ref={scrollRef} className="relative flex-1 space-y-3 overflow-x-hidden overflow-y-auto p-4 sm:p-6">
         {loading ? (
           <div className="space-y-2">
@@ -289,10 +355,12 @@ export function MessageThread({
               <div key={i} className="h-12 animate-pulse rounded-lg bg-muted/20" />
             ))}
           </div>
-        ) : messages.length === 0 ? (
-          <p className="py-12 text-center text-sm text-muted-foreground">{emptyText}</p>
+        ) : filteredMessages.length === 0 ? (
+          <p className="py-12 text-center text-sm text-muted-foreground">
+            {query ? "No messages match your search." : emptyText}
+          </p>
         ) : (
-          messages.map((m) => {
+          filteredMessages.map((m) => {
             const profile = profiles[m.user_id];
             const mine = m.user_id === user?.id;
             const name =
@@ -304,7 +372,14 @@ export function MessageThread({
             return (
               <div key={m.id} className={`group flex max-w-full flex-col ${mine ? "items-end" : "items-start"}`}>
                 <div className="mb-0.5 flex max-w-full flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
-                  <span className={mine ? "text-gold" : ""}>{name}</span>
+                  <button
+                    type="button"
+                    onClick={() => setQuery(`@${profile?.username ?? profile?.wallet_address ?? name}`)}
+                    className={`${mine ? "text-gold" : ""} hover:underline`}
+                    title="Filter by this user"
+                  >
+                    {name}
+                  </button>
                   <span>
                     {new Date(m.created_at).toLocaleTimeString([], {
                       hour: "2-digit",
@@ -320,7 +395,7 @@ export function MessageThread({
                   >
                     {m.body && (
                       <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
-                        {m.body}
+                        {renderTokens(m.body, (tok) => setQuery(tok))}
                       </p>
                     )}
                     {m.image_url && (
