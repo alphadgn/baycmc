@@ -298,6 +298,28 @@ export function MessageThread({
   const editShownImageUrl = pendingImagePreview ?? editingImageUrl;
   const editShownGifUrl = pendingGifUrl ?? editingGifUrl;
 
+  // Filter messages by free-text search. Supports:
+  //  - "@username" → only messages from users whose username/wallet matches
+  //  - "#tag"      → only messages whose body contains that hashtag
+  //  - plain text  → matches body OR author name (case-insensitive)
+  const filteredMessages = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return messages;
+    const isUser = q.startsWith("@");
+    const isTag = q.startsWith("#");
+    const needle = isUser || isTag ? q.slice(1) : q;
+    if (!needle) return messages;
+    return messages.filter((m) => {
+      const p = profiles[m.user_id];
+      const name = (p?.username ?? p?.wallet_address ?? "").toLowerCase();
+      const body = (m.body ?? "").toLowerCase();
+      if (isUser) return name.includes(needle);
+      if (isTag) return body.includes(`#${needle}`);
+      return body.includes(needle) || name.includes(needle);
+    });
+  }, [messages, profiles, query]);
+
+
   return (
     <div className="glass relative flex h-[70vh] flex-col overflow-hidden rounded-2xl shadow-card">
       {backgroundImage && (
