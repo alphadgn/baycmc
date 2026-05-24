@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ConferenceRoom } from "@/components/ConferenceRoom";
 import { KaraokeStage } from "@/components/KaraokeStage";
+import { SingerLiveIndicator } from "@/components/karaoke/SingerLiveIndicator";
+import { KaraokeRecordingsPanel } from "@/components/karaoke/KaraokeRecordingsPanel";
 import { getRoomThemeImage, getRoomThemeAmbience } from "@/lib/baycmc/roomThemes";
 
 interface RoomMeta {
@@ -24,6 +26,11 @@ function KaraokeRoomPage() {
   const [meta, setMeta] = useState<RoomMeta | null>(null);
   const [hostUserId, setHostUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Live performer tracking for the SingerLiveIndicator banner.
+  const [performerId, setPerformerId] = useState<string | null>(null);
+  const [performerName, setPerformerName] = useState<string>("—");
+  const [micLive, setMicLive] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,6 +58,66 @@ function KaraokeRoomPage() {
       cancelled = true;
     };
   }, [roomId]);
+
+  // Track current performer from karaoke_sessions (realtime).
+  useEffect(() => {
+    let cancelled = false;
+    async function refresh() {
+      const { data } = await supabase
+        .from("karaoke_sessions")
+        .select("performer_user_id")
+        .eq("room_id", roomId)
+        .maybeSingle();
+      if (cancelled) return;
+      setPerformerId(((data?.performer_user_id as string | null) ?? null) || null);
+    }
+    void refresh();
+    const channel = supabase
+      .channel(`karaoke-session-${roomId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "karaoke_sessions", filter: `room_id=eq.${roomId}` },
+        () => void refresh(),
+      )
+      .subscribe();
+    return () => {
+      cancelled = true;
+      void supabase.removeChannel(channel);
+    };
+  }, [roomId]);
+
+  // Resolve performer profile name.
+  useEffect(() => {
+    let cancelled = false;
+    if (!performerId) {
+      setPerformerName("—");
+      return;
+    }
+    void supabase
+      .from("profiles")
+      .select("username")
+      .eq("id", performerId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled) return;
+        setPerformerName(((data?.username as string | null) ?? null) || "Performer");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [performerId]);
+
+  // Listen to the karaoke:mic-state custom event ConferenceRoom dispatches
+  // whenever the local participant toggles their mic. For non-performers
+  // this stays false (they never broadcast as the singer).
+  useEffect(() => {
+    function onState(e: Event) {
+      setMicLive(!!(e as CustomEvent<{ enabled: boolean }>).detail?.enabled);
+    }
+    window.addEventListener("karaoke:mic-state", onState as EventListener);
+    return () =>
+      window.removeEventListener("karaoke:mic-state", onState as EventListener);
+  }, []);
 
   if (loading) {
     return (
@@ -83,6 +150,16 @@ function KaraokeRoomPage() {
         hostUserId={hostUserId}
       />
       <KaraokeStage roomId={roomId} bookingHostUserId={hostUserId} />
+      {performerId && (
+        <SingerLiveIndicator
+          singerName={performerName}
+          live={micLive}
+          recording={false}
+        />
+      )}
+      <div className="px-4 pb-16">
+        <KaraokeRecordingsPanel roomId={roomId} />
+      </div>
     </>
   );
 }
