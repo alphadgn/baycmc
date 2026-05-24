@@ -923,7 +923,7 @@ export type Database = {
       ape_ride_status: "live" | "ended"
       app_role: "super_admin" | "admin" | "verified_user" | "chapter_leader"
       chapter_submission_status: "pending" | "approved" | "rejected"
-      room_tier: "token_proof" | "lifer"
+      room_tier: "token_proof" | "lifer" | "public"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1055,7 +1055,7 @@ export const Constants = {
       ape_ride_status: ["live", "ended"],
       app_role: ["super_admin", "admin", "verified_user", "chapter_leader"],
       chapter_submission_status: ["pending", "approved", "rejected"],
-      room_tier: ["token_proof", "lifer"],
+      room_tier: ["token_proof", "lifer", "public"],
     },
   },
 } as const
