@@ -70,6 +70,10 @@ export function AmaConference({ roomName, hostUserId, backgroundImage, karaoke =
     return participants.filter((p) => p.identity !== hostParticipant.identity);
   }, [participants, hostParticipant]);
 
+  // In karaoke rooms, resolve which participants are verified BAYC/MAYC
+  // holders so we can crown their tiles. Non-karaoke rooms skip the call.
+  const vipUserIds = useVipUserIds(participants, karaoke);
+
   const activeScreenShare = screenShareTracks.find(isTrackReference) ?? null;
 
   if (activeScreenShare) {
@@ -82,6 +86,7 @@ export function AmaConference({ roomName, hostUserId, backgroundImage, karaoke =
         profiles={profiles}
         backgroundImage={backgroundImage}
         hasActiveBooking={hostUserId !== null}
+        vipUserIds={vipUserIds}
       />
     );
   }
@@ -96,6 +101,7 @@ export function AmaConference({ roomName, hostUserId, backgroundImage, karaoke =
       backgroundImage={backgroundImage}
       hasActiveBooking={hostUserId !== null}
       karaoke={karaoke}
+      vipUserIds={vipUserIds}
     />
   );
 }
