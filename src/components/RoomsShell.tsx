@@ -63,11 +63,11 @@ const NAV_ITEMS: NavItem[] = [
     icon: <Video className="h-4 w-4" />,
     match: "/rooms",
   },
-  // Karaoke is open to all members (lobby tier). Holders see a VIP badge
-  // inside the room — visibility is NOT gated.
+  // Single public karaoke room — open to all members. Holders see a VIP
+  // badge inside the room; visibility is NOT gated.
   {
     to: "/karaoke",
-    label: "Karaoke Lounges",
+    label: "Karaoke Room",
     tier: "all",
     icon: <Mic className="h-4 w-4" />,
     match: "/karaoke",
