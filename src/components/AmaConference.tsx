@@ -119,6 +119,7 @@ interface AmaGridLayoutProps {
   backgroundImage: string | null;
   hasActiveBooking: boolean;
   karaoke?: boolean;
+  vipUserIds: Set<string>;
 }
 
 function AmaGridLayout({
@@ -130,6 +131,7 @@ function AmaGridLayout({
   backgroundImage,
   hasActiveBooking,
   karaoke = false,
+  vipUserIds,
 }: AmaGridLayoutProps) {
   const total = audienceParticipants.length;
   const visibleCount = Math.min(total, MAX_AUDIENCE_TILES);
