@@ -236,6 +236,7 @@ interface ScreenShareLayoutProps {
   profiles: Map<string, ProfileMini>;
   backgroundImage: string | null;
   hasActiveBooking: boolean;
+  vipUserIds: Set<string>;
 }
 
 function ScreenShareLayout({
@@ -246,6 +247,7 @@ function ScreenShareLayout({
   profiles,
   backgroundImage,
   hasActiveBooking,
+  vipUserIds,
 }: ScreenShareLayoutProps) {
   const sharerName =
     profiles.get(screenTrack.participant.identity)?.username ||
@@ -278,6 +280,7 @@ function ScreenShareLayout({
             backgroundImage={backgroundImage}
             hasActiveBooking={hasActiveBooking}
             compact
+            vipUserIds={vipUserIds}
           />
         )}
         {audienceParticipants.map((p) => (
@@ -286,6 +289,7 @@ function ScreenShareLayout({
             participant={p}
             cameraTracks={cameraTracks}
             profile={profiles.get(p.identity) ?? null}
+            isVip={vipUserIds.has(p.identity)}
           />
         ))}
       </aside>
