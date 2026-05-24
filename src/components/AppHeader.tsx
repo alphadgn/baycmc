@@ -65,6 +65,13 @@ export function AppHeader() {
   const router = useRouter();
   const location = useLocation();
 
+  // Count internal navigations so the back button never lands on a blank/
+  // external page. The first effect run is the route the user landed on;
+  // every subsequent change counts as a navigation we can rewind to.
+  useEffect(() => {
+    internalNavCount += 1;
+  }, [location.pathname]);
+
   useEffect(() => {
     if (!user) {
       setIsAdmin(false);
