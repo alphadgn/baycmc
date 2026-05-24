@@ -645,3 +645,43 @@ function useParticipantProfiles(participants: Participant[]): Map<string, Profil
 
   return profiles;
 }
+
+/**
+ * Resolve which of the room's current participants are verified BAYC/MAYC
+ * holders. Only runs when `enabled` is true (karaoke rooms) so non-karaoke
+ * rooms don't issue any server calls.
+ */
+function useVipUserIds(participants: Participant[], enabled: boolean): Set<string> {
+  const fetchFn = useServerFn(fetchVipUserIds);
+  const [vipIds, setVipIds] = useState<Set<string>>(() => new Set());
+  const fetchedRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!enabled) return;
+    const toCheck = participants
+      .map((p) => p.identity)
+      .filter((id) => id && !fetchedRef.current.has(id));
+    if (toCheck.length === 0) return;
+    for (const id of toCheck) fetchedRef.current.add(id);
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetchFn({ data: { userIds: toCheck } });
+        if (cancelled) return;
+        setVipIds((prev) => {
+          const next = new Set(prev);
+          for (const id of res.vipUserIds) next.add(id);
+          return next;
+        });
+      } catch (e) {
+        console.warn("[karaoke] vip lookup failed", e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [participants, enabled, fetchFn]);
+
+  return vipIds;
+}
