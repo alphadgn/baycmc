@@ -195,14 +195,14 @@ export const getLivekitToken = createServerFn({ method: "POST" })
     const cfg = getLivekitConfig();
     if (!cfg) return { ok: false as const, error: "LiveKit not configured" };
 
-  const activeParticipants = await listActiveParticipants(cfg, room.livekit_room);
-  if (activeParticipants !== null && activeParticipants >= room.capacity) {
-    return {
-      ok: false as const,
-      error: "This room is at capacity. Please wait for someone to leave before joining.",
-      code: "room_full" as const,
-    };
-  }
+    const activeParticipants = await listActiveParticipants(cfg, room.livekit_room);
+    if (activeParticipants !== null && activeParticipants >= room.capacity) {
+      return {
+        ok: false as const,
+        error: "This room is at capacity. Please wait for someone to leave before joining.",
+        code: "room_full" as const,
+      };
+    }
 
     // Display name = wallet short
     const { data: profile } = await supabase
