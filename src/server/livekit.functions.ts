@@ -8,7 +8,7 @@ import { recomputeOwnership } from "@/server/ownership.server";
 type RoomRecord = {
   id: string;
   name: string;
-  tier: "token_proof" | "lifer";
+  tier: "token_proof" | "lifer" | "public";
   livekit_room: string;
   active: boolean;
   is_locked: boolean;
