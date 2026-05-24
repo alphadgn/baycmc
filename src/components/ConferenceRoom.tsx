@@ -100,6 +100,10 @@ export function ConferenceRoom({
           toast.error("Exclusive room locked", { description: res.error, duration: 8000 });
         } else if ("code" in res && res.code === "room_locked") {
           toast.error("Room is locked", { description: res.error, duration: 6000 });
+        } else if ("code" in res && res.code === "room_booked") {
+          toast.error("Room is booked", { description: res.error, duration: 6000 });
+        } else if ("code" in res && res.code === "room_full") {
+          toast.error("Room is full", { description: res.error, duration: 6000 });
         } else {
           toast.error(res.error);
         }
@@ -159,8 +163,8 @@ export function ConferenceRoom({
   }, [state.phase, roomId, revalidateAccess]);
 
   const goBack = useCallback(() => {
-    void navigate({ to: "/rooms" });
-  }, [navigate]);
+    void navigate({ to: kind === "karaoke" ? "/karaoke" : "/rooms" });
+  }, [kind, navigate]);
 
   // ─── LIVE PHASE ──────────────────────────────────────────────────────────
   if (state.phase === "live") {
