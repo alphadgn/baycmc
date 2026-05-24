@@ -459,8 +459,10 @@ export function KaraokeMusicBoard({
           <button
             type="button"
             onClick={handlePause}
+            disabled={!isMyTurn}
             aria-label={paused ? "Play" : "Pause"}
-            className="inline-flex items-center gap-1 rounded-sm border border-gold/40 bg-gold/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-gold transition hover:bg-gold/20"
+            title={isMyTurn ? undefined : "Only the current performer can control playback"}
+            className="inline-flex items-center gap-1 rounded-sm border border-gold/40 bg-gold/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-gold transition hover:bg-gold/20 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {paused ? <Play className="h-3 w-3" /> : <Pause className="h-3 w-3" />}
             {paused ? "Play" : "Pause"}
@@ -468,8 +470,10 @@ export function KaraokeMusicBoard({
           <button
             type="button"
             onClick={handleStop}
+            disabled={!isMyTurn}
             aria-label="Stop"
-            className="inline-flex items-center gap-1 rounded-sm border border-rose-400/50 bg-rose-500/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-rose-300 transition hover:bg-rose-500/20"
+            title={isMyTurn ? undefined : "Only the current performer can control playback"}
+            className="inline-flex items-center gap-1 rounded-sm border border-rose-400/50 bg-rose-500/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-rose-300 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Square className="h-3 w-3" /> Stop
           </button>
@@ -551,16 +555,17 @@ export function KaraokeMusicBoard({
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
+                disabled={!isMyTurn}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") runSearch(query);
+                  if (e.key === "Enter" && isMyTurn) runSearch(query);
                 }}
-                placeholder={isMyTurn ? "Search song or artist…" : "Locked"}
+                placeholder={isMyTurn ? "Search song or artist…" : "Locked — wait your turn"}
                 className="flex-1 rounded-sm border border-gold/20 bg-black/60 px-1.5 py-1 text-[9px] text-gold placeholder:text-gold/30 outline-none focus:border-gold/60 disabled:cursor-not-allowed disabled:opacity-50"
               />
               <button
                 type="button"
                 onClick={() => runSearch(query)}
-                disabled={!query.trim() || searching}
+                disabled={!isMyTurn || !query.trim() || searching}
                 className="inline-flex items-center gap-0.5 rounded-sm bg-gradient-gold px-1.5 py-1 text-[8px] font-semibold text-gold-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {searching ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Search className="h-2.5 w-2.5" />} Find
@@ -597,16 +602,17 @@ export function KaraokeMusicBoard({
               <input
                 value={urlInput}
                 onChange={(e) => setUrlInput(e.target.value)}
+                disabled={!isMyTurn}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") playUrl();
+                  if (e.key === "Enter" && isMyTurn) playUrl();
                 }}
-                placeholder="…or paste YouTube link"
+                placeholder={isMyTurn ? "…or paste YouTube link" : "Locked — wait your turn"}
                 className="flex-1 rounded-sm border border-gold/10 bg-black/40 px-1.5 py-1 text-[8px] text-gold placeholder:text-gold/30 outline-none focus:border-gold/60 disabled:cursor-not-allowed disabled:opacity-50"
               />
               <button
                 type="button"
                 onClick={playUrl}
-                disabled={!extractYouTubeId(urlInput)}
+                disabled={!isMyTurn || !extractYouTubeId(urlInput)}
                 className="inline-flex items-center gap-0.5 rounded-sm border border-gold/30 bg-black/60 px-1.5 py-1 text-[8px] font-semibold text-gold transition hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <Play className="h-2.5 w-2.5" /> Cue
@@ -630,7 +636,9 @@ export function KaraokeMusicBoard({
                 key={p.label}
                 type="button"
                 onClick={() => runSearch(p.query)}
-                className={`relative aspect-square rounded-sm bg-gradient-to-br ${p.hue} text-[6px] font-bold uppercase leading-tight tracking-tight text-black/85 shadow-[inset_0_-2px_4px_rgba(0,0,0,0.35),0_0_6px_rgba(255,255,255,0.08)] transition active:scale-95`}
+                disabled={!isMyTurn}
+                title={isMyTurn ? p.label : "Locked — wait your turn"}
+                className={`relative aspect-square rounded-sm bg-gradient-to-br ${p.hue} text-[6px] font-bold uppercase leading-tight tracking-tight text-black/85 shadow-[inset_0_-2px_4px_rgba(0,0,0,0.35),0_0_6px_rgba(255,255,255,0.08)] transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:saturate-50`}
               >
                 <span className="absolute inset-0 flex items-center justify-center px-0.5 text-center drop-shadow">
                   {p.label}
