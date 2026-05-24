@@ -636,7 +636,9 @@ export function KaraokeMusicBoard({
                 key={p.label}
                 type="button"
                 onClick={() => runSearch(p.query)}
-                className={`relative aspect-square rounded-sm bg-gradient-to-br ${p.hue} text-[6px] font-bold uppercase leading-tight tracking-tight text-black/85 shadow-[inset_0_-2px_4px_rgba(0,0,0,0.35),0_0_6px_rgba(255,255,255,0.08)] transition active:scale-95`}
+                disabled={!isMyTurn}
+                title={isMyTurn ? p.label : "Locked — wait your turn"}
+                className={`relative aspect-square rounded-sm bg-gradient-to-br ${p.hue} text-[6px] font-bold uppercase leading-tight tracking-tight text-black/85 shadow-[inset_0_-2px_4px_rgba(0,0,0,0.35),0_0_6px_rgba(255,255,255,0.08)] transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:saturate-50`}
               >
                 <span className="absolute inset-0 flex items-center justify-center px-0.5 text-center drop-shadow">
                   {p.label}
