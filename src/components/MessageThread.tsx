@@ -46,11 +46,18 @@ export function MessageThread({
   const [input, setInput] = useState("");
   const [pendingImage, setPendingImage] = useState<File | null>(null);
   const [pendingImagePreview, setPendingImagePreview] = useState<string | null>(null);
+  // Pending GIF picked while editing (or composing) — applied on save/send.
+  const [pendingGifUrl, setPendingGifUrl] = useState<string | null>(null);
   const [gifOpen, setGifOpen] = useState(false);
   const [posting, setPosting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [denied, setDenied] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Existing attachments on the message currently being edited. Either may
+  // be cleared by the user; if a new pendingImage/pendingGifUrl is chosen
+  // it replaces the old one on save.
+  const [editingImageUrl, setEditingImageUrl] = useState<string | null>(null);
+  const [editingGifUrl, setEditingGifUrl] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -150,24 +157,45 @@ export function MessageThread({
     const body = input.trim().slice(0, 2000);
 
     if (editingId) {
-      if (!body) {
-        toast.error("Message can't be empty.");
-        return;
-      }
       setPosting(true);
-      const { error } = await supabase
-        .from(table)
-        .update({ body })
-        .eq("id", editingId)
-        .eq("user_id", user.id);
-      setPosting(false);
-      if (error) {
-        toast.error(error.message);
-        return;
+      try {
+        // Resolve the final image_url: prefer freshly uploaded > kept existing > null
+        let nextImageUrl: string | null = editingImageUrl;
+        if (pendingImage) {
+          nextImageUrl = await uploadPendingImage();
+        }
+        const nextGifUrl: string | null = pendingGifUrl ?? editingGifUrl ?? null;
+
+        const hasContent = !!body || !!nextImageUrl || !!nextGifUrl;
+        if (!hasContent) {
+          toast.error("Message can't be empty. Add text or an attachment.");
+          setPosting(false);
+          return;
+        }
+
+        const { error } = await supabase
+          .from(table)
+          .update({
+            body: body || null,
+            image_url: nextImageUrl,
+            gif_url: nextGifUrl,
+          })
+          .eq("id", editingId)
+          .eq("user_id", user.id);
+        if (error) throw error;
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === editingId
+              ? { ...m, body: body || null, image_url: nextImageUrl, gif_url: nextGifUrl }
+              : m,
+          ),
+        );
+        cancelEdit();
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Couldn't save changes");
+      } finally {
+        setPosting(false);
       }
-      setMessages((prev) => prev.map((m) => (m.id === editingId ? { ...m, body } : m)));
-      setEditingId(null);
-      setInput("");
       return;
     }
 
@@ -197,12 +225,22 @@ export function MessageThread({
   function beginEdit(m: Message) {
     setEditingId(m.id);
     setInput(m.body ?? "");
+    setEditingImageUrl(m.image_url ?? null);
+    setEditingGifUrl(m.gif_url ?? null);
+    setPendingImage(null);
+    setPendingGifUrl(null);
+    if (fileRef.current) fileRef.current.value = "";
     setTimeout(() => inputRef.current?.focus(), 0);
   }
 
   function cancelEdit() {
     setEditingId(null);
     setInput("");
+    setEditingImageUrl(null);
+    setEditingGifUrl(null);
+    setPendingImage(null);
+    setPendingGifUrl(null);
+    if (fileRef.current) fileRef.current.value = "";
   }
 
   async function deleteMessage(m: Message) {
@@ -216,6 +254,11 @@ export function MessageThread({
 
   function handleGifPick(gif: GifResult) {
     setGifOpen(false);
+    if (editingId) {
+      // Stage the gif change for the edit save — don't insert a new message.
+      setPendingGifUrl(gif.url);
+      return;
+    }
     void send({ gifUrl: gif.url });
   }
 
@@ -226,6 +269,10 @@ export function MessageThread({
       </div>
     );
   }
+
+  // Effective attachments shown in the edit dock (new pending > kept existing).
+  const editShownImageUrl = pendingImagePreview ?? editingImageUrl;
+  const editShownGifUrl = pendingGifUrl ?? editingGifUrl;
 
   return (
     <div className="glass relative flex h-[70vh] flex-col overflow-hidden rounded-2xl shadow-card">
@@ -253,6 +300,7 @@ export function MessageThread({
               (profile?.wallet_address
                 ? `${profile.wallet_address.slice(0, 6)}…${profile.wallet_address.slice(-4)}`
                 : "anon");
+            const hasAnyContent = !!m.body || !!m.image_url || !!m.gif_url;
             return (
               <div key={m.id} className={`group flex max-w-full flex-col ${mine ? "items-end" : "items-start"}`}>
                 <div className="mb-0.5 flex max-w-full flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
@@ -294,7 +342,7 @@ export function MessageThread({
                   </div>
                   {mine && (
                     <div className="flex shrink-0 items-center gap-1 opacity-0 transition group-hover:opacity-100">
-                      {m.body && (
+                      {hasAnyContent && (
                         <button
                           type="button"
                           onClick={() => beginEdit(m)}
@@ -324,19 +372,68 @@ export function MessageThread({
       </div>
 
       {editingId && (
-        <div className="relative flex items-center justify-between gap-2 border-t border-gold/30 bg-gold/5 px-3 py-2 text-xs">
-          <span className="flex items-center gap-1.5 text-gold">
-            <Pencil className="h-3.5 w-3.5" />
-            <span className="font-semibold">Editing message</span>
-          </span>
-          <button
-            type="button"
-            onClick={cancelEdit}
-            className="rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
-            aria-label="Cancel edit"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
+        <div className="relative flex flex-col gap-2 border-t border-gold/30 bg-gold/5 px-3 py-2 text-xs">
+          <div className="flex items-center justify-between gap-2">
+            <span className="flex items-center gap-1.5 text-gold">
+              <Pencil className="h-3.5 w-3.5" />
+              <span className="font-semibold">Editing message</span>
+            </span>
+            <button
+              type="button"
+              onClick={cancelEdit}
+              className="rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
+              aria-label="Cancel edit"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          {(editShownImageUrl || editShownGifUrl) && (
+            <div className="flex flex-wrap items-center gap-2">
+              {editShownImageUrl && (
+                <div className="relative">
+                  <img
+                    src={editShownImageUrl}
+                    alt="image attachment"
+                    className="h-14 w-14 rounded object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPendingImage(null);
+                      setEditingImageUrl(null);
+                      if (fileRef.current) fileRef.current.value = "";
+                    }}
+                    aria-label="Remove image"
+                    title="Remove image"
+                    className="absolute -right-1.5 -top-1.5 rounded-full bg-background/90 p-0.5 text-muted-foreground shadow hover:text-destructive"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
+              {editShownGifUrl && (
+                <div className="relative">
+                  <img
+                    src={editShownGifUrl}
+                    alt="gif attachment"
+                    className="h-14 w-14 rounded object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPendingGifUrl(null);
+                      setEditingGifUrl(null);
+                    }}
+                    aria-label="Remove GIF"
+                    title="Remove GIF"
+                    className="absolute -right-1.5 -top-1.5 rounded-full bg-background/90 p-0.5 text-muted-foreground shadow hover:text-destructive"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -382,36 +479,32 @@ export function MessageThread({
             setPendingImage(f);
           }}
         />
-        {!editingId && (
-          <>
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          disabled={!user || posting}
+          className="shrink-0 rounded-md border border-border bg-secondary/40 p-2 text-muted-foreground transition hover:bg-secondary hover:text-foreground disabled:opacity-50"
+          aria-label={editingId ? "Replace image" : "Attach image"}
+          title={editingId ? "Replace image" : "Attach image"}
+        >
+          <ImageIcon className="h-4 w-4" />
+        </button>
+        <Popover open={gifOpen} onOpenChange={setGifOpen}>
+          <PopoverTrigger asChild>
             <button
               type="button"
-              onClick={() => fileRef.current?.click()}
               disabled={!user || posting}
               className="shrink-0 rounded-md border border-border bg-secondary/40 p-2 text-muted-foreground transition hover:bg-secondary hover:text-foreground disabled:opacity-50"
-              aria-label="Attach image"
-              title="Attach image"
+              aria-label={editingId ? "Replace GIF" : "Add GIF"}
+              title={editingId ? "Replace GIF" : "Add GIF"}
             >
-              <ImageIcon className="h-4 w-4" />
+              <Sticker className="h-4 w-4" />
             </button>
-            <Popover open={gifOpen} onOpenChange={setGifOpen}>
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  disabled={!user || posting}
-                  className="shrink-0 rounded-md border border-border bg-secondary/40 p-2 text-muted-foreground transition hover:bg-secondary hover:text-foreground disabled:opacity-50"
-                  aria-label="Add GIF"
-                  title="Add GIF"
-                >
-                  <Sticker className="h-4 w-4" />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[20rem] p-0" align="end" side="top">
-                <GifPicker onPick={handleGifPick} />
-              </PopoverContent>
-            </Popover>
-          </>
-        )}
+          </PopoverTrigger>
+          <PopoverContent className="w-[20rem] p-0" align="end" side="top">
+            <GifPicker onPick={handleGifPick} />
+          </PopoverContent>
+        </Popover>
         <input
           ref={inputRef}
           value={input}
@@ -429,7 +522,17 @@ export function MessageThread({
         />
         <button
           type="submit"
-          disabled={!user || posting || (!input.trim() && !pendingImage && !editingId)}
+          disabled={
+            !user ||
+            posting ||
+            (editingId
+              ? !input.trim() &&
+                !pendingImage &&
+                !editingImageUrl &&
+                !pendingGifUrl &&
+                !editingGifUrl
+              : !input.trim() && !pendingImage)
+          }
           aria-label={editingId ? "Save edit" : "Send"}
           className={`inline-flex shrink-0 items-center gap-1.5 rounded-md px-4 py-2 text-sm font-semibold shadow-gold disabled:opacity-50 ${accentClassName}`}
         >
