@@ -555,16 +555,17 @@ export function KaraokeMusicBoard({
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
+                disabled={!isMyTurn}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") runSearch(query);
+                  if (e.key === "Enter" && isMyTurn) runSearch(query);
                 }}
-                placeholder={isMyTurn ? "Search song or artist…" : "Locked"}
+                placeholder={isMyTurn ? "Search song or artist…" : "Locked — wait your turn"}
                 className="flex-1 rounded-sm border border-gold/20 bg-black/60 px-1.5 py-1 text-[9px] text-gold placeholder:text-gold/30 outline-none focus:border-gold/60 disabled:cursor-not-allowed disabled:opacity-50"
               />
               <button
                 type="button"
                 onClick={() => runSearch(query)}
-                disabled={!query.trim() || searching}
+                disabled={!isMyTurn || !query.trim() || searching}
                 className="inline-flex items-center gap-0.5 rounded-sm bg-gradient-gold px-1.5 py-1 text-[8px] font-semibold text-gold-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {searching ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Search className="h-2.5 w-2.5" />} Find
