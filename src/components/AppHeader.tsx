@@ -27,7 +27,12 @@ interface NavItem {
     | "/admin"
     | "/super-admin";
   label: string;
-  tier: "all" | "verified" | "lifer" | "admin" | "super_admin";
+  // "lobby_only" = visible only to signed-in users who are NOT verified
+  // holders. Holders already reach the karaoke room from the Conference
+  // Rooms hall (it lives there as a karaoke-kind tile), so a duplicate
+  // top-level entry would be redundant for them. Lobby visitors still
+  // need a direct way in since Conference Rooms is gated.
+  tier: "all" | "lobby_only" | "verified" | "lifer" | "admin" | "super_admin";
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -36,8 +41,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/rooms", label: "Conference Rooms", tier: "verified" },
   { to: "/ape-rides", label: "Ape Rides", tier: "verified" },
   { to: "/lifers/messages", label: "Lifer Chat", tier: "lifer" },
-  { to: "/karaoke", label: "Karaoke Room", tier: "all" },
-  { to: "/activity", label: "My Activity", tier: "all" },
+  { to: "/karaoke", label: "Karaoke Room", tier: "lobby_only" },
   { to: "/profile", label: "Profile", tier: "all" },
   { to: "/support", label: "Support", tier: "all" },
   { to: "/admin", label: "Administrator", tier: "admin" },
@@ -180,6 +184,9 @@ export function AppHeader() {
                       if (item.tier === "lifer") return isLifer;
                       if (item.tier === "super_admin") return isSuperAdmin;
                       if (item.tier === "admin") return isAdmin;
+                      // Karaoke Room shortcut only for lobby visitors;
+                      // holders reach it via Conference Rooms.
+                      if (item.tier === "lobby_only") return !isVerifiedHolder;
                       return true;
                     }).map((item) => {
                       const isAdminTier = item.tier === "admin" || item.tier === "super_admin";
