@@ -9,7 +9,7 @@
  * Holders (BAYC / MAYC) still get visible VIP treatment via the badge
  * pill below — this is presentation-only, NOT access control.
  */
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, redirect, useLocation } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Mic, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,9 +27,13 @@ interface KaraokeRoom {
 }
 
 export const Route = createFileRoute("/_authenticated/karaoke")({
-  beforeLoad: async () => {
+  beforeLoad: async ({ location }) => {
     const { data: sess } = await supabase.auth.getSession();
     if (!sess.session) throw redirect({ to: "/" });
+
+    const isKaraokeIndex = (location.pathname.replace(/\/+$/, "") || "/") === "/karaoke";
+    if (!isKaraokeIndex) return;
+
     // Single public karaoke room — skip listing, jump straight in.
     const { data: room } = await supabase
       .from("rooms")
@@ -43,8 +47,14 @@ export const Route = createFileRoute("/_authenticated/karaoke")({
       throw redirect({ to: "/karaoke/$roomId", params: { roomId: room.id } });
     }
   },
-  component: KaraokePage,
+  component: KaraokeRoute,
 });
+
+function KaraokeRoute() {
+  const location = useLocation();
+  const isKaraokeIndex = (location.pathname.replace(/\/+$/, "") || "/") === "/karaoke";
+  return isKaraokeIndex ? <KaraokePage /> : <Outlet />;
+}
 
 function KaraokePage() {
   const [rooms, setRooms] = useState<KaraokeRoom[] | null>(null);
