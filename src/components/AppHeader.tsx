@@ -228,7 +228,9 @@ export function AppHeader() {
                       return (
                         <Link
                           key={item.to}
-                          to={item.to}
+                          {...(item.to === "/karaoke" && karaokeRoomId
+                            ? { to: "/karaoke/$roomId", params: { roomId: karaokeRoomId } }
+                            : { to: item.to })}
                           onClick={() => setNavOpen(false)}
                           className={sharedClass}
                         >
