@@ -452,6 +452,17 @@ function ParticipantVideoTile({
         </div>
       )}
 
+      {isVip && (
+        <div
+          aria-label="Verified BAYC/MAYC holder"
+          title="VIP — verified BAYC/MAYC holder"
+          className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full border border-gold/70 bg-gradient-gold px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-gold-foreground shadow-gold"
+        >
+          <Crown className="h-2.5 w-2.5" />
+          VIP
+        </div>
+      )}
+
       <div className="absolute inset-x-2 bottom-2 flex items-center justify-between gap-2">
         <span className="max-w-[70%] truncate rounded-full bg-background/70 px-2 py-0.5 text-[10px] font-medium text-foreground backdrop-blur sm:text-[11px]">
           {displayName}
