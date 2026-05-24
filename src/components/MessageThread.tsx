@@ -81,6 +81,7 @@ export function MessageThread({
   // it replaces the old one on save.
   const [editingImageUrl, setEditingImageUrl] = useState<string | null>(null);
   const [editingGifUrl, setEditingGifUrl] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
