@@ -310,6 +310,7 @@ interface HostTileProps {
   compact?: boolean;
   /** True when the host is the only participant — get a bigger Discord-style card. */
   solo?: boolean;
+  vipUserIds?: Set<string>;
 }
 
 function HostTile({
@@ -320,6 +321,7 @@ function HostTile({
   hasActiveBooking,
   compact = false,
   solo = false,
+  vipUserIds,
 }: HostTileProps) {
   // No host present → wallpaper fallback with status copy.
   if (!participant) {
@@ -357,6 +359,7 @@ function HostTile({
       cameraTracks={cameraTracks}
       profile={profiles.get(participant.identity) ?? null}
       variant={compact ? "host-compact" : solo ? "host-solo" : "host"}
+      isVip={vipUserIds?.has(participant.identity) ?? false}
     />
   );
 }
@@ -365,15 +368,17 @@ interface AudienceTileProps {
   participant: Participant;
   cameraTracks: TrackReferenceOrPlaceholder[];
   profile: ProfileMini | null;
+  isVip?: boolean;
 }
 
-function AudienceTile({ participant, cameraTracks, profile }: AudienceTileProps) {
+function AudienceTile({ participant, cameraTracks, profile, isVip = false }: AudienceTileProps) {
   return (
     <ParticipantVideoTile
       participant={participant}
       cameraTracks={cameraTracks}
       profile={profile}
       variant="audience"
+      isVip={isVip}
     />
   );
 }
