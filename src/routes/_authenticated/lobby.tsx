@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { LobbyChat } from "@/components/LobbyChat";
+import { LobbyAttendeeHero } from "@/components/LobbyAttendeeHero";
 
 
 // Lazy, optional asset import — Vite resolves the file at build time only if
@@ -69,6 +70,7 @@ function LobbyPage() {
       )}
 
       <div className="relative flex min-h-0 flex-1 flex-col">
+        <LobbyAttendeeHero />
         <div className="flex min-h-0 flex-1 flex-col">
           <LobbyChat channelName="lobby" />
         </div>

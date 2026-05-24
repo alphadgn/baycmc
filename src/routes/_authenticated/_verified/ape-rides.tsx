@@ -317,21 +317,60 @@ function ApeRidesCheckpoint({
     ...requests.map((r) => ({ kind: "request" as const, at: r.created_at, request: r })),
   ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
 
+  const liveRideForViewer = rides.find((r) => r.host_id !== currentUserId);
+  const myPendingOrAccepted = requests.find(
+    (q) => q.status === "pending" || q.status === "accepted",
+  );
+
   return (
     <section className="glass mt-2 mb-8 rounded-2xl p-6 shadow-card">
-      <div className="mb-4 flex items-baseline justify-between gap-3">
-        <h2 className="font-display text-2xl">ApeRides Checkpoint</h2>
-        <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
-          Signups · chronological
-        </span>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="font-display text-2xl">ApeRides Checkpoint</h2>
+          <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
+            Signups · chronological
+          </span>
+        </div>
+        {myPendingOrAccepted ? (
+          <span className="rounded-md border border-gold/30 bg-gold/10 px-3 py-1.5 text-xs text-gold">
+            {myPendingOrAccepted.status === "accepted"
+              ? "You're paired — open the ride below"
+              : "Request sent — waiting for a host"}
+          </span>
+        ) : liveRideForViewer ? (
+          <button
+            onClick={() => onRequest(liveRideForViewer.id)}
+            className="rounded-md bg-gradient-gold px-4 py-2 text-sm font-semibold text-gold-foreground shadow-gold"
+          >
+            Request an ApeRide
+          </button>
+        ) : (
+          <button
+            disabled
+            title="No hosts are live right now"
+            className="cursor-not-allowed rounded-md border border-border bg-secondary/40 px-4 py-2 text-sm text-muted-foreground"
+          >
+            Request an ApeRide
+          </button>
+        )}
       </div>
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : entries.length === 0 ? (
-        <p className="rounded-md border border-dashed border-border bg-secondary/30 p-6 text-center text-sm text-muted-foreground">
-          No ride signups or pairing requests yet.
-        </p>
+        <div className="space-y-3 rounded-md border border-dashed border-border bg-secondary/30 p-6 text-center">
+          <p className="text-sm text-muted-foreground">
+            No ride signups or pairing requests yet.
+          </p>
+          {liveRideForViewer && !myPendingOrAccepted && (
+            <button
+              onClick={() => onRequest(liveRideForViewer.id)}
+              className="mx-auto rounded-md bg-gradient-gold px-4 py-2 text-xs font-semibold text-gold-foreground shadow-gold"
+            >
+              Register for the next ApeRide
+            </button>
+          )}
+        </div>
       ) : (
         <ul className="space-y-2">
           {entries.map((e) => {
