@@ -12,7 +12,7 @@ import { useVerificationRevalidation } from "@/hooks/useVerificationRevalidation
 interface Room {
   id: string;
   name: string;
-  tier: "token_proof" | "lifer";
+  tier: "token_proof" | "lifer" | "public";
   theme: string | null;
   display_order: number | null;
 }
