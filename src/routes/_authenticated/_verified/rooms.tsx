@@ -18,7 +18,7 @@ interface Room {
   name: string;
   description: string | null;
   capacity: number;
-  tier: "token_proof" | "lifer";
+  tier: "token_proof" | "lifer" | "public";
   livekit_room: string;
   theme: string | null;
   display_order: number | null;
