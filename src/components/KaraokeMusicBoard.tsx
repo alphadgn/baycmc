@@ -459,8 +459,10 @@ export function KaraokeMusicBoard({
           <button
             type="button"
             onClick={handlePause}
+            disabled={!isMyTurn}
             aria-label={paused ? "Play" : "Pause"}
-            className="inline-flex items-center gap-1 rounded-sm border border-gold/40 bg-gold/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-gold transition hover:bg-gold/20"
+            title={isMyTurn ? undefined : "Only the current performer can control playback"}
+            className="inline-flex items-center gap-1 rounded-sm border border-gold/40 bg-gold/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-gold transition hover:bg-gold/20 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {paused ? <Play className="h-3 w-3" /> : <Pause className="h-3 w-3" />}
             {paused ? "Play" : "Pause"}
@@ -468,8 +470,10 @@ export function KaraokeMusicBoard({
           <button
             type="button"
             onClick={handleStop}
+            disabled={!isMyTurn}
             aria-label="Stop"
-            className="inline-flex items-center gap-1 rounded-sm border border-rose-400/50 bg-rose-500/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-rose-300 transition hover:bg-rose-500/20"
+            title={isMyTurn ? undefined : "Only the current performer can control playback"}
+            className="inline-flex items-center gap-1 rounded-sm border border-rose-400/50 bg-rose-500/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-rose-300 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Square className="h-3 w-3" /> Stop
           </button>
