@@ -30,6 +30,18 @@ export const Route = createFileRoute("/_authenticated/karaoke")({
   beforeLoad: async () => {
     const { data: sess } = await supabase.auth.getSession();
     if (!sess.session) throw redirect({ to: "/" });
+    // Single public karaoke room — skip listing, jump straight in.
+    const { data: room } = await supabase
+      .from("rooms")
+      .select("id")
+      .eq("kind", "karaoke")
+      .eq("active", true)
+      .order("display_order", { ascending: true, nullsFirst: false })
+      .limit(1)
+      .maybeSingle();
+    if (room?.id) {
+      throw redirect({ to: "/karaoke/$roomId", params: { roomId: room.id } });
+    }
   },
   component: KaraokePage,
 });
