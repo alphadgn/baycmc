@@ -602,16 +602,17 @@ export function KaraokeMusicBoard({
               <input
                 value={urlInput}
                 onChange={(e) => setUrlInput(e.target.value)}
+                disabled={!isMyTurn}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") playUrl();
+                  if (e.key === "Enter" && isMyTurn) playUrl();
                 }}
-                placeholder="…or paste YouTube link"
+                placeholder={isMyTurn ? "…or paste YouTube link" : "Locked — wait your turn"}
                 className="flex-1 rounded-sm border border-gold/10 bg-black/40 px-1.5 py-1 text-[8px] text-gold placeholder:text-gold/30 outline-none focus:border-gold/60 disabled:cursor-not-allowed disabled:opacity-50"
               />
               <button
                 type="button"
                 onClick={playUrl}
-                disabled={!extractYouTubeId(urlInput)}
+                disabled={!isMyTurn || !extractYouTubeId(urlInput)}
                 className="inline-flex items-center gap-0.5 rounded-sm border border-gold/30 bg-black/60 px-1.5 py-1 text-[8px] font-semibold text-gold transition hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <Play className="h-2.5 w-2.5" /> Cue
