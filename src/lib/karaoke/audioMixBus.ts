@@ -358,7 +358,9 @@ export class KaraokeMixBus {
 
 /** Read a meter level from an AnalyserNode (call inside requestAnimationFrame). */
 export function readMeter(analyser: AnalyserNode, scratch: Uint8Array): AudioMeterReading {
-  analyser.getByteTimeDomainData(scratch);
+  // Cast: lib.dom types narrow to Uint8Array<ArrayBuffer> in some TS versions,
+  // but a plain Uint8Array (over ArrayBufferLike) is fine for the Web Audio API.
+  (analyser.getByteTimeDomainData as (a: Uint8Array) => void)(scratch);
   let sumSq = 0;
   let peak = 0;
   for (let i = 0; i < scratch.length; i++) {
