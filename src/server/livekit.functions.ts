@@ -29,7 +29,7 @@ type RoomAccessResult =
 async function validateRoomAccess(userId: string, roomId: string): Promise<RoomAccessResult> {
   const { data: room, error } = await supabaseAdmin
     .from("rooms")
-    .select("id,name,tier,livekit_room,active,is_locked")
+    .select("id,name,tier,kind,livekit_room,active,is_locked")
     .eq("id", roomId)
     .maybeSingle();
   if (error || !room || !room.active) {
