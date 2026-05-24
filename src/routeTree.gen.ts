@@ -18,6 +18,7 @@ import { Route as AuthenticatedSuperAdminRouteImport } from './routes/_authentic
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 import { Route as AuthenticatedLobbyRouteImport } from './routes/_authenticated/lobby'
 import { Route as AuthenticatedLifersRouteImport } from './routes/_authenticated/lifers'
+import { Route as AuthenticatedKaraokeRouteImport } from './routes/_authenticated/karaoke'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedActivityRouteImport } from './routes/_authenticated/activity'
 import { Route as AuthenticatedVerifiedRouteImport } from './routes/_authenticated/_verified'
@@ -25,6 +26,7 @@ import { Route as AuthenticatedLifersIndexRouteImport } from './routes/_authenti
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
 import { Route as AuthenticatedLifersRoomRouteImport } from './routes/_authenticated/lifers/room'
 import { Route as AuthenticatedLifersMessagesRouteImport } from './routes/_authenticated/lifers/messages'
+import { Route as AuthenticatedKaraokeRoomIdRouteImport } from './routes/_authenticated/karaoke.$roomId'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin.users'
 import { Route as AuthenticatedAdminSupportRouteImport } from './routes/_authenticated/admin.support'
 import { Route as AuthenticatedAdminOtherpageRouteImport } from './routes/_authenticated/admin.otherpage'
@@ -81,6 +83,11 @@ const AuthenticatedLifersRoute = AuthenticatedLifersRouteImport.update({
   path: '/lifers',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedKaraokeRoute = AuthenticatedKaraokeRouteImport.update({
+  id: '/karaoke',
+  path: '/karaoke',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -116,6 +123,12 @@ const AuthenticatedLifersMessagesRoute =
     id: '/messages',
     path: '/messages',
     getParentRoute: () => AuthenticatedLifersRoute,
+  } as any)
+const AuthenticatedKaraokeRoomIdRoute =
+  AuthenticatedKaraokeRoomIdRouteImport.update({
+    id: '/$roomId',
+    path: '/$roomId',
+    getParentRoute: () => AuthenticatedKaraokeRoute,
   } as any)
 const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
   id: '/users',
@@ -189,6 +202,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/activity': typeof AuthenticatedActivityRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/karaoke': typeof AuthenticatedKaraokeRouteWithChildren
   '/lifers': typeof AuthenticatedLifersRouteWithChildren
   '/lobby': typeof AuthenticatedLobbyRoute
   '/profile': typeof AuthenticatedProfileRoute
@@ -203,6 +217,7 @@ export interface FileRoutesByFullPath {
   '/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
   '/admin/support': typeof AuthenticatedAdminSupportRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/karaoke/$roomId': typeof AuthenticatedKaraokeRoomIdRoute
   '/lifers/messages': typeof AuthenticatedLifersMessagesRoute
   '/lifers/room': typeof AuthenticatedLifersRoomRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
@@ -215,6 +230,7 @@ export interface FileRoutesByTo {
   '/diagnostics': typeof DiagnosticsRoute
   '/login': typeof LoginRoute
   '/activity': typeof AuthenticatedActivityRoute
+  '/karaoke': typeof AuthenticatedKaraokeRouteWithChildren
   '/lobby': typeof AuthenticatedLobbyRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/super-admin': typeof AuthenticatedSuperAdminRoute
@@ -228,6 +244,7 @@ export interface FileRoutesByTo {
   '/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
   '/admin/support': typeof AuthenticatedAdminSupportRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/karaoke/$roomId': typeof AuthenticatedKaraokeRoomIdRoute
   '/lifers/messages': typeof AuthenticatedLifersMessagesRoute
   '/lifers/room': typeof AuthenticatedLifersRoomRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
@@ -244,6 +261,7 @@ export interface FileRoutesById {
   '/_authenticated/_verified': typeof AuthenticatedVerifiedRouteWithChildren
   '/_authenticated/activity': typeof AuthenticatedActivityRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/_authenticated/karaoke': typeof AuthenticatedKaraokeRouteWithChildren
   '/_authenticated/lifers': typeof AuthenticatedLifersRouteWithChildren
   '/_authenticated/lobby': typeof AuthenticatedLobbyRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
@@ -258,6 +276,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
   '/_authenticated/admin/support': typeof AuthenticatedAdminSupportRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/_authenticated/karaoke/$roomId': typeof AuthenticatedKaraokeRoomIdRoute
   '/_authenticated/lifers/messages': typeof AuthenticatedLifersMessagesRoute
   '/_authenticated/lifers/room': typeof AuthenticatedLifersRoomRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
@@ -273,6 +292,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/activity'
     | '/admin'
+    | '/karaoke'
     | '/lifers'
     | '/lobby'
     | '/profile'
@@ -287,6 +307,7 @@ export interface FileRouteTypes {
     | '/admin/otherpage'
     | '/admin/support'
     | '/admin/users'
+    | '/karaoke/$roomId'
     | '/lifers/messages'
     | '/lifers/room'
     | '/admin/'
@@ -299,6 +320,7 @@ export interface FileRouteTypes {
     | '/diagnostics'
     | '/login'
     | '/activity'
+    | '/karaoke'
     | '/lobby'
     | '/profile'
     | '/super-admin'
@@ -312,6 +334,7 @@ export interface FileRouteTypes {
     | '/admin/otherpage'
     | '/admin/support'
     | '/admin/users'
+    | '/karaoke/$roomId'
     | '/lifers/messages'
     | '/lifers/room'
     | '/admin'
@@ -327,6 +350,7 @@ export interface FileRouteTypes {
     | '/_authenticated/_verified'
     | '/_authenticated/activity'
     | '/_authenticated/admin'
+    | '/_authenticated/karaoke'
     | '/_authenticated/lifers'
     | '/_authenticated/lobby'
     | '/_authenticated/profile'
@@ -341,6 +365,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/otherpage'
     | '/_authenticated/admin/support'
     | '/_authenticated/admin/users'
+    | '/_authenticated/karaoke/$roomId'
     | '/_authenticated/lifers/messages'
     | '/_authenticated/lifers/room'
     | '/_authenticated/admin/'
@@ -421,6 +446,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLifersRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/karaoke': {
+      id: '/_authenticated/karaoke'
+      path: '/karaoke'
+      fullPath: '/karaoke'
+      preLoaderRoute: typeof AuthenticatedKaraokeRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/admin': {
       id: '/_authenticated/admin'
       path: '/admin'
@@ -469,6 +501,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/lifers/messages'
       preLoaderRoute: typeof AuthenticatedLifersMessagesRouteImport
       parentRoute: typeof AuthenticatedLifersRoute
+    }
+    '/_authenticated/karaoke/$roomId': {
+      id: '/_authenticated/karaoke/$roomId'
+      path: '/$roomId'
+      fullPath: '/karaoke/$roomId'
+      preLoaderRoute: typeof AuthenticatedKaraokeRoomIdRouteImport
+      parentRoute: typeof AuthenticatedKaraokeRoute
     }
     '/_authenticated/admin/users': {
       id: '/_authenticated/admin/users'
@@ -608,6 +647,17 @@ const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
 const AuthenticatedAdminRouteWithChildren =
   AuthenticatedAdminRoute._addFileChildren(AuthenticatedAdminRouteChildren)
 
+interface AuthenticatedKaraokeRouteChildren {
+  AuthenticatedKaraokeRoomIdRoute: typeof AuthenticatedKaraokeRoomIdRoute
+}
+
+const AuthenticatedKaraokeRouteChildren: AuthenticatedKaraokeRouteChildren = {
+  AuthenticatedKaraokeRoomIdRoute: AuthenticatedKaraokeRoomIdRoute,
+}
+
+const AuthenticatedKaraokeRouteWithChildren =
+  AuthenticatedKaraokeRoute._addFileChildren(AuthenticatedKaraokeRouteChildren)
+
 interface AuthenticatedLifersRouteChildren {
   AuthenticatedLifersMessagesRoute: typeof AuthenticatedLifersMessagesRoute
   AuthenticatedLifersRoomRoute: typeof AuthenticatedLifersRoomRoute
@@ -627,6 +677,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedVerifiedRoute: typeof AuthenticatedVerifiedRouteWithChildren
   AuthenticatedActivityRoute: typeof AuthenticatedActivityRoute
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
+  AuthenticatedKaraokeRoute: typeof AuthenticatedKaraokeRouteWithChildren
   AuthenticatedLifersRoute: typeof AuthenticatedLifersRouteWithChildren
   AuthenticatedLobbyRoute: typeof AuthenticatedLobbyRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
@@ -638,6 +689,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedVerifiedRoute: AuthenticatedVerifiedRouteWithChildren,
   AuthenticatedActivityRoute: AuthenticatedActivityRoute,
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
+  AuthenticatedKaraokeRoute: AuthenticatedKaraokeRouteWithChildren,
   AuthenticatedLifersRoute: AuthenticatedLifersRouteWithChildren,
   AuthenticatedLobbyRoute: AuthenticatedLobbyRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
@@ -658,13 +710,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

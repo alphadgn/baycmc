@@ -29,7 +29,7 @@ type RoomAccessResult =
 async function validateRoomAccess(userId: string, roomId: string): Promise<RoomAccessResult> {
   const { data: room, error } = await supabaseAdmin
     .from("rooms")
-    .select("id,name,tier,livekit_room,active,is_locked")
+    .select("id,name,tier,kind,livekit_room,active,is_locked")
     .eq("id", roomId)
     .maybeSingle();
   if (error || !room || !room.active) {
@@ -72,7 +72,10 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
   const bypassesBaycGate =
     isAdmin || !!roleRows?.some((r) => r.role === "verified_user");
 
-  if (!ver?.bayc_verified && !bypassesBaycGate) {
+  // Karaoke rooms are open to any signed-in user (lobby tier). Holder gate
+  // applies only to non-karaoke rooms.
+  const isKaraoke = (room as { kind?: string }).kind === "karaoke";
+  if (!isKaraoke && !ver?.bayc_verified && !bypassesBaycGate) {
     return {
       ok: false,
       error:
