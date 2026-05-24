@@ -36,6 +36,7 @@ type NavTarget =
   | "/lobby"
   | "/feed"
   | "/rooms"
+  | "/karaoke"
   | "/calendar"
   | "/profile"
   | "/admin"
@@ -61,6 +62,15 @@ const NAV_ITEMS: NavItem[] = [
     tier: "verified",
     icon: <Video className="h-4 w-4" />,
     match: "/rooms",
+  },
+  // Karaoke is open to all members (lobby tier). Holders see a VIP badge
+  // inside the room — visibility is NOT gated.
+  {
+    to: "/karaoke",
+    label: "Karaoke Lounges",
+    tier: "all",
+    icon: <Mic className="h-4 w-4" />,
+    match: "/karaoke",
   },
   {
     to: "/calendar",
