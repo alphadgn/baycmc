@@ -10,13 +10,18 @@
  * loop" cannot reappear here.
  *
  * Lifecycle (deterministic, no polling):
- *   1. Wait for Glyph:   ready && authenticated && user.evmWallet
- *   2. If a Supabase session already exists for this address → done.
- *   3. Otherwise: build a SIWE message, sign it via Glyph's signMessage,
- *      POST { message, signature } to the `verifyOwnership` server fn → it
- *      verifies the signature, runs on-chain balanceOf against BAYC + MAYC +
- *      delegate.cash, and mints a Supabase session for the wallet (lobby for
- *      everyone, bayc_verified flipped for holders).
+ *   1. Wallet connects through Glyph → wagmi's useAccount() reports the
+ *      address (the automatic path, runVerify(false)).
+ *   2. If a Supabase session already exists for this address → done, no popup.
+ *   3. Otherwise the user must TAP "Sign to enter" (runVerify(true)). The
+ *      wallet's signing popup can only open from inside a user gesture, so we
+ *      never auto-pop it from an effect — that popup is silently blocked. The
+ *      tap dispatches "baycmc:wallet-verify"; dispatchEvent runs the listener
+ *      synchronously, so signMessage fires inside the same gesture. We build a
+ *      SIWE message, sign it, and POST { message, signature } to the
+ *      `verifyOwnership` server fn → it verifies the signature, runs on-chain
+ *      balanceOf against BAYC + MAYC + delegate.cash, and mints a Supabase
+ *      session (lobby for everyone, bayc_verified flipped for holders).
  *   4. supabase.auth.setSession(...) → onAuthStateChange fires → RLS-protected
  *      reads work app-wide.
  *
@@ -24,7 +29,7 @@
  * a signature" path — the new server fn mints a session from the SIWE
  * signature directly, so every entrance requires exactly one signature.
  */
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { SiweMessage } from "siwe";
 import { toast } from "sonner";
@@ -197,9 +202,12 @@ export function GlyphBridge({
   const { logout, signMessage } = useGlyph();
   const { address: wagmiAddress, isConnected } = useAccount();
   const verifyFn = useServerFn(verifyOwnership);
-  const [retryNonce, setRetryNonce] = useState(0);
 
   const address = isConnected ? (wagmiAddress ?? null) : null;
+  // Latest connected address, read inside the stable runVerify callback so we
+  // don't have to thread it through deps.
+  const addressRef = useRef(address);
+  addressRef.current = address;
 
   // signMessage/verifyFn/logout are new refs every render — store them in
   // refs so we call the latest version inside the effect without putting them
@@ -216,10 +224,6 @@ export function GlyphBridge({
   // unchanged — this is what kills the historic verify loop.
   const inFlightRef = useRef<string | null>(null);
   const completedRef = useRef<Set<string>>(new Set());
-  // True when the user fired the "Verify holder access" action — lets an
-  // already-signed-in user pop a fresh SIWE signature to re-check ownership
-  // instead of short-circuiting on the existing session.
-  const verifyRequestedRef = useRef(false);
   const unmountedRef = useRef(false);
   useEffect(() => {
     unmountedRef.current = false;
@@ -228,23 +232,179 @@ export function GlyphBridge({
     };
   }, []);
 
-  useEffect(() => {
-    const retry = () => {
-      // Single-flight: ignore retries while a verify is already running.
-      if (inFlightRef.current) {
-        logEvent("auth", "info", "retry ignored — verify already in-flight", {
-          inFlight: inFlightRef.current,
+  // The SIWE sign + on-chain verify + Supabase session mint.
+  //
+  // `explicit` means a real user gesture (a tap) is driving this. The wallet's
+  // signing popup can ONLY be opened from inside a user gesture — a popup
+  // requested from a bare effect (e.g. right after the wallet connects) is
+  // blocked by the browser and silently never appears. So the automatic path
+  // (`explicit === false`) NEVER opens the signing popup: it only reuses an
+  // existing Supabase session for a returning wallet. A brand-new connection
+  // signs only once the user taps "Sign to enter", which calls this with
+  // `explicit === true` synchronously inside the tap.
+  const runVerify = useCallback(async (explicit: boolean) => {
+    const addr = addressRef.current;
+    if (!addr) {
+      logEvent("auth", "debug", "verify skipped: no connected wallet");
+      return;
+    }
+
+    if (!explicit) {
+      if (completedRef.current.has(addr.toLowerCase())) return;
+      const { data: sess } = await supabase.auth.getSession();
+      const existingEmail = sess.session?.user.email ?? "";
+      if (existingEmail === `${addr.toLowerCase()}@wallet.baycmc.local`) {
+        logEvent(
+          "auth",
+          "info",
+          "verify: existing Supabase session matches wallet — short-circuit",
+        );
+        completedRef.current.add(addr.toLowerCase());
+        if (!isVerifiedFresh(addr)) markVerified(addr);
+      } else {
+        logEvent(
+          "auth",
+          "info",
+          "verify: wallet connected — awaiting user tap (popup needs a gesture)",
+        );
+      }
+      return;
+    }
+
+    // Explicit path — single-flight so a double-tap can't fire two popups.
+    if (inFlightRef.current === addr) {
+      logEvent("auth", "debug", "verify skipped: signature already in-flight");
+      return;
+    }
+    inFlightRef.current = addr;
+    const toastId = `glyph-bridge-${addr.toLowerCase()}`;
+    logEvent("auth", "info", "verify: entering signature path", {
+      address: addr.slice(0, 6) + "…" + addr.slice(-4),
+    });
+
+    try {
+      patchGlyphSnapshot({ verifying: true });
+      logEvent("auth", "info", "verify: building SIWE + calling signMessage");
+
+      const domain = window.location.host;
+      const origin = window.location.origin;
+      const nonce = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+      const siwe = new SiweMessage({
+        domain,
+        address: addr,
+        uri: origin,
+        version: "1",
+        chainId: 1,
+        nonce,
+        issuedAt: new Date().toISOString(),
+        expirationTime: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+      });
+      const message = siwe.prepareMessage();
+
+      // signMessage is invoked synchronously here (inside the user's tap) so
+      // the wallet's signing popup is allowed to open.
+      let signature: string;
+      try {
+        signature = await withTimeout(
+          signMessageRef.current({ message }),
+          45_000,
+          "Signature request timed out. Please try signing in again.",
+        );
+      } catch (e) {
+        if (!isChunkLoadError(e)) throw e;
+        logEvent("auth", "warn", "verify: signMessage chunk-load failed — retrying", {
+          message: e instanceof Error ? e.message : String(e),
         });
+        toast.loading("Reloading wallet sign-in…", { id: toastId, position: "top-center" });
+        await new Promise((r) => window.setTimeout(r, 600));
+        toast.dismiss(toastId);
+        signature = await withTimeout(
+          signMessageRef.current({ message }),
+          45_000,
+          "Signature request timed out. Please try signing in again.",
+        );
+      }
+      if (unmountedRef.current) {
+        logEvent("auth", "warn", "verify: aborted after signMessage — component unmounted");
         return;
       }
-      logEvent("auth", "info", "retry accepted — kicking verify");
-      completedRef.current.clear();
-      verifyRequestedRef.current = true;
-      setRetryNonce((n) => n + 1);
-    };
-    window.addEventListener("baycmc:wallet-verify", retry);
-    return () => window.removeEventListener("baycmc:wallet-verify", retry);
+      logEvent("auth", "info", "verify: signature obtained — calling verifyFn");
+
+      toast.loading("Checking BAYC / MAYC ownership…", { id: toastId, position: "top-center" });
+      const result = await withTimeout(
+        verifyFnRef.current({ data: { message, signature } }),
+        20_000,
+        "The verification check is taking longer than expected. Please try again.",
+      );
+      if (unmountedRef.current) {
+        logEvent("auth", "warn", "verify: aborted after verifyFn — component unmounted");
+        return;
+      }
+      logEvent("auth", "info", "verify: verifyFn returned", {
+        verified: result.verified,
+        hasSession: !!result.session,
+        collection: result.collection,
+        reason: result.reason ?? null,
+      });
+
+      if (!result.session) {
+        logEvent("auth", "error", "verify: server returned no session", { reason: result.reason });
+        toast.error(result.reason ?? "Sign-in failed.", { id: toastId });
+        return;
+      }
+      const { error } = await supabase.auth.setSession({
+        access_token: result.session.access_token,
+        refresh_token: result.session.refresh_token,
+      });
+      if (error) {
+        logEvent("auth", "error", "verify: setSession failed", { message: error.message });
+        toast.error(error.message, { id: toastId });
+        return;
+      }
+      logEvent("auth", "info", "verify: Supabase session set — redirect should follow");
+
+      completedRef.current.add(addr.toLowerCase());
+      markVerified(addr);
+
+      // Tell useVerificationStatus consumers to reload their row — the server
+      // fn just rewrote user_verifications.
+      window.dispatchEvent(new Event("baycmc:verification-refresh"));
+
+      if (result.verified) {
+        toast.success("Verified", { id: toastId, duration: 2500 });
+      } else {
+        toast.error("Not verified", { id: toastId, duration: 2500 });
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (
+        !msg.toLowerCase().includes("user rejected") &&
+        !msg.toLowerCase().includes("user denied")
+      ) {
+        logEvent("auth", "error", "verify: threw", { message: msg });
+        toast.error(msg || "Sign-in failed. Please try again.", { id: toastId });
+      } else {
+        logEvent("auth", "info", "verify: user rejected signature");
+        toast.dismiss(toastId);
+      }
+    } finally {
+      if (inFlightRef.current === addr) inFlightRef.current = null;
+      patchGlyphSnapshot({ verifying: false });
+    }
   }, []);
+
+  // Explicit sign trigger. dispatchEvent runs listeners synchronously, so a
+  // tap that dispatches "baycmc:wallet-verify" reaches signMessage inside the
+  // same gesture and the wallet popup is allowed to open. Clearing the
+  // completed guard lets a lobby user re-sign to re-check holdings.
+  useEffect(() => {
+    const onVerify = () => {
+      completedRef.current.clear();
+      void runVerify(true);
+    };
+    window.addEventListener("baycmc:wallet-verify", onVerify);
+    return () => window.removeEventListener("baycmc:wallet-verify", onVerify);
+  }, [runVerify]);
 
   // Hard sign-out from Glyph on demand. The inactivity timer can't call Glyph
   // hooks itself (it lives outside this React tree), so it dispatches a window
@@ -254,7 +414,6 @@ export function GlyphBridge({
       logEvent("auth", "info", "forced Glyph logout");
       completedRef.current.clear();
       inFlightRef.current = null;
-      verifyRequestedRef.current = false;
       patchGlyphSnapshot({
         ready: false,
         authenticated: false,
@@ -272,171 +431,13 @@ export function GlyphBridge({
     return () => window.removeEventListener("baycmc:wallet-logout", onLogout);
   }, []);
 
+  // Automatic path on connect: reuse an existing Supabase session if there is
+  // one for this wallet (a returning user — no popup needed). A brand-new
+  // connection does NOT sign here; it waits for the user's "Sign to enter"
+  // tap, because the wallet signing popup can't open outside a user gesture.
   useEffect(() => {
-    if (!address) {
-      logEvent("auth", "debug", "bridge gate: no connected wallet", {
-        isConnected,
-        hasAddress: !!address,
-      });
-      return;
-    }
-    if (inFlightRef.current === address) {
-      logEvent("auth", "debug", "bridge gate: already in-flight for address");
-      return;
-    }
-    if (completedRef.current.has(address.toLowerCase())) {
-      logEvent("auth", "debug", "bridge gate: already completed for address");
-      return;
-    }
-
-    inFlightRef.current = address;
-    const toastId = `glyph-bridge-${address.toLowerCase()}`;
-    logEvent("auth", "info", "bridge: entering verify path", {
-      address: address.slice(0, 6) + "…" + address.slice(-4),
-      verifyRequested: verifyRequestedRef.current,
-    });
-
-    void (async () => {
-      try {
-        // If the user already has a Supabase session for this wallet, do
-        // nothing — handles refresh after first verify. Exception: an explicit
-        // re-verify request (the "Verify holder access" action) MUST re-run
-        // the SIWE flow to re-check ownership on-chain.
-        const { data: sess } = await supabase.auth.getSession();
-        const existingEmail = sess.session?.user.email ?? "";
-        if (
-          existingEmail === `${address.toLowerCase()}@wallet.baycmc.local` &&
-          !verifyRequestedRef.current
-        ) {
-          logEvent(
-            "auth",
-            "info",
-            "bridge: existing Supabase session matches wallet — short-circuit",
-          );
-          completedRef.current.add(address.toLowerCase());
-          if (!isVerifiedFresh(address)) markVerified(address);
-          return;
-        }
-
-        // Consume the explicit-request flag immediately so a thrown error
-        // below doesn't leave us re-firing the loading toast on every
-        // re-render of the bridge.
-        verifyRequestedRef.current = false;
-        patchGlyphSnapshot({ verifying: true });
-
-        logEvent("auth", "info", "bridge: building SIWE + calling signMessage");
-        toast.loading("Preparing wallet sign-in…", { id: toastId, position: "top-center" });
-
-        const domain = window.location.host;
-        const origin = window.location.origin;
-        const nonce = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
-        const siwe = new SiweMessage({
-          domain,
-          address,
-          uri: origin,
-          version: "1",
-          chainId: 1,
-          nonce,
-          issuedAt: new Date().toISOString(),
-          expirationTime: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-        });
-        const message = siwe.prepareMessage();
-
-        // Dismiss the prep toast just before Glyph opens its signing UI so it
-        // doesn't cover the modal's action button.
-        toast.dismiss(toastId);
-        let signature: string;
-        try {
-          signature = await withTimeout(
-            signMessageRef.current({ message }),
-            45_000,
-            "Signature request timed out. Please try signing in again.",
-          );
-        } catch (e) {
-          if (!isChunkLoadError(e)) throw e;
-          logEvent("auth", "warn", "bridge: signMessage chunk-load failed — retrying", {
-            message: e instanceof Error ? e.message : String(e),
-          });
-          toast.loading("Reloading wallet sign-in…", { id: toastId, position: "top-center" });
-          await new Promise((r) => window.setTimeout(r, 600));
-          toast.dismiss(toastId);
-          signature = await withTimeout(
-            signMessageRef.current({ message }),
-            45_000,
-            "Signature request timed out. Please try signing in again.",
-          );
-        }
-        if (unmountedRef.current) {
-          logEvent("auth", "warn", "bridge: aborted after signMessage — component unmounted");
-          return;
-        }
-        logEvent("auth", "info", "bridge: signature obtained — calling verifyFn");
-
-        toast.loading("Checking BAYC / MAYC ownership…", { id: toastId });
-        const result = await withTimeout(
-          verifyFnRef.current({ data: { message, signature } }),
-          20_000,
-          "The verification check is taking longer than expected. Please try again.",
-        );
-        if (unmountedRef.current) {
-          logEvent("auth", "warn", "bridge: aborted after verifyFn — component unmounted");
-          return;
-        }
-        logEvent("auth", "info", "bridge: verifyFn returned", {
-          verified: result.verified,
-          hasSession: !!result.session,
-          collection: result.collection,
-          reason: result.reason ?? null,
-        });
-
-        if (!result.session) {
-          logEvent("auth", "error", "bridge: server returned no session", {
-            reason: result.reason,
-          });
-          toast.error(result.reason ?? "Sign-in failed.", { id: toastId });
-          return;
-        }
-        const { error } = await supabase.auth.setSession({
-          access_token: result.session.access_token,
-          refresh_token: result.session.refresh_token,
-        });
-        if (error) {
-          logEvent("auth", "error", "bridge: setSession failed", { message: error.message });
-          toast.error(error.message, { id: toastId });
-          return;
-        }
-        logEvent("auth", "info", "bridge: Supabase session set — redirect should follow");
-
-        completedRef.current.add(address.toLowerCase());
-        markVerified(address);
-
-        // Tell useVerificationStatus consumers to reload their row — the
-        // server fn just rewrote user_verifications.
-        window.dispatchEvent(new Event("baycmc:verification-refresh"));
-
-        if (result.verified) {
-          toast.success("Verified", { id: toastId, duration: 2500 });
-        } else {
-          toast.error("Not verified", { id: toastId, duration: 2500 });
-        }
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        if (
-          !msg.toLowerCase().includes("user rejected") &&
-          !msg.toLowerCase().includes("user denied")
-        ) {
-          logEvent("auth", "error", "bridge: verify threw", { message: msg });
-          toast.error(msg || "Sign-in failed. Please try again.", { id: toastId });
-        } else {
-          logEvent("auth", "info", "bridge: user rejected signature");
-          toast.dismiss(toastId);
-        }
-      } finally {
-        if (inFlightRef.current === address) inFlightRef.current = null;
-        patchGlyphSnapshot({ verifying: false });
-      }
-    })();
-  }, [address, retryNonce]);
+    void runVerify(false);
+  }, [address, runVerify]);
 
   // Publish the latest snapshot to the module-level store. `verifying` is
   // owned by the verify effect — patch the other fields only. The provider is
