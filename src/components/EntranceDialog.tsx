@@ -1,20 +1,20 @@
 /**
- * Entrance trigger.
+ * VIP Entrance modal.
  *
- * No dialog, no Tokenproof, no localStorage cache. The "VIP" / Entrance button
- * in the header opens Glyph's connect popup directly (the Glyph Global Wallet,
- * via wagmi). After the wallet connects, <GlyphBridge> (mounted at the root)
- * signs the user into Supabase by verifying on-chain BAYC/MAYC ownership via a
- * single SIWE signature.
+ * Clicking "VIP" in the header opens this branded modal (styled like the main
+ * entrance — gold radial wash + glass card). Confirming hands off to Glyph's
+ * own connect popup (the Glyph Global Wallet, via wagmi). After the wallet
+ * connects, <GlyphBridge> (mounted at the root) signs the user into Supabase
+ * by verifying on-chain BAYC/MAYC ownership via a single SIWE signature.
  *
- * This file is kept as a named export `EntranceDialog` so AppHeader's existing
- * import keeps working with no further wiring. The `open` prop is the trigger:
- * when it flips to `true`, we call Glyph's `connect()` and immediately set it
- * back to `false` so re-clicks always re-open the popup.
+ * Kept as a named export `EntranceDialog` so AppHeader's existing import keeps
+ * working. The `open` prop drives visibility; `onOpenChange(false)` closes it.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import { useGlyphReady } from "@/components/GlyphAppProvider";
+import { EmbroideredImage } from "@/components/EmbroideredImage";
 import { importWithRetry } from "@/lib/import-with-retry";
 
 interface EntranceDialogProps {
@@ -39,10 +39,9 @@ function isFrameAncestorBlocked(error: unknown) {
 export function EntranceDialog({ open, onOpenChange }: EntranceDialogProps) {
   const glyphReady = useGlyphReady();
   const [hooks, setHooks] = useState<EntranceHooks | null>(null);
-  const triggeredRef = useRef(false);
 
   // Lazy-load the Glyph + wagmi hooks (SSR-unsafe SDK). Only after the
-  // GlyphWalletProvider has actually mounted — calling these outside it throws.
+  // GlyphWalletProvider has mounted — calling these outside it throws.
   useEffect(() => {
     if (!glyphReady) return;
     let cancelled = false;
@@ -69,64 +68,86 @@ export function EntranceDialog({ open, onOpenChange }: EntranceDialogProps) {
     };
   }, [glyphReady]);
 
-  if (!glyphReady || !hooks) {
-    return <NoHooksTrigger open={open} onOpenChange={onOpenChange} ready={glyphReady} />;
-  }
-  return (
-    <WithHooks open={open} onOpenChange={onOpenChange} hooks={hooks} triggeredRef={triggeredRef} />
-  );
+  if (!open) return null;
+  return <EntranceModal onOpenChange={onOpenChange} hooks={hooks} ready={glyphReady} />;
 }
 
-function NoHooksTrigger({
-  open,
-  onOpenChange,
-  ready,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  ready: boolean;
-}) {
-  // Queue the intent: keep `open=true` until the hooks arrive, then <WithHooks>
-  // picks it up and calls connect(). If the provider never became ready, the
-  // boundary has already degraded — surface a gentle message.
-  useEffect(() => {
-    if (!open) return;
-    if (ready) return;
-    const t = window.setTimeout(() => {
-      toast.error("Wallet sign-in is taking a moment to load. Please try again.");
-      onOpenChange(false);
-    }, 8000);
-    return () => window.clearTimeout(t);
-  }, [open, ready, onOpenChange]);
-  return null;
-}
-
-function WithHooks({
-  open,
+function EntranceModal({
   onOpenChange,
   hooks,
-  triggeredRef,
+  ready,
 }: {
-  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  hooks: EntranceHooks | null;
+  ready: boolean;
+}) {
+  // Hooks must be called unconditionally and only when present — render a
+  // hookless variant until the SDK loads so ordering stays stable.
+  if (!hooks) {
+    return (
+      <EntranceModalShell
+        onOpenChange={onOpenChange}
+        ready={ready}
+        connect={null}
+        isConnected={false}
+      />
+    );
+  }
+  return <EntranceModalWithHooks onOpenChange={onOpenChange} hooks={hooks} />;
+}
+
+function EntranceModalWithHooks({
+  onOpenChange,
+  hooks,
+}: {
   onOpenChange: (open: boolean) => void;
   hooks: EntranceHooks;
-  triggeredRef: React.MutableRefObject<boolean>;
 }) {
   const { connect } = hooks.useNativeGlyphConnection();
   const { isConnected } = hooks.useAccount();
 
+  // Already connected → nothing to do; the bridge handles the Supabase
+  // session. Close the modal so it doesn't linger.
   useEffect(() => {
-    if (!open) {
-      triggeredRef.current = false;
-      return;
+    if (isConnected) onOpenChange(false);
+  }, [isConnected, onOpenChange]);
+
+  return (
+    <EntranceModalShell
+      onOpenChange={onOpenChange}
+      ready
+      connect={connect}
+      isConnected={isConnected}
+    />
+  );
+}
+
+function EntranceModalShell({
+  onOpenChange,
+  ready,
+  connect,
+  isConnected,
+}: {
+  onOpenChange: (open: boolean) => void;
+  ready: boolean;
+  connect: (() => void) | null;
+  isConnected: boolean;
+}) {
+  const [connecting, setConnecting] = useState(false);
+  const canConnect = ready && !!connect && !isConnected;
+
+  // Escape closes the modal.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onOpenChange(false);
     }
-    if (triggeredRef.current) return;
-    triggeredRef.current = true;
-    if (isConnected) {
-      // Wallet already connected — the bridge handles the Supabase session.
-      onOpenChange(false);
-      return;
-    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onOpenChange]);
+
+  function handleConnect() {
+    if (!connect) return;
+    setConnecting(true);
     try {
       connect();
     } catch (e) {
@@ -139,11 +160,87 @@ function WithHooks({
       } else {
         toast.error("Couldn't open the wallet sign-in popup.");
       }
-      triggeredRef.current = false;
-    } finally {
-      onOpenChange(false);
+      setConnecting(false);
     }
-  }, [open, isConnected, connect, onOpenChange, triggeredRef]);
+  }
 
-  return null;
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center px-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="VIP entrance"
+    >
+      {/* Backdrop */}
+      <button
+        type="button"
+        aria-label="Close"
+        onClick={() => onOpenChange(false)}
+        className="absolute inset-0 cursor-default bg-black/70 backdrop-blur-sm"
+      />
+
+      {/* Card — mirrors the landing hero: gold radial wash + glass. */}
+      <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-gold/30 bg-card/90 p-6 shadow-card backdrop-blur sm:p-8">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 -z-10 opacity-70"
+          style={{ background: "var(--gradient-radial-gold)" }}
+        />
+
+        <button
+          type="button"
+          aria-label="Close"
+          onClick={() => onOpenChange(false)}
+          className="absolute right-3 top-3 rounded-md p-1.5 text-muted-foreground transition hover:bg-secondary/60 hover:text-foreground"
+        >
+          <X className="h-4 w-4" />
+        </button>
+
+        <div className="inline-flex items-center gap-2 rounded-full border border-gold/30 bg-gold/5 px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-gold sm:text-xs">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-gold animate-pulse-glow" />
+          Members only · BAYC/MAYC
+        </div>
+
+        <div className="mt-4">
+          <EmbroideredImage
+            variant="baycmc"
+            size="lg"
+            alt="BAYCmc"
+            clamp="clamp(1.6rem, 8vw, 2.75rem)"
+          />
+        </div>
+
+        <h2 className="mt-3 font-display text-2xl font-bold text-gradient-gold sm:text-3xl">
+          VIP Entrance
+        </h2>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          Connect your wallet with Glyph to verify your Bored or Mutant Ape and unlock the
+          clubhouse. You'll be asked to sign one message — no gas, no transaction.
+        </p>
+
+        <button
+          type="button"
+          disabled={!canConnect || connecting}
+          onClick={handleConnect}
+          className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-md bg-gradient-gold px-4 py-2.5 text-sm font-semibold text-gold-foreground shadow-gold transition hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
+        >
+          {!ready ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading wallet…
+            </>
+          ) : connecting ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" /> Look for the popup…
+            </>
+          ) : (
+            "Connect wallet"
+          )}
+        </button>
+
+        <p className="mt-3 text-center text-[11px] text-muted-foreground">
+          Powered by Glyph · ApeChain
+        </p>
+      </div>
+    </div>
+  );
 }

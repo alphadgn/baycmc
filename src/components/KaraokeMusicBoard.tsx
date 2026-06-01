@@ -88,14 +88,11 @@ export function KaraokeMusicBoard({
       setMicOn(!!(e as CustomEvent<{ enabled: boolean }>).detail?.enabled);
     }
     window.addEventListener("karaoke:mic-state", onState as EventListener);
-    return () =>
-      window.removeEventListener("karaoke:mic-state", onState as EventListener);
+    return () => window.removeEventListener("karaoke:mic-state", onState as EventListener);
   }, []);
   function toggleMic() {
     const next = !micOn;
-    window.dispatchEvent(
-      new CustomEvent("karaoke:toggle-mic", { detail: { enabled: next } }),
-    );
+    window.dispatchEvent(new CustomEvent("karaoke:toggle-mic", { detail: { enabled: next } }));
     // When the performer unmutes during playback, also broadcast the music
     // track to the room so every participant (and the recording) hears both
     // the singer AND the music simultaneously. On desktop this uses tab-audio
@@ -104,9 +101,7 @@ export function KaraokeMusicBoard({
     // through the (echo-cancellation-disabled) mic — keep the device speaker
     // on so the mic picks it up.
     if (isMyTurn && next && videoId && !paused) {
-      window.dispatchEvent(
-        new CustomEvent("karaoke:publish-music", { detail: { play: true } }),
-      );
+      window.dispatchEvent(new CustomEvent("karaoke:publish-music", { detail: { play: true } }));
     }
     if (isMyTurn && !next) {
       window.dispatchEvent(new CustomEvent("karaoke:unpublish-music"));
@@ -118,9 +113,7 @@ export function KaraokeMusicBoard({
   // their own iframe so they hear the music exactly once via LiveKit.
   const [musicShared, setMusicShared] = useState(false);
   function shareMusicToRoom() {
-    window.dispatchEvent(
-      new CustomEvent("karaoke:publish-music", { detail: { play: true } }),
-    );
+    window.dispatchEvent(new CustomEvent("karaoke:publish-music", { detail: { play: true } }));
     setMusicShared(true);
   }
   function stopSharingMusic() {
@@ -141,11 +134,8 @@ export function KaraokeMusicBoard({
       setMusicShared(!!(e as CustomEvent<{ shared: boolean }>).detail?.shared);
     }
     window.addEventListener("karaoke:music-shared", onShared as EventListener);
-    return () =>
-      window.removeEventListener("karaoke:music-shared", onShared as EventListener);
+    return () => window.removeEventListener("karaoke:music-shared", onShared as EventListener);
   }, []);
-
-
 
   // Mobile hint: first time the music machine opens on a small screen, show
   // a one-time overlay explaining the transport controls. Dismissable.
@@ -183,25 +173,14 @@ export function KaraokeMusicBoard({
     null,
   );
 
-  // Clamp the drag offset so the chassis never leaves the viewport — the
-  // container is anchored bottom-right with a 16px margin and uses
-  // `translate(-dx, -dy)`, so positive dx moves it left and positive dy moves
-  // it up. We bound both so every edge stays at least 8px inside the visible
-  // area on phones (which previously let the controls slide off-screen).
+  // Free drag: the chassis may move anywhere, including partly/fully past the
+  // page edges, as the user drags (per design request). The container is
+  // anchored bottom-right and uses `translate(-dx, -dy)`. We intentionally do
+  // NOT clamp into the viewport here — recovery is always available by closing
+  // and reopening the machine (the reopen pill resets position to 0,0) or via
+  // the "reset panels" event.
   function clampPos(dx: number, dy: number) {
-    const el = containerRef.current;
-    const vw = typeof window !== "undefined" ? window.innerWidth : 0;
-    const vh = typeof window !== "undefined" ? window.innerHeight : 0;
-    const rect = el?.getBoundingClientRect();
-    const w = rect?.width ?? 0;
-    const h = rect?.height ?? 0;
-    const margin = 16; // matches bottom-4 / right-4
-    const maxDx = Math.max(0, vw - w - margin - 8);
-    const maxDy = Math.max(0, vh - h - margin - 8);
-    return {
-      dx: Math.max(0, Math.min(dx, maxDx)),
-      dy: Math.max(0, Math.min(dy, maxDy)),
-    };
+    return { dx, dy };
   }
 
   function onDragPointerDown(e: React.PointerEvent) {
@@ -211,9 +190,7 @@ export function KaraokeMusicBoard({
   function onDragPointerMove(e: React.PointerEvent) {
     if (!dragRef.current) return;
     const { startX, startY, baseDx, baseDy } = dragRef.current;
-    setPos(
-      clampPos(baseDx - (e.clientX - startX), baseDy - (e.clientY - startY)),
-    );
+    setPos(clampPos(baseDx - (e.clientX - startX), baseDy - (e.clientY - startY)));
   }
   function onDragPointerUp(e: React.PointerEvent) {
     if (!dragRef.current) return;
@@ -253,7 +230,11 @@ export function KaraokeMusicBoard({
     { label: "Disney", query: "disney karaoke", hue: "from-cyan-300 to-cyan-500" },
     { label: "Duets", query: "duet karaoke", hue: "from-sky-300 to-sky-500" },
     { label: "Power Ballads", query: "power ballad karaoke", hue: "from-blue-400 to-blue-600" },
-    { label: "Frank Sinatra", query: "frank sinatra karaoke", hue: "from-indigo-400 to-indigo-600" },
+    {
+      label: "Frank Sinatra",
+      query: "frank sinatra karaoke",
+      hue: "from-indigo-400 to-indigo-600",
+    },
     { label: "Beyoncé", query: "beyonce karaoke", hue: "from-violet-400 to-violet-600" },
     { label: "Drake", query: "drake karaoke", hue: "from-purple-400 to-purple-600" },
     { label: "Trending", query: "trending karaoke 2025", hue: "from-pink-500 to-rose-600" },
@@ -265,7 +246,8 @@ export function KaraokeMusicBoard({
     if (/^[a-zA-Z0-9_-]{11}$/.test(t)) return t;
     try {
       const u = new URL(t);
-      if (u.hostname.includes("youtu.be")) return u.pathname.replace(/^\//, "").slice(0, 11) || null;
+      if (u.hostname.includes("youtu.be"))
+        return u.pathname.replace(/^\//, "").slice(0, 11) || null;
       const v = u.searchParams.get("v");
       if (v) return v.slice(0, 11);
       const parts = u.pathname.split("/").filter(Boolean);
@@ -321,7 +303,9 @@ export function KaraokeMusicBoard({
           setOpen(true);
         }}
         aria-label="Open music machine"
-        style={{ top: "calc(env(safe-area-inset-top, 0px) + 4.5rem)" }}
+        // Anchored bottom-left (was top-left) so the pulsing reopen pill no
+        // longer overlaps the waiting-list panel in the top-left corner.
+        style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 1rem)" }}
         className="group fixed left-4 z-50 inline-flex items-center gap-2 rounded-full border border-gold/60 bg-background/80 px-3 py-1.5 text-[11px] font-semibold text-gold shadow-gold backdrop-blur transition hover:bg-gold/10 relative"
       >
         {/* Pulsing rings — pure CSS, no extra deps */}
@@ -351,7 +335,6 @@ export function KaraokeMusicBoard({
     : activeQuery
       ? `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(activeQuery)}&${ytParams}`
       : null;
-
 
   function handleStop() {
     postToPlayer("stopVideo");
@@ -509,15 +492,14 @@ export function KaraokeMusicBoard({
         </div>
       )}
 
-
       {/* Mobile-only one-time hint overlay */}
       {showHint && (
         <div className="border-b border-gold/20 bg-gradient-to-b from-gold/15 to-transparent p-2 text-[10px] text-gold sm:hidden">
           <div className="flex items-start justify-between gap-2">
             <p className="leading-snug">
-              <strong>Music Machine tips:</strong> tap a song or pad to play ·
-              use Pause / Stop above the screen · tap the Mic button to be
-              heard by the room · drag the top bar to move · × closes.
+              <strong>Music Machine tips:</strong> tap a song or pad to play · use Pause / Stop
+              above the screen · tap the Mic button to be heard by the room · drag the top bar to
+              move · × closes.
             </p>
             <button
               type="button"
@@ -529,7 +511,6 @@ export function KaraokeMusicBoard({
           </div>
         </div>
       )}
-
 
       {/* Everything below collapses while the video is actively playing */}
       {!minimized && (
@@ -568,7 +549,12 @@ export function KaraokeMusicBoard({
                 disabled={!isMyTurn || !query.trim() || searching}
                 className="inline-flex items-center gap-0.5 rounded-sm bg-gradient-gold px-1.5 py-1 text-[8px] font-semibold text-gold-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                {searching ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Search className="h-2.5 w-2.5" />} Find
+                {searching ? (
+                  <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                ) : (
+                  <Search className="h-2.5 w-2.5" />
+                )}{" "}
+                Find
               </button>
             </div>
 

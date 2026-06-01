@@ -25,7 +25,6 @@ import { toast } from "sonner";
 import {
   AlertTriangle,
   Check,
-  ChevronDown,
   ChevronUp,
   Loader2,
   Lock,
@@ -1178,76 +1177,13 @@ function BottomBarShell({
   controls: React.ReactNode;
   participants?: number;
 }) {
-  // The "Room Settings" label used to be static. Now it's a toggle: click it
-  // (or its chevron) to reveal a small help panel above the bar explaining
-  // what each control does. Closed by default so the bar stays compact.
-  const [settingsOpen, setSettingsOpen] = useState(false);
-
+  // The read-only "Room Settings" help toggle was removed — it conveyed no
+  // actionable settings and ate horizontal space. The dock now spreads the
+  // live controls evenly across its width, with Leave Room pinned at the end.
   return (
     <div className="relative">
-      {settingsOpen && (
-        <div className="absolute bottom-full left-0 right-0 border-t border-border/60 bg-background/95 px-3 py-3 backdrop-blur sm:px-6">
-          <div className="flex items-start justify-between gap-3">
-            <div className="text-[11px] text-muted-foreground font-sans-display">
-              <p className="mb-1 font-semibold uppercase tracking-widest text-foreground">
-                What you can do here
-              </p>
-              <ul className="space-y-1">
-                <li>
-                  <strong className="text-foreground">Mic</strong> · mute or un-mute yourself. Use
-                  the caret to switch microphones.
-                </li>
-                <li>
-                  <strong className="text-foreground">Cam</strong> · turn your camera on or off. The
-                  caret lets you pick a webcam.
-                </li>
-                <li>
-                  <strong className="text-foreground">Screen</strong> · share a window or your full
-                  screen with the room.
-                </li>
-                <li>
-                  <strong className="text-foreground">Chat</strong> · open the in-room chat thread.
-                </li>
-                <li>
-                  <strong className="text-foreground">Participants</strong> · see everyone in the
-                  room.
-                </li>
-                <li>
-                  <strong className="text-foreground">Leave Room</strong> · disconnect and return to
-                  the room list.
-                </li>
-              </ul>
-            </div>
-            <button
-              type="button"
-              onClick={() => setSettingsOpen(false)}
-              aria-label="Close room settings"
-              className="rounded-md border border-border bg-secondary/40 px-2 py-1 text-[10px] uppercase tracking-widest text-muted-foreground transition hover:bg-secondary"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-3 sm:px-6">
-        <button
-          type="button"
-          onClick={() => setSettingsOpen((v) => !v)}
-          aria-expanded={settingsOpen}
-          aria-label="Toggle room settings help"
-          className="inline-flex items-center gap-2 rounded-md px-1.5 py-1 text-[11px] uppercase tracking-widest text-muted-foreground transition hover:bg-secondary/40 hover:text-foreground"
-        >
-          <Lock className="h-3.5 w-3.5" />
-          <span>Room Settings</span>
-          {settingsOpen ? (
-            <ChevronDown className="h-3.5 w-3.5" />
-          ) : (
-            <ChevronUp className="h-3.5 w-3.5" />
-          )}
-        </button>
-
-        <div className="flex flex-1 items-center justify-center gap-3 sm:gap-5">{controls}</div>
+      <div className="flex flex-wrap items-center gap-3 px-3 py-3 sm:px-6">
+        <div className="flex flex-1 items-center justify-evenly gap-2 sm:gap-4">{controls}</div>
 
         <div className="flex items-center gap-2">
           {typeof participants === "number" && (

@@ -237,6 +237,25 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
     await supabase.from("karaoke_queue").delete().eq("room_id", roomId).eq("user_id", user.id);
   }
 
+  // Presence: drop the user from the waiting list the moment they leave the
+  // room — whether by navigating away (component unmounts) or closing/hiding
+  // the tab (pagehide). Without this, a departed user lingers in everyone
+  // else's waiting list until they manually hit "Leave line".
+  const userIdRef = useRef<string | null>(user?.id ?? null);
+  userIdRef.current = user?.id ?? null;
+  useEffect(() => {
+    function removeSelfFromQueue() {
+      const uid = userIdRef.current;
+      if (!uid) return;
+      void supabase.from("karaoke_queue").delete().eq("room_id", roomId).eq("user_id", uid);
+    }
+    window.addEventListener("pagehide", removeSelfFromQueue);
+    return () => {
+      window.removeEventListener("pagehide", removeSelfFromQueue);
+      removeSelfFromQueue();
+    };
+  }, [roomId]);
+
   const performerProfile = effectivePerformerId ? profiles[effectivePerformerId] : null;
   const performerName =
     performerProfile?.username ?? short(performerProfile?.wallet_address) ?? "—";
@@ -293,7 +312,9 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
   // now that the dedicated "Show all panels" button has been removed in
   // favour of the Participants pill.
   useEffect(() => {
-    function onReq() { resetAllPanels(); }
+    function onReq() {
+      resetAllPanels();
+    }
     window.addEventListener("karaoke:request-reset-panels", onReq);
     return () => window.removeEventListener("karaoke:request-reset-panels", onReq);
   }, [resetAllPanels]);
@@ -338,70 +359,66 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
           <span className="font-display text-[10px] uppercase tracking-[0.25em]">On stage</span>
         </div>
         <div className="p-3 pt-2">
-        <div className="mt-1 truncate text-sm font-semibold text-foreground">
-          {effectivePerformerId ? performerName : "Nobody — first in line goes up"}
-          {bookingHostUserId && (
-            <span className="ml-1 rounded-sm bg-gold/15 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wider text-gold">
-              Booked
-            </span>
+          <div className="mt-1 truncate text-sm font-semibold text-foreground">
+            {effectivePerformerId ? performerName : "Nobody — first in line goes up"}
+            {bookingHostUserId && (
+              <span className="ml-1 rounded-sm bg-gold/15 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wider text-gold">
+                Booked
+              </span>
+            )}
+          </div>
+
+          {!bookingHostUserId && (
+            <>
+              <div className="mt-3 flex items-center justify-between">
+                <div className="flex items-center gap-1 text-gold/80">
+                  <Users className="h-3 w-3" />
+                  <span className="text-[10px] uppercase tracking-wider">
+                    Waiting · {queue.length}
+                  </span>
+                </div>
+                {meInQueue ? (
+                  <button
+                    type="button"
+                    onClick={leaveLine}
+                    className="rounded-sm border border-rose-400/40 bg-rose-400/10 px-2 py-0.5 text-[10px] font-semibold text-rose-300 hover:bg-rose-400/20"
+                  >
+                    Leave line
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={!user || isMyTurn}
+                    onClick={joinLine}
+                    className="rounded-sm bg-gradient-gold px-2 py-0.5 text-[10px] font-semibold text-gold-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Join line
+                  </button>
+                )}
+              </div>
+              {queue.length > 0 && (
+                <ol className="mt-2 space-y-0.5 text-[11px] text-muted-foreground">
+                  {queue.slice(0, 6).map((q, i) => {
+                    const p = profiles[q.user_id];
+                    const name = p?.username ?? short(p?.wallet_address) ?? q.user_id.slice(0, 6);
+                    return (
+                      <li key={q.id} className="flex justify-between">
+                        <span>
+                          {i + 1}. {name}
+                        </span>
+                        {user?.id === q.user_id && <span className="text-gold/70">you</span>}
+                      </li>
+                    );
+                  })}
+                </ol>
+              )}
+              <p className="mt-2 text-[10px] leading-snug text-muted-foreground">
+                One song per turn. The line auto-advances when the performer ends their song.
+              </p>
+            </>
           )}
         </div>
-
-
-        {!bookingHostUserId && (
-          <>
-            <div className="mt-3 flex items-center justify-between">
-              <div className="flex items-center gap-1 text-gold/80">
-                <Users className="h-3 w-3" />
-                <span className="text-[10px] uppercase tracking-wider">
-                  Waiting · {queue.length}
-                </span>
-              </div>
-              {meInQueue ? (
-                <button
-                  type="button"
-                  onClick={leaveLine}
-                  className="rounded-sm border border-rose-400/40 bg-rose-400/10 px-2 py-0.5 text-[10px] font-semibold text-rose-300 hover:bg-rose-400/20"
-                >
-                  Leave line
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  disabled={!user || isMyTurn}
-                  onClick={joinLine}
-                  className="rounded-sm bg-gradient-gold px-2 py-0.5 text-[10px] font-semibold text-gold-foreground disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  Join line
-                </button>
-              )}
-            </div>
-            {queue.length > 0 && (
-              <ol className="mt-2 space-y-0.5 text-[11px] text-muted-foreground">
-                {queue.slice(0, 6).map((q, i) => {
-                  const p = profiles[q.user_id];
-                  const name = p?.username ?? short(p?.wallet_address) ?? q.user_id.slice(0, 6);
-                  return (
-                    <li key={q.id} className="flex justify-between">
-                      <span>
-                        {i + 1}. {name}
-                      </span>
-                      {user?.id === q.user_id && (
-                        <span className="text-gold/70">you</span>
-                      )}
-                    </li>
-                  );
-                })}
-              </ol>
-            )}
-            <p className="mt-2 text-[10px] leading-snug text-muted-foreground">
-              One song per turn. The line auto-advances when the performer ends their song.
-            </p>
-          </>
-        )}
-        </div>
       </div>
-
 
       <KaraokeMusicBoard
         isMyTurn={isMyTurn}

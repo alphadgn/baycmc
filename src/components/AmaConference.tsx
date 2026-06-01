@@ -327,7 +327,9 @@ function HostTile({
   if (!participant) {
     const wallStyle = backgroundImage
       ? {
-          backgroundImage: `linear-gradient(rgba(8,8,12,0.55), rgba(8,8,12,0.85)), url(${backgroundImage})`,
+          // Lighter vignette (was 0.55→0.85) so the room scene reads through
+          // and feels like a lit room rather than a dark stage.
+          backgroundImage: `linear-gradient(rgba(8,8,12,0.30), rgba(8,8,12,0.55)), url(${backgroundImage})`,
           backgroundSize: "cover",
           backgroundPosition: "center",
         }
