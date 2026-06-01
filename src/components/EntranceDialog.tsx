@@ -16,6 +16,8 @@ import { toast } from "sonner";
 import { useGlyphReady } from "@/components/GlyphAppProvider";
 import { EmbroideredImage } from "@/components/EmbroideredImage";
 import { importWithRetry } from "@/lib/import-with-retry";
+import { useAuth } from "@/lib/auth/useAuth";
+import { useGlyphAuthState } from "@/lib/auth/useGlyphBridge";
 
 interface EntranceDialogProps {
   open: boolean;
@@ -105,12 +107,15 @@ function EntranceModalWithHooks({
 }) {
   const { connect } = hooks.useNativeGlyphConnection();
   const { isConnected } = hooks.useAccount();
+  const { isAuthenticated } = useAuth();
+  const { verifying } = useGlyphAuthState();
 
-  // Already connected → nothing to do; the bridge handles the Supabase
-  // session. Close the modal so it doesn't linger.
+  // Close once the Supabase session exists (sign-in complete). We intentionally
+  // keep the modal open after the wallet merely connects so the user can tap
+  // "Sign to enter" — the wallet signing popup can only open from that tap.
   useEffect(() => {
-    if (isConnected) onOpenChange(false);
-  }, [isConnected, onOpenChange]);
+    if (isAuthenticated) onOpenChange(false);
+  }, [isAuthenticated, onOpenChange]);
 
   return (
     <EntranceModalShell
@@ -118,6 +123,7 @@ function EntranceModalWithHooks({
       ready
       connect={connect}
       isConnected={isConnected}
+      verifying={verifying}
     />
   );
 }
@@ -127,14 +133,26 @@ function EntranceModalShell({
   ready,
   connect,
   isConnected,
+  verifying = false,
 }: {
   onOpenChange: (open: boolean) => void;
   ready: boolean;
   connect: (() => void) | null;
   isConnected: boolean;
+  verifying?: boolean;
 }) {
   const [connecting, setConnecting] = useState(false);
   const canConnect = ready && !!connect && !isConnected;
+  // Two phases: connect the wallet, then sign one message to enter. Once the
+  // wallet is connected the modal switches to the sign step.
+  const phase: "connect" | "sign" = isConnected ? "sign" : "connect";
+
+  // Fire the SIWE signature inside this click. dispatchEvent runs the bridge's
+  // listener synchronously, so signMessage is reached within the user gesture
+  // and the wallet's signing popup is allowed to open.
+  function handleSign() {
+    window.dispatchEvent(new Event("baycmc:wallet-verify"));
+  }
 
   // Escape closes the modal.
   useEffect(() => {
@@ -214,28 +232,46 @@ function EntranceModalShell({
           VIP Entrance
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          Connect your wallet with Glyph to verify your Bored or Mutant Ape and unlock the
-          clubhouse. You'll be asked to sign one message — no gas, no transaction.
+          {phase === "sign"
+            ? "Wallet connected. Tap “Sign to enter” and approve the one-tap message to verify holdings — no gas, no transaction."
+            : "Connect your Glyph wallet to verify holdings for access into gated areas of the BAYCmc. No gas, no transaction."}
         </p>
 
-        <button
-          type="button"
-          disabled={!canConnect || connecting}
-          onClick={handleConnect}
-          className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-md bg-gradient-gold px-4 py-2.5 text-sm font-semibold text-gold-foreground shadow-gold transition hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
-        >
-          {!ready ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" /> Loading wallet…
-            </>
-          ) : connecting ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" /> Look for the popup…
-            </>
-          ) : (
-            "Connect wallet"
-          )}
-        </button>
+        {phase === "sign" ? (
+          <button
+            type="button"
+            disabled={verifying}
+            onClick={handleSign}
+            className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-md bg-gradient-gold px-4 py-2.5 text-sm font-semibold text-gold-foreground shadow-gold transition hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
+          >
+            {verifying ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" /> Signing…
+              </>
+            ) : (
+              "Sign to enter"
+            )}
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled={!canConnect || connecting}
+            onClick={handleConnect}
+            className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-md bg-gradient-gold px-4 py-2.5 text-sm font-semibold text-gold-foreground shadow-gold transition hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
+          >
+            {!ready ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" /> Loading wallet…
+              </>
+            ) : connecting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" /> Look for the popup…
+              </>
+            ) : (
+              "Connect wallet"
+            )}
+          </button>
+        )}
 
         <p className="mt-3 text-center text-[11px] text-muted-foreground">
           Powered by Glyph · ApeChain

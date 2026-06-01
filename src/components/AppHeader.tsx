@@ -355,10 +355,10 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
   if (authLoading) return <div className="h-9 w-24" aria-hidden />;
 
   if (glyph.authenticated && glyph.address) {
-    // Glyph connected; the bridge auto-pops SIWE now, so we don't need a
-    // standalone "Verify" CTA here. Render the calm sliced-address pill —
-    // matches the look users see in the lobby. The whole pill stays
-    // clickable so a user who rejected the Glyph signing modal can retry.
+    // Wallet connected but not yet signed in to Supabase. The signing popup
+    // can only open from a user gesture, so this is a deliberate "Sign to
+    // enter" tap: clicking dispatches the verify event, whose listener calls
+    // signMessage synchronously inside this click.
     return (
       <button
         type="button"
@@ -366,12 +366,21 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
         onClick={() => {
           window.dispatchEvent(new Event("baycmc:wallet-verify"));
         }}
-        className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-full border border-gold/30 bg-secondary/40 px-2.5 pr-3 font-mono text-xs text-foreground transition hover:border-gold/60 hover:bg-secondary/70 disabled:cursor-wait disabled:opacity-70"
-        title={verifying ? "Signing in…" : glyph.address}
-        aria-label={`Wallet ${glyph.address}${verifying ? " — signing in" : ""}`}
+        className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-full border border-gold/40 bg-gold/10 px-3 text-xs font-semibold text-gold transition hover:border-gold/70 hover:bg-gold/20 disabled:cursor-wait disabled:opacity-70"
+        title={verifying ? "Signing in…" : `Sign to enter (${sliceAddress(glyph.address)})`}
+        aria-label={
+          verifying
+            ? `Signing in with wallet ${sliceAddress(glyph.address)}`
+            : `Sign to enter with wallet ${sliceAddress(glyph.address)}`
+        }
       >
-        {verifying ? <Loader2 className="h-3.5 w-3.5 animate-spin text-gold/70" /> : null}
-        <span className="tabular-nums">{sliceAddress(glyph.address)}</span>
+        {verifying ? (
+          <>
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-gold/70" /> Signing…
+          </>
+        ) : (
+          "Sign to enter"
+        )}
       </button>
     );
   }
