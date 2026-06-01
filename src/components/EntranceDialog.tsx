@@ -214,8 +214,8 @@ function EntranceModalShell({
           VIP Entrance
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          Connect your wallet with Glyph to verify your Bored or Mutant Ape and unlock the
-          clubhouse. You'll be asked to sign one message — no gas, no transaction.
+          Connect your Glyph wallet to verify holdings for access into gated areas of the
+          BAYCmc. No gas, no transaction.
         </p>
 
         <button
