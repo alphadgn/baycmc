@@ -4,11 +4,16 @@ import { importWithRetry } from "@/lib/import-with-retry";
 /**
  * Glyph wallet provider (replaces the old Privy + Reown AppKit stack).
  *
- * Glyph (@use-glyph/sdk-react, by Yuga Labs) is itself built on a hosted
- * Privy "cross-app" wallet, so we use its PRIVY strategy: Glyph manages its
- * own Privy app, embedded wallet and social/login UX. There is no app-id to
- * configure on our side (the SDK bakes in GLYPH_PRIVY_APP_ID), which is why
- * the old `getPrivyPublicConfig` server fn is gone.
+ * We mount Glyph's all-in-one <GlyphWalletProvider> (the Glyph Global Wallet,
+ * @use-glyph/sdk-react by Yuga Labs). It internally sets up the WagmiProvider
+ * + QueryClientProvider + GlyphProvider that useGlyph() depends on — mounting
+ * the bare <GlyphProvider> instead throws "WagmiProviderNotFoundError: useConfig
+ * must be used within WagmiProvider" because it expects a wagmi config above it.
+ *
+ * `askForSignature={false}`: Glyph would otherwise pop its OWN login signature
+ * prompt, and our bridge already pops a single SIWE signature for the Supabase
+ * session (see useGlyphBridge.tsx). Disabling Glyph's keeps it to one prompt —
+ * Glyph just connects the wallet, our bridge does the SIWE.
  *
  * AUTH MODEL (unchanged): Glyph proves *who* you are (a connected EVM
  * wallet); Supabase Auth holds the session; on-chain BAYC/MAYC ownership
@@ -17,10 +22,10 @@ import { importWithRetry } from "@/lib/import-with-retry";
  */
 
 /**
- * `true` only when <GlyphProvider> is actually mounted above this subtree.
- * Children that call useGlyph() MUST gate on this — calling the hook before
- * the provider mounts throws ("useGlyph must be used within a GlyphProvider")
- * and kills the calling component (e.g. the Entrance button handler).
+ * `true` only when <GlyphWalletProvider> is actually mounted above this
+ * subtree. Children that call useGlyph() MUST gate on this — calling the hook
+ * before the provider mounts throws ("useGlyph must be used within a
+ * GlyphProvider") and kills the calling component (e.g. the Entrance handler).
  */
 const GlyphReadyContext = createContext(false);
 export function useGlyphReady(): boolean {
@@ -51,8 +56,7 @@ class GlyphMountBoundary extends Component<
 
 type GlyphModule = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  GlyphProvider: any;
-  StrategyType: { PRIVY: string; EIP1193: string };
+  GlyphWalletProvider: any;
 };
 
 /**
@@ -92,15 +96,15 @@ export function GlyphAppProvider({ children }: { children: ReactNode }) {
     return <GlyphReadyContext.Provider value={false}>{children}</GlyphReadyContext.Provider>;
   }
 
-  const { GlyphProvider, StrategyType } = mod;
+  const { GlyphWalletProvider } = mod;
 
   return (
     <GlyphMountBoundary
       fallback={<GlyphReadyContext.Provider value={false}>{children}</GlyphReadyContext.Provider>}
     >
-      <GlyphProvider strategy={StrategyType.PRIVY}>
+      <GlyphWalletProvider askForSignature={false}>
         <GlyphReadyContext.Provider value={true}>{children}</GlyphReadyContext.Provider>
-      </GlyphProvider>
+      </GlyphWalletProvider>
     </GlyphMountBoundary>
   );
 }

@@ -2,14 +2,15 @@
  * Entrance trigger.
  *
  * No dialog, no Tokenproof, no localStorage cache. The "VIP" / Entrance button
- * in the header opens Glyph's own login modal directly. After Glyph login,
- * <GlyphBridge> (mounted at the root) signs the user into Supabase by
- * verifying on-chain BAYC/MAYC ownership via a SIWE signature.
+ * in the header opens Glyph's connect popup directly (the Glyph Global Wallet,
+ * via wagmi). After the wallet connects, <GlyphBridge> (mounted at the root)
+ * signs the user into Supabase by verifying on-chain BAYC/MAYC ownership via a
+ * single SIWE signature.
  *
  * This file is kept as a named export `EntranceDialog` so AppHeader's existing
  * import keeps working with no further wiring. The `open` prop is the trigger:
- * when it flips to `true`, we call Glyph's `login()` and immediately set it
- * back to `false` so re-clicks always re-open the modal.
+ * when it flips to `true`, we call Glyph's `connect()` and immediately set it
+ * back to `false` so re-clicks always re-open the popup.
  */
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -21,12 +22,14 @@ interface EntranceDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-type GlyphHookValue = {
-  ready: boolean;
-  authenticated: boolean;
-  login: () => void;
+type GlyphConnection = { connect: () => void; disconnect: () => void };
+type UseNativeGlyphConnection = () => GlyphConnection;
+type AccountValue = { isConnected: boolean };
+type UseAccount = () => AccountValue;
+type EntranceHooks = {
+  useNativeGlyphConnection: UseNativeGlyphConnection;
+  useAccount: UseAccount;
 };
-type UseGlyph = () => GlyphHookValue;
 
 function isFrameAncestorBlocked(error: unknown) {
   const message = error instanceof Error ? error.message : String(error ?? "");
@@ -35,21 +38,28 @@ function isFrameAncestorBlocked(error: unknown) {
 
 export function EntranceDialog({ open, onOpenChange }: EntranceDialogProps) {
   const glyphReady = useGlyphReady();
-  const [useGlyph, setUseGlyph] = useState<UseGlyph | null>(null);
+  const [hooks, setHooks] = useState<EntranceHooks | null>(null);
   const triggeredRef = useRef(false);
 
-  // Lazy-load the useGlyph hook (SSR-unsafe SDK). Only after the GlyphProvider
-  // has actually mounted — calling useGlyph outside it throws.
+  // Lazy-load the Glyph + wagmi hooks (SSR-unsafe SDK). Only after the
+  // GlyphWalletProvider has actually mounted — calling these outside it throws.
   useEffect(() => {
     if (!glyphReady) return;
     let cancelled = false;
     void (async () => {
       try {
-        const mod = await importWithRetry(() => import("@use-glyph/sdk-react"), {
-          label: "glyph-sdk-react-entrance",
-        });
+        const [glyphMod, wagmiMod] = await Promise.all([
+          importWithRetry(() => import("@use-glyph/sdk-react"), {
+            label: "glyph-sdk-react-entrance",
+          }),
+          importWithRetry(() => import("wagmi"), { label: "wagmi-entrance" }),
+        ]);
         if (cancelled) return;
-        setUseGlyph(() => mod.useGlyph as unknown as UseGlyph);
+        setHooks(() => ({
+          useNativeGlyphConnection:
+            glyphMod.useNativeGlyphConnection as unknown as UseNativeGlyphConnection,
+          useAccount: wagmiMod.useAccount as unknown as UseAccount,
+        }));
       } catch {
         /* provider boundary already renders children without Glyph */
       }
@@ -59,16 +69,11 @@ export function EntranceDialog({ open, onOpenChange }: EntranceDialogProps) {
     };
   }, [glyphReady]);
 
-  if (!glyphReady || !useGlyph) {
+  if (!glyphReady || !hooks) {
     return <NoHooksTrigger open={open} onOpenChange={onOpenChange} ready={glyphReady} />;
   }
   return (
-    <WithHooks
-      open={open}
-      onOpenChange={onOpenChange}
-      useGlyph={useGlyph}
-      triggeredRef={triggeredRef}
-    />
+    <WithHooks open={open} onOpenChange={onOpenChange} hooks={hooks} triggeredRef={triggeredRef} />
   );
 }
 
@@ -81,9 +86,9 @@ function NoHooksTrigger({
   onOpenChange: (open: boolean) => void;
   ready: boolean;
 }) {
-  // Queue the intent: keep `open=true` until the hook arrives, then
-  // <WithHooks> picks it up and calls login(). If the provider never became
-  // ready, the boundary has already degraded — surface a gentle message.
+  // Queue the intent: keep `open=true` until the hooks arrive, then <WithHooks>
+  // picks it up and calls connect(). If the provider never became ready, the
+  // boundary has already degraded — surface a gentle message.
   useEffect(() => {
     if (!open) return;
     if (ready) return;
@@ -99,15 +104,16 @@ function NoHooksTrigger({
 function WithHooks({
   open,
   onOpenChange,
-  useGlyph,
+  hooks,
   triggeredRef,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  useGlyph: UseGlyph;
+  hooks: EntranceHooks;
   triggeredRef: React.MutableRefObject<boolean>;
 }) {
-  const { ready, authenticated, login } = useGlyph();
+  const { connect } = hooks.useNativeGlyphConnection();
+  const { isConnected } = hooks.useAccount();
 
   useEffect(() => {
     if (!open) {
@@ -115,30 +121,29 @@ function WithHooks({
       return;
     }
     if (triggeredRef.current) return;
-    if (!ready) return;
     triggeredRef.current = true;
-    if (authenticated) {
-      // Already connected to Glyph — the bridge handles the Supabase session.
+    if (isConnected) {
+      // Wallet already connected — the bridge handles the Supabase session.
       onOpenChange(false);
       return;
     }
     try {
-      login();
+      connect();
     } catch (e) {
-      console.warn("[EntranceDialog] Glyph login() threw:", e);
+      console.warn("[EntranceDialog] Glyph connect() threw:", e);
       if (isFrameAncestorBlocked(e)) {
         toast.error("Wallet sign-in is blocked inside this embedded preview.", {
           description: "Open the preview in a new tab or use the published app to continue.",
           duration: 7000,
         });
       } else {
-        toast.error("Couldn't open the wallet sign-in modal.");
+        toast.error("Couldn't open the wallet sign-in popup.");
       }
       triggeredRef.current = false;
     } finally {
       onOpenChange(false);
     }
-  }, [open, ready, authenticated, login, onOpenChange, triggeredRef]);
+  }, [open, isConnected, connect, onOpenChange, triggeredRef]);
 
   return null;
 }

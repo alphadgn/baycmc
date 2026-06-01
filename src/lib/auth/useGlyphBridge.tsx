@@ -168,22 +168,38 @@ function isChunkLoadError(error: unknown): boolean {
   );
 }
 
-/** The subset of the useGlyph() hook return that the bridge depends on. */
+/**
+ * The bridge consumes two hooks (both valid inside <GlyphWalletProvider>,
+ * which sets up WagmiProvider + the Glyph context):
+ *
+ *  - wagmi's `useAccount()` for the connected wallet address + connection
+ *    state. In Glyph's EIP1193 "Global Wallet" strategy the address comes from
+ *    wagmi — `useGlyph().user` is only populated after the optional Glyph
+ *    *widget* login, which we don't use (we do our own SIWE for Supabase).
+ *  - `useGlyph()` for `signMessage` (works as soon as the wallet is connected)
+ *    and `logout`.
+ */
 type GlyphHookValue = {
-  ready: boolean;
-  authenticated: boolean;
-  user: { evmWallet?: string | null } | null;
   logout: () => void;
   signMessage: (params: { message: string }) => Promise<string>;
 };
 type UseGlyph = () => GlyphHookValue;
+type AccountValue = { address?: string | null; isConnected: boolean };
+type UseAccount = () => AccountValue;
 
-export function GlyphBridge({ useGlyph }: { useGlyph: UseGlyph }) {
-  const { ready, authenticated, user, logout, signMessage } = useGlyph();
+export function GlyphBridge({
+  useGlyph,
+  useAccount,
+}: {
+  useGlyph: UseGlyph;
+  useAccount: UseAccount;
+}) {
+  const { logout, signMessage } = useGlyph();
+  const { address: wagmiAddress, isConnected } = useAccount();
   const verifyFn = useServerFn(verifyOwnership);
   const [retryNonce, setRetryNonce] = useState(0);
 
-  const address = user?.evmWallet ?? null;
+  const address = isConnected ? (wagmiAddress ?? null) : null;
 
   // signMessage/verifyFn/logout are new refs every render — store them in
   // refs so we call the latest version inside the effect without putting them
@@ -257,10 +273,9 @@ export function GlyphBridge({ useGlyph }: { useGlyph: UseGlyph }) {
   }, []);
 
   useEffect(() => {
-    if (!ready || !authenticated || !address) {
-      logEvent("auth", "debug", "bridge gate: not ready", {
-        ready,
-        authenticated,
+    if (!address) {
+      logEvent("auth", "debug", "bridge gate: no connected wallet", {
+        isConnected,
         hasAddress: !!address,
       });
       return;
@@ -421,44 +436,53 @@ export function GlyphBridge({ useGlyph }: { useGlyph: UseGlyph }) {
         patchGlyphSnapshot({ verifying: false });
       }
     })();
-  }, [ready, authenticated, address, retryNonce]);
+  }, [address, retryNonce]);
 
   // Publish the latest snapshot to the module-level store. `verifying` is
-  // owned by the verify effect — patch the other fields only.
+  // owned by the verify effect — patch the other fields only. The provider is
+  // mounted by the time this component renders, so `ready` is always true here;
+  // `authenticated` tracks wallet connection.
   useEffect(() => {
     patchGlyphSnapshot({
-      ready: !!ready,
-      authenticated: !!authenticated,
-      address: authenticated ? address : null,
+      ready: true,
+      authenticated: isConnected,
+      address,
     });
-  }, [ready, authenticated, address]);
+  }, [isConnected, address]);
 
   return null;
 }
 
 /**
- * Lazy loader: dynamic-imports @use-glyph/sdk-react (SSR-unsafe) and mounts
- * <GlyphBridge> once the Glyph provider is ready and the useGlyph hook is
- * available.
+ * Lazy loader: dynamic-imports @use-glyph/sdk-react + wagmi (both SSR-unsafe to
+ * import eagerly) and mounts <GlyphBridge> once the Glyph provider is ready and
+ * the hooks are available. wagmi's useAccount reads the WagmiProvider that
+ * <GlyphWalletProvider> sets up, so both hooks resolve the same wallet.
  */
 export function GlyphBridgeMount() {
   const glyphReady = useGlyphReady();
-  const [useGlyph, setUseGlyph] = useState<UseGlyph | null>(null);
+  const [hooks, setHooks] = useState<{ useGlyph: UseGlyph; useAccount: UseAccount } | null>(null);
 
   useEffect(() => {
     if (!glyphReady) return;
     let cancelled = false;
     void (async () => {
       try {
-        const mod = await importWithRetry(() => import("@use-glyph/sdk-react"), {
-          label: "glyph-sdk-react-bridge",
-        });
+        const [glyphMod, wagmiMod] = await Promise.all([
+          importWithRetry(() => import("@use-glyph/sdk-react"), {
+            label: "glyph-sdk-react-bridge",
+          }),
+          importWithRetry(() => import("wagmi"), { label: "wagmi-bridge" }),
+        ]);
         if (cancelled) return;
-        // Store the hook function itself; wrap in a fn so React's setState
-        // doesn't invoke it as an updater.
-        setUseGlyph(() => mod.useGlyph as unknown as UseGlyph);
+        // Store the hook functions; wrap in a fn so React's setState doesn't
+        // invoke them as updaters.
+        setHooks(() => ({
+          useGlyph: glyphMod.useGlyph as unknown as UseGlyph,
+          useAccount: wagmiMod.useAccount as unknown as UseAccount,
+        }));
       } catch (e) {
-        console.warn("[GlyphBridgeMount] failed to load Glyph hooks:", e);
+        console.warn("[GlyphBridgeMount] failed to load wallet hooks:", e);
       }
     })();
     return () => {
@@ -466,6 +490,6 @@ export function GlyphBridgeMount() {
     };
   }, [glyphReady]);
 
-  if (!glyphReady || !useGlyph) return null;
-  return <GlyphBridge useGlyph={useGlyph} />;
+  if (!glyphReady || !hooks) return null;
+  return <GlyphBridge useGlyph={hooks.useGlyph} useAccount={hooks.useAccount} />;
 }
