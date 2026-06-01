@@ -9,7 +9,7 @@ interface WalletPillProps {
   address: string;
   collection: "BAYC" | "MAYC" | null;
   /** Lobby users (Tier 1) get a "Verify holder access" dropdown item that
-   *  triggers a fresh Privy signature + on-chain ownership check. */
+   *  triggers a fresh Glyph signature + on-chain ownership check. */
   isVerifiedHolder?: boolean;
   onVerify?: () => void;
   verifying?: boolean;

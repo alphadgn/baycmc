@@ -1,21 +1,19 @@
 /**
  * Entrance trigger.
  *
- * No dialog, no Tokenproof, no localStorage cache. The "Entrance" button
- * in the header opens Privy's own modal directly. After Privy login,
- * `PrivyBridge` (mounted at the root) signs the user into Supabase by
- * verifying on-chain BAYC/MAYC ownership.
+ * No dialog, no Tokenproof, no localStorage cache. The "VIP" / Entrance button
+ * in the header opens Glyph's own login modal directly. After Glyph login,
+ * <GlyphBridge> (mounted at the root) signs the user into Supabase by
+ * verifying on-chain BAYC/MAYC ownership via a SIWE signature.
  *
- * This file is kept as a named export `EntranceDialog` so AppHeader's
- * existing import keeps working with no further wiring. The `open` prop
- * is the trigger: when it flips to `true`, we call Privy's `login()` and
- * immediately set it back to `false` so re-clicks always re-open the modal.
+ * This file is kept as a named export `EntranceDialog` so AppHeader's existing
+ * import keeps working with no further wiring. The `open` prop is the trigger:
+ * when it flips to `true`, we call Glyph's `login()` and immediately set it
+ * back to `false` so re-clicks always re-open the modal.
  */
 import { useEffect, useRef, useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { getPrivyPublicConfig } from "@/server/privy.functions";
-import { usePrivyReady } from "@/components/PrivyAppProvider";
+import { useGlyphReady } from "@/components/GlyphAppProvider";
 import { importWithRetry } from "@/lib/import-with-retry";
 
 interface EntranceDialogProps {
@@ -23,13 +21,12 @@ interface EntranceDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-type PrivyHooks = {
-  usePrivy: () => {
-    ready: boolean;
-    authenticated: boolean;
-    login: () => void;
-  };
+type GlyphHookValue = {
+  ready: boolean;
+  authenticated: boolean;
+  login: () => void;
 };
+type UseGlyph = () => GlyphHookValue;
 
 function isFrameAncestorBlocked(error: unknown) {
   const message = error instanceof Error ? error.message : String(error ?? "");
@@ -37,80 +34,39 @@ function isFrameAncestorBlocked(error: unknown) {
 }
 
 export function EntranceDialog({ open, onOpenChange }: EntranceDialogProps) {
-  const privyReady = usePrivyReady();
-  const [hooks, setHooks] = useState<PrivyHooks | null>(null);
-  const [configured, setConfigured] = useState<boolean | null>(null);
-  const fetchConfig = useServerFn(getPrivyPublicConfig);
+  const glyphReady = useGlyphReady();
+  const [useGlyph, setUseGlyph] = useState<UseGlyph | null>(null);
   const triggeredRef = useRef(false);
 
-  // Lazy-load Privy hooks (SSR-unsafe SDK). Only after the PrivyProvider
-  // has actually mounted — calling usePrivy outside it throws.
+  // Lazy-load the useGlyph hook (SSR-unsafe SDK). Only after the GlyphProvider
+  // has actually mounted — calling useGlyph outside it throws.
   useEffect(() => {
-    if (!privyReady) return;
+    if (!glyphReady) return;
     let cancelled = false;
     void (async () => {
       try {
-        const cfg = await fetchConfig();
-        if (cancelled) return;
-        const id = (cfg.appId ?? "").trim();
-        const valid =
-          cfg.configured && id.length >= 20 && id.length <= 40 && /^[a-z0-9]+$/i.test(id);
-        setConfigured(valid);
-        if (!valid) return;
-        const mod = await importWithRetry(() => import("@privy-io/react-auth"), {
-          label: "privy-react-auth-entrance",
+        const mod = await importWithRetry(() => import("@use-glyph/sdk-react"), {
+          label: "glyph-sdk-react-entrance",
         });
         if (cancelled) return;
-        setHooks({ usePrivy: mod.usePrivy });
+        setUseGlyph(() => mod.useGlyph as unknown as UseGlyph);
       } catch {
-        if (!cancelled) setConfigured(false);
+        /* provider boundary already renders children without Glyph */
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [fetchConfig, privyReady]);
+  }, [glyphReady]);
 
-  return (
-    <PrivyLoginTrigger
-      open={open}
-      onOpenChange={onOpenChange}
-      hooks={privyReady ? hooks : null}
-      configured={configured}
-      triggeredRef={triggeredRef}
-    />
-  );
-}
-
-function PrivyLoginTrigger({
-  open,
-  onOpenChange,
-  hooks,
-  configured,
-  triggeredRef,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  hooks: PrivyHooks | null;
-  configured: boolean | null;
-  triggeredRef: React.MutableRefObject<boolean>;
-}) {
-  // Render-time hooks call requires unconditional ordering — gate the
-  // wrapped component instead of the hook itself.
-  if (!hooks) {
-    return (
-      <NoHooksTrigger
-        open={open}
-        onOpenChange={onOpenChange}
-        configured={configured}
-      />
-    );
+  if (!glyphReady || !useGlyph) {
+    return <NoHooksTrigger open={open} onOpenChange={onOpenChange} ready={glyphReady} />;
   }
   return (
     <WithHooks
       open={open}
       onOpenChange={onOpenChange}
-      hooks={hooks}
+      useGlyph={useGlyph}
       triggeredRef={triggeredRef}
     />
   );
@@ -119,37 +75,39 @@ function PrivyLoginTrigger({
 function NoHooksTrigger({
   open,
   onOpenChange,
-  configured,
+  ready,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  configured: boolean | null;
+  ready: boolean;
 }) {
-  // Queue the intent: keep `open=true` until Privy hooks arrive, then
-  // <WithHooks> will pick it up and call login(). Only close early if we
-  // know wallet sign-in is permanently unavailable.
+  // Queue the intent: keep `open=true` until the hook arrives, then
+  // <WithHooks> picks it up and calls login(). If the provider never became
+  // ready, the boundary has already degraded — surface a gentle message.
   useEffect(() => {
     if (!open) return;
-    if (configured === false) {
-      toast.error("Wallet sign-in is being set up. Please try again in a moment.");
+    if (ready) return;
+    const t = window.setTimeout(() => {
+      toast.error("Wallet sign-in is taking a moment to load. Please try again.");
       onOpenChange(false);
-    }
-  }, [open, configured, onOpenChange]);
+    }, 8000);
+    return () => window.clearTimeout(t);
+  }, [open, ready, onOpenChange]);
   return null;
 }
 
 function WithHooks({
   open,
   onOpenChange,
-  hooks,
+  useGlyph,
   triggeredRef,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  hooks: PrivyHooks;
+  useGlyph: UseGlyph;
   triggeredRef: React.MutableRefObject<boolean>;
 }) {
-  const { ready, authenticated, login } = hooks.usePrivy();
+  const { ready, authenticated, login } = useGlyph();
 
   useEffect(() => {
     if (!open) {
@@ -160,14 +118,14 @@ function WithHooks({
     if (!ready) return;
     triggeredRef.current = true;
     if (authenticated) {
-      // Already signed in to Privy — bridge handles Supabase session.
+      // Already connected to Glyph — the bridge handles the Supabase session.
       onOpenChange(false);
       return;
     }
     try {
       login();
     } catch (e) {
-      console.warn("[EntranceDialog] Privy login() threw:", e);
+      console.warn("[EntranceDialog] Glyph login() threw:", e);
       if (isFrameAncestorBlocked(e)) {
         toast.error("Wallet sign-in is blocked inside this embedded preview.", {
           description: "Open the preview in a new tab or use the published app to continue.",

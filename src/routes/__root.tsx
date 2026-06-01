@@ -1,7 +1,7 @@
 import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { PrivyAppProvider } from "@/components/PrivyAppProvider";
-import { PrivyBridgeMount } from "@/lib/auth/usePrivyBridge";
+import { GlyphAppProvider } from "@/components/GlyphAppProvider";
+import { GlyphBridgeMount } from "@/lib/auth/useGlyphBridge";
 import { AppHeader } from "@/components/AppHeader";
 import { InactivityWatcher } from "@/components/InactivityWatcher";
 import { AuthRedirectWatcher } from "@/components/AuthRedirectWatcher";
@@ -95,8 +95,8 @@ function RootComponent() {
     installDiagnostics();
   }, []);
   return (
-    <PrivyAppProvider>
-      <PrivyBridgeMount />
+    <GlyphAppProvider>
+      <GlyphBridgeMount />
       <div className="min-h-screen grain">
         <AppHeader />
         <Outlet />
@@ -104,6 +104,6 @@ function RootComponent() {
         <InactivityWatcher />
         <AuthRedirectWatcher />
       </div>
-    </PrivyAppProvider>
+    </GlyphAppProvider>
   );
 }

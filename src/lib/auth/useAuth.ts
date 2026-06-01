@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Session, User } from "@supabase/supabase-js";
-import { clearWalletAuthLocalState } from "@/lib/auth/usePrivyBridge";
+import { clearWalletAuthLocalState } from "@/lib/auth/useGlyphBridge";
 
 export type AppRole = "super_admin" | "admin" | "verified_user" | "chapter_leader";
 
@@ -43,14 +43,14 @@ export function useAuth() {
 
 /**
  * Full sign-out. Matches the inactivity-timeout teardown so the next
- * visit must go through the Privy modal from scratch.
+ * visit must go through the Glyph modal from scratch.
  *
  *   1. Supabase sign-out — drops the API session.
- *   2. Dispatch `baycmc:privy-logout` — the PrivyBridge handles this
- *      from inside Privy's React context and calls its `logout()`.
- *   3. Wipe persisted Privy + verify-cache state from local/sessionStorage.
+ *   2. Dispatch `baycmc:wallet-logout` — the GlyphBridge handles this
+ *      from inside Glyph's React context and calls its `logout()`.
+ *   3. Wipe persisted Glyph + verify-cache state from local/sessionStorage.
  *
- * Skipping (2) or (3) would let Privy's persisted session silently
+ * Skipping (2) or (3) would let Glyph's persisted session silently
  * re-authenticate the user on next visit without the modal.
  */
 export async function signOut() {
@@ -60,7 +60,7 @@ export async function signOut() {
     console.warn("[signOut] supabase signOut failed", e);
   }
   try {
-    window.dispatchEvent(new Event("baycmc:privy-logout"));
+    window.dispatchEvent(new Event("baycmc:wallet-logout"));
   } catch {
     /* noop */
   }

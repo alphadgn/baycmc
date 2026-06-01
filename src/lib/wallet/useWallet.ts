@@ -1,13 +1,11 @@
 /**
  * NOTE: The previous useWallet hook (manual createWallet retry loop, polling,
- * exponential backoff) has been removed. Privy embedded wallet provisioning
- * is now handled entirely by PrivyProvider's
- * `embeddedWallets.ethereum.createOnLogin: 'all-users'` config and is
- * consumed strictly via `useWallets()` in PrivyVerifyCard. Manual
- * createWallet() calls created an infinite hydration loop and are forbidden.
+ * exponential backoff) has been removed. Wallet provisioning is now handled by
+ * the Glyph SDK (@use-glyph/sdk-react); the connected wallet and signer are
+ * consumed via `useGlyph()` in the GlyphBridge. Do not re-add hook logic here.
  *
  * This file is kept only to export the EthereumProviderLike type used by
- * `txQueue.ts`. Do not re-add hook logic here.
+ * `txQueue.ts`.
  */
 
 export type EthereumProviderLike = {

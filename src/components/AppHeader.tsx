@@ -4,7 +4,7 @@ import { ArrowLeft, Loader2, Menu, X } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth/useAuth";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
-import { usePrivyAuthState } from "@/lib/auth/usePrivyBridge";
+import { useGlyphAuthState } from "@/lib/auth/useGlyphBridge";
 import { supabase } from "@/integrations/supabase/client";
 import { EntranceDialog } from "@/components/EntranceDialog";
 import { EmbroideredImage } from "@/components/EmbroideredImage";
@@ -127,7 +127,7 @@ export function AppHeader() {
   // Show the hamburger to every authenticated user — lobby visitors get to
   // browse the full clubhouse menu and see exactly what unlocks once they
   // verify a BAYC/MAYC. Gated items render with a lock icon and pop the
-  // Privy signing modal on click.
+  // Glyph signing modal on click.
   const showHamburger = isAuthenticated;
   // Normalize trailing slash so /lobby/ also counts as a home route, and
   // hide the back chevron entirely on the lobby / landing pages so lobby
@@ -276,28 +276,28 @@ function sliceAddress(addr: string) {
 function EntranceControls({ onOpen }: { onOpen: () => void }) {
   const { isAuthenticated, user, loading: authLoading } = useAuth();
   const { isVerifiedHolder, collection, loading: verifLoading } = useVerificationStatus();
-  const privy = usePrivyAuthState();
+  const glyph = useGlyphAuthState();
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [clicked, setClicked] = useState(false);
-  const isBooting = clicked && !privy.ready;
+  const isBooting = clicked && !glyph.ready;
 
   useEffect(() => {
-    if (privy.ready) setClicked(false);
-  }, [privy.ready]);
+    if (glyph.ready) setClicked(false);
+  }, [glyph.ready]);
 
   useEffect(() => {
     if (!clicked) return;
-    if (privy.ready) return;
+    if (glyph.ready) return;
     const t = window.setTimeout(() => {
       toast.error("Wallet sign-in didn't load.", {
-        description: "Check that PRIVY_APP_ID is set in .env and the dev server was restarted.",
+        description: "Please refresh the page and try again.",
         duration: 8000,
       });
       setClicked(false);
     }, 8000);
     return () => window.clearTimeout(t);
-  }, [clicked, privy.ready]);
+  }, [clicked, glyph.ready]);
 
   useEffect(() => {
     if (!isAuthenticated || !user) {
@@ -322,14 +322,14 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
     };
   }, [isAuthenticated, user]);
 
-  const verifying = privy.verifying;
+  const verifying = glyph.verifying;
 
-  // Re-verification (lobby → holder): hands off to the Privy bridge,
+  // Re-verification (lobby → holder): hands off to the Glyph bridge,
   // which pops a fresh SIWE signature and re-runs the on-chain check.
   // The bridge dispatches "baycmc:verification-refresh" on success so
   // useVerificationStatus reloads — no manual refresh needed here.
   function requestReverify() {
-    window.dispatchEvent(new Event("baycmc:privy-bridge-retry"));
+    window.dispatchEvent(new Event("baycmc:wallet-verify"));
   }
 
   if (isAuthenticated) {
@@ -354,24 +354,24 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
 
   if (authLoading) return <div className="h-9 w-24" aria-hidden />;
 
-  if (privy.authenticated && privy.address) {
-    // Privy connected; the bridge auto-pops SIWE now, so we don't need a
+  if (glyph.authenticated && glyph.address) {
+    // Glyph connected; the bridge auto-pops SIWE now, so we don't need a
     // standalone "Verify" CTA here. Render the calm sliced-address pill —
     // matches the look users see in the lobby. The whole pill stays
-    // clickable so a user who rejected the Privy signing modal can retry.
+    // clickable so a user who rejected the Glyph signing modal can retry.
     return (
       <button
         type="button"
         disabled={verifying}
         onClick={() => {
-          window.dispatchEvent(new Event("baycmc:privy-bridge-retry"));
+          window.dispatchEvent(new Event("baycmc:wallet-verify"));
         }}
         className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-full border border-gold/30 bg-secondary/40 px-2.5 pr-3 font-mono text-xs text-foreground transition hover:border-gold/60 hover:bg-secondary/70 disabled:cursor-wait disabled:opacity-70"
-        title={verifying ? "Signing in…" : privy.address}
-        aria-label={`Wallet ${privy.address}${verifying ? " — signing in" : ""}`}
+        title={verifying ? "Signing in…" : glyph.address}
+        aria-label={`Wallet ${glyph.address}${verifying ? " — signing in" : ""}`}
       >
         {verifying ? <Loader2 className="h-3.5 w-3.5 animate-spin text-gold/70" /> : null}
-        <span className="tabular-nums">{sliceAddress(privy.address)}</span>
+        <span className="tabular-nums">{sliceAddress(glyph.address)}</span>
       </button>
     );
   }

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { clearWalletAuthLocalState } from "@/lib/auth/usePrivyBridge";
+import { clearWalletAuthLocalState } from "@/lib/auth/useGlyphBridge";
 
 const INACTIVITY_MS = 5 * 60 * 1000; // 5 minutes — strict
 const ACTIVITY_EVENTS = [
@@ -18,13 +18,13 @@ const ACTIVITY_EVENTS = [
  *
  * On timeout we:
  *   1. Sign out of Supabase.
- *   2. Dispatch `baycmc:privy-logout` — the PrivyBridge handles this from
- *      inside Privy's React context and calls `logout()` for real.
- *   3. Synchronously wipe any persisted Privy / verify cache from
+ *   2. Dispatch `baycmc:wallet-logout` — the GlyphBridge handles this from
+ *      inside Glyph's React context and calls `logout()` for real.
+ *   3. Synchronously wipe any persisted Glyph / verify cache from
  *      localStorage so a refresh after timeout can never short-circuit
- *      back into the app without going through the Privy modal again.
+ *      back into the app without going through the Glyph modal again.
  *
- * Without step 2+3 the prior implementation left the Privy session in
+ * Without step 2+3 the prior implementation left the wallet session in
  * localStorage; reopening the app silently logged the user back in,
  * skipping the modal — a security gap.
  */
@@ -43,10 +43,10 @@ export function InactivityWatcher() {
       } catch (e) {
         console.warn("[InactivityWatcher] supabase signOut failed", e);
       }
-      // Hand off to the PrivyBridge to perform Privy logout from inside
+      // Hand off to the GlyphBridge to perform Glyph logout from inside
       // the hook context, then nuke local caches as a belt-and-braces.
       try {
-        window.dispatchEvent(new Event("baycmc:privy-logout"));
+        window.dispatchEvent(new Event("baycmc:wallet-logout"));
       } catch {
         /* noop */
       }
