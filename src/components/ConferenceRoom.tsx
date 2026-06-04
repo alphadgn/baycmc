@@ -162,8 +162,10 @@ export function ConferenceRoom({
   }, [state.phase, roomId, revalidateAccess]);
 
   const goBack = useCallback(() => {
-    void navigate({ to: kind === "karaoke" ? "/karaoke" : "/rooms" });
-  }, [kind, navigate]);
+    // "Leave room" always returns the user to the main lobby (the app's home),
+    // regardless of which room (karaoke / conference / game) they came from.
+    void navigate({ to: "/lobby" });
+  }, [navigate]);
 
   // ─── LIVE PHASE ──────────────────────────────────────────────────────────
   if (state.phase === "live") {
