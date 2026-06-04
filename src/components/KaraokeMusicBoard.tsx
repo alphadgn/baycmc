@@ -412,6 +412,34 @@ export function KaraokeMusicBoard({
         </div>
       </div>
 
+      {/* Turn-status strip — performer, my queue position, and ETA so every
+          viewer always knows where they stand in the karaoke rotation.
+          Hidden during a booking (the booked host owns the whole slot). */}
+      {!bookingActive && (
+        <div className="flex items-center justify-between gap-2 border-b border-gold/15 bg-[#0a0a0a] px-2 py-1 text-[8px] uppercase tracking-wider text-gold/70">
+          <span className="min-w-0 truncate">
+            <span className="text-gold/50">Now:</span>{" "}
+            <span className="text-gold">{performerName ?? "Stage open"}</span>
+          </span>
+          <span className="shrink-0 text-right">
+            {myQueuePosition === 0 ? (
+              <span className="text-emerald-300">You're live</span>
+            ) : myQueuePosition && myQueuePosition > 0 ? (
+              <>
+                <span className="text-gold/50">You:</span>{" "}
+                <span className="text-gold">#{myQueuePosition}</span>
+                <span className="ml-1 text-gold/40">·</span>{" "}
+                <span className="text-gold/70">~{formatEta(myQueuePosition)}</span>
+              </>
+            ) : (
+              <span className="text-gold/40">Not in line</span>
+            )}
+          </span>
+        </div>
+      )}
+
+
+
       {/* Screens — when playing, collapse to a single full-width video */}
       <div
         className={`gap-1 border-b border-gold/10 bg-[#050505] p-1.5 ${
