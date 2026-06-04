@@ -56,6 +56,13 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
   const [queue, setQueue] = useState<QueueRow[]>([]);
   const [profiles, setProfiles] = useState<Record<string, Profile>>({});
 
+  // Track which user IDs are currently present on the karaoke page (via
+  // Supabase Realtime presence). Used to auto-advance the turn queue when
+  // the active performer (or a queued user) disconnects, navigates away,
+  // or otherwise drops out without explicitly leaving the line.
+  const [presentIds, setPresentIds] = useState<Set<string>>(() => new Set());
+  const lastSeenRef = useRef<Map<string, number>>(new Map());
+
   // ---- Initial load + realtime subscriptions ----
   useEffect(() => {
     let cancelled = false;
@@ -87,8 +94,9 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
     void loadSession();
     void loadQueue();
 
+    const presenceKey = user?.id ?? `anon-${Math.random().toString(36).slice(2)}`;
     const ch = supabase
-      .channel(`karaoke:${roomId}`)
+      .channel(`karaoke:${roomId}`, { config: { presence: { key: presenceKey } } })
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "karaoke_sessions", filter: `room_id=eq.${roomId}` },
@@ -99,13 +107,64 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
         { event: "*", schema: "public", table: "karaoke_queue", filter: `room_id=eq.${roomId}` },
         () => void loadQueue(),
       )
-      .subscribe();
+      .on("presence", { event: "sync" }, () => {
+        const state = ch.presenceState() as Record<string, Array<{ user_id?: string }>>;
+        const ids = new Set<string>();
+        const now = Date.now();
+        Object.entries(state).forEach(([key, metas]) => {
+          const uid = metas?.[0]?.user_id ?? key;
+          if (uid && !uid.startsWith("anon-")) {
+            ids.add(uid);
+            lastSeenRef.current.set(uid, now);
+          }
+        });
+        setPresentIds(ids);
+      })
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED" && user?.id) {
+          void ch.track({ user_id: user.id, at: new Date().toISOString() });
+        }
+      });
 
     return () => {
       cancelled = true;
       void supabase.removeChannel(ch);
     };
-  }, [roomId]);
+  }, [roomId, user?.id]);
+
+  // ---- Auto-advance: prune absent performer / queued users ----
+  // Any client can run the prune; the writes are idempotent (deletes are
+  // no-ops if the row is already gone, upserts converge on the same state)
+  // and we add a tiny per-client jitter to avoid thundering-herd writes.
+  useEffect(() => {
+    const GRACE_MS = 15_000;
+    const jitter = Math.floor(Math.random() * 2000);
+    const timer = window.setInterval(() => {
+      const now = Date.now();
+      const isAbsent = (uid: string) => {
+        if (presentIds.has(uid)) return false;
+        const seen = lastSeenRef.current.get(uid) ?? 0;
+        return now - seen > GRACE_MS;
+      };
+      const stale = queue.filter((q) => isAbsent(q.user_id));
+      stale.forEach((row) => {
+        void supabase.from("karaoke_queue").delete().eq("id", row.id);
+      });
+      if (!bookingHostUserId && session.performer_user_id && isAbsent(session.performer_user_id)) {
+        void supabase.from("karaoke_sessions").upsert(
+          {
+            room_id: roomId,
+            performer_user_id: null,
+            video_id: null,
+            search_query: null,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "room_id" },
+        );
+      }
+    }, 5_000 + jitter);
+    return () => window.clearInterval(timer);
+  }, [presentIds, queue, session.performer_user_id, bookingHostUserId, roomId]);
 
   // ---- Resolve display names for performer + queue ----
   useEffect(() => {
