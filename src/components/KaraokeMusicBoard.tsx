@@ -55,6 +55,9 @@ export function KaraokeMusicBoard({
   onEndSong,
   paused = false,
   onPauseToggle,
+  performerName = null,
+  myQueuePosition = null,
+  bookingActive = false,
 }: KaraokeMusicBoardProps) {
   const [open, setOpen] = useState(true);
   // When a video is playing the machine collapses to just the screen +
