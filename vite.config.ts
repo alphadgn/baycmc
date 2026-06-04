@@ -7,6 +7,19 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 
+// @privy-io/cross-app-connect (pulled in by Glyph SDK) imports `Buffer` from
+// the bare `buffer` specifier in browser code. Polyfill it for the CLIENT
+// build only — injecting these polyfills into the SSR (Cloudflare Worker)
+// bundle breaks the worker runtime and surfaces as
+// `{"status":500,"unhandled":true,"message":"HTTPError"}` on every request.
+const clientOnlyNodePolyfills = nodePolyfills({
+  globals: { Buffer: true, global: true, process: true },
+}).map((plugin) => ({
+  ...plugin,
+  apply: (_config: unknown, env: { isSsrBuild?: boolean; command: string }) =>
+    !env.isSsrBuild,
+}));
+
 export default defineConfig({
   tanstackStart: {
     importProtection: {
@@ -21,14 +34,6 @@ export default defineConfig({
     },
   },
   vite: {
-    plugins: [
-      // @privy-io/cross-app-connect (pulled in by Glyph SDK) imports `Buffer`
-      // from the bare `buffer` specifier. Without a polyfill, Vite stubs it
-      // with __vite-browser-external and the production build fails with
-      // `"Buffer" is not exported by "__vite-browser-external"`.
-      nodePolyfills({
-        globals: { Buffer: true, global: true, process: true },
-      }),
-    ],
+    plugins: [clientOnlyNodePolyfills],
   },
 });
