@@ -16,6 +16,16 @@ import {
 } from "lucide-react";
 import { searchKaraokeSongs, type SongHit } from "@/lib/karaoke.functions";
 
+// Average karaoke song length, used to estimate ETA to the stage from a
+// queue position. Pure estimate — we don't track actual song duration.
+const AVG_SONG_SECONDS = 240;
+function formatEta(position: number): string {
+  const secs = position * AVG_SONG_SECONDS;
+  if (secs < 60) return `${secs}s`;
+  const m = Math.round(secs / 60);
+  return m < 60 ? `${m} min` : `${Math.floor(m / 60)}h ${m % 60}m`;
+}
+
 interface KaraokeMusicBoardProps {
   isMyTurn: boolean;
   videoId: string | null;
@@ -26,6 +36,15 @@ interface KaraokeMusicBoardProps {
    *  list can react and restore itself. */
   paused?: boolean;
   onPauseToggle?: (next: boolean) => void;
+  /** Display name of the active performer, or null if the stage is empty. */
+  performerName?: string | null;
+  /** Viewer's position relative to the stage:
+   *   0   = currently performing
+   *   N>0 = N turns away (number of songs that must finish first)
+   *   null = not in the line and not on stage */
+  myQueuePosition?: number | null;
+  /** When true, a booking is in effect and the queue is bypassed. */
+  bookingActive?: boolean;
 }
 
 /**
@@ -46,6 +65,9 @@ export function KaraokeMusicBoard({
   onEndSong,
   paused = false,
   onPauseToggle,
+  performerName = null,
+  myQueuePosition = null,
+  bookingActive = false,
 }: KaraokeMusicBoardProps) {
   const [open, setOpen] = useState(true);
   // When a video is playing the machine collapses to just the screen +
@@ -399,6 +421,34 @@ export function KaraokeMusicBoard({
           </button>
         </div>
       </div>
+
+      {/* Turn-status strip — performer, my queue position, and ETA so every
+          viewer always knows where they stand in the karaoke rotation.
+          Hidden during a booking (the booked host owns the whole slot). */}
+      {!bookingActive && (
+        <div className="flex items-center justify-between gap-2 border-b border-gold/15 bg-[#0a0a0a] px-2 py-1 text-[8px] uppercase tracking-wider text-gold/70">
+          <span className="min-w-0 truncate">
+            <span className="text-gold/50">Now:</span>{" "}
+            <span className="text-gold">{performerName ?? "Stage open"}</span>
+          </span>
+          <span className="shrink-0 text-right">
+            {myQueuePosition === 0 ? (
+              <span className="text-emerald-300">You're live</span>
+            ) : myQueuePosition && myQueuePosition > 0 ? (
+              <>
+                <span className="text-gold/50">You:</span>{" "}
+                <span className="text-gold">#{myQueuePosition}</span>
+                <span className="ml-1 text-gold/40">·</span>{" "}
+                <span className="text-gold/70">~{formatEta(myQueuePosition)}</span>
+              </>
+            ) : (
+              <span className="text-gold/40">Not in line</span>
+            )}
+          </span>
+        </div>
+      )}
+
+
 
       {/* Screens — when playing, collapse to a single full-width video */}
       <div
