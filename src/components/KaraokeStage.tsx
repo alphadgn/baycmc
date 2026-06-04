@@ -296,22 +296,41 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
     await supabase.from("karaoke_queue").delete().eq("room_id", roomId).eq("user_id", user.id);
   }
 
-  // Presence: drop the user from the waiting list the moment they leave the
-  // room — whether by navigating away (component unmounts) or closing/hiding
-  // the tab (pagehide). Without this, a departed user lingers in everyone
-  // else's waiting list until they manually hit "Leave line".
+  // Presence: drop the user from the waiting list AND release the stage
+  // if they're the active performer the moment they leave the room — whether
+  // by navigating away (component unmounts) or closing/hiding the tab
+  // (pagehide). Without this, the room would stall on a departed performer
+  // until the presence-based prune timer (above) catches up.
   const userIdRef = useRef<string | null>(user?.id ?? null);
   userIdRef.current = user?.id ?? null;
+  const performerIdRef = useRef<string | null>(session.performer_user_id);
+  performerIdRef.current = session.performer_user_id;
+  const bookingRef = useRef<string | null>(bookingHostUserId);
+  bookingRef.current = bookingHostUserId;
   useEffect(() => {
-    function removeSelfFromQueue() {
+    function cleanupSelf() {
       const uid = userIdRef.current;
       if (!uid) return;
       void supabase.from("karaoke_queue").delete().eq("room_id", roomId).eq("user_id", uid);
+      // If I was the performer, clear the stage so the next person in line
+      // can be promoted automatically by other clients' auto-promote effect.
+      if (!bookingRef.current && performerIdRef.current === uid) {
+        void supabase.from("karaoke_sessions").upsert(
+          {
+            room_id: roomId,
+            performer_user_id: null,
+            video_id: null,
+            search_query: null,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "room_id" },
+        );
+      }
     }
-    window.addEventListener("pagehide", removeSelfFromQueue);
+    window.addEventListener("pagehide", cleanupSelf);
     return () => {
-      window.removeEventListener("pagehide", removeSelfFromQueue);
-      removeSelfFromQueue();
+      window.removeEventListener("pagehide", cleanupSelf);
+      cleanupSelf();
     };
   }, [roomId]);
 
