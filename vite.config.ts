@@ -26,4 +26,18 @@ export default defineConfig({
       },
     },
   },
+  vite: {
+    resolve: {
+      alias: {
+        // @privy-io/cross-app-connect (pulled in by Glyph SDK) imports `Buffer`
+        // from the bare `buffer` specifier, which Vite otherwise stubs with
+        // __vite-browser-external and breaks the production build. Point it at
+        // the real npm `buffer` polyfill so the browser bundle can use it.
+        buffer: "buffer/",
+      },
+    },
+    optimizeDeps: {
+      include: ["buffer"],
+    },
+  },
 });
