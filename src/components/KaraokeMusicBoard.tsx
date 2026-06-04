@@ -26,6 +26,15 @@ interface KaraokeMusicBoardProps {
    *  list can react and restore itself. */
   paused?: boolean;
   onPauseToggle?: (next: boolean) => void;
+  /** Display name of the active performer, or null if the stage is empty. */
+  performerName?: string | null;
+  /** Viewer's position relative to the stage:
+   *   0   = currently performing
+   *   N>0 = N turns away (number of songs that must finish first)
+   *   null = not in the line and not on stage */
+  myQueuePosition?: number | null;
+  /** When true, a booking is in effect and the queue is bypassed. */
+  bookingActive?: boolean;
 }
 
 /**
