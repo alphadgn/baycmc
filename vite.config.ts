@@ -27,8 +27,7 @@ export default defineConfig({
       // with __vite-browser-external and the production build fails with
       // `"Buffer" is not exported by "__vite-browser-external"`.
       nodePolyfills({
-        include: ["buffer"],
-        globals: { Buffer: true },
+        globals: { Buffer: true, global: true, process: true },
       }),
     ],
   },
