@@ -5,14 +5,8 @@
 //     error logger plugins, and sandbox detection (port/host/strictPort).
 // You can pass additional config via defineConfig({ vite: { ... } }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import { nodePolyfills } from "vite-plugin-node-polyfills";
 
-// The lovable wrapper sets a default `client.files: ["**/server/**"]` for the
-// TanStack import-protection plugin and merges via vite's `mergeConfig`, which
-// concatenates arrays. That means we can't drop the default by overriding
-// `files`. Instead we whitelist `*.functions.*` modules (createServerFn
-// wrappers — safe to import from the client; TanStack splits handler bodies
-// into a server-only chunk) via `excludeFiles`. Genuinely server-only modules
-// (`*.server.ts`) stay protected.
 export default defineConfig({
   tanstackStart: {
     importProtection: {
@@ -25,5 +19,16 @@ export default defineConfig({
         ],
       },
     },
+  },
+  vite: {
+    plugins: [
+      // @privy-io/cross-app-connect (pulled in by Glyph SDK) imports `Buffer`
+      // from the bare `buffer` specifier. Without a polyfill, Vite stubs it
+      // with __vite-browser-external and the production build fails with
+      // `"Buffer" is not exported by "__vite-browser-external"`.
+      nodePolyfills({
+        globals: { Buffer: true, global: true, process: true },
+      }),
+    ],
   },
 });
