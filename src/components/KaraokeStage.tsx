@@ -506,6 +506,23 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
         onEndSong={bookingHostUserId ? undefined : onEndSong}
         paused={paused}
         onPauseToggle={setPaused}
+        performerName={effectivePerformerId ? performerName : null}
+        // Position: 0 = currently performing, N>=1 = N turns away from the
+        // stage (counts the active performer + everyone queued ahead), or
+        // null when the viewer is neither performing nor in line.
+        myQueuePosition={
+          isMyTurn
+            ? 0
+            : (() => {
+                if (!user) return null;
+                const idx = queue.findIndex((q) => q.user_id === user.id);
+                if (idx < 0) return null;
+                // If there's an active performer in front, add 1; otherwise
+                // queue index 0 is up next immediately.
+                return effectivePerformerId && effectivePerformerId !== user.id ? idx + 1 : idx;
+              })()
+        }
+        bookingActive={!!bookingHostUserId}
       />
     </>
   );
