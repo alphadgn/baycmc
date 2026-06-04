@@ -16,6 +16,16 @@ import {
 } from "lucide-react";
 import { searchKaraokeSongs, type SongHit } from "@/lib/karaoke.functions";
 
+// Average karaoke song length, used to estimate ETA to the stage from a
+// queue position. Pure estimate — we don't track actual song duration.
+const AVG_SONG_SECONDS = 240;
+function formatEta(position: number): string {
+  const secs = position * AVG_SONG_SECONDS;
+  if (secs < 60) return `${secs}s`;
+  const m = Math.round(secs / 60);
+  return m < 60 ? `${m} min` : `${Math.floor(m / 60)}h ${m % 60}m`;
+}
+
 interface KaraokeMusicBoardProps {
   isMyTurn: boolean;
   videoId: string | null;
