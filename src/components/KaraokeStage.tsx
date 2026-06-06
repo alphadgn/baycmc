@@ -281,7 +281,73 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
     );
   }, [isMyTurn, user, bookingHostUserId, queue, roomId]);
 
+  // ---- Host / super-admin force-skip ----
+  // The booking holder always counts as the room host. Outside of bookings,
+  // anyone with `admin` / `super_admin` role can advance the queue when it
+  // stalls (e.g. a performer's tab froze before presence prune kicked in).
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    if (!user?.id) {
+      setIsAdmin(false);
+      return;
+    }
+    let cancelled = false;
+    void supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .then(({ data }) => {
+        if (cancelled) return;
+        setIsAdmin(!!data?.some((r) => r.role === "admin" || r.role === "super_admin"));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+  const canForceSkip =
+    !!user &&
+    !!effectivePerformerId &&
+    effectivePerformerId !== user.id &&
+    (isAdmin || (bookingHostUserId ? bookingHostUserId === user.id : false));
+
+  const forceSkip = useCallback(async () => {
+    if (!canForceSkip || !effectivePerformerId) return;
+    const skipped = effectivePerformerId;
+    // Pull the current performer out of the line and promote the next
+    // eligible user. The auto-promote effect will fill in if `next` is
+    // also absent for any reason.
+    await supabase
+      .from("karaoke_queue")
+      .delete()
+      .eq("room_id", roomId)
+      .eq("user_id", skipped);
+    const next = queue.find((q) => q.user_id !== skipped);
+    await supabase.from("karaoke_sessions").upsert(
+      {
+        room_id: roomId,
+        performer_user_id: next?.user_id ?? null,
+        video_id: null,
+        search_query: null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "room_id" },
+    );
+    toast.success("Skipped current performer");
+  }, [canForceSkip, effectivePerformerId, queue, roomId]);
+
   // ---- Queue actions ----
+  // `intentJoinedRef` survives a brief disconnect: if the user explicitly
+  // pressed "Join line" but the presence-prune effect dropped them while
+  // they were offline, we silently re-insert once they're back online and
+  // visible in presence again. Without this, a flaky network would kick
+  // users out of the queue with no obvious cause.
+  const storageKey = user ? `karaoke:intent:${roomId}:${user.id}` : null;
+  const intentJoinedRef = useRef<boolean>(false);
+  useEffect(() => {
+    if (!storageKey) return;
+    intentJoinedRef.current = window.localStorage.getItem(storageKey) === "1";
+  }, [storageKey]);
+
   async function joinLine() {
     if (!user) return;
     const { error } = await supabase
@@ -289,12 +355,35 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
       .insert({ room_id: roomId, user_id: user.id });
     if (error && !/duplicate/i.test(error.message)) {
       toast.error("Could not join the line", { description: error.message });
+      return;
     }
+    intentJoinedRef.current = true;
+    if (storageKey) window.localStorage.setItem(storageKey, "1");
   }
   async function leaveLine() {
     if (!user) return;
     await supabase.from("karaoke_queue").delete().eq("room_id", roomId).eq("user_id", user.id);
+    intentJoinedRef.current = false;
+    if (storageKey) window.localStorage.removeItem(storageKey);
   }
+
+  // Auto-resync: if I intended to be in the queue, I'm currently present,
+  // but I'm not in the queue (because a prune ran while I was offline),
+  // re-insert me. Runs whenever queue/presence changes.
+  useEffect(() => {
+    if (!user || !intentJoinedRef.current) return;
+    if (!presentIds.has(user.id)) return;
+    if (queue.some((q) => q.user_id === user.id)) return;
+    if (effectivePerformerId === user.id) return;
+    void supabase
+      .from("karaoke_queue")
+      .insert({ room_id: roomId, user_id: user.id })
+      .then(({ error }) => {
+        if (error && !/duplicate/i.test(error.message)) {
+          console.warn("[karaoke] auto-rejoin failed", error);
+        }
+      });
+  }, [user, queue, presentIds, effectivePerformerId, roomId]);
 
   // Presence: drop the user from the waiting list AND release the stage
   // if they're the active performer the moment they leave the room — whether
@@ -445,6 +534,20 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
               </span>
             )}
           </div>
+          {canForceSkip && (
+            <button
+              type="button"
+              onClick={forceSkip}
+              className="mt-2 w-full rounded-sm border border-amber-400/40 bg-amber-400/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-amber-200 hover:bg-amber-400/20"
+              title={
+                isAdmin
+                  ? "Admin override: skip the current performer"
+                  : "Host override: skip the current performer"
+              }
+            >
+              Skip performer →
+            </button>
+          )}
 
           {!bookingHostUserId && (
             <>
