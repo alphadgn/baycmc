@@ -41,10 +41,6 @@ function Index() {
         />
         <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-28 lg:py-36">
           <div className="mx-auto max-w-3xl text-center">
-            <div className="inline-flex items-center gap-2 rounded-full border border-gold/30 bg-gold/5 px-3 py-1 text-[10px] font-medium text-gold uppercase tracking-wider sm:text-xs">
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-gold animate-pulse-glow" />
-              Members only · BAYC/MAYC
-            </div>
             <h1 className="mt-5 font-display text-4xl font-bold leading-[1.05] tracking-tight sm:mt-6 sm:text-6xl lg:text-7xl">
               <span className="block">The mobile clubhouse for</span>
               {/* Responsive clamp scales smoothly with viewport without overflow. */}

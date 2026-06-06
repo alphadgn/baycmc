@@ -352,7 +352,9 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
     return null;
   }
 
-  if (authLoading) return <div className="h-9 w-24" aria-hidden />;
+  // Don't gate the VIP button on authLoading — render it immediately so
+  // the landing-page top-right always has a visible sign-in entry point.
+
 
   if (glyph.authenticated && glyph.address) {
     // Wallet connected but not yet signed in to Supabase. The signing popup
