@@ -190,7 +190,11 @@ export function AppHeader() {
           </div>
 
           <div className="flex min-w-0 items-center gap-2">
-            <EntranceControls onOpen={() => setEntranceOpen(true)} />
+            <EntranceControls onOpen={() => {
+              // eslint-disable-next-line no-console
+              console.log("[AppHeader] onOpen called");
+              setEntranceOpen(true);
+            }} />
             {showHamburger && (
               <Sheet open={navOpen} onOpenChange={setNavOpen}>
                 <SheetTrigger asChild>
