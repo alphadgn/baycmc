@@ -8,12 +8,19 @@ import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 
 // @privy-io/cross-app-connect (pulled in by Glyph SDK) imports `Buffer` from
-// the bare `buffer` specifier in browser code. Polyfill it for the CLIENT
-// build only — injecting these polyfills into the SSR (Cloudflare Worker)
-// bundle breaks the worker runtime and surfaces as
-// `{"status":500,"unhandled":true,"message":"HTTPError"}` on every request.
+// the bare `buffer` specifier in browser code. We inline the `Buffer` /
+// `process` / `global` polyfills via `src/lib/polyfill-shim.ts` (bundled
+// with the main entry) rather than letting `vite-plugin-node-polyfills`
+// inject its own `_shims_*.js` deps chunk — that chunk intermittently
+// 401/502s in the sandbox preview and, when it fails, the entire client
+// entry stops evaluating and React never hydrates (every onClick — VIP,
+// hamburger, etc. — becomes inert while SSR HTML keeps rendering).
+//
+// We still pass the plugin through so bare specifiers like `import "buffer"`
+// resolve to its browser shims for the client build only — never the SSR
+// (Cloudflare Worker) bundle, where these polyfills break the runtime.
 const clientOnlyNodePolyfills = nodePolyfills({
-  globals: { Buffer: true, global: true, process: true },
+  globals: { Buffer: false, global: false, process: false },
 }).map((plugin) => ({
   ...plugin,
   apply: (_config: unknown, env: { isSsrBuild?: boolean; command: string }) =>

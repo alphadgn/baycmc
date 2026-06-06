@@ -1,3 +1,4 @@
+import "@/lib/polyfill-shim";
 import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { GlyphAppProvider } from "@/components/GlyphAppProvider";
