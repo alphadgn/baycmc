@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { useAuth } from "@/lib/auth/useAuth";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import { useGlyphAuthState } from "@/lib/auth/useGlyphBridge";
+import { useGlyphReady } from "@/components/GlyphAppProvider";
+import { importWithRetry } from "@/lib/import-with-retry";
 import { supabase } from "@/integrations/supabase/client";
 import { EntranceDialog } from "@/components/EntranceDialog";
 import { EmbroideredImage } from "@/components/EmbroideredImage";
@@ -277,6 +279,8 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
   const { isAuthenticated, user, loading: authLoading } = useAuth();
   const { isVerifiedHolder, collection, loading: verifLoading } = useVerificationStatus();
   const glyph = useGlyphAuthState();
+  const glyphReady = useGlyphReady();
+  const [hooks, setHooks] = useState<HeaderEntranceHooks | null>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [clicked, setClicked] = useState(false);
@@ -285,6 +289,30 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
   useEffect(() => {
     if (glyph.ready) setClicked(false);
   }, [glyph.ready]);
+
+  useEffect(() => {
+    if (!glyphReady) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [glyphMod, wagmiMod] = await Promise.all([
+          importWithRetry(() => import("@use-glyph/sdk-react"), { label: "glyph-sdk-react-header" }),
+          importWithRetry(() => import("wagmi"), { label: "wagmi-header" }),
+        ]);
+        if (cancelled) return;
+        setHooks(() => ({
+          useNativeGlyphConnection:
+            glyphMod.useNativeGlyphConnection as unknown as UseNativeGlyphConnection,
+          useAccount: wagmiMod.useAccount as unknown as UseAccount,
+        }));
+      } catch (e) {
+        console.warn("[AppHeader] failed to load Glyph sign-in hooks", e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [glyphReady]);
 
   useEffect(() => {
     if (!clicked) return;
@@ -385,6 +413,10 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
         )}
       </button>
     );
+  }
+
+  if (glyphReady && hooks) {
+    return <GlyphVipButton hooks={hooks} fallbackOpen={onOpen} />;
   }
 
   return (
