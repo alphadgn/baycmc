@@ -62,6 +62,8 @@ export function AppHeader() {
   const { isAuthenticated, user } = useAuth();
   const { isVerifiedHolder, isLifer } = useVerificationStatus();
   const [entranceOpen, setEntranceOpen] = useState(false);
+  // eslint-disable-next-line no-console
+  console.log("[AppHeader] render entranceOpen=", entranceOpen);
   const [navOpen, setNavOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
