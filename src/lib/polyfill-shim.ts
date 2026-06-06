@@ -1,26 +1,39 @@
 /**
- * Inline browser polyfills for the Node globals that Privy / Glyph need.
+ * Inline browser polyfills for the Node globals Privy / Glyph need
+ * (Buffer, process, global). Bundled into the main client entry so we
+ * never depend on `vite-plugin-node-polyfills`' separate `_shims_*.js`
+ * deps chunk — when that chunk 401/502s in the sandbox preview, the
+ * client entry stops evaluating and React never hydrates (every onClick,
+ * including the VIP button, becomes inert while SSR HTML keeps rendering).
  *
- * Replaces `vite-plugin-node-polyfills`' `globals` option, which injected a
- * separate `vite-plugin-node-polyfills_shims_process.js` chunk fetched from
- * `node_modules/.vite/deps/` at runtime. When the sandbox preview returned
- * 401/502/504 for that chunk, the entire client entry failed to evaluate
- * and React never hydrated — every onClick (VIP, hamburger, etc.) became
- * a no-op while the SSR HTML kept rendering. Bundling the polyfills inline
- * removes that single point of failure.
- *
- * Imported at the top of `src/start.ts` so it runs before any module that
- * touches `Buffer`/`process`/`global`. SSR-safe: the assignments are gated
- * on `typeof window !== "undefined"`.
+ * SSR-safe: all work is gated on `typeof window !== "undefined"`, and the
+ * `buffer` / `process` modules are loaded via dynamic `import()` so they
+ * never enter the Cloudflare Worker SSR bundle.
  */
-import { Buffer as NodeBuffer } from "buffer";
-import nodeProcess from "process";
-
-if (typeof window !== "undefined") {
+export function installBrowserPolyfills(): void {
+  if (typeof window === "undefined") return;
   const g = window as unknown as Record<string, unknown>;
-  if (typeof g.Buffer !== "function") g.Buffer = NodeBuffer;
-  if (typeof g.process !== "object" || g.process === null) g.process = nodeProcess;
   if (typeof g.global !== "object" || g.global === null) g.global = window;
+  if (typeof g.Buffer !== "function") {
+    void import("buffer").then((m) => {
+      if (typeof (window as unknown as { Buffer?: unknown }).Buffer !== "function") {
+        (window as unknown as Record<string, unknown>).Buffer = m.Buffer;
+      }
+    });
+  }
+  if (typeof g.process !== "object" || g.process === null) {
+    void import("process").then((m) => {
+      const p = (m as { default?: unknown }).default ?? m;
+      if (
+        typeof (window as unknown as { process?: unknown }).process !== "object" ||
+        (window as unknown as { process?: unknown }).process === null
+      ) {
+        (window as unknown as Record<string, unknown>).process = p;
+      }
+    });
+  }
 }
 
-export {};
+if (typeof window !== "undefined") {
+  installBrowserPolyfills();
+}
