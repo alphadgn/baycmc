@@ -534,6 +534,20 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
               </span>
             )}
           </div>
+          {canForceSkip && (
+            <button
+              type="button"
+              onClick={forceSkip}
+              className="mt-2 w-full rounded-sm border border-amber-400/40 bg-amber-400/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-amber-200 hover:bg-amber-400/20"
+              title={
+                isAdmin
+                  ? "Admin override: skip the current performer"
+                  : "Host override: skip the current performer"
+              }
+            >
+              Skip performer →
+            </button>
+          )}
 
           {!bookingHostUserId && (
             <>
