@@ -1,0 +1,64 @@
+name: Production Build
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  build:
+    name: Build + SSR guards
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      # Required at build-time by the Vite client bundle. Repo-level CI
+      # secrets so the build can reach Lovable Cloud for type-checking.
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+      VITE_SUPABASE_PROJECT_ID: ${{ secrets.VITE_SUPABASE_PROJECT_ID }}
+      # Verbose Rollup/Vite output so failed builds leave a usable trace
+      # in the GitHub Actions log.
+      DEBUG: "vite:*,rollup:*"
+      ROLLUP_WATCH: "false"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install deps
+        run: bun install --frozen-lockfile
+
+      - name: Lint (non-blocking)
+        run: bun run lint || true
+
+      - name: Server-import guard
+        run: bun run check:server-imports
+
+      - name: Production build
+        run: bun run build 2>&1 | tee build.log
+
+      - name: SSR polyfill-leak guard
+        run: bun scripts/check-no-polyfills-in-ssr.ts
+
+      - name: SSR smoke test
+        run: bun scripts/ssr-smoke-test.ts
+        env:
+          SMOKE_PORT: "4173"
+
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output-${{ github.run_id }}
+          path: |
+            build.log
+            dist/**
+            .output/**
+          if-no-files-found: ignore
+          retention-days: 7
