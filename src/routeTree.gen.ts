@@ -24,6 +24,7 @@ import { Route as AuthenticatedActivityRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedVerifiedRouteImport } from './routes/_authenticated/_verified'
 import { Route as AuthenticatedLifersIndexRouteImport } from './routes/_authenticated/lifers/index'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
+import { Route as ApiPublicHealthRouteImport } from './routes/api/public/health'
 import { Route as AuthenticatedLifersRoomRouteImport } from './routes/_authenticated/lifers/room'
 import { Route as AuthenticatedLifersMessagesRouteImport } from './routes/_authenticated/lifers/messages'
 import { Route as AuthenticatedKaraokeRoomIdRouteImport } from './routes/_authenticated/karaoke.$roomId'
@@ -112,6 +113,11 @@ const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
+const ApiPublicHealthRoute = ApiPublicHealthRouteImport.update({
+  id: '/api/public/health',
+  path: '/api/public/health',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedLifersRoomRoute = AuthenticatedLifersRoomRouteImport.update({
   id: '/room',
@@ -220,6 +226,7 @@ export interface FileRoutesByFullPath {
   '/karaoke/$roomId': typeof AuthenticatedKaraokeRoomIdRoute
   '/lifers/messages': typeof AuthenticatedLifersMessagesRoute
   '/lifers/room': typeof AuthenticatedLifersRoomRoute
+  '/api/public/health': typeof ApiPublicHealthRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/lifers/': typeof AuthenticatedLifersIndexRoute
   '/ape-rides/$rideId': typeof AuthenticatedVerifiedApeRidesRideIdRoute
@@ -247,6 +254,7 @@ export interface FileRoutesByTo {
   '/karaoke/$roomId': typeof AuthenticatedKaraokeRoomIdRoute
   '/lifers/messages': typeof AuthenticatedLifersMessagesRoute
   '/lifers/room': typeof AuthenticatedLifersRoomRoute
+  '/api/public/health': typeof ApiPublicHealthRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/lifers': typeof AuthenticatedLifersIndexRoute
   '/ape-rides/$rideId': typeof AuthenticatedVerifiedApeRidesRideIdRoute
@@ -279,6 +287,7 @@ export interface FileRoutesById {
   '/_authenticated/karaoke/$roomId': typeof AuthenticatedKaraokeRoomIdRoute
   '/_authenticated/lifers/messages': typeof AuthenticatedLifersMessagesRoute
   '/_authenticated/lifers/room': typeof AuthenticatedLifersRoomRoute
+  '/api/public/health': typeof ApiPublicHealthRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/lifers/': typeof AuthenticatedLifersIndexRoute
   '/_authenticated/_verified/ape-rides/$rideId': typeof AuthenticatedVerifiedApeRidesRideIdRoute
@@ -310,6 +319,7 @@ export interface FileRouteTypes {
     | '/karaoke/$roomId'
     | '/lifers/messages'
     | '/lifers/room'
+    | '/api/public/health'
     | '/admin/'
     | '/lifers/'
     | '/ape-rides/$rideId'
@@ -337,6 +347,7 @@ export interface FileRouteTypes {
     | '/karaoke/$roomId'
     | '/lifers/messages'
     | '/lifers/room'
+    | '/api/public/health'
     | '/admin'
     | '/lifers'
     | '/ape-rides/$rideId'
@@ -368,6 +379,7 @@ export interface FileRouteTypes {
     | '/_authenticated/karaoke/$roomId'
     | '/_authenticated/lifers/messages'
     | '/_authenticated/lifers/room'
+    | '/api/public/health'
     | '/_authenticated/admin/'
     | '/_authenticated/lifers/'
     | '/_authenticated/_verified/ape-rides/$rideId'
@@ -379,6 +391,7 @@ export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   DiagnosticsRoute: typeof DiagnosticsRoute
   LoginRoute: typeof LoginRoute
+  ApiPublicHealthRoute: typeof ApiPublicHealthRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -487,6 +500,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/'
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/api/public/health': {
+      id: '/api/public/health'
+      path: '/api/public/health'
+      fullPath: '/api/public/health'
+      preLoaderRoute: typeof ApiPublicHealthRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/lifers/room': {
       id: '/_authenticated/lifers/room'
@@ -706,17 +726,8 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   DiagnosticsRoute: DiagnosticsRoute,
   LoginRoute: LoginRoute,
+  ApiPublicHealthRoute: ApiPublicHealthRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

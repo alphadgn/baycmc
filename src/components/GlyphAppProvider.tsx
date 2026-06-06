@@ -1,5 +1,6 @@
 import { Component, createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { importWithRetry } from "@/lib/import-with-retry";
+import { ensureBrowserPolyfills } from "@/lib/polyfill-check";
 
 /**
  * Glyph wallet provider (replaces the old Privy + Reown AppKit stack).
@@ -70,6 +71,16 @@ export function GlyphAppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+    // Hard-fail fast if Buffer/EventEmitter aren't on the page — Privy
+    // (under Glyph) needs them and will crash deep inside its bundle
+    // otherwise. The ensure() helper logs a clear diagnostic.
+    const polyfills = ensureBrowserPolyfills();
+    if (!polyfills.ok) {
+      console.warn(
+        "[GlyphAppProvider] Skipping Glyph init: required browser polyfills missing.",
+      );
+      return;
+    }
     void (async () => {
       try {
         // Glyph's widget styles must be present for the login modal / widget.

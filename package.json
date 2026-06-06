@@ -11,7 +11,10 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "test": "vitest run",
-    "check:server-imports": "bun scripts/check-server-imports.ts"
+    "check:server-imports": "bun scripts/check-server-imports.ts",
+    "check:ssr-polyfills": "bun scripts/check-no-polyfills-in-ssr.ts",
+    "smoke:ssr": "bun scripts/ssr-smoke-test.ts",
+    "build:verbose": "DEBUG=vite:*,rollup:* NODE_OPTIONS=--max-old-space-size=6144 vite build 2>&1 | tee build.log"
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.25.5",
