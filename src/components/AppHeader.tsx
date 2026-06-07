@@ -284,51 +284,11 @@ type HeaderEntranceHooks = {
   useAccount: UseAccount;
 };
 
-function GlyphVipButton({
-  hooks,
-  openEntrance,
-}: {
-  hooks: HeaderEntranceHooks;
-  openEntrance: () => void;
-}) {
-  const { connect } = hooks.useNativeGlyphConnection();
-  const { isConnected } = hooks.useAccount();
-  const glyph = useGlyphAuthState();
-  const [connecting, setConnecting] = useState(false);
+// GlyphVipButton removed: the VIP button no longer drives Glyph connection
+// directly. Clicking VIP opens <EntranceDialog>, which owns the connect +
+// sign flow. This guarantees the modal appears immediately on every click,
+// regardless of Glyph SDK / wallet / auth state.
 
-  async function handleClick() {
-    if (isConnected || glyph.authenticated) {
-      window.dispatchEvent(new Event("baycmc:wallet-verify"));
-      return;
-    }
-    // Always open the app-level entrance modal first so the VIP tap has an
-    // immediate visible result. The previous implementation only called the
-    // Glyph connector directly; when the SDK returned without surfacing UI,
-    // the user saw nothing and had no fallback sign-in controls.
-    openEntrance();
-    setConnecting(true);
-    try {
-      await connect();
-    } catch (e) {
-      console.warn("[AppHeader] Glyph connect() failed", e);
-      openEntrance();
-    } finally {
-      setConnecting(false);
-    }
-  }
-
-  return (
-    <button
-      type="button"
-      data-vip-trigger="true"
-      disabled={connecting || glyph.verifying}
-      onClick={() => void handleClick()}
-      className="shrink-0 cursor-pointer rounded-md bg-gradient-gold px-3 py-2 text-xs font-semibold text-gold-foreground shadow-gold transition hover:opacity-90 disabled:cursor-wait disabled:opacity-70 sm:px-4 sm:text-sm"
-    >
-      {connecting ? "Loading…" : "VIP"}
-    </button>
-  );
-}
 
 function EntranceControls({ onOpen }: { onOpen: () => void }) {
   const { isAuthenticated, user, loading: authLoading } = useAuth();
