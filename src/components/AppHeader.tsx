@@ -1,12 +1,9 @@
 import { Link, useLocation, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Loader2, Menu, X } from "lucide-react";
-import { toast } from "sonner";
 import { useAuth } from "@/lib/auth/useAuth";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import { useGlyphAuthState } from "@/lib/auth/useGlyphBridge";
-import { useGlyphReady } from "@/components/GlyphAppProvider";
-import { importWithRetry } from "@/lib/import-with-retry";
 import { supabase } from "@/integrations/supabase/client";
 import { EntranceDialog } from "@/components/EntranceDialog";
 import { EmbroideredImage } from "@/components/EmbroideredImage";
