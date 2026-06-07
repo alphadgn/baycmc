@@ -29,7 +29,9 @@ const CANDIDATE_DIRS = [
 // `vite-plugin-node-polyfills` fingerprint and the unresolved
 // `__vite-browser-external` stub that broke the worker the first time.
 const POLYFILL_FINGERPRINTS = [
-  "vite-plugin-node-polyfills",
+  // Actual plugin-injected virtual modules (not the bare string, which
+  // appears in our own polyfill-check.ts diagnostic message).
+  "\\0vite-plugin-node-polyfills",
   "@jspm/core/nodelibs/browser",
   "__vite-browser-external",
 ];
