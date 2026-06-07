@@ -291,65 +291,21 @@ type HeaderEntranceHooks = {
 
 
 function EntranceControls({ onOpen }: { onOpen: () => void }) {
-  const { isAuthenticated, user, loading: authLoading } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { isVerifiedHolder, collection, loading: verifLoading } = useVerificationStatus();
   const glyph = useGlyphAuthState();
-  const glyphReady = useGlyphReady();
-  const [hooks, setHooks] = useState<HeaderEntranceHooks | null>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [profileLoaded, setProfileLoaded] = useState(false);
-  const [clicked, setClicked] = useState(false);
-  const isBooting = clicked && !glyph.ready;
+  const [, setProfileLoaded] = useState(false);
 
+  // Allow other code (e.g. queued taps before mount) to request the modal.
   useEffect(() => {
     function openFromQueuedVipTap() {
-      setClicked(true);
       onOpen();
     }
     window.addEventListener("baycmc:vip-click", openFromQueuedVipTap);
     return () => window.removeEventListener("baycmc:vip-click", openFromQueuedVipTap);
   }, [onOpen]);
 
-  useEffect(() => {
-    if (glyph.ready) setClicked(false);
-  }, [glyph.ready]);
-
-  useEffect(() => {
-    if (!glyphReady) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const [glyphMod, wagmiMod] = await Promise.all([
-          importWithRetry(() => import("@use-glyph/sdk-react"), { label: "glyph-sdk-react-header" }),
-          importWithRetry(() => import("wagmi"), { label: "wagmi-header" }),
-        ]);
-        if (cancelled) return;
-        setHooks(() => ({
-          useNativeGlyphConnection:
-            glyphMod.useNativeGlyphConnection as unknown as UseNativeGlyphConnection,
-          useAccount: wagmiMod.useAccount as unknown as UseAccount,
-        }));
-      } catch (e) {
-        console.warn("[AppHeader] failed to load Glyph sign-in hooks", e);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [glyphReady]);
-
-  useEffect(() => {
-    if (!clicked) return;
-    if (glyph.ready) return;
-    const t = window.setTimeout(() => {
-      toast.error("Wallet sign-in didn't load.", {
-        description: "Please refresh the page and try again.",
-        duration: 8000,
-      });
-      setClicked(false);
-    }, 8000);
-    return () => window.clearTimeout(t);
-  }, [clicked, glyph.ready]);
 
   useEffect(() => {
     if (!isAuthenticated || !user) {
