@@ -286,10 +286,10 @@ type HeaderEntranceHooks = {
 
 function GlyphVipButton({
   hooks,
-  fallbackOpen,
+  openEntrance,
 }: {
   hooks: HeaderEntranceHooks;
-  fallbackOpen: () => void;
+  openEntrance: () => void;
 }) {
   const { connect } = hooks.useNativeGlyphConnection();
   const { isConnected } = hooks.useAccount();
@@ -301,12 +301,17 @@ function GlyphVipButton({
       window.dispatchEvent(new Event("baycmc:wallet-verify"));
       return;
     }
+    // Always open the app-level entrance modal first so the VIP tap has an
+    // immediate visible result. The previous implementation only called the
+    // Glyph connector directly; when the SDK returned without surfacing UI,
+    // the user saw nothing and had no fallback sign-in controls.
+    openEntrance();
     setConnecting(true);
     try {
       await connect();
     } catch (e) {
       console.warn("[AppHeader] Glyph connect() failed", e);
-      fallbackOpen();
+      openEntrance();
     } finally {
       setConnecting(false);
     }
@@ -315,6 +320,7 @@ function GlyphVipButton({
   return (
     <button
       type="button"
+      data-vip-trigger="true"
       disabled={connecting || glyph.verifying}
       onClick={() => void handleClick()}
       className="shrink-0 cursor-pointer rounded-md bg-gradient-gold px-3 py-2 text-xs font-semibold text-gold-foreground shadow-gold transition hover:opacity-90 disabled:cursor-wait disabled:opacity-70 sm:px-4 sm:text-sm"
@@ -334,6 +340,15 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [clicked, setClicked] = useState(false);
   const isBooting = clicked && !glyph.ready;
+
+  useEffect(() => {
+    function openFromQueuedVipTap() {
+      setClicked(true);
+      onOpen();
+    }
+    window.addEventListener("baycmc:vip-click", openFromQueuedVipTap);
+    return () => window.removeEventListener("baycmc:vip-click", openFromQueuedVipTap);
+  }, [onOpen]);
 
   useEffect(() => {
     if (glyph.ready) setClicked(false);
@@ -465,12 +480,13 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
   }
 
   if (glyphReady && hooks) {
-    return <GlyphVipButton hooks={hooks} fallbackOpen={onOpen} />;
+    return <GlyphVipButton hooks={hooks} openEntrance={onOpen} />;
   }
 
   return (
     <button
       type="button"
+      data-vip-trigger="true"
       disabled={isBooting}
       onClick={() => {
         setClicked(true);
