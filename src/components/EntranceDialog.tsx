@@ -190,10 +190,14 @@ function EntranceModalShell({
       aria-label="VIP entrance"
     >
       {/* Backdrop */}
-      <button
-        type="button"
+      <a
+        href="/"
+        role="button"
         aria-label="Close"
-        onClick={() => onOpenChange(false)}
+        onClick={(e) => {
+          e.preventDefault();
+          onOpenChange(false);
+        }}
         className="absolute inset-0 cursor-default bg-black/70 backdrop-blur-sm"
       />
 
@@ -205,14 +209,18 @@ function EntranceModalShell({
           style={{ background: "var(--gradient-radial-gold)" }}
         />
 
-        <button
-          type="button"
+        <a
+          href="/"
+          role="button"
           aria-label="Close"
-          onClick={() => onOpenChange(false)}
+          onClick={(e) => {
+            e.preventDefault();
+            onOpenChange(false);
+          }}
           className="absolute right-3 top-3 rounded-md p-1.5 text-muted-foreground transition hover:bg-secondary/60 hover:text-foreground"
         >
           <X className="h-4 w-4" />
-        </button>
+        </a>
 
         <div className="inline-flex items-center gap-2 rounded-full border border-gold/30 bg-gold/5 px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-gold sm:text-xs">
           <span className="inline-block h-1.5 w-1.5 rounded-full bg-gold animate-pulse-glow" />
