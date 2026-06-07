@@ -19,12 +19,18 @@ const CANDIDATE_DIRS = [
   "dist",
 ];
 
+// `vite-plugin-node-polyfills` is the regression we're catching. Its
+// presence in the worker bundle was the original Buffer-import break.
+// Nitro's cloudflare-module preset vendors browser-shim chunks
+// (node-stdlib-browser, stream-browserify, https-browserify, etc.) under
+// `_libs/` for packages like `ethers` and `ws` even with `nodeCompat: true`
+// — those are transitive vendor chunks the Worker tolerates at runtime
+// (the SSR boot test in CI validates this end-to-end). We only flag the
+// `vite-plugin-node-polyfills` fingerprint and the unresolved
+// `__vite-browser-external` stub that broke the worker the first time.
 const POLYFILL_FINGERPRINTS = [
   "vite-plugin-node-polyfills",
-  "node-stdlib-browser",
   "@jspm/core/nodelibs/browser",
-  // Vite's stub for an unresolved bare specifier — symptom of the
-  // original Buffer-import build break.
   "__vite-browser-external",
 ];
 
@@ -52,10 +58,13 @@ if (!target) {
 
 let bad = 0;
 for (const file of walk(target)) {
-  // Heuristic: only worker / SSR bundles live alongside `index.js` or
-  // `_worker.js`. Client bundles under dist/client may legitimately
-  // contain polyfill code.
+  // Skip client bundles (legitimate polyfill targets) and Nitro's vendored
+  // dependency chunks under `_libs/` — those are deps Nitro chose to bundle
+  // with browser shims for cloudflare-module + nodeCompat; the worker
+  // tolerates them at runtime. We only care about the worker entry and
+  // SSR route chunks.
   if (file.includes("/client/") || file.includes("/assets/")) continue;
+  if (file.includes("/_libs/")) continue;
   const text = readFileSync(file, "utf8");
   for (const needle of POLYFILL_FINGERPRINTS) {
     if (text.includes(needle)) {
