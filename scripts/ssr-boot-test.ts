@@ -6,22 +6,28 @@
  * Worker entry (`src/server.ts` → `@tanstack/react-start/server-entry`)
  * evaluates without throwing at module init.
  *
- * A module-init throw in the Worker bundle produces one of two symptoms
- * that this test detects:
- *
- *   1. HTTP 5xx on every route (the worker can't dispatch anything).
- *   2. HTTP 500 with body `{"status":500,"unhandled":true,"message":"HTTPError"}`
- *      — h3's swallowed-error envelope (see tanstack-ssr-error-handling).
- *
- * Either case fails CI. This complements scripts/ssr-smoke-test.ts (which
- * also hits multiple routes) by giving a single, fast, dedicated signal
- * for the "worker exploded at boot" class of regressions.
+ * On failure, captures the worker's full stdout/stderr and the boot-error
+ * stack trace as plain files at the repo root so the CI workflow can
+ * upload them as artifacts:
+ *   - worker-stdout.log
+ *   - worker-stderr.log
+ *   - boot-error.log   (the error from this script, including stack)
  */
 import { spawn } from "node:child_process";
+import { writeFileSync, appendFileSync } from "node:fs";
 
 const PORT = Number(process.env.BOOT_PORT ?? 4174);
 const BASE = `http://127.0.0.1:${PORT}`;
 const TIMEOUT_MS = 60_000;
+
+const STDOUT_LOG = "worker-stdout.log";
+const STDERR_LOG = "worker-stderr.log";
+const ERROR_LOG = "boot-error.log";
+
+// Truncate the artifact files on each run so we never upload stale logs.
+writeFileSync(STDOUT_LOG, "");
+writeFileSync(STDERR_LOG, "");
+writeFileSync(ERROR_LOG, "");
 
 const child = spawn(
   "bunx",
@@ -36,9 +42,14 @@ let serverReady = false;
 child.stdout.on("data", (d) => {
   const s = d.toString();
   process.stdout.write(`[preview] ${s}`);
+  appendFileSync(STDOUT_LOG, s);
   if (/Local:\s+http/.test(s)) serverReady = true;
 });
-child.stderr.on("data", (d) => process.stderr.write(`[preview!] ${d}`));
+child.stderr.on("data", (d) => {
+  const s = d.toString();
+  process.stderr.write(`[preview!] ${s}`);
+  appendFileSync(STDERR_LOG, s);
+});
 
 async function waitReady() {
   const deadline = Date.now() + TIMEOUT_MS;
@@ -96,7 +107,12 @@ async function main() {
 }
 
 void main().catch((e) => {
+  const stack = e instanceof Error ? (e.stack ?? `${e.name}: ${e.message}`) : String(e);
   console.error(e);
+  appendFileSync(
+    ERROR_LOG,
+    `[ssr-boot-test] FAILED at ${new Date().toISOString()}\n${stack}\n`,
+  );
   child.kill("SIGTERM");
   process.exit(1);
 });

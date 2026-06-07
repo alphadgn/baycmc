@@ -37,6 +37,12 @@ jobs:
       - name: Lint (non-blocking)
         run: bun run lint || true
 
+      - name: Validate required env vars
+        run: bun scripts/check-required-env.ts
+
+      - name: Worker entry module-init unit test
+        run: bunx vitest run tests/unit/server-entry-init.test.ts
+
       - name: Server-import guard
         run: bun run check:server-imports
 
@@ -64,7 +70,11 @@ jobs:
           name: build-output-${{ github.run_id }}
           path: |
             build.log
+            worker-stdout.log
+            worker-stderr.log
+            boot-error.log
             dist/**
             .output/**
           if-no-files-found: ignore
           retention-days: 7
+
