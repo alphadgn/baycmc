@@ -51,6 +51,12 @@ jobs:
         env:
           SMOKE_PORT: "4173"
 
+      - name: SSR/Worker boot test
+        run: bun scripts/ssr-boot-test.ts
+        env:
+          BOOT_PORT: "4174"
+
+
       - name: Upload build artifacts
         if: always()
         uses: actions/upload-artifact@v4
