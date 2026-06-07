@@ -19,12 +19,19 @@ import { nodePolyfills } from "vite-plugin-node-polyfills";
 // We still pass the plugin through so bare specifiers like `import "buffer"`
 // resolve to its browser shims for the client build only — never the SSR
 // (Cloudflare Worker) bundle, where these polyfills break the runtime.
+// Gate via BOTH `apply` (legacy ConfigEnv.isSsrBuild) and the Vite 6+
+// `applyToEnvironment` per-environment hook. The Cloudflare Worker build
+// runs through Vite's environment API as the `ssr` environment, which does
+// NOT set `ConfigEnv.isSsrBuild=true` — only `applyToEnvironment` catches
+// it. Without this guard, `node-stdlib-browser` and friends leak into the
+// Worker bundle (caught by scripts/check-no-polyfills-in-ssr.ts).
 const clientOnlyNodePolyfills = nodePolyfills({
   globals: { Buffer: false, global: false, process: false },
 }).map((plugin) => ({
   ...plugin,
   apply: (_config: unknown, env: { isSsrBuild?: boolean; command: string }) =>
     !env.isSsrBuild,
+  applyToEnvironment: (env: { name: string }) => env.name === "client",
 }));
 
 export default defineConfig({
