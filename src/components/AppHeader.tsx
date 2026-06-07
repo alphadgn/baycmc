@@ -1,12 +1,9 @@
 import { Link, useLocation, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Loader2, Menu, X } from "lucide-react";
-import { toast } from "sonner";
 import { useAuth } from "@/lib/auth/useAuth";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import { useGlyphAuthState } from "@/lib/auth/useGlyphBridge";
-import { useGlyphReady } from "@/components/GlyphAppProvider";
-import { importWithRetry } from "@/lib/import-with-retry";
 import { supabase } from "@/integrations/supabase/client";
 import { EntranceDialog } from "@/components/EntranceDialog";
 import { EmbroideredImage } from "@/components/EmbroideredImage";
@@ -275,121 +272,27 @@ function sliceAddress(addr: string) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 }
 
-type GlyphConnection = { connect: () => void | Promise<void>; disconnect: () => void };
-type UseNativeGlyphConnection = () => GlyphConnection;
-type AccountValue = { isConnected: boolean };
-type UseAccount = () => AccountValue;
-type HeaderEntranceHooks = {
-  useNativeGlyphConnection: UseNativeGlyphConnection;
-  useAccount: UseAccount;
-};
+// VIP button click → opens EntranceDialog. The dialog owns the Glyph
+// connect + SIWE sign flow. Header no longer loads the SDK hooks itself.
 
-function GlyphVipButton({
-  hooks,
-  openEntrance,
-}: {
-  hooks: HeaderEntranceHooks;
-  openEntrance: () => void;
-}) {
-  const { connect } = hooks.useNativeGlyphConnection();
-  const { isConnected } = hooks.useAccount();
-  const glyph = useGlyphAuthState();
-  const [connecting, setConnecting] = useState(false);
 
-  async function handleClick() {
-    if (isConnected || glyph.authenticated) {
-      window.dispatchEvent(new Event("baycmc:wallet-verify"));
-      return;
-    }
-    // Always open the app-level entrance modal first so the VIP tap has an
-    // immediate visible result. The previous implementation only called the
-    // Glyph connector directly; when the SDK returned without surfacing UI,
-    // the user saw nothing and had no fallback sign-in controls.
-    openEntrance();
-    setConnecting(true);
-    try {
-      await connect();
-    } catch (e) {
-      console.warn("[AppHeader] Glyph connect() failed", e);
-      openEntrance();
-    } finally {
-      setConnecting(false);
-    }
-  }
-
-  return (
-    <button
-      type="button"
-      data-vip-trigger="true"
-      disabled={connecting || glyph.verifying}
-      onClick={() => void handleClick()}
-      className="shrink-0 cursor-pointer rounded-md bg-gradient-gold px-3 py-2 text-xs font-semibold text-gold-foreground shadow-gold transition hover:opacity-90 disabled:cursor-wait disabled:opacity-70 sm:px-4 sm:text-sm"
-    >
-      {connecting ? "Loading…" : "VIP"}
-    </button>
-  );
-}
 
 function EntranceControls({ onOpen }: { onOpen: () => void }) {
-  const { isAuthenticated, user, loading: authLoading } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { isVerifiedHolder, collection, loading: verifLoading } = useVerificationStatus();
   const glyph = useGlyphAuthState();
-  const glyphReady = useGlyphReady();
-  const [hooks, setHooks] = useState<HeaderEntranceHooks | null>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [profileLoaded, setProfileLoaded] = useState(false);
-  const [clicked, setClicked] = useState(false);
-  const isBooting = clicked && !glyph.ready;
+  const [, setProfileLoaded] = useState(false);
 
+  // Allow other code (e.g. queued taps before mount) to request the modal.
   useEffect(() => {
     function openFromQueuedVipTap() {
-      setClicked(true);
       onOpen();
     }
     window.addEventListener("baycmc:vip-click", openFromQueuedVipTap);
     return () => window.removeEventListener("baycmc:vip-click", openFromQueuedVipTap);
   }, [onOpen]);
 
-  useEffect(() => {
-    if (glyph.ready) setClicked(false);
-  }, [glyph.ready]);
-
-  useEffect(() => {
-    if (!glyphReady) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const [glyphMod, wagmiMod] = await Promise.all([
-          importWithRetry(() => import("@use-glyph/sdk-react"), { label: "glyph-sdk-react-header" }),
-          importWithRetry(() => import("wagmi"), { label: "wagmi-header" }),
-        ]);
-        if (cancelled) return;
-        setHooks(() => ({
-          useNativeGlyphConnection:
-            glyphMod.useNativeGlyphConnection as unknown as UseNativeGlyphConnection,
-          useAccount: wagmiMod.useAccount as unknown as UseAccount,
-        }));
-      } catch (e) {
-        console.warn("[AppHeader] failed to load Glyph sign-in hooks", e);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [glyphReady]);
-
-  useEffect(() => {
-    if (!clicked) return;
-    if (glyph.ready) return;
-    const t = window.setTimeout(() => {
-      toast.error("Wallet sign-in didn't load.", {
-        description: "Please refresh the page and try again.",
-        duration: 8000,
-      });
-      setClicked(false);
-    }, 8000);
-    return () => window.clearTimeout(t);
-  }, [clicked, glyph.ready]);
 
   useEffect(() => {
     if (!isAuthenticated || !user) {
@@ -479,22 +382,21 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
     );
   }
 
-  if (glyphReady && hooks) {
-    return <GlyphVipButton hooks={hooks} openEntrance={onOpen} />;
-  }
-
+  // Single VIP button. First action on click is ALWAYS to open the
+  // EntranceDialog — no gating on glyph.ready, wallet connection, auth, or
+  // SDK init. The modal owns the connect / sign flow.
   return (
     <button
       type="button"
       data-vip-trigger="true"
-      disabled={isBooting}
       onClick={() => {
-        setClicked(true);
+        console.log("[VIP CLICKED]");
+        console.log("[MODAL OPEN REQUESTED]");
         onOpen();
       }}
-      className="shrink-0 cursor-pointer rounded-md bg-gradient-gold px-3 py-2 text-xs font-semibold text-gold-foreground shadow-gold transition hover:opacity-90 disabled:cursor-wait disabled:opacity-70 sm:px-4 sm:text-sm"
+      className="shrink-0 cursor-pointer rounded-md bg-gradient-gold px-3 py-2 text-xs font-semibold text-gold-foreground shadow-gold transition hover:opacity-90 sm:px-4 sm:text-sm"
     >
-      {isBooting ? "Loading…" : "VIP"}
+      VIP
     </button>
   );
 }
