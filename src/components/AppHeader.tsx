@@ -272,19 +272,9 @@ function sliceAddress(addr: string) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 }
 
-type GlyphConnection = { connect: () => void | Promise<void>; disconnect: () => void };
-type UseNativeGlyphConnection = () => GlyphConnection;
-type AccountValue = { isConnected: boolean };
-type UseAccount = () => AccountValue;
-type HeaderEntranceHooks = {
-  useNativeGlyphConnection: UseNativeGlyphConnection;
-  useAccount: UseAccount;
-};
+// VIP button click → opens EntranceDialog. The dialog owns the Glyph
+// connect + SIWE sign flow. Header no longer loads the SDK hooks itself.
 
-// GlyphVipButton removed: the VIP button no longer drives Glyph connection
-// directly. Clicking VIP opens <EntranceDialog>, which owns the connect +
-// sign flow. This guarantees the modal appears immediately on every click,
-// regardless of Glyph SDK / wallet / auth state.
 
 
 function EntranceControls({ onOpen }: { onOpen: () => void }) {
