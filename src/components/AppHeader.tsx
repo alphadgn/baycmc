@@ -384,15 +384,30 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
 
   // Single VIP button. First action on click is ALWAYS to open the
   // EntranceDialog — no gating on glyph.ready, wallet connection, auth, or
-  // SDK init. The modal owns the connect / sign flow.
+  // SDK init. The modal owns the connect / sign flow. Inline styles guarantee
+  // the gold treatment renders even if a downstream CSS rule shadows the
+  // Tailwind utility classes (matches the Main Entrance button).
   return (
     <button
       type="button"
       data-vip-trigger="true"
-      onClick={() => {
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
         console.log("[VIP CLICKED]");
         console.log("[MODAL OPEN REQUESTED]");
         onOpen();
+      }}
+      onPointerDown={() => {
+        // Belt-and-suspenders: if hydration is slow, a pointerdown still
+        // wakes the listener once React attaches.
+        try { window.dispatchEvent(new Event("baycmc:vip-click")); } catch { /* noop */ }
+      }}
+      style={{
+        backgroundImage:
+          "linear-gradient(135deg, oklch(0.85 0.16 82) 0%, oklch(0.68 0.18 50) 100%)",
+        color: "oklch(0.14 0.01 80)",
+        boxShadow: "0 10px 40px -10px oklch(0.78 0.14 78 / 35%)",
       }}
       className="shrink-0 cursor-pointer rounded-md bg-gradient-gold px-3 py-2 text-xs font-semibold text-gold-foreground shadow-gold transition hover:opacity-90 sm:px-4 sm:text-sm"
     >
