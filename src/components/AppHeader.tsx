@@ -74,8 +74,18 @@ export function AppHeader() {
     setEntranceOpen(true);
   };
 
+  const handleEntranceOpenChange = (open: boolean) => {
+    setEntranceOpen(open);
+    if (!open && typeof window !== "undefined" && hasEntranceRequest(location)) {
+      window.history.replaceState(window.history.state, "", location.pathname || "/");
+    }
+  };
+
   useEffect(() => {
-    if (hasEntranceRequest(location)) openEntrance();
+    if (hasEntranceRequest(location)) {
+      console.log("[ENTRANCE MODAL OPEN]");
+      setEntranceOpen(true);
+    }
   }, [location]);
 
   // Count internal navigations so the back button never lands on a blank/
@@ -269,7 +279,7 @@ export function AppHeader() {
         </div>
       </header>
 
-      <EntranceDialog open={entranceOpen} onOpenChange={setEntranceOpen} />
+      <EntranceDialog open={entranceOpen} onOpenChange={handleEntranceOpenChange} />
     </>
   );
 }
