@@ -29,6 +29,7 @@ const clientOnlyNodePolyfills = nodePolyfills({
 
 export default defineConfig({
   tanstackStart: {
+    server: { entry: "server" },
     importProtection: {
       behavior: "error",
       client: {
@@ -44,3 +45,4 @@ export default defineConfig({
     plugins: [clientOnlyNodePolyfills],
   },
 });
+
