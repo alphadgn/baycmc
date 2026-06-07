@@ -479,22 +479,21 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
     );
   }
 
-  if (glyphReady && hooks) {
-    return <GlyphVipButton hooks={hooks} openEntrance={onOpen} />;
-  }
-
+  // Single VIP button. First action on click is ALWAYS to open the
+  // EntranceDialog — no gating on glyph.ready, wallet connection, auth, or
+  // SDK init. The modal owns the connect / sign flow.
   return (
     <button
       type="button"
       data-vip-trigger="true"
-      disabled={isBooting}
       onClick={() => {
-        setClicked(true);
+        console.log("[VIP CLICKED]");
+        console.log("[MODAL OPEN REQUESTED]");
         onOpen();
       }}
-      className="shrink-0 cursor-pointer rounded-md bg-gradient-gold px-3 py-2 text-xs font-semibold text-gold-foreground shadow-gold transition hover:opacity-90 disabled:cursor-wait disabled:opacity-70 sm:px-4 sm:text-sm"
+      className="shrink-0 cursor-pointer rounded-md bg-gradient-gold px-3 py-2 text-xs font-semibold text-gold-foreground shadow-gold transition hover:opacity-90 sm:px-4 sm:text-sm"
     >
-      {isBooting ? "Loading…" : "VIP"}
+      VIP
     </button>
   );
 }
