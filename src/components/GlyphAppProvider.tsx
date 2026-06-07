@@ -71,17 +71,23 @@ export function GlyphAppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
-    // Hard-fail fast if Buffer/EventEmitter aren't on the page — Privy
-    // (under Glyph) needs them and will crash deep inside its bundle
-    // otherwise. The ensure() helper logs a clear diagnostic.
-    const polyfills = ensureBrowserPolyfills();
-    if (!polyfills.ok) {
-      console.warn(
-        "[GlyphAppProvider] Skipping Glyph init: required browser polyfills missing.",
-      );
-      return;
-    }
     void (async () => {
+      // Install browser polyfills (Buffer / process / global) BEFORE we
+      // touch Privy/Glyph. Loaded from a client-only effect so the shim
+      // (and its `import("buffer")` / `import("process")` calls) never
+      // enters the Cloudflare Worker SSR bundle.
+      try {
+        await import("@/lib/polyfill-shim").then((m) => m.installBrowserPolyfills());
+      } catch (e) {
+        console.warn("[GlyphAppProvider] polyfill install failed:", e);
+      }
+      const polyfills = ensureBrowserPolyfills();
+      if (!polyfills.ok) {
+        console.warn(
+          "[GlyphAppProvider] Skipping Glyph init: required browser polyfills missing.",
+        );
+        return;
+      }
       try {
         // Glyph's widget styles must be present for the login modal / widget.
         await importWithRetry(() => import("@use-glyph/sdk-react/style.css") as Promise<unknown>, {
