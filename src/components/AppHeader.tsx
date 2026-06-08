@@ -60,33 +60,16 @@ let internalNavCount = 0;
 export function AppHeader() {
   const { isAuthenticated, user } = useAuth();
   const { isVerifiedHolder, isLifer } = useVerificationStatus();
-  const router = useRouter();
-  const location = useLocation();
-  const [entranceOpen, setEntranceOpen] = useState(() => hasEntranceRequest(location));
+  const [entranceOpen, setEntranceOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [karaokeRoomId, setKaraokeRoomId] = useState<string | null>(null);
   // pendingGatedRoute removed: gated nav entries are now hidden entirely
   // until verification completes, so there's no in-menu retry flow.
-  const openEntrance = () => {
-    console.log("[ENTRANCE MODAL OPEN]");
-    setEntranceOpen(true);
-  };
 
-  const handleEntranceOpenChange = (open: boolean) => {
-    setEntranceOpen(open);
-    if (!open && typeof window !== "undefined" && hasEntranceRequest(location)) {
-      window.history.replaceState(window.history.state, "", location.pathname || "/");
-    }
-  };
-
-  useEffect(() => {
-    if (hasEntranceRequest(location)) {
-      console.log("[ENTRANCE MODAL OPEN]");
-      setEntranceOpen(true);
-    }
-  }, [location]);
+  const router = useRouter();
+  const location = useLocation();
 
   // Count internal navigations so the back button never lands on a blank/
   // external page. The first effect run is the route the user landed on;
@@ -204,7 +187,7 @@ export function AppHeader() {
           </div>
 
           <div className="flex min-w-0 items-center gap-2">
-            <EntranceControls onOpen={openEntrance} />
+            <EntranceControls onOpen={() => setEntranceOpen(true)} />
             {showHamburger && (
               <Sheet open={navOpen} onOpenChange={setNavOpen}>
                 <SheetTrigger asChild>
@@ -279,20 +262,9 @@ export function AppHeader() {
         </div>
       </header>
 
-      <EntranceDialog open={entranceOpen} onOpenChange={handleEntranceOpenChange} />
+      <EntranceDialog open={entranceOpen} onOpenChange={setEntranceOpen} />
     </>
   );
-}
-
-function hasEntranceRequest(location: unknown): boolean {
-  const loc = location as { href?: string; searchStr?: string; search?: unknown };
-  const search = loc.search;
-  if (search && typeof search === "object") {
-    const params = search as Record<string, unknown>;
-    if (params.vip === "1" || params.entrance === "vip" || params.vip === true) return true;
-  }
-  const searchText = typeof loc.searchStr === "string" ? loc.searchStr : typeof loc.href === "string" ? loc.href : "";
-  return /(?:[?&](?:vip=1|entrance=vip))(?:&|$)/.test(searchText);
 }
 
 function sliceAddress(addr: string) {
@@ -416,9 +388,8 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
   // the gold treatment renders even if a downstream CSS rule shadows the
   // Tailwind utility classes (matches the Main Entrance button).
   return (
-    <a
-      href="/?vip=1"
-      role="button"
+    <button
+      type="button"
       data-vip-trigger="true"
       onClick={(e) => {
         e.preventDefault();
@@ -441,7 +412,7 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
       className="shrink-0 cursor-pointer rounded-md bg-gradient-gold px-3 py-2 text-xs font-semibold text-gold-foreground shadow-gold transition hover:opacity-90 sm:px-4 sm:text-sm"
     >
       VIP
-    </a>
+    </button>
   );
 }
 
