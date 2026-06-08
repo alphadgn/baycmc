@@ -137,16 +137,14 @@ export const searchKaraokeSongs = createServerFn({ method: "POST" })
 
     // Cache it
     if (hits.length > 0) {
-      await supabaseAdmin
-        .from("karaoke_search_cache")
-        .upsert(
-          {
-            query: cacheKey,
-            results: JSON.parse(JSON.stringify(hits)),
-            fetched_at: new Date().toISOString(),
-          },
-          { onConflict: "query" },
-        );
+      await supabaseAdmin.from("karaoke_search_cache").upsert(
+        {
+          query: cacheKey,
+          results: JSON.parse(JSON.stringify(hits)),
+          fetched_at: new Date().toISOString(),
+        },
+        { onConflict: "query" },
+      );
     }
 
     return { source: "web" as const, hits };
