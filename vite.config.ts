@@ -1,6 +1,11 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      buffer: "buffer/",
+    },
+  },
   tanstackStart: {
     server: { entry: "server" },
     importProtection: {
@@ -11,3 +16,4 @@ export default defineConfig({
     },
   },
 });
+
