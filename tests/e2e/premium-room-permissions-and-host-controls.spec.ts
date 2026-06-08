@@ -34,7 +34,11 @@ const ROOM_PATH = process.env.PREMIUM_ROOM_PATH ?? "/lifers/room";
 
 type GumCall = { audio: boolean; video: boolean };
 
-async function newHostContext(browser: Parameters<typeof test.use>[0] extends never ? never : Parameters<Parameters<typeof test>[1]>[0]["browser"]): Promise<BrowserContext> {
+async function newHostContext(
+  browser: Parameters<typeof test.use>[0] extends never
+    ? never
+    : Parameters<Parameters<typeof test>[1]>[0]["browser"],
+): Promise<BrowserContext> {
   return browser.newContext({
     storageState: HOST_STATE,
     permissions: ["microphone", "camera"],
@@ -104,9 +108,27 @@ async function installMediaMocks(page: Page) {
       return fakeStream(audio, video);
     };
     md.enumerateDevices = async () => [
-      { deviceId: "mock-audio", kind: "audioinput", label: "Mock Mic", groupId: "g1", toJSON: () => ({}) } as MediaDeviceInfo,
-      { deviceId: "mock-video", kind: "videoinput", label: "Mock Cam", groupId: "g1", toJSON: () => ({}) } as MediaDeviceInfo,
-      { deviceId: "mock-out", kind: "audiooutput", label: "Mock Speaker", groupId: "g1", toJSON: () => ({}) } as MediaDeviceInfo,
+      {
+        deviceId: "mock-audio",
+        kind: "audioinput",
+        label: "Mock Mic",
+        groupId: "g1",
+        toJSON: () => ({}),
+      } as MediaDeviceInfo,
+      {
+        deviceId: "mock-video",
+        kind: "videoinput",
+        label: "Mock Cam",
+        groupId: "g1",
+        toJSON: () => ({}),
+      } as MediaDeviceInfo,
+      {
+        deviceId: "mock-out",
+        kind: "audiooutput",
+        label: "Mock Speaker",
+        groupId: "g1",
+        toJSON: () => ({}),
+      } as MediaDeviceInfo,
     ];
   });
 }
@@ -117,7 +139,9 @@ test.describe("Premium room — device permissions + host controls", () => {
     "Set HOST_STORAGE_STATE to a Playwright storageState file for a verified host account to run this suite.",
   );
 
-  test("getUserMedia is invoked with audio + video; host toggles round-trip", async ({ browser }) => {
+  test("getUserMedia is invoked with audio + video; host toggles round-trip", async ({
+    browser,
+  }) => {
     const context = await newHostContext(browser);
     const page = await context.newPage();
     await installMediaMocks(page);
@@ -146,9 +170,7 @@ test.describe("Premium room — device permissions + host controls", () => {
     await expect
       .poll(
         async () =>
-          page.evaluate(
-            () => (window as unknown as { __gumCalls?: GumCall[] }).__gumCalls ?? [],
-          ),
+          page.evaluate(() => (window as unknown as { __gumCalls?: GumCall[] }).__gumCalls ?? []),
         { timeout: 20_000, message: "navigator.mediaDevices.getUserMedia was never called" },
       )
       .toEqual(expect.arrayContaining([expect.objectContaining({ audio: true })]));
@@ -156,8 +178,14 @@ test.describe("Premium room — device permissions + host controls", () => {
     const allCalls = await page.evaluate(
       () => (window as unknown as { __gumCalls?: GumCall[] }).__gumCalls ?? [],
     );
-    expect(allCalls.some((c) => c.audio), "expected at least one audio permission request").toBeTruthy();
-    expect(allCalls.some((c) => c.video), "expected at least one video permission request").toBeTruthy();
+    expect(
+      allCalls.some((c) => c.audio),
+      "expected at least one audio permission request",
+    ).toBeTruthy();
+    expect(
+      allCalls.some((c) => c.video),
+      "expected at least one video permission request",
+    ).toBeTruthy();
 
     // 5. Host controls must be present (proves the LiveKit token minted
     //    with `isHost: true` — i.e. the user is the active booking owner
@@ -175,7 +203,9 @@ test.describe("Premium room — device permissions + host controls", () => {
     );
     await muteAll.click();
     await muteAllReq;
-    await expect(page.getByRole("button", { name: /Unmute all/i })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("button", { name: /Unmute all/i })).toBeVisible({
+      timeout: 10_000,
+    });
 
     // 7. Lock room → button flips to "Unlock room"; assert setRoomLocked
     //    round-trips.
@@ -185,7 +215,9 @@ test.describe("Premium room — device permissions + host controls", () => {
     );
     await lockRoom.click();
     await lockReq;
-    await expect(page.getByRole("button", { name: /Unlock room/i })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("button", { name: /Unlock room/i })).toBeVisible({
+      timeout: 10_000,
+    });
 
     // 8. Restore room state so the test is re-runnable.
     await page.getByRole("button", { name: /Unlock room/i }).click();

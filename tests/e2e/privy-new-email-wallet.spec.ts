@@ -26,9 +26,7 @@ for (const { name, device } of profiles) {
     test.use({ ...device });
     test.skip(!NEW_EMAIL, "Set PRIVY_TEST_NEW_EMAIL to run this spec.");
 
-    test("auto-created embedded wallet drives the BAYC/MAYC verification", async ({
-      page,
-    }) => {
+    test("auto-created embedded wallet drives the BAYC/MAYC verification", async ({ page }) => {
       // Capture the verifyPrivyOwnership server-fn call so we can assert the
       // wallet that was checked is the same auto-created one shown in UI.
       const verifyCalls: { address?: string; status: number }[] = [];
@@ -94,9 +92,7 @@ for (const { name, device } of profiles) {
       );
 
       // The server-fn must have been hit at least once.
-      await expect
-        .poll(() => verifyCalls.length, { timeout: 30_000 })
-        .toBeGreaterThan(0);
+      await expect.poll(() => verifyCalls.length, { timeout: 30_000 }).toBeGreaterThan(0);
     });
   });
 }
