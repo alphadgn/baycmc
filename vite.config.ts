@@ -1,9 +1,11 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
-  resolve: {
-    alias: {
-      buffer: "buffer/",
+  vite: {
+    resolve: {
+      alias: {
+        buffer: "buffer/",
+      },
     },
   },
   tanstackStart: {
@@ -16,4 +18,5 @@ export default defineConfig({
     },
   },
 });
+
 
