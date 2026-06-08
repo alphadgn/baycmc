@@ -1,4 +1,7 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import path from "node:path";
+
+const bufferPath = path.resolve(process.cwd(), "node_modules/buffer/index.js");
 
 export default defineConfig({
   tanstackStart: {
@@ -13,15 +16,14 @@ export default defineConfig({
   vite: {
     resolve: {
       alias: {
-        // Privy/Glyph transitive deps import `buffer` directly. Vite would
-        // otherwise externalize it to __vite-browser-external in the client
-        // bundle and break the build ("Buffer is not exported"). Point it at
-        // the installed npm `buffer` polyfill package for the browser build.
-        buffer: "buffer/index.js",
+        // Privy/Glyph transitive deps (e.g. @privy-io/cross-app-connect/crypto)
+        // statically `import { Buffer } from "buffer"`. Without an alias Vite
+        // externalizes the node builtin name to `__vite-browser-external` in
+        // the browser build and the import fails with
+        // `"Buffer" is not exported by "__vite-browser-external"`. Point it
+        // at the installed npm `buffer` polyfill so the client build links.
+        buffer: bufferPath,
       },
-    },
-    optimizeDeps: {
-      include: ["buffer"],
     },
   },
 });
