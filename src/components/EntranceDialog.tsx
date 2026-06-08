@@ -246,7 +246,6 @@ function EntranceModalShell({
           Glyph.io vault delegations supported
         </p>
 
-
         {phase === "sign" ? (
           <button
             type="button"
