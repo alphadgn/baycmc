@@ -1,22 +1,10 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import type { UserConfig } from "vite";
 
 export default defineConfig({
-  vite: {
-    resolve: {
-      alias: {
-        buffer: "buffer/",
-      },
+  resolve: {
+    alias: {
+      buffer: "buffer/",
     },
   },
-  tanstackStart: {
-    server: { entry: "server" },
-    importProtection: {
-      behavior: "error",
-      client: {
-        excludeFiles: ["**/*.functions.ts", "**/*.functions.tsx", "**/*.functions.js"],
-      },
-    },
-  },
-});
-
-
+} as UserConfig);
