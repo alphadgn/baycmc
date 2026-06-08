@@ -289,6 +289,9 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
   const { isAuthenticated, user } = useAuth();
   const { isVerifiedHolder, collection, loading: verifLoading } = useVerificationStatus();
   const glyph = useGlyphAuthState();
+  const glyphReady = useGlyphReady();
+  const [hooks, setHooks] = useState<HeaderEntranceHooks | null>(null);
+  const connectAfterOpenRef = useRef(false);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [, setProfileLoaded] = useState(false);
 
@@ -300,6 +303,28 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
     window.addEventListener("baycmc:vip-click", openFromQueuedVipTap);
     return () => window.removeEventListener("baycmc:vip-click", openFromQueuedVipTap);
   }, [onOpen]);
+
+  useEffect(() => {
+    if (!glyphReady) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const glyphMod = await importWithRetry(() => import("@use-glyph/sdk-react"), {
+          label: "glyph-sdk-react-header",
+        });
+        if (cancelled) return;
+        setHooks(() => ({
+          useNativeGlyphConnection:
+            glyphMod.useNativeGlyphConnection as unknown as UseNativeGlyphConnection,
+        }));
+      } catch {
+        /* EntranceDialog still opens and can load Glyph itself. */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [glyphReady]);
 
 
   useEffect(() => {
@@ -326,6 +351,19 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
   }, [isAuthenticated, user]);
 
   const verifying = glyph.verifying;
+  const connect = hooks?.useNativeGlyphConnection().connect ?? null;
+
+  useEffect(() => {
+    if (!connectAfterOpenRef.current || !connect || glyph.authenticated) return;
+    connectAfterOpenRef.current = false;
+    try {
+      console.log("[GLYPH CONNECT START]");
+      connect();
+      console.log("[GLYPH CONNECT SUCCESS]");
+    } catch (e) {
+      console.warn("[AppHeader] Glyph connect() threw:", e);
+    }
+  }, [connect, glyph.authenticated]);
 
   // Re-verification (lobby → holder): hands off to the Glyph bridge,
   // which pops a fresh SIWE signature and re-runs the on-chain check.
@@ -404,6 +442,7 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
         e.stopPropagation();
         console.log("[VIP CLICKED]");
         console.log("[MODAL OPEN REQUESTED]");
+        connectAfterOpenRef.current = true;
         onOpen();
       }}
       onPointerDown={() => {
