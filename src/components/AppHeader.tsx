@@ -1,5 +1,5 @@
 import { Link, useLocation, useRouter } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import { ArrowLeft, Loader2, Menu, X } from "lucide-react";
 import { useAuth } from "@/lib/auth/useAuth";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
@@ -461,7 +461,7 @@ function VipButtonWithGlyphConnect({
 }) {
   const { connect } = hooks.useNativeGlyphConnection();
 
-  function handleVipClick(e: React.MouseEvent<HTMLButtonElement>) {
+  function handleVipClick(e: MouseEvent<HTMLButtonElement>) {
     e.preventDefault();
     e.stopPropagation();
     console.log("[VIP CLICKED]");
