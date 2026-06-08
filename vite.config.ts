@@ -1,4 +1,5 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import { nodePolyfills } from "vite-plugin-node-polyfills";
 
 export default defineConfig({
   tanstackStart: {
@@ -10,16 +11,17 @@ export default defineConfig({
       },
     },
   },
-  // Force the bare `buffer` / `process` specifiers (used by Privy's
-  // cross-app-connect crypto bundle) to resolve to the npm browser polyfills
-  // instead of Vite's default `__vite-browser-external` stub, which does not
-  // export `Buffer` and breaks the production Rollup build.
-  vite: {
-    resolve: {
-      alias: [
-        { find: /^buffer$/, replacement: "buffer/" },
-        { find: /^process$/, replacement: "process/browser" },
-      ],
-    },
-  },
+  // Privy's `@privy-io/cross-app-connect/dist/esm/crypto.mjs` does
+  // `import { Buffer } from "buffer"` at module scope. Without a real
+  // polyfill, Vite resolves bare `buffer` to its `__vite-browser-external`
+  // stub which has no `Buffer` named export, breaking the production Rollup
+  // build. The polyfill plugin provides browser-compatible shims for the
+  // few Node built-ins Privy / Glyph / wagmi reach for at module scope.
+  plugins: [
+    nodePolyfills({
+      include: ["buffer", "process", "events", "util", "stream"],
+      globals: { Buffer: true, process: true, global: true },
+      protocolImports: true,
+    }),
+  ],
 });
