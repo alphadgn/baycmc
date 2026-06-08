@@ -269,7 +269,11 @@ function Sidebar({
   return (
     <nav className={`flex flex-col ${className ?? ""}`} aria-label="Primary">
       <div className="flex h-16 items-center justify-between border-b border-border/60 px-4">
-        <Link to="/lobby" onClick={onNavigate} className="flex items-center gap-2 font-display text-sm">
+        <Link
+          to="/lobby"
+          onClick={onNavigate}
+          className="flex items-center gap-2 font-display text-sm"
+        >
           <span className="flex h-7 w-7 items-center justify-center rounded-md bg-gradient-gold font-display text-base font-bold text-gold-foreground shadow-gold">
             B
           </span>
@@ -403,7 +407,10 @@ function WelcomeStrip({ title, onOpenMobileNav }: { title: string; onOpenMobileN
   return (
     <header
       className="sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-border/60 bg-background/95 px-4 backdrop-blur pl-safe pr-safe sm:px-6"
-      style={{ paddingTop: "max(env(safe-area-inset-top, 0px), 0.75rem)", minHeight: "calc(3.5rem + max(env(safe-area-inset-top, 0px), 0.75rem))" }}
+      style={{
+        paddingTop: "max(env(safe-area-inset-top, 0px), 0.75rem)",
+        minHeight: "calc(3.5rem + max(env(safe-area-inset-top, 0px), 0.75rem))",
+      }}
     >
       <div className="flex min-w-0 items-center gap-2">
         <button
@@ -453,9 +460,7 @@ function NotificationSettingsButton() {
           aria-label="Notification settings"
           title="Notification settings"
           className={`relative inline-flex h-9 w-9 items-center justify-center rounded-md border bg-secondary/40 transition hover:bg-secondary ${
-            allOff
-              ? "border-destructive/40 text-destructive"
-              : "border-border text-foreground"
+            allOff ? "border-destructive/40 text-destructive" : "border-border text-foreground"
           }`}
         >
           <Bell className="h-4 w-4" />
@@ -467,11 +472,7 @@ function NotificationSettingsButton() {
           )}
         </button>
       </PopoverTrigger>
-      <PopoverContent
-        align="end"
-        sideOffset={8}
-        className="w-72 border-gold/20 bg-popover p-4"
-      >
+      <PopoverContent align="end" sideOffset={8} className="w-72 border-gold/20 bg-popover p-4">
         <p className="font-display text-sm uppercase tracking-wider text-gold">
           Notification settings
         </p>

@@ -85,7 +85,8 @@ function KaraokePage() {
             <Sparkles className="h-3.5 w-3.5" /> Lobby access
           </p>
           <p className="mt-1 text-muted-foreground">
-            Any signed-in member can sing, queue, and spectate. Verified BAYC/MAYC holders get a VIP badge and priority in the queue.
+            Any signed-in member can sing, queue, and spectate. Verified BAYC/MAYC holders get a VIP
+            badge and priority in the queue.
           </p>
         </div>
       )}
@@ -123,7 +124,9 @@ function KaraokeCard({ room, isHolder }: { room: KaraokeRoom; isHolder: boolean 
         className="aspect-[16/10] w-full bg-cover bg-center"
         style={
           bg
-            ? { backgroundImage: `linear-gradient(rgba(8,8,12,0.45), rgba(8,8,12,0.75)), url(${bg})` }
+            ? {
+                backgroundImage: `linear-gradient(rgba(8,8,12,0.45), rgba(8,8,12,0.75)), url(${bg})`,
+              }
             : { background: "linear-gradient(135deg, hsl(var(--card)), hsl(var(--background)))" }
         }
       />

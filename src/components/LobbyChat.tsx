@@ -133,7 +133,6 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
-
   const hydrateProfiles = useCallback(
     async (msgs: LobbyMessage[]) => {
       const missing = Array.from(new Set(msgs.map((m) => m.user_id).filter((id) => !profiles[id])));
@@ -281,7 +280,6 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
     if (!el) return;
     el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, []);
-
 
   const messageById = useMemo(() => {
     const m = new Map<string, LobbyMessage>();
@@ -567,7 +565,6 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
           </button>
         )}
       </div>
-
 
       {replyTo && !editing && (
         <div className="flex items-center justify-between gap-2 border-t border-border/60 bg-muted/10 px-3 py-2 text-xs sm:px-4">
@@ -1023,9 +1020,7 @@ function MessageRow({
       onTouchCancel={onTouchCancel}
       onContextMenu={onContextMenu}
     >
-      <div
-        className="group flex max-w-full items-start gap-2.5 rounded-lg px-2 py-1.5 transition hover:bg-secondary/30 sm:gap-3"
-      >
+      <div className="group flex max-w-full items-start gap-2.5 rounded-lg px-2 py-1.5 transition hover:bg-secondary/30 sm:gap-3">
         <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full border border-border bg-gradient-gold">
           {author?.avatar_url ? (
             <img src={author.avatar_url} alt={name} className="h-full w-full object-cover" />

@@ -150,7 +150,9 @@ export function useKaraokeMixBus({
     } catch (e) {
       console.warn("[karaoke-mix] startSession failed", e);
       toast.error(
-        e instanceof Error ? e.message : "Couldn't start karaoke audio. Check microphone permission.",
+        e instanceof Error
+          ? e.message
+          : "Couldn't start karaoke audio. Check microphone permission.",
       );
       await teardown();
     }
@@ -202,9 +204,7 @@ export function useKaraokeMixBus({
           upsert: false,
         });
       if (up.error) throw new Error(up.error.message);
-      const { data: pub } = supabase.storage
-        .from("karaoke-recordings")
-        .getPublicUrl(storagePath);
+      const { data: pub } = supabase.storage.from("karaoke-recordings").getPublicUrl(storagePath);
       const row = await saveFn({
         data: {
           roomId,

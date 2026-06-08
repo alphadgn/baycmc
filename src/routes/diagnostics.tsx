@@ -72,8 +72,7 @@ function DiagnosticsPage() {
     }
   }
 
-  const filteredEvents =
-    filter === "all" ? events : events.filter((e) => e.category === filter);
+  const filteredEvents = filter === "all" ? events : events.filter((e) => e.category === filter);
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">

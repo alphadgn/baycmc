@@ -86,8 +86,8 @@ function AdminLuminaPage() {
     <main className="mx-auto max-w-2xl px-4 py-10 sm:px-6 sm:py-14">
       <h1 className="font-display text-2xl font-semibold">Lumina endpoint</h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Configure the Lumina REST endpoint used to verify BAYC ownership.
-        Use <code className="font-mono">{"{wallet}"}</code> and{" "}
+        Configure the Lumina REST endpoint used to verify BAYC ownership. Use{" "}
+        <code className="font-mono">{"{wallet}"}</code> and{" "}
         <code className="font-mono">{"{contract}"}</code> as placeholders.
       </p>
 

@@ -378,10 +378,7 @@ export const verifyOwnership = createServerFn({ method: "POST" })
     const directLookupOk = true;
     const delegationLookupOk = vaultsResult.status === "fulfilled";
     if (vaultsResult.status === "rejected") {
-      console.warn(
-        "delegate.cash lookup failed during ownership verify",
-        vaultsResult.reason,
-      );
+      console.warn("delegate.cash lookup failed during ownership verify", vaultsResult.reason);
     }
     const vaults = delegationLookupOk ? vaultsResult.value : [];
 

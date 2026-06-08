@@ -48,7 +48,12 @@ export function useVerificationRevalidation({
     channel.on(
       "postgres_changes",
       userId
-        ? { event: "*", schema: "public", table: "user_verifications", filter: `user_id=eq.${userId}` }
+        ? {
+            event: "*",
+            schema: "public",
+            table: "user_verifications",
+            filter: `user_id=eq.${userId}`,
+          }
         : { event: "*", schema: "public", table: "user_verifications" },
       fire,
     );

@@ -68,8 +68,7 @@ export function AudioDiagnosticsPanel({
   }, []);
 
   const supportsSinkId =
-    typeof HTMLMediaElement !== "undefined" &&
-    "setSinkId" in HTMLMediaElement.prototype;
+    typeof HTMLMediaElement !== "undefined" && "setSinkId" in HTMLMediaElement.prototype;
 
   return (
     <div className="glass rounded-xl border border-border/60 p-3 shadow-card">
@@ -102,7 +101,10 @@ export function AudioDiagnosticsPanel({
             )
           }
         />
-        <Row label="Recorder" value={<span className="text-muted-foreground">{recorderMime ?? "—"}</span>} />
+        <Row
+          label="Recorder"
+          value={<span className="text-muted-foreground">{recorderMime ?? "—"}</span>}
+        />
       </div>
 
       <div className="mt-3 space-y-2">
@@ -162,7 +164,8 @@ export function AudioDiagnosticsPanel({
 
       {permission === "denied" && (
         <p className="mt-2 text-[10px] text-destructive">
-          Microphone access is blocked. Open your browser's site settings and allow microphone, then click Reconnect.
+          Microphone access is blocked. Open your browser's site settings and allow microphone, then
+          click Reconnect.
         </p>
       )}
     </div>

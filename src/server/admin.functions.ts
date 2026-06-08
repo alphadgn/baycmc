@@ -6,10 +6,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 type AppRole = "super_admin" | "admin" | "verified_user" | "chapter_leader";
 
 async function getRoles(userId: string): Promise<AppRole[]> {
-  const { data } = await supabaseAdmin
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", userId);
+  const { data } = await supabaseAdmin.from("user_roles").select("role").eq("user_id", userId);
   return (data?.map((r) => r.role) ?? []) as AppRole[];
 }
 
@@ -60,7 +57,9 @@ export const listUsers = createServerFn({ method: "POST" })
       supabaseAdmin.from("user_roles").select("user_id, role").in("user_id", ids),
       supabaseAdmin
         .from("user_verifications")
-        .select("user_id, bayc_verified, otherpage_verified, delegation_verified, lumina_verified, verified_at")
+        .select(
+          "user_id, bayc_verified, otherpage_verified, delegation_verified, lumina_verified, verified_at",
+        )
         .in("user_id", ids),
     ]);
 
@@ -96,7 +95,11 @@ export const setUserRole = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await requireSuperAdmin(context.userId);
 
-    if (data.targetUserId === context.userId && data.role === "super_admin" && data.action === "revoke") {
+    if (
+      data.targetUserId === context.userId &&
+      data.role === "super_admin" &&
+      data.action === "revoke"
+    ) {
       throw new Error("You cannot revoke your own super_admin role");
     }
 
@@ -126,18 +129,15 @@ export const setUserRole = createServerFn({ method: "POST" })
 /** Admin+ override of a user's verification flags (allow/deny access). */
 export const overrideVerification = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: {
-    targetUserId: string;
-    bayc_verified?: boolean;
-    otherpage_verified?: boolean;
-  }) =>
-    z
-      .object({
-        targetUserId: z.string().uuid(),
-        bayc_verified: z.boolean().optional(),
-        otherpage_verified: z.boolean().optional(),
-      })
-      .parse(input),
+  .inputValidator(
+    (input: { targetUserId: string; bayc_verified?: boolean; otherpage_verified?: boolean }) =>
+      z
+        .object({
+          targetUserId: z.string().uuid(),
+          bayc_verified: z.boolean().optional(),
+          otherpage_verified: z.boolean().optional(),
+        })
+        .parse(input),
   )
   .handler(async ({ data, context }) => {
     await requireAdmin(context.userId);
@@ -149,7 +149,8 @@ export const overrideVerification = createServerFn({ method: "POST" })
       verified_at?: string;
     } = { user_id: data.targetUserId };
     if (typeof data.bayc_verified === "boolean") patch.bayc_verified = data.bayc_verified;
-    if (typeof data.otherpage_verified === "boolean") patch.otherpage_verified = data.otherpage_verified;
+    if (typeof data.otherpage_verified === "boolean")
+      patch.otherpage_verified = data.otherpage_verified;
     if (data.bayc_verified) patch.verified_at = new Date().toISOString();
 
     const { error } = await supabaseAdmin
@@ -209,13 +210,17 @@ export const getMyAdminContext = createServerFn({ method: "POST" })
 export const listChapterSubmissions = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { status?: "pending" | "approved" | "rejected" | "all" }) =>
-    z.object({ status: z.enum(["pending", "approved", "rejected", "all"]).optional() }).parse(input ?? {}),
+    z
+      .object({ status: z.enum(["pending", "approved", "rejected", "all"]).optional() })
+      .parse(input ?? {}),
   )
   .handler(async ({ data, context }) => {
     await requireAdmin(context.userId);
     let q = supabaseAdmin
       .from("chapter_submissions")
-      .select("id, user_id, chapter_name, city, region, pitch, status, reviewer_id, review_notes, reviewed_at, created_at")
+      .select(
+        "id, user_id, chapter_name, city, region, pitch, status, reviewer_id, review_notes, reviewed_at, created_at",
+      )
       .order("created_at", { ascending: false })
       .limit(500);
     if (data.status && data.status !== "all") q = q.eq("status", data.status);
@@ -224,7 +229,8 @@ export const listChapterSubmissions = createServerFn({ method: "POST" })
 
     const ids = Array.from(new Set((rows ?? []).map((r) => r.user_id)));
     const profiles = ids.length
-      ? (await supabaseAdmin.from("profiles").select("id, username, wallet_address").in("id", ids)).data ?? []
+      ? ((await supabaseAdmin.from("profiles").select("id, username, wallet_address").in("id", ids))
+          .data ?? [])
       : [];
     const pmap = new Map(profiles.map((p) => [p.id, p]));
     return {
@@ -238,18 +244,15 @@ export const listChapterSubmissions = createServerFn({ method: "POST" })
 /** Review (approve / reject) a chapter submission with optional notes. */
 export const reviewChapterSubmission = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: {
-    submissionId: string;
-    decision: "approved" | "rejected";
-    notes?: string;
-  }) =>
-    z
-      .object({
-        submissionId: z.string().uuid(),
-        decision: z.enum(["approved", "rejected"]),
-        notes: z.string().max(2000).optional(),
-      })
-      .parse(input),
+  .inputValidator(
+    (input: { submissionId: string; decision: "approved" | "rejected"; notes?: string }) =>
+      z
+        .object({
+          submissionId: z.string().uuid(),
+          decision: z.enum(["approved", "rejected"]),
+          notes: z.string().max(2000).optional(),
+        })
+        .parse(input),
   )
   .handler(async ({ data, context }) => {
     await requireAdmin(context.userId);

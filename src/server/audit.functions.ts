@@ -7,31 +7,23 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
  */
 export const queryAuditLogs = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: {
-    eventType?: string;
-    actorId?: string;
-    from?: string;
-    to?: string;
-    limit?: number;
-  }) =>
-    z
-      .object({
-        eventType: z.string().max(100).optional(),
-        actorId: z.string().uuid().optional(),
-        from: z.string().datetime().optional(),
-        to: z.string().datetime().optional(),
-        limit: z.number().int().min(1).max(1000).optional(),
-      })
-      .parse(input),
+  .inputValidator(
+    (input: { eventType?: string; actorId?: string; from?: string; to?: string; limit?: number }) =>
+      z
+        .object({
+          eventType: z.string().max(100).optional(),
+          actorId: z.string().uuid().optional(),
+          from: z.string().datetime().optional(),
+          to: z.string().datetime().optional(),
+          limit: z.number().int().min(1).max(1000).optional(),
+        })
+        .parse(input),
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
     // Verify admin
-    const { data: roles } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId);
+    const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", userId);
     const isAdmin = roles?.some((r) => r.role === "admin" || r.role === "super_admin");
     if (!isAdmin) {
       return { ok: false as const, error: "Admin only", logs: [] };

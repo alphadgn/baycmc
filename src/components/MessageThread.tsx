@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Image as ImageIcon, Loader2, Pencil, Search, Sticker, Trash2, X } from "lucide-react";
+import {
+  Check,
+  Image as ImageIcon,
+  Loader2,
+  Pencil,
+  Search,
+  Sticker,
+  Trash2,
+  X,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
 import { toast } from "sonner";
@@ -319,7 +328,6 @@ export function MessageThread({
     });
   }, [messages, profiles, query]);
 
-
   return (
     <div className="glass relative flex h-[70vh] flex-col overflow-hidden rounded-2xl shadow-card">
       {backgroundImage && (
@@ -348,7 +356,10 @@ export function MessageThread({
           </button>
         )}
       </div>
-      <div ref={scrollRef} className="relative flex-1 space-y-3 overflow-x-hidden overflow-y-auto p-4 sm:p-6">
+      <div
+        ref={scrollRef}
+        className="relative flex-1 space-y-3 overflow-x-hidden overflow-y-auto p-4 sm:p-6"
+      >
         {loading ? (
           <div className="space-y-2">
             {[1, 2, 3].map((i) => (
@@ -370,11 +381,16 @@ export function MessageThread({
                 : "anon");
             const hasAnyContent = !!m.body || !!m.image_url || !!m.gif_url;
             return (
-              <div key={m.id} className={`group flex max-w-full flex-col ${mine ? "items-end" : "items-start"}`}>
+              <div
+                key={m.id}
+                className={`group flex max-w-full flex-col ${mine ? "items-end" : "items-start"}`}
+              >
                 <div className="mb-0.5 flex max-w-full flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
                   <button
                     type="button"
-                    onClick={() => setQuery(`@${profile?.username ?? profile?.wallet_address ?? name}`)}
+                    onClick={() =>
+                      setQuery(`@${profile?.username ?? profile?.wallet_address ?? name}`)
+                    }
                     className={`${mine ? "text-gold" : ""} hover:underline`}
                     title="Filter by this user"
                   >
@@ -387,10 +403,14 @@ export function MessageThread({
                     })}
                   </span>
                 </div>
-                <div className={`flex max-w-full items-center gap-1.5 ${mine ? "flex-row-reverse" : ""}`}>
+                <div
+                  className={`flex max-w-full items-center gap-1.5 ${mine ? "flex-row-reverse" : ""}`}
+                >
                   <div
                     className={`flex max-w-[75%] flex-col gap-2 rounded-2xl px-3 py-2 text-sm ${
-                      mine ? `${accentClassName} shadow-gold` : "border border-border bg-background/40"
+                      mine
+                        ? `${accentClassName} shadow-gold`
+                        : "border border-border bg-background/40"
                     }`}
                   >
                     {m.body && (
@@ -611,7 +631,11 @@ export function MessageThread({
           aria-label={editingId ? "Save edit" : "Send"}
           className={`inline-flex shrink-0 items-center gap-1.5 rounded-md px-4 py-2 text-sm font-semibold shadow-gold disabled:opacity-50 ${accentClassName}`}
         >
-          {posting ? <Loader2 className="h-4 w-4 animate-spin" /> : editingId ? <Check className="h-4 w-4" /> : null}
+          {posting ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : editingId ? (
+            <Check className="h-4 w-4" />
+          ) : null}
           {editingId ? "Save" : "Send"}
         </button>
       </form>

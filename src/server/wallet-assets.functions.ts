@@ -86,10 +86,8 @@ export const listWalletNfts = createServerFn({ method: "POST" })
       const items: NftItem[] = (resp.ownedNfts ?? []).map((n) => {
         const contract = (n.contract?.address ?? "").toLowerCase();
         const tokenId = n.tokenId ?? "";
-        const collection =
-          n.contract?.openSeaMetadata?.collectionName ?? n.contract?.name ?? null;
-        const image =
-          n.image?.cachedUrl ?? n.image?.thumbnailUrl ?? n.image?.originalUrl ?? null;
+        const collection = n.contract?.openSeaMetadata?.collectionName ?? n.contract?.name ?? null;
+        const image = n.image?.cachedUrl ?? n.image?.thumbnailUrl ?? n.image?.originalUrl ?? null;
         return {
           contract,
           tokenId,

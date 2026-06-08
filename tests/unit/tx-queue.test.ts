@@ -56,11 +56,7 @@ describe("transaction queue", () => {
         return "0xhash";
       },
     };
-    const hash = await enqueueSend(
-      provider,
-      { from: "0x0", to: "0x1" },
-      { maxAttempts: 4 },
-    );
+    const hash = await enqueueSend(provider, { from: "0x0", to: "0x1" }, { maxAttempts: 4 });
     expect(hash).toBe("0xhash");
     expect(calls).toBe(3);
   });
@@ -73,9 +69,9 @@ describe("transaction queue", () => {
         throw new Error("User rejected the request");
       },
     };
-    await expect(
-      enqueueSign(provider, "personal_sign", [], { maxAttempts: 5 }),
-    ).rejects.toThrow(/user rejected/i);
+    await expect(enqueueSign(provider, "personal_sign", [], { maxAttempts: 5 })).rejects.toThrow(
+      /user rejected/i,
+    );
     expect(calls).toBe(1);
   });
 
@@ -87,9 +83,9 @@ describe("transaction queue", () => {
         throw new Error("network timeout");
       },
     };
-    await expect(
-      enqueueSign(provider, "personal_sign", [], { maxAttempts: 2 }),
-    ).rejects.toThrow(/timeout/);
+    await expect(enqueueSign(provider, "personal_sign", [], { maxAttempts: 2 })).rejects.toThrow(
+      /timeout/,
+    );
     expect(calls).toBe(2);
   });
 
@@ -109,9 +105,7 @@ describe("transaction queue", () => {
 
   it("rejects send response that isn't a string hash", async () => {
     const provider: ProviderLike = { request: async () => 42 };
-    await expect(enqueueSend(provider, { from: "0x0", to: "0x1" })).rejects.toThrow(
-      /Unexpected/,
-    );
+    await expect(enqueueSend(provider, { from: "0x0", to: "0x1" })).rejects.toThrow(/Unexpected/);
   });
 
   it("validates exponential backoff timing between retries", async () => {

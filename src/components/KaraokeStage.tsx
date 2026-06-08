@@ -316,11 +316,7 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
     // Pull the current performer out of the line and promote the next
     // eligible user. The auto-promote effect will fill in if `next` is
     // also absent for any reason.
-    await supabase
-      .from("karaoke_queue")
-      .delete()
-      .eq("room_id", roomId)
-      .eq("user_id", skipped);
+    await supabase.from("karaoke_queue").delete().eq("room_id", roomId).eq("user_id", skipped);
     const next = queue.find((q) => q.user_id !== skipped);
     await supabase.from("karaoke_sessions").upsert(
       {

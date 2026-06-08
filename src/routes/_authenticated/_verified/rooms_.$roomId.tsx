@@ -28,11 +28,7 @@ function RoomDetail() {
       setLoading(true);
       const nowIso = new Date().toISOString();
       const [{ data: m }, { data: b }] = await Promise.all([
-        supabase
-          .from("rooms")
-          .select("name,tier,theme,kind")
-          .eq("id", roomId)
-          .maybeSingle(),
+        supabase.from("rooms").select("name,tier,theme,kind").eq("id", roomId).maybeSingle(),
         // The currently-active booking decides who occupies the host tile.
         // Only the booking owner (not admins) gets the host slot per the
         // grilling decision — admins keep moderation powers but sit in the

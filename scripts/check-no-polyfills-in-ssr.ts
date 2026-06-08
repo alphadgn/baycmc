@@ -11,13 +11,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-const CANDIDATE_DIRS = [
-  "dist/server",
-  "dist/_worker.js",
-  ".output/server",
-  ".output",
-  "dist",
-];
+const CANDIDATE_DIRS = ["dist/server", "dist/_worker.js", ".output/server", ".output", "dist"];
 
 // `vite-plugin-node-polyfills` is the regression we're catching. Its
 // presence in the worker bundle was the original Buffer-import break.

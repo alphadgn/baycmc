@@ -58,9 +58,7 @@ export function NftGallery({ address }: { address: string }) {
       <div className="glass rounded-2xl p-6 shadow-card">
         <div className="flex flex-col items-center justify-center py-10 text-center text-sm text-muted-foreground">
           <ImageOff className="mb-2 h-6 w-6 text-muted-foreground" />
-          {error
-            ? `Couldn't load NFTs — ${error}`
-            : "No NFTs found in this wallet yet."}
+          {error ? `Couldn't load NFTs — ${error}` : "No NFTs found in this wallet yet."}
         </div>
       </div>
     );
@@ -72,8 +70,8 @@ export function NftGallery({ address }: { address: string }) {
     (acc[key] ??= []).push(n);
     return acc;
   }, {});
-  const collections = Object.keys(grouped).sort((a, b) =>
-    grouped[b].length - grouped[a].length || a.localeCompare(b),
+  const collections = Object.keys(grouped).sort(
+    (a, b) => grouped[b].length - grouped[a].length || a.localeCompare(b),
   );
 
   return (

@@ -17,9 +17,7 @@ const BREAKPOINTS = [320, 375, 414, 768, 1024, 1280, 1536, 1920];
 
 function evalClamp(expr: string, vw: number): number {
   // Parse: clamp(<min>rem, <pref>vw, <max>rem)
-  const m = expr.match(
-    /clamp\(\s*([\d.]+)rem\s*,\s*([\d.]+)vw\s*,\s*([\d.]+)rem\s*\)/,
-  );
+  const m = expr.match(/clamp\(\s*([\d.]+)rem\s*,\s*([\d.]+)vw\s*,\s*([\d.]+)rem\s*\)/);
   if (!m) throw new Error(`Unparseable clamp: ${expr}`);
   const [, min, pref, max] = m;
   const px = (parseFloat(pref) / 100) * vw;
@@ -32,9 +30,7 @@ describe("EmbroideredImage", () => {
   it("always emits overflow-safe classes", () => {
     for (const variant of VARIANTS) {
       for (const size of SIZES) {
-        const html = renderToStaticMarkup(
-          <EmbroideredImage variant={variant} size={size} />,
-        );
+        const html = renderToStaticMarkup(<EmbroideredImage variant={variant} size={size} />);
         expect(html).toContain("max-w-full");
         expect(html).toContain("object-contain");
         expect(html).toContain("w-auto");
@@ -63,11 +59,7 @@ describe("EmbroideredImage", () => {
 
   it("respects sizes preset overrides", () => {
     const html = renderToStaticMarkup(
-      <EmbroideredImage
-        variant="bored-apes"
-        size="lg"
-        sizes={{ lg: "clamp(1rem, 3vw, 4rem)" }}
-      />,
+      <EmbroideredImage variant="bored-apes" size="lg" sizes={{ lg: "clamp(1rem, 3vw, 4rem)" }} />,
     );
     expect(html).toContain("clamp(1rem, 3vw, 4rem)");
   });

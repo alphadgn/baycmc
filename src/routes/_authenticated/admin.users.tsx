@@ -2,11 +2,7 @@ import { createFileRoute, redirect, Link } from "@tanstack/react-router";
 import { useEffect, useState, useCallback } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  listUsers,
-  overrideVerification,
-  getMyAdminContext,
-} from "@/server/admin.functions";
+import { listUsers, overrideVerification, getMyAdminContext } from "@/server/admin.functions";
 
 interface UserRow {
   id: string;
@@ -83,9 +79,7 @@ function AdminUsersPage() {
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-display text-3xl text-gradient-gold sm:text-5xl">
-            Admin · Users
-          </h1>
+          <h1 className="font-display text-3xl text-gradient-gold sm:text-5xl">Admin · Users</h1>
           <p className="mt-1 text-xs text-muted-foreground font-sans-display sm:text-sm">
             Override verification and allow access for any member
           </p>
@@ -107,7 +101,9 @@ function AdminUsersPage() {
 
       <div className="glass mb-4 flex flex-wrap items-end gap-3 rounded-2xl p-4 shadow-card">
         <div className="flex-1 min-w-[240px]">
-          <label className="block text-[11px] text-muted-foreground">Search wallet / username</label>
+          <label className="block text-[11px] text-muted-foreground">
+            Search wallet / username
+          </label>
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -160,7 +156,10 @@ function AdminUsersPage() {
                     {u.roles.length ? (
                       <div className="flex flex-wrap gap-1">
                         {u.roles.map((r) => (
-                          <span key={r} className="rounded bg-gold/10 px-1.5 py-0.5 text-[10px] text-gold">
+                          <span
+                            key={r}
+                            className="rounded bg-gold/10 px-1.5 py-0.5 text-[10px] text-gold"
+                          >
                             {r}
                           </span>
                         ))}

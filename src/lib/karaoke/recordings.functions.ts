@@ -9,7 +9,13 @@ const InsertSchema = z.object({
   songTitle: z.string().max(255).optional().nullable(),
   songArtist: z.string().max(255).optional().nullable(),
   youtubeId: z.string().max(20).optional().nullable(),
-  durationMs: z.number().int().min(0).max(60 * 60 * 1000).optional().nullable(),
+  durationMs: z
+    .number()
+    .int()
+    .min(0)
+    .max(60 * 60 * 1000)
+    .optional()
+    .nullable(),
   mimeType: z.string().max(64).default("audio/webm"),
   hasInstrumental: z.boolean().default(true),
 });

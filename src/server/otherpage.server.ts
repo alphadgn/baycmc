@@ -15,10 +15,9 @@ export async function runOtherpageCheckAndPersist(args: {
   wallet: string;
 }): Promise<{ verified: boolean; configured: boolean; reason?: string }> {
   if (!isAddress(args.wallet)) {
-    await supabaseAdmin.from("user_verifications").upsert(
-      { user_id: args.userId, otherpage_verified: false },
-      { onConflict: "user_id" },
-    );
+    await supabaseAdmin
+      .from("user_verifications")
+      .upsert({ user_id: args.userId, otherpage_verified: false }, { onConflict: "user_id" });
     return { verified: false, configured: false, reason: "invalid-wallet" };
   }
   const wallet = getAddress(args.wallet);
@@ -28,15 +27,13 @@ export async function runOtherpageCheckAndPersist(args: {
     .select("value")
     .eq("key", "otherpage_gate")
     .maybeSingle();
-  const cfg = (row?.value as
-    | { contract?: string; min_balance?: number; chain_id?: number }
-    | null) ?? null;
+  const cfg =
+    (row?.value as { contract?: string; min_balance?: number; chain_id?: number } | null) ?? null;
 
   if (!cfg?.contract) {
-    await supabaseAdmin.from("user_verifications").upsert(
-      { user_id: args.userId, otherpage_verified: false },
-      { onConflict: "user_id" },
-    );
+    await supabaseAdmin
+      .from("user_verifications")
+      .upsert({ user_id: args.userId, otherpage_verified: false }, { onConflict: "user_id" });
     return { verified: false, configured: false, reason: "gate-not-configured" };
   }
 
@@ -47,10 +44,12 @@ export async function runOtherpageCheckAndPersist(args: {
     chainId: cfg.chain_id ?? 1,
   });
 
-  await supabaseAdmin.from("user_verifications").upsert(
-    { user_id: args.userId, otherpage_verified: proof.verified },
-    { onConflict: "user_id" },
-  );
+  await supabaseAdmin
+    .from("user_verifications")
+    .upsert(
+      { user_id: args.userId, otherpage_verified: proof.verified },
+      { onConflict: "user_id" },
+    );
 
   return {
     verified: proof.verified,

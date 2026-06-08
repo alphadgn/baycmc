@@ -6,13 +6,8 @@ export default defineConfig({
     importProtection: {
       behavior: "error",
       client: {
-        excludeFiles: [
-          "**/*.functions.ts",
-          "**/*.functions.tsx",
-          "**/*.functions.js",
-        ],
+        excludeFiles: ["**/*.functions.ts", "**/*.functions.tsx", "**/*.functions.js"],
       },
     },
   },
 });
-

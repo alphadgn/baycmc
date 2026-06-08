@@ -194,14 +194,12 @@ export function ConferenceRoom({
               }
             : undefined
         }
-
         data-lk-theme="default"
         onDisconnected={() => setState({ phase: "idle" })}
         // We render the LiveKit toolbar ourselves so the bottom bar matches
         // the conf.png mockup; suppress the SDK's default UI.
         style={{ background: "transparent" }}
       >
-
         <RoomsShell
           title={roomName}
           subtitle={ambience ?? undefined}
@@ -663,7 +661,15 @@ function SignalBars({ active, tone }: { active: number; tone: string }) {
   );
 }
 
-function LiveBottomBar({ onLeave, isHost, karaoke = false }: { onLeave: () => void; isHost: boolean; karaoke?: boolean }) {
+function LiveBottomBar({
+  onLeave,
+  isHost,
+  karaoke = false,
+}: {
+  onLeave: () => void;
+  isHost: boolean;
+  karaoke?: boolean;
+}) {
   const local = useLocalParticipant();
   const room = useRoomContext();
   const participants = useParticipants();
@@ -723,7 +729,9 @@ function LiveBottomBar({ onLeave, isHost, karaoke = false }: { onLeave: () => vo
 
   async function toggleScreen() {
     if (!screenShareSupported) {
-      toast.error("Screen sharing isn't available on this browser. Use a desktop browser to share your screen.");
+      toast.error(
+        "Screen sharing isn't available on this browser. Use a desktop browser to share your screen.",
+      );
       return;
     }
     const next = !screenOn;
@@ -944,9 +952,7 @@ function LivePreferencesPanel({ isHost }: { isHost: boolean }) {
     setPrefs({ micEnabled: v });
     try {
       await local.localParticipant.setMicrophoneEnabled(v);
-      window.dispatchEvent(
-        new CustomEvent("karaoke:mic-state", { detail: { enabled: v } }),
-      );
+      window.dispatchEvent(new CustomEvent("karaoke:mic-state", { detail: { enabled: v } }));
     } catch (e) {
       console.warn("toggleMic", e);
     }
@@ -964,8 +970,7 @@ function LivePreferencesPanel({ isHost }: { isHost: boolean }) {
     window.dispatchEvent(
       new CustomEvent("karaoke:mic-state", { detail: { enabled: prefs.micEnabled } }),
     );
-    return () =>
-      window.removeEventListener("karaoke:toggle-mic", onReq as EventListener);
+    return () => window.removeEventListener("karaoke:toggle-mic", onReq as EventListener);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefs.micEnabled, micLocked]);
 
@@ -1435,11 +1440,12 @@ function KaraokeMusicAudioBridge() {
     // KaraokeMusicBoard can mute the local iframe for non-performers.
     function broadcastState() {
       if (!room) return;
-      const anyMusic = Array.from(room.remoteParticipants.values()).some((p) =>
-        Array.from(p.trackPublications.values()).some(
-          (pub) => pub.source === Track.Source.ScreenShareAudio,
-        ),
-      ) || !!trackRef.current;
+      const anyMusic =
+        Array.from(room.remoteParticipants.values()).some((p) =>
+          Array.from(p.trackPublications.values()).some(
+            (pub) => pub.source === Track.Source.ScreenShareAudio,
+          ),
+        ) || !!trackRef.current;
       window.dispatchEvent(
         new CustomEvent("karaoke:music-shared", { detail: { shared: anyMusic } }),
       );
@@ -1469,7 +1475,5 @@ function KaraokeMusicAudioBridge() {
     };
   }, [room]);
 
-
   return null;
 }
-

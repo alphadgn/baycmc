@@ -132,9 +132,7 @@ test.describe("Delegation-based BAYC/MAYC verification result", () => {
         const { privateKeyToAccount } = await import(
           /* @vite-ignore */ "https://esm.sh/viem@2/accounts?bundle"
         );
-        const { SiweMessage } = await import(
-          /* @vite-ignore */ "https://esm.sh/siwe@2?bundle"
-        );
+        const { SiweMessage } = await import(/* @vite-ignore */ "https://esm.sh/siwe@2?bundle");
 
         const account = privateKeyToAccount(hotPk as `0x${string}`);
         const siwe = new SiweMessage({

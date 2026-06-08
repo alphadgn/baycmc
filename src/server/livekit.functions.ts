@@ -61,7 +61,8 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
   if (isKaraoke && (await hasActiveBooking(roomId)) && !(await isRoomHost(userId, roomId))) {
     return {
       ok: false,
-      error: "This karaoke room is currently reserved for a booked session. Try again after the booking ends.",
+      error:
+        "This karaoke room is currently reserved for a booked session. Try again after the booking ends.",
       code: "room_booked",
     };
   }
@@ -101,11 +102,8 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
     .from("user_roles")
     .select("role")
     .eq("user_id", userId);
-  const isAdmin = !!roleRows?.some(
-    (r) => r.role === "super_admin" || r.role === "admin",
-  );
-  const bypassesBaycGate =
-    isAdmin || !!roleRows?.some((r) => r.role === "verified_user");
+  const isAdmin = !!roleRows?.some((r) => r.role === "super_admin" || r.role === "admin");
+  const bypassesBaycGate = isAdmin || !!roleRows?.some((r) => r.role === "verified_user");
 
   if (!ver?.bayc_verified && !bypassesBaycGate) {
     return {
@@ -115,11 +113,7 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
       code: "bayc_revoked",
     };
   }
-  if (
-    room.tier === "lifer" &&
-    !isAdmin &&
-    !(ver?.bayc_verified && ver?.otherpage_verified)
-  ) {
+  if (room.tier === "lifer" && !isAdmin && !(ver?.bayc_verified && ver?.otherpage_verified)) {
     return {
       ok: false,
       error:
@@ -280,9 +274,7 @@ export const revalidateLivekitRoomAccess = createServerFn({ method: "POST" })
 export const setRoomLocked = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { roomId: string; locked: boolean }) =>
-    z
-      .object({ roomId: z.string().uuid(), locked: z.boolean() })
-      .parse(input),
+    z.object({ roomId: z.string().uuid(), locked: z.boolean() }).parse(input),
   )
   .handler(async ({ data, context }) => {
     const { userId } = context;
@@ -310,9 +302,7 @@ export const setRoomLocked = createServerFn({ method: "POST" })
 export const kickRoomParticipant = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { roomId: string; identity: string }) =>
-    z
-      .object({ roomId: z.string().uuid(), identity: z.string().min(1) })
-      .parse(input),
+    z.object({ roomId: z.string().uuid(), identity: z.string().min(1) }).parse(input),
   )
   .handler(async ({ data, context }) => {
     const { userId } = context;
@@ -356,9 +346,7 @@ export const kickRoomParticipant = createServerFn({ method: "POST" })
 export const muteAllRoomParticipants = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { roomId: string; muted: boolean }) =>
-    z
-      .object({ roomId: z.string().uuid(), muted: z.boolean() })
-      .parse(input),
+    z.object({ roomId: z.string().uuid(), muted: z.boolean() }).parse(input),
   )
   .handler(async ({ data, context }) => {
     const { userId } = context;

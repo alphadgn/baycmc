@@ -67,7 +67,9 @@ export function AudioMeter({
         <div className="relative h-24 w-2.5 overflow-hidden rounded-sm bg-border/40">
           <div
             className={`absolute bottom-0 left-0 right-0 rounded-sm transition-[height] duration-75 ${
-              clipping ? "bg-destructive" : "bg-gradient-to-t from-emerald-500 via-amber-400 to-rose-500"
+              clipping
+                ? "bg-destructive"
+                : "bg-gradient-to-t from-emerald-500 via-amber-400 to-rose-500"
             }`}
             style={{ height: `${levelPct}%` }}
           />
@@ -89,7 +91,9 @@ export function AudioMeter({
       <div className="relative h-2 w-full overflow-hidden rounded-sm bg-border/40">
         <div
           className={`absolute left-0 top-0 bottom-0 rounded-sm transition-[width] duration-75 ${
-            clipping ? "bg-destructive" : "bg-gradient-to-r from-emerald-500 via-amber-400 to-rose-500"
+            clipping
+              ? "bg-destructive"
+              : "bg-gradient-to-r from-emerald-500 via-amber-400 to-rose-500"
           }`}
           style={{ width: `${levelPct}%` }}
         />

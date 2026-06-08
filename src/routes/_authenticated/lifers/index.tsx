@@ -17,12 +17,10 @@ function LifersHome() {
           <p className="mt-2 text-xs uppercase tracking-[0.4em] text-gold">
             Dual-verified · Lifers only
           </p>
-          <h1 className="mt-4 font-display text-3xl font-bold sm:text-4xl">
-            Welcome, Lifer.
-          </h1>
+          <h1 className="mt-4 font-display text-3xl font-bold sm:text-4xl">Welcome, Lifer.</h1>
           <p className="mt-3 max-w-2xl text-sm text-muted-foreground sm:text-base">
-            This wing of BAYCMC is invisible to anyone outside the Lifer circle.
-            The conference room and the Lifer thread are yours.
+            This wing of BAYCMC is invisible to anyone outside the Lifer circle. The conference room
+            and the Lifer thread are yours.
           </p>
         </div>
 

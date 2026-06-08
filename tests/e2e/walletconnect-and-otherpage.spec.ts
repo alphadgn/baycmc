@@ -63,9 +63,7 @@ test.describe("WalletConnect sign-in + delegation verification", () => {
         const { privateKeyToAccount } = await import(
           /* @vite-ignore */ "https://esm.sh/viem@2/accounts?bundle"
         );
-        const { SiweMessage } = await import(
-          /* @vite-ignore */ "https://esm.sh/siwe@2?bundle"
-        );
+        const { SiweMessage } = await import(/* @vite-ignore */ "https://esm.sh/siwe@2?bundle");
 
         const account = privateKeyToAccount(hotPk as `0x${string}`);
         const siwe = new SiweMessage({
@@ -142,9 +140,7 @@ test.describe("Otherpage.xyz premium-room access after delegated verification", 
         const { privateKeyToAccount } = await import(
           /* @vite-ignore */ "https://esm.sh/viem@2/accounts?bundle"
         );
-        const { SiweMessage } = await import(
-          /* @vite-ignore */ "https://esm.sh/siwe@2?bundle"
-        );
+        const { SiweMessage } = await import(/* @vite-ignore */ "https://esm.sh/siwe@2?bundle");
         const account = privateKeyToAccount(hotPk as `0x${string}`);
         const siwe = new SiweMessage({
           domain: location.host,

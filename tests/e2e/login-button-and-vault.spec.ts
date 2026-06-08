@@ -25,18 +25,14 @@ const BASE_URL = process.env.BASE_URL ?? "http://localhost:3000";
 test.describe("Entrance button is always operable", () => {
   test.use({ ...devices["Desktop Chrome"] });
 
-  test("renders, is enabled, and opens the Privy modal on first click", async ({
-    browser,
-  }) => {
+  test("renders, is enabled, and opens the Privy modal on first click", async ({ browser }) => {
     // Fresh incognito context — no cached Supabase / Privy session.
     const context = await browser.newContext();
     const page = await context.newPage();
 
     await page.goto(BASE_URL);
 
-    const entrance = page
-      .getByRole("button", { name: /entrance|enter|verify|sign in/i })
-      .first();
+    const entrance = page.getByRole("button", { name: /entrance|enter|verify|sign in/i }).first();
     await expect(entrance).toBeVisible({ timeout: 15_000 });
     await expect(entrance).toBeEnabled();
     await expect(entrance).not.toHaveAttribute("aria-disabled", "true");
@@ -55,16 +51,12 @@ test.describe("Entrance button is always operable", () => {
     await context.close();
   });
 
-  test("button does not become inoperable after a cancelled login", async ({
-    browser,
-  }) => {
+  test("button does not become inoperable after a cancelled login", async ({ browser }) => {
     const context = await browser.newContext();
     const page = await context.newPage();
     await page.goto(BASE_URL);
 
-    const entrance = page
-      .getByRole("button", { name: /entrance|enter|verify|sign in/i })
-      .first();
+    const entrance = page.getByRole("button", { name: /entrance|enter|verify|sign in/i }).first();
 
     for (let i = 0; i < 3; i++) {
       await expect(entrance).toBeEnabled();
@@ -78,9 +70,7 @@ test.describe("Entrance button is always operable", () => {
     await expect(entrance).toBeVisible();
     await expect(entrance).toBeEnabled();
     await entrance.click();
-    const modal = page
-      .locator('iframe[src*="privy.io"], [role="dialog"]')
-      .first();
+    const modal = page.locator('iframe[src*="privy.io"], [role="dialog"]').first();
     await expect(modal).toBeVisible({ timeout: 10_000 });
 
     await context.close();
@@ -99,9 +89,7 @@ test.describe("Vault-to-hot wallet authentication via delegate.cash", () => {
     "Set VAULT_HOT_WALLET_ADDRESS / VAULT_HOT_WALLET_PK / VAULT_ADDRESS to run vault flow",
   );
 
-  test("hot wallet authenticates on behalf of vault (incognito)", async ({
-    browser,
-  }) => {
+  test("hot wallet authenticates on behalf of vault (incognito)", async ({ browser }) => {
     const context = await browser.newContext();
     const page = await context.newPage();
     await page.goto(BASE_URL);
@@ -113,15 +101,11 @@ test.describe("Vault-to-hot wallet authentication via delegate.cash", () => {
       async ({ hot, hotPk }) => {
         // viem is bundled — pull it via dynamic import to keep the test
         // independent of app internals.
-        const viem = await import(
-          /* @vite-ignore */ "https://esm.sh/viem@2?bundle"
-        );
+        const viem = await import(/* @vite-ignore */ "https://esm.sh/viem@2?bundle");
         const { privateKeyToAccount } = await import(
           /* @vite-ignore */ "https://esm.sh/viem@2/accounts?bundle"
         );
-        const { SiweMessage } = await import(
-          /* @vite-ignore */ "https://esm.sh/siwe@2?bundle"
-        );
+        const { SiweMessage } = await import(/* @vite-ignore */ "https://esm.sh/siwe@2?bundle");
 
         const account = privateKeyToAccount(hotPk as `0x${string}`);
         const msg = new SiweMessage({
@@ -186,9 +170,7 @@ test.describe("Vault-to-hot wallet authentication via delegate.cash", () => {
         const { privateKeyToAccount } = await import(
           /* @vite-ignore */ "https://esm.sh/viem@2/accounts?bundle"
         );
-        const { SiweMessage } = await import(
-          /* @vite-ignore */ "https://esm.sh/siwe@2?bundle"
-        );
+        const { SiweMessage } = await import(/* @vite-ignore */ "https://esm.sh/siwe@2?bundle");
 
         const account = privateKeyToAccount(hotPk as `0x${string}`);
         const siwe = new SiweMessage({

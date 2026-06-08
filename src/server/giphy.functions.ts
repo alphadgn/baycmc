@@ -15,8 +15,8 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export interface GifResult {
   id: string;
-  url: string;        // direct media URL we render in chat
-  preview: string;    // smaller URL for the picker grid
+  url: string; // direct media URL we render in chat
+  preview: string; // smaller URL for the picker grid
   width: number;
   height: number;
   description: string;
@@ -63,16 +63,10 @@ function mapResults(json: GiphyResponse): GifResult[] {
     // Render in chat at a reasonable size; pick a downsized version first
     // so we don't blow through bandwidth, fall back to original.
     const main =
-      g.images.downsized_medium ??
-      g.images.downsized ??
-      g.images.fixed_height ??
-      g.images.original;
+      g.images.downsized_medium ?? g.images.downsized ?? g.images.fixed_height ?? g.images.original;
     // Picker thumbnail — small.
     const thumb =
-      g.images.fixed_width_small ??
-      g.images.preview_gif ??
-      g.images.fixed_height ??
-      main;
+      g.images.fixed_width_small ?? g.images.preview_gif ?? g.images.fixed_height ?? main;
     if (!main?.url || !thumb?.url) return [];
     return [
       {

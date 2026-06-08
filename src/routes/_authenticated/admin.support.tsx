@@ -101,7 +101,10 @@ function AdminSupport() {
   );
 
   return (
-    <main className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-6 sm:px-6" style={{ height: "calc(100dvh - 4rem - max(env(safe-area-inset-top, 0px), 0.75rem))" }}>
+    <main
+      className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-6 sm:px-6"
+      style={{ height: "calc(100dvh - 4rem - max(env(safe-area-inset-top, 0px), 0.75rem))" }}
+    >
       <header className="flex items-center gap-3">
         <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-gradient-gold text-gold-foreground shadow-gold">
           <LifeBuoy className="h-5 w-5" />
@@ -142,9 +145,7 @@ function AdminSupport() {
                       type="button"
                       onClick={() => setSelected(t.threadUserId)}
                       className={`flex w-full items-start gap-2.5 rounded-md p-2 text-left transition ${
-                        active
-                          ? "bg-gold/10 ring-1 ring-gold/30"
-                          : "hover:bg-secondary/40"
+                        active ? "bg-gold/10 ring-1 ring-gold/30" : "hover:bg-secondary/40"
                       }`}
                     >
                       <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 overflow-hidden rounded-full border border-border bg-gradient-gold">

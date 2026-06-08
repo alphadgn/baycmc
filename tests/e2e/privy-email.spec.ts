@@ -53,9 +53,7 @@ for (const { name, device } of profiles) {
 
       const emailInput = page
         .frameLocator('iframe[src*="privy.io"]')
-        .locator(
-          'input[type="email"], input[name="email"], input[autocomplete="email"]',
-        )
+        .locator('input[type="email"], input[name="email"], input[autocomplete="email"]')
         .first();
       const panel = page.getByTestId("privy-troubleshoot-panel");
 
@@ -73,12 +71,8 @@ for (const { name, device } of profiles) {
       if (result === "email") {
         await emailInput.tap();
         await emailInput.focus();
-        const focused = await emailInput.evaluate(
-          (el) => el === document.activeElement,
-        );
-        expect(focused, `email input should be focused after tap (${name})`).toBe(
-          true,
-        );
+        const focused = await emailInput.evaluate((el) => el === document.activeElement);
+        expect(focused, `email input should be focused after tap (${name})`).toBe(true);
 
         await emailInput.fill("test+e2e@example.com");
         await expect(emailInput).toHaveValue("test+e2e@example.com");

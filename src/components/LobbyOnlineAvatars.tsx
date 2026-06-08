@@ -111,9 +111,7 @@ export function LobbyOnlineAvatars({ max = 12 }: LobbyOnlineAvatarsProps) {
           <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/80" />
           <span className="relative inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
         </span>
-        <span className="text-muted-foreground">
-          {members.length} online
-        </span>
+        <span className="text-muted-foreground">{members.length} online</span>
       </span>
       <ul className="flex items-center -space-x-2">
         {visible.map((m) => {

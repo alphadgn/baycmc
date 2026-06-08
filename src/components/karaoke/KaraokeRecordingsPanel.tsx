@@ -47,10 +47,7 @@ export function KaraokeRecordingsPanel({ roomId }: KaraokeRecordingsPanelProps) 
         setRows(res);
         const ids = Array.from(new Set(res.map((r) => r.performer_id)));
         if (ids.length) {
-          const { data } = await supabase
-            .from("profiles")
-            .select("id,username")
-            .in("id", ids);
+          const { data } = await supabase.from("profiles").select("id,username").in("id", ids);
           if (!cancelled && data) {
             const map: Record<string, string> = {};
             for (const p of data as { id: string; username: string | null }[]) {
@@ -78,9 +75,7 @@ export function KaraokeRecordingsPanel({ roomId }: KaraokeRecordingsPanelProps) 
     >
       <header className="mb-3 flex items-center gap-2">
         <Disc3 className="h-4 w-4 text-gold" />
-        <h2 className="font-display text-sm uppercase tracking-[0.3em] text-gold">
-          Recent Takes
-        </h2>
+        <h2 className="font-display text-sm uppercase tracking-[0.3em] text-gold">Recent Takes</h2>
         {loading && <Loader2 className="ml-auto h-3 w-3 animate-spin text-gold/60" />}
       </header>
 
@@ -101,24 +96,16 @@ export function KaraokeRecordingsPanel({ roomId }: KaraokeRecordingsPanelProps) 
                   <p className="truncate text-xs font-semibold text-foreground">
                     {r.song_title ?? "Untitled take"}
                     {r.song_artist ? (
-                      <span className="ml-1 text-muted-foreground">
-                        · {r.song_artist}
-                      </span>
+                      <span className="ml-1 text-muted-foreground">· {r.song_artist}</span>
                     ) : null}
                   </p>
                   <p className="truncate text-[10px] uppercase tracking-wider text-muted-foreground">
-                    {performers[r.performer_id] ?? "anon"} ·{" "}
-                    {fmtDuration(r.duration_ms)} ·{" "}
+                    {performers[r.performer_id] ?? "anon"} · {fmtDuration(r.duration_ms)} ·{" "}
                     {new Date(r.created_at).toLocaleDateString()}
                   </p>
                 </div>
               </div>
-              <audio
-                controls
-                preload="none"
-                src={r.public_url}
-                className="h-8 w-full sm:w-64"
-              />
+              <audio controls preload="none" src={r.public_url} className="h-8 w-full sm:w-64" />
             </li>
           ))}
         </ul>

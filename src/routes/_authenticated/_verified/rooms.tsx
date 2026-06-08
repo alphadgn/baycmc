@@ -41,7 +41,8 @@ export const Route = createFileRoute("/_authenticated/_verified/rooms")({
       { title: "Conference Rooms — BAYCMC" },
       {
         name: "description",
-        content: "Choose a themed conference room to join and connect with verified members in real time.",
+        content:
+          "Choose a themed conference room to join and connect with verified members in real time.",
       },
     ],
   }),
@@ -183,9 +184,9 @@ function RoomsPage() {
 
       {!loading && !canBook && (
         <div className="glass mb-5 rounded-2xl border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive font-sans-display">
-          You're signed in, but no verified BAYC/MAYC holding was detected in your connected
-          wallet. Booking is disabled until verification is restored. Reconnect or refresh your
-          wallet to try again.
+          You're signed in, but no verified BAYC/MAYC holding was detected in your connected wallet.
+          Booking is disabled until verification is restored. Reconnect or refresh your wallet to
+          try again.
         </div>
       )}
 
@@ -322,9 +323,7 @@ function RoomCard({
           <span className="inline-flex items-center gap-1">
             <Users className="h-3.5 w-3.5" /> capacity {room.capacity}
           </span>
-          <span className="text-[10px] uppercase tracking-wider">
-            {bookings.length} upcoming
-          </span>
+          <span className="text-[10px] uppercase tracking-wider">{bookings.length} upcoming</span>
         </div>
         {bookings[0] && (
           <p className="truncate text-[11px] text-muted-foreground">
@@ -365,9 +364,7 @@ function CreateRoomTile() {
     >
       <Plus className="h-8 w-8 text-gold/70 transition group-hover:text-gold" />
       <span className="font-display text-lg text-gold">Create new room</span>
-      <span className="text-[11px] text-muted-foreground font-sans-display">
-        Super-admins only
-      </span>
+      <span className="text-[11px] text-muted-foreground font-sans-display">Super-admins only</span>
     </Link>
   );
 }
@@ -376,9 +373,7 @@ function PreferencesPanel() {
   const { prefs, setPrefs } = useRoomPreferences();
   return (
     <div className="glass rounded-2xl border border-border/60 p-4 shadow-card">
-      <h3 className="font-display text-sm text-gold uppercase tracking-wider">
-        Your Preferences
-      </h3>
+      <h3 className="font-display text-sm text-gold uppercase tracking-wider">Your Preferences</h3>
       <p className="mt-1 text-[11px] text-muted-foreground font-sans-display">
         Defaults applied every time you join a room.
       </p>

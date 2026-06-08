@@ -41,18 +41,14 @@ export function EmbroideredImage({
   className,
 }: EmbroideredImageProps) {
   const { src, alt: defaultAlt } = SOURCES[variant];
-  const height =
-    clamp ?? sizes?.[size] ?? DEFAULT_EMBROIDERED_SIZES[size];
+  const height = clamp ?? sizes?.[size] ?? DEFAULT_EMBROIDERED_SIZES[size];
 
   return (
     <img
       src={src}
       alt={alt ?? defaultAlt}
       draggable={false}
-      className={cn(
-        "block w-auto max-w-full select-none object-contain",
-        className,
-      )}
+      className={cn("block w-auto max-w-full select-none object-contain", className)}
       style={{ height }}
     />
   );

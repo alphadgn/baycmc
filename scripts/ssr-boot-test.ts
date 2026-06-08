@@ -29,14 +29,10 @@ writeFileSync(STDOUT_LOG, "");
 writeFileSync(STDERR_LOG, "");
 writeFileSync(ERROR_LOG, "");
 
-const child = spawn(
-  "bunx",
-  ["vite", "preview", "--port", String(PORT), "--strictPort"],
-  {
-    stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env, NODE_ENV: "production" },
-  },
-);
+const child = spawn("bunx", ["vite", "preview", "--port", String(PORT), "--strictPort"], {
+  stdio: ["ignore", "pipe", "pipe"],
+  env: { ...process.env, NODE_ENV: "production" },
+});
 
 let serverReady = false;
 child.stdout.on("data", (d) => {
@@ -81,10 +77,7 @@ async function main() {
     }
 
     // 2. Body is not the h3 swallowed-error envelope from a module-init throw.
-    if (
-      rootBody.includes('"unhandled":true') &&
-      rootBody.includes('"message":"HTTPError"')
-    ) {
+    if (rootBody.includes('"unhandled":true') && rootBody.includes('"message":"HTTPError"')) {
       throw new Error(
         `Worker boot failed: h3 swallowed an init error on GET /\n${rootBody.slice(0, 600)}`,
       );
@@ -109,10 +102,7 @@ async function main() {
 void main().catch((e) => {
   const stack = e instanceof Error ? (e.stack ?? `${e.name}: ${e.message}`) : String(e);
   console.error(e);
-  appendFileSync(
-    ERROR_LOG,
-    `[ssr-boot-test] FAILED at ${new Date().toISOString()}\n${stack}\n`,
-  );
+  appendFileSync(ERROR_LOG, `[ssr-boot-test] FAILED at ${new Date().toISOString()}\n${stack}\n`);
   child.kill("SIGTERM");
   process.exit(1);
 });

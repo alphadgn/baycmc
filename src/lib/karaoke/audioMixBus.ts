@@ -44,7 +44,12 @@ export function getAudioContext(): AudioContext {
   }
   if (!_ctx) {
     const Ctor: typeof AudioContext =
-      (window as unknown as { AudioContext: typeof AudioContext; webkitAudioContext?: typeof AudioContext }).AudioContext ??
+      (
+        window as unknown as {
+          AudioContext: typeof AudioContext;
+          webkitAudioContext?: typeof AudioContext;
+        }
+      ).AudioContext ??
       (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     _ctx = new Ctor({ latencyHint: "interactive" });
   }
