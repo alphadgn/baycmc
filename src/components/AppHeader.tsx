@@ -1,5 +1,5 @@
 import { Link, useLocation, useRouter } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, Loader2, Menu, X } from "lucide-react";
 import { useAuth } from "@/lib/auth/useAuth";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
@@ -438,6 +438,55 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
         // Belt-and-suspenders: if hydration is slow, a pointerdown still
         // wakes the listener once React attaches.
         try { window.dispatchEvent(new Event("baycmc:vip-click")); } catch { /* noop */ }
+      }}
+      style={{
+        backgroundImage:
+          "linear-gradient(135deg, oklch(0.85 0.16 82) 0%, oklch(0.68 0.18 50) 100%)",
+        color: "oklch(0.14 0.01 80)",
+        boxShadow: "0 10px 40px -10px oklch(0.78 0.14 78 / 35%)",
+      }}
+      className="shrink-0 cursor-pointer rounded-md bg-gradient-gold px-3 py-2 text-xs font-semibold text-gold-foreground shadow-gold transition hover:opacity-90 sm:px-4 sm:text-sm"
+    >
+      VIP
+    </button>
+  );
+}
+
+function VipButtonWithGlyphConnect({
+  hooks,
+  onOpen,
+}: {
+  hooks: HeaderEntranceHooks;
+  onOpen: () => void;
+}) {
+  const { connect } = hooks.useNativeGlyphConnection();
+
+  function handleVipClick(e: React.MouseEvent<HTMLButtonElement>) {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log("[VIP CLICKED]");
+    console.log("[MODAL OPEN REQUESTED]");
+    onOpen();
+    try {
+      console.log("[GLYPH CONNECT START]");
+      connect();
+      console.log("[GLYPH CONNECT SUCCESS]");
+    } catch (error) {
+      console.warn("[AppHeader] Glyph connect() threw:", error);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      data-vip-trigger="true"
+      onClick={handleVipClick}
+      onPointerDown={() => {
+        try {
+          window.dispatchEvent(new Event("baycmc:vip-click"));
+        } catch {
+          /* noop */
+        }
       }}
       style={{
         backgroundImage:
