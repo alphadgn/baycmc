@@ -4,11 +4,13 @@ import { ArrowLeft, Loader2, Menu, X } from "lucide-react";
 import { useAuth } from "@/lib/auth/useAuth";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import { useGlyphAuthState } from "@/lib/auth/useGlyphBridge";
+import { useGlyphReady } from "@/components/GlyphAppProvider";
 import { supabase } from "@/integrations/supabase/client";
 import { EntranceDialog } from "@/components/EntranceDialog";
 import { EmbroideredImage } from "@/components/EmbroideredImage";
 import { WalletPill } from "@/components/WalletPill";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { importWithRetry } from "@/lib/import-with-retry";
 
 interface NavItem {
   to:
