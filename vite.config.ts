@@ -1,10 +1,13 @@
+import path from "path";
+import { fileURLToPath } from "url";
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
-import type { UserConfig } from "vite";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   resolve: {
     alias: {
-      buffer: "buffer/",
+      buffer: path.resolve(__dirname, "node_modules/buffer/index.js"),
     },
   },
-} as UserConfig);
+} as import("vite").UserConfig);
