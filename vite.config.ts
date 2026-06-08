@@ -1,19 +1,13 @@
-import path from "path";
-import { fileURLToPath } from "url";
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
 export default defineConfig({
-  plugins: [
-    {
-      name: "buffer-polyfill",
-      enforce: "pre",
-      resolveId(id) {
-        if (id === "buffer") {
-          return path.resolve(__dirname, "node_modules/buffer/index.js");
-        }
+  tanstackStart: {
+    server: { entry: "server" },
+    importProtection: {
+      behavior: "error",
+      client: {
+        excludeFiles: ["**/*.functions.ts", "**/*.functions.tsx", "**/*.functions.js"],
       },
     },
-  ],
-} as import("vite").UserConfig);
+  },
+});
