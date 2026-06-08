@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequestHost } from "@tanstack/react-start/server";
+import { getRequestHost, getRequestHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { SiweMessage } from "siwe";
 import { createPublicClient, http, getAddress, parseAbi, isAddress } from "viem";
@@ -292,9 +292,20 @@ export const verifyOwnership = createServerFn({ method: "POST" })
     try {
       const siwe = new SiweMessage(data.message);
 
-      // Domain check: the SIWE message must be bound to this server's host.
-      // Allow a configured override (SITE_DOMAIN) for environments behind
-      // proxies; otherwise fall back to the request host.
+      // Domain check: the SIWE message must be bound to the host the user
+      // actually visited. In preview / proxy environments the worker's
+      // internal request host (e.g. "localhost:8080") differs from the
+      // browser-visible host, so prefer the Origin/Referer header (set by
+      // the browser to the real site) and fall back to the request host.
+      const headerHost = (() => {
+        try {
+          const origin = getRequestHeader("origin") ?? getRequestHeader("referer");
+          if (!origin) return null;
+          return new URL(origin).host;
+        } catch {
+          return null;
+        }
+      })();
       const requestHost = (() => {
         try {
           return getRequestHost();
@@ -302,13 +313,20 @@ export const verifyOwnership = createServerFn({ method: "POST" })
           return null;
         }
       })();
-      const expectedDomain = (process.env.SITE_DOMAIN ?? requestHost ?? "").toLowerCase();
-      if (!expectedDomain) {
+      const acceptedDomains = new Set(
+        [process.env.SITE_DOMAIN, headerHost, requestHost]
+          .filter((d): d is string => Boolean(d))
+          .map((d) => d.toLowerCase()),
+      );
+      if (acceptedDomains.size === 0) {
         throw new Error("Server domain not configured");
       }
       const messageDomain = (siwe.domain ?? "").toLowerCase();
-      if (messageDomain !== expectedDomain) {
-        console.warn("SIWE domain mismatch", { messageDomain, expectedDomain });
+      if (!acceptedDomains.has(messageDomain)) {
+        console.warn("SIWE domain mismatch", {
+          messageDomain,
+          acceptedDomains: [...acceptedDomains],
+        });
         throw new Error("Signature was not issued for this site.");
       }
 
