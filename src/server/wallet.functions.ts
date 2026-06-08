@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequestHost } from "@tanstack/react-start/server";
+import { getRequestHost, getRequestHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { SiweMessage } from "siwe";
 import { createPublicClient, http, getAddress, parseAbi, isAddress } from "viem";
