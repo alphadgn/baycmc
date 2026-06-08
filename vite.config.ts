@@ -12,13 +12,16 @@ export default defineConfig({
   },
   vite: {
     resolve: {
-      alias: [
+      alias: {
         // Privy/Glyph transitive deps import `buffer` directly. Vite would
         // otherwise externalize it to __vite-browser-external in the client
         // bundle and break the build ("Buffer is not exported"). Point it at
         // the installed npm `buffer` polyfill package for the browser build.
-        { find: /^buffer$/, replacement: "buffer/index.js" },
-      ],
+        buffer: "buffer/index.js",
+      },
+    },
+    optimizeDeps: {
+      include: ["buffer"],
     },
   },
 });
