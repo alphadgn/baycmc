@@ -10,13 +10,15 @@ export default defineConfig({
       },
     },
   },
-  resolve: {
-    alias: {
-      // Privy/Glyph transitive deps import `buffer` directly. Vite would
-      // otherwise externalize it to __vite-browser-external in the client
-      // bundle and break the build ("Buffer is not exported"). Point it at
-      // the installed npm `buffer` polyfill package for the browser build.
-      buffer: "buffer/",
+  vite: {
+    resolve: {
+      alias: {
+        // Privy/Glyph transitive deps import `buffer` directly. Vite would
+        // otherwise externalize it to __vite-browser-external in the client
+        // bundle and break the build ("Buffer is not exported"). Point it at
+        // the installed npm `buffer` polyfill package for the browser build.
+        buffer: "buffer/",
+      },
     },
   },
 });
