@@ -16,10 +16,10 @@ export default defineConfig({
   // export `Buffer` and breaks the production Rollup build.
   vite: {
     resolve: {
-      alias: {
-        buffer: "buffer/",
-        process: "process/browser",
-      },
+      alias: [
+        { find: /^buffer$/, replacement: "buffer/" },
+        { find: /^process$/, replacement: "process/browser" },
+      ],
     },
   },
 });
