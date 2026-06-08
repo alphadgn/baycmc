@@ -42,6 +42,10 @@ export function EntranceDialog({ open, onOpenChange }: EntranceDialogProps) {
   const glyphReady = useGlyphReady();
   const [hooks, setHooks] = useState<EntranceHooks | null>(null);
 
+  useEffect(() => {
+    if (open) console.log("[ENTRANCE MODAL OPEN]");
+  }, [open]);
+
   // Lazy-load the Glyph + wagmi hooks (SSR-unsafe SDK). Only after the
   // GlyphWalletProvider has mounted — calling these outside it throws.
   useEffect(() => {

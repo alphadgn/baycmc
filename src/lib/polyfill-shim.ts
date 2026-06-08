@@ -1,10 +1,7 @@
 /**
  * Inline browser polyfills for the Node globals Privy / Glyph need
- * (Buffer, process, global). Bundled into the main client entry so we
- * never depend on `vite-plugin-node-polyfills`' separate `_shims_*.js`
- * deps chunk — when that chunk 401/502s in the sandbox preview, the
- * client entry stops evaluating and React never hydrates (every onClick,
- * including the VIP button, becomes inert while SSR HTML keeps rendering).
+ * (Buffer, process, global). Bundled into the main client entry so the
+ * client can hydrate before any wallet SDK code evaluates.
  *
  * SSR-safe: all work is gated on `typeof window !== "undefined"`, and the
  * `buffer` / `process` modules are loaded via dynamic `import()` so they
@@ -28,6 +25,12 @@ export async function installBrowserPolyfills(): Promise<void> {
       (window as unknown as { process?: unknown }).process === null
     ) {
       (window as unknown as Record<string, unknown>).process = p;
+    }
+  }
+  if (typeof g.events !== "object" || g.events === null) {
+    const m = await import("events");
+    if (typeof (window as unknown as { events?: unknown }).events !== "object") {
+      (window as unknown as Record<string, unknown>).events = m;
     }
   }
 }

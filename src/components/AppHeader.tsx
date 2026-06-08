@@ -1,14 +1,16 @@
 import { Link, useLocation, useRouter } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import { ArrowLeft, Loader2, Menu, X } from "lucide-react";
 import { useAuth } from "@/lib/auth/useAuth";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import { useGlyphAuthState } from "@/lib/auth/useGlyphBridge";
+import { useGlyphReady } from "@/components/GlyphAppProvider";
 import { supabase } from "@/integrations/supabase/client";
 import { EntranceDialog } from "@/components/EntranceDialog";
 import { EmbroideredImage } from "@/components/EmbroideredImage";
 import { WalletPill } from "@/components/WalletPill";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { importWithRetry } from "@/lib/import-with-retry";
 
 interface NavItem {
   to:
@@ -49,6 +51,12 @@ const NAV_ITEMS: NavItem[] = [
 
 // Routes treated as "home" — no back arrow shown here.
 const HOME_ROUTES = new Set<string>(["/", "/lobby"]);
+
+type GlyphConnection = { connect: () => void };
+type UseNativeGlyphConnection = () => GlyphConnection;
+type HeaderEntranceHooks = {
+  useNativeGlyphConnection: UseNativeGlyphConnection;
+};
 
 // Tracks how many in-app navigations have happened since the tab opened.
 // `window.history.length` is unreliable (counts entries from before the SPA
@@ -281,6 +289,8 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
   const { isAuthenticated, user } = useAuth();
   const { isVerifiedHolder, collection, loading: verifLoading } = useVerificationStatus();
   const glyph = useGlyphAuthState();
+  const glyphReady = useGlyphReady();
+  const [hooks, setHooks] = useState<HeaderEntranceHooks | null>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [, setProfileLoaded] = useState(false);
 
@@ -292,6 +302,28 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
     window.addEventListener("baycmc:vip-click", openFromQueuedVipTap);
     return () => window.removeEventListener("baycmc:vip-click", openFromQueuedVipTap);
   }, [onOpen]);
+
+  useEffect(() => {
+    if (!glyphReady) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const glyphMod = await importWithRetry(() => import("@use-glyph/sdk-react"), {
+          label: "glyph-sdk-react-header",
+        });
+        if (cancelled) return;
+        setHooks(() => ({
+          useNativeGlyphConnection:
+            glyphMod.useNativeGlyphConnection as unknown as UseNativeGlyphConnection,
+        }));
+      } catch {
+        /* EntranceDialog still opens and can load Glyph itself. */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [glyphReady]);
 
 
   useEffect(() => {
@@ -387,6 +419,10 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
   // SDK init. The modal owns the connect / sign flow. Inline styles guarantee
   // the gold treatment renders even if a downstream CSS rule shadows the
   // Tailwind utility classes (matches the Main Entrance button).
+  if (hooks) {
+    return <VipButtonWithGlyphConnect hooks={hooks} onOpen={onOpen} />;
+  }
+
   return (
     <button
       type="button"
@@ -402,6 +438,55 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
         // Belt-and-suspenders: if hydration is slow, a pointerdown still
         // wakes the listener once React attaches.
         try { window.dispatchEvent(new Event("baycmc:vip-click")); } catch { /* noop */ }
+      }}
+      style={{
+        backgroundImage:
+          "linear-gradient(135deg, oklch(0.85 0.16 82) 0%, oklch(0.68 0.18 50) 100%)",
+        color: "oklch(0.14 0.01 80)",
+        boxShadow: "0 10px 40px -10px oklch(0.78 0.14 78 / 35%)",
+      }}
+      className="shrink-0 cursor-pointer rounded-md bg-gradient-gold px-3 py-2 text-xs font-semibold text-gold-foreground shadow-gold transition hover:opacity-90 sm:px-4 sm:text-sm"
+    >
+      VIP
+    </button>
+  );
+}
+
+function VipButtonWithGlyphConnect({
+  hooks,
+  onOpen,
+}: {
+  hooks: HeaderEntranceHooks;
+  onOpen: () => void;
+}) {
+  const { connect } = hooks.useNativeGlyphConnection();
+
+  function handleVipClick(e: MouseEvent<HTMLButtonElement>) {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log("[VIP CLICKED]");
+    console.log("[MODAL OPEN REQUESTED]");
+    onOpen();
+    try {
+      console.log("[GLYPH CONNECT START]");
+      connect();
+      console.log("[GLYPH CONNECT SUCCESS]");
+    } catch (error) {
+      console.warn("[AppHeader] Glyph connect() threw:", error);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      data-vip-trigger="true"
+      onClick={handleVipClick}
+      onPointerDown={() => {
+        try {
+          window.dispatchEvent(new Event("baycmc:vip-click"));
+        } catch {
+          /* noop */
+        }
       }}
       style={{
         backgroundImage:
