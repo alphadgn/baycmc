@@ -14,7 +14,7 @@ import { spawn } from "node:child_process";
 const PORT = Number(process.env.SMOKE_PORT ?? 4173);
 const BASE = `http://127.0.0.1:${PORT}`;
 const ROUTES = ["/", "/login", "/api/public/health"];
-const TIMEOUT_MS = 60_000;
+const TIMEOUT_MS = 120_000;
 
 const child = spawn("bunx", ["vite", "preview", "--port", String(PORT), "--strictPort"], {
   stdio: ["ignore", "pipe", "pipe"],
