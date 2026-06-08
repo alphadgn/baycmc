@@ -18,9 +18,7 @@ function NotFoundComponent() {
       <div className="max-w-md text-center">
         <h1 className="text-5xl font-bold text-gradient-gold sm:text-7xl">404</h1>
         <h2 className="mt-4 text-lg font-semibold sm:text-xl">Page not found</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          This door doesn't open. Even for apes.
-        </p>
+        <p className="mt-2 text-sm text-muted-foreground">This door doesn't open. Even for apes.</p>
         <div className="mt-6">
           <Link
             to="/"
@@ -40,15 +38,41 @@ export const Route = createRootRoute({
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { title: "BAYCmc the mobile clubhouse experience 2nd to the real exper" },
-      { name: "description", content: "An exclusive social and real-time platform for verified Bored Ape Yacht Club holders." },
-      { property: "og:title", content: "BAYCmc the mobile clubhouse experience 2nd to the real exper" },
-      { property: "og:description", content: "An exclusive social and real-time platform for verified Bored Ape Yacht Club holders." },
+      {
+        name: "description",
+        content:
+          "An exclusive social and real-time platform for verified Bored Ape Yacht Club holders.",
+      },
+      {
+        property: "og:title",
+        content: "BAYCmc the mobile clubhouse experience 2nd to the real exper",
+      },
+      {
+        property: "og:description",
+        content:
+          "An exclusive social and real-time platform for verified Bored Ape Yacht Club holders.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "BAYCmc the mobile clubhouse experience 2nd to the real exper" },
-      { name: "twitter:description", content: "An exclusive social and real-time platform for verified Bored Ape Yacht Club holders." },
-      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/xmS42tZ3QgXuTy3Hc7qF00PSwAX2/social-images/social-1777991694625-IMG_2602.webp" },
-      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/xmS42tZ3QgXuTy3Hc7qF00PSwAX2/social-images/social-1777991694625-IMG_2602.webp" },
+      {
+        name: "twitter:title",
+        content: "BAYCmc the mobile clubhouse experience 2nd to the real exper",
+      },
+      {
+        name: "twitter:description",
+        content:
+          "An exclusive social and real-time platform for verified Bored Ape Yacht Club holders.",
+      },
+      {
+        property: "og:image",
+        content:
+          "https://storage.googleapis.com/gpt-engineer-file-uploads/xmS42tZ3QgXuTy3Hc7qF00PSwAX2/social-images/social-1777991694625-IMG_2602.webp",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://storage.googleapis.com/gpt-engineer-file-uploads/xmS42tZ3QgXuTy3Hc7qF00PSwAX2/social-images/social-1777991694625-IMG_2602.webp",
+      },
     ],
     links: [
       { rel: "stylesheet", href: appCss },

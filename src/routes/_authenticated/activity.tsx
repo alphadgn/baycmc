@@ -12,21 +12,10 @@ import {
   TrendingUp,
   Calendar,
 } from "lucide-react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
-import {
-  listWalletActivity,
-  type ActivityItem,
-} from "@/server/wallet-assets.functions";
+import { listWalletActivity, type ActivityItem } from "@/server/wallet-assets.functions";
 
 export const Route = createFileRoute("/_authenticated/activity")({
   head: () => ({
@@ -126,7 +115,9 @@ function ActivityPage() {
           icon={<TrendingUp className="h-4 w-4" />}
           label="Total transactions"
           value={loading ? "…" : analytics.total.toString()}
-          sub={analytics.last30 > 0 ? `${analytics.last30} in last 30 days` : "across recent history"}
+          sub={
+            analytics.last30 > 0 ? `${analytics.last30} in last 30 days` : "across recent history"
+          }
         />
         <StatCard
           icon={<Sparkles className="h-4 w-4" />}
@@ -143,7 +134,7 @@ function ActivityPage() {
         <StatCard
           icon={<Calendar className="h-4 w-4" />}
           label="Most active day"
-          value={loading ? "…" : analytics.busiestDay ?? "—"}
+          value={loading ? "…" : (analytics.busiestDay ?? "—")}
           sub={analytics.busiestDayCount ? `${analytics.busiestDayCount} txs` : "no data yet"}
         />
       </section>
@@ -208,9 +199,7 @@ function ActivityPage() {
                   <DirectionIcon item={it} walletLower={wallet.toLowerCase()} />
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 text-sm">
-                      <span className="font-medium">
-                        {describeCategory(it)}
-                      </span>
+                      <span className="font-medium">{describeCategory(it)}</span>
                       <span className="rounded-full border border-border bg-muted/30 px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
                         {it.category}
                       </span>
@@ -285,7 +274,8 @@ function DirectionIcon({ item, walletLower }: { item: ActivityItem; walletLower:
 
 function describeCategory(item: ActivityItem): string {
   const isMint = item.from?.toLowerCase() === "0x0000000000000000000000000000000000000000";
-  if (isMint) return `Minted ${item.asset ?? "NFT"}${item.tokenId ? ` #${shortTokenId(item.tokenId)}` : ""}`;
+  if (isMint)
+    return `Minted ${item.asset ?? "NFT"}${item.tokenId ? ` #${shortTokenId(item.tokenId)}` : ""}`;
   if (item.category === "erc721" || item.category === "erc1155") {
     return `${item.asset ?? "NFT"}${item.tokenId ? ` #${shortTokenId(item.tokenId)}` : ""}`;
   }

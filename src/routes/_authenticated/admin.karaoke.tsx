@@ -3,10 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  getKaraokeCatalogStats,
-  seedKaraokeCatalog,
-} from "@/lib/karaoke.functions";
+import { getKaraokeCatalogStats, seedKaraokeCatalog } from "@/lib/karaoke.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/karaoke")({
   beforeLoad: async () => {
@@ -99,11 +96,7 @@ function AdminKaraokePage() {
           />
           <Stat
             label="Last seeded"
-            value={
-              stats?.lastSeededAt
-                ? new Date(stats.lastSeededAt).toLocaleString()
-                : "Never"
-            }
+            value={stats?.lastSeededAt ? new Date(stats.lastSeededAt).toLocaleString() : "Never"}
           />
         </dl>
       </section>
@@ -111,9 +104,9 @@ function AdminKaraokePage() {
       <section className="glass rounded-2xl p-6 shadow-card">
         <h2 className="font-display text-xl text-gold">Seed actions</h2>
         <p className="mt-2 text-sm text-muted-foreground font-sans-display">
-          Scrapes KaraFun's Most Popular chart (pages 1–5) and upserts songs into
-          the catalog. Safe to re-run — it refreshes existing ranks instead of
-          duplicating rows. May take 30–90 seconds.
+          Scrapes KaraFun's Most Popular chart (pages 1–5) and upserts songs into the catalog. Safe
+          to re-run — it refreshes existing ranks instead of duplicating rows. May take 30–90
+          seconds.
         </p>
 
         <div className="mt-4 flex flex-wrap gap-3">
@@ -147,9 +140,7 @@ function AdminKaraokePage() {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border border-border/60 bg-black/30 p-3">
-      <dt className="text-[10px] uppercase tracking-wider text-muted-foreground">
-        {label}
-      </dt>
+      <dt className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</dt>
       <dd className="mt-1 font-display text-lg text-gold">{value}</dd>
     </div>
   );

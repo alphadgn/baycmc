@@ -51,7 +51,9 @@ export function VerificationStatusPanel() {
     try {
       const res = await verifyLumina({ data: {} });
       if (res.ok) {
-        toast.success(res.verified ? "Lumina ownership verified" : "Lumina did not detect ownership");
+        toast.success(
+          res.verified ? "Lumina ownership verified" : "Lumina did not detect ownership",
+        );
         await load();
       } else {
         setLuminaError(res.error ?? "Lumina check failed");

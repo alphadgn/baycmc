@@ -28,7 +28,8 @@ export const Route = createFileRoute("/api/public/health")({
               return false;
             }
           })(),
-          crypto: typeof (globalThis as { crypto?: { subtle?: unknown } }).crypto?.subtle === "object",
+          crypto:
+            typeof (globalThis as { crypto?: { subtle?: unknown } }).crypto?.subtle === "object",
         };
         const env = {
           SUPABASE_URL: !!process.env.SUPABASE_URL,
@@ -40,7 +41,9 @@ export const Route = createFileRoute("/api/public/health")({
           JSON.stringify({
             ok,
             runtime: "cloudflare-worker",
-            nodeCompat: typeof (globalThis as { process?: { versions?: unknown } }).process?.versions === "object",
+            nodeCompat:
+              typeof (globalThis as { process?: { versions?: unknown } }).process?.versions ===
+              "object",
             polyfills,
             env,
             ms: Date.now() - t0,

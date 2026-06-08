@@ -115,8 +115,7 @@ function KaraokeRoomPage() {
       setMicLive(!!(e as CustomEvent<{ enabled: boolean }>).detail?.enabled);
     }
     window.addEventListener("karaoke:mic-state", onState as EventListener);
-    return () =>
-      window.removeEventListener("karaoke:mic-state", onState as EventListener);
+    return () => window.removeEventListener("karaoke:mic-state", onState as EventListener);
   }, []);
 
   if (loading) {
@@ -151,11 +150,7 @@ function KaraokeRoomPage() {
       />
       <KaraokeStage roomId={roomId} bookingHostUserId={hostUserId} />
       {performerId && (
-        <SingerLiveIndicator
-          singerName={performerName}
-          live={micLive}
-          recording={false}
-        />
+        <SingerLiveIndicator singerName={performerName} live={micLive} recording={false} />
       )}
       <div className="px-4 pb-16">
         <KaraokeRecordingsPanel roomId={roomId} />

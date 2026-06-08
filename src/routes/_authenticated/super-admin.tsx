@@ -63,9 +63,7 @@ function SuperAdminPage() {
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-display text-3xl text-gradient-gold sm:text-5xl">
-            Super Admin
-          </h1>
+          <h1 className="font-display text-3xl text-gradient-gold sm:text-5xl">Super Admin</h1>
           <p className="mt-1 text-xs text-muted-foreground font-sans-display sm:text-sm">
             Appoint roles, override access, review chapters, configure gates
           </p>
@@ -74,7 +72,10 @@ function SuperAdminPage() {
           <Link to="/admin" className="rounded-md border border-border px-3 py-2 hover:bg-muted">
             Audit
           </Link>
-          <Link to="/admin/users" className="rounded-md border border-border px-3 py-2 hover:bg-muted">
+          <Link
+            to="/admin/users"
+            className="rounded-md border border-border px-3 py-2 hover:bg-muted"
+          >
             Admin · Users
           </Link>
           <Link
@@ -175,7 +176,9 @@ function UsersTab() {
     <>
       <div className="glass mb-4 flex flex-wrap items-end gap-3 rounded-2xl p-4 shadow-card">
         <div className="flex-1 min-w-[240px]">
-          <label className="block text-[11px] text-muted-foreground">Search wallet / username</label>
+          <label className="block text-[11px] text-muted-foreground">
+            Search wallet / username
+          </label>
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -206,9 +209,17 @@ function UsersTab() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Loading…</td></tr>
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                  Loading…
+                </td>
+              </tr>
             ) : users.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">No users found.</td></tr>
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                  No users found.
+                </td>
+              </tr>
             ) : (
               users.map((u) => {
                 const isAdmin = u.roles.includes("admin");
@@ -224,10 +235,17 @@ function UsersTab() {
                       {u.roles.length ? (
                         <div className="flex flex-wrap gap-1">
                           {u.roles.map((r) => (
-                            <span key={r} className="rounded bg-gold/10 px-1.5 py-0.5 text-[10px] text-gold">{r}</span>
+                            <span
+                              key={r}
+                              className="rounded bg-gold/10 px-1.5 py-0.5 text-[10px] text-gold"
+                            >
+                              {r}
+                            </span>
                           ))}
                         </div>
-                      ) : <span className="text-muted-foreground">—</span>}
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-2">
                       <div className="flex flex-wrap gap-1">
@@ -309,7 +327,9 @@ function ChaptersTab() {
     setLoading(false);
   }, [list, filter]);
 
-  useEffect(() => { void run(); }, [run]);
+  useEffect(() => {
+    void run();
+  }, [run]);
 
   async function decide(r: ChapterRow, decision: "approved" | "rejected") {
     setBusy(r.id);
@@ -343,7 +363,9 @@ function ChaptersTab() {
         {loading ? (
           <div className="glass rounded-2xl p-8 text-center text-muted-foreground">Loading…</div>
         ) : rows.length === 0 ? (
-          <div className="glass rounded-2xl p-8 text-center text-muted-foreground">No submissions.</div>
+          <div className="glass rounded-2xl p-8 text-center text-muted-foreground">
+            No submissions.
+          </div>
         ) : (
           rows.map((r) => (
             <article key={r.id} className="glass rounded-2xl p-4 shadow-card">
@@ -361,8 +383,8 @@ function ChaptersTab() {
                     r.status === "approved"
                       ? "bg-emerald-600/20 text-emerald-300"
                       : r.status === "rejected"
-                      ? "bg-destructive/20 text-destructive"
-                      : "bg-amber-600/20 text-amber-200"
+                        ? "bg-destructive/20 text-destructive"
+                        : "bg-amber-600/20 text-amber-200"
                   }`}
                 >
                   {r.status}

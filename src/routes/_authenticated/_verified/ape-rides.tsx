@@ -23,8 +23,7 @@ export const Route = createFileRoute("/_authenticated/_verified/ape-rides")({
       { title: "Ape Rides — BAYC/MAYC Clubhouse" },
       {
         name: "description",
-        content:
-          "Pair with a member inside the Wynwood clubhouse and stream a live Ape Ride.",
+        content: "Pair with a member inside the Wynwood clubhouse and stream a live Ape Ride.",
       },
       { property: "og:title", content: "Ape Rides — BAYC/MAYC Clubhouse" },
       {
@@ -101,15 +100,11 @@ function ApeRidesPage() {
     loadRequests();
     const ch = supabase
       .channel("ape-rides")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "ape_rides" },
-        () => loadRides(),
+      .on("postgres_changes", { event: "*", schema: "public", table: "ape_rides" }, () =>
+        loadRides(),
       )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "ape_ride_requests" },
-        () => loadRequests(),
+      .on("postgres_changes", { event: "*", schema: "public", table: "ape_ride_requests" }, () =>
+        loadRequests(),
       )
       .subscribe();
     return () => {
@@ -187,9 +182,8 @@ function ApeRidesPage() {
         <div>
           <h1 className="font-display text-3xl text-gradient-gold sm:text-4xl">Ape Rides</h1>
           <p className="mt-2 text-xs text-muted-foreground sm:text-sm">
-            Pair with a member physically inside the Wynwood, FL clubhouse and
-            watch their live POV. Hosting is unlocked only when your GPS places
-            you inside the clubhouse geofence.
+            Pair with a member physically inside the Wynwood, FL clubhouse and watch their live POV.
+            Hosting is unlocked only when your GPS places you inside the clubhouse geofence.
           </p>
         </div>
         {pfpUrl && (
@@ -202,10 +196,7 @@ function ApeRidesPage() {
           </button>
         )}
       </header>
-      {arOpen && pfpUrl && (
-        <ApeArFilter pfpUrl={pfpUrl} onClose={() => setArOpen(false)} />
-      )}
-
+      {arOpen && pfpUrl && <ApeArFilter pfpUrl={pfpUrl} onClose={() => setArOpen(false)} />}
 
       {/* Host panel */}
       <section className="glass mb-8 rounded-2xl p-6 shadow-card">
@@ -227,9 +218,7 @@ function ApeRidesPage() {
           {geo.status === "loading" && (
             <span className="text-xs text-muted-foreground">Locating…</span>
           )}
-          {geo.status === "denied" && (
-            <div className="text-xs text-destructive">{geo.reason}</div>
-          )}
+          {geo.status === "denied" && <div className="text-xs text-destructive">{geo.reason}</div>}
           {geo.status === "ok" && !geo.inside && (
             <div className="text-xs text-muted-foreground">
               You're outside Wynwood — request a ride from a host below.
@@ -263,8 +252,8 @@ function ApeRidesPage() {
         </div>
         {!canHost && geo.status === "ok" && !geo.inside && (
           <p className="mt-3 text-[11px] text-muted-foreground">
-            Your location was verified outside the clubhouse. Hosting requires
-            you to be physically present in Wynwood.
+            Your location was verified outside the clubhouse. Hosting requires you to be physically
+            present in Wynwood.
           </p>
         )}
       </section>
@@ -281,12 +270,7 @@ function ApeRidesPage() {
       />
 
       {/* Host request inbox */}
-      {myActiveRide && (
-        <HostRequestInbox
-          rideId={myActiveRide.id}
-          onRespond={handleRespond}
-        />
-      )}
+      {myActiveRide && <HostRequestInbox rideId={myActiveRide.id} onRespond={handleRespond} />}
     </div>
   );
 }
@@ -359,9 +343,7 @@ function ApeRidesCheckpoint({
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : entries.length === 0 ? (
         <div className="space-y-3 rounded-md border border-dashed border-border bg-secondary/30 p-6 text-center">
-          <p className="text-sm text-muted-foreground">
-            No ride signups or pairing requests yet.
-          </p>
+          <p className="text-sm text-muted-foreground">No ride signups or pairing requests yet.</p>
           {liveRideForViewer && !myPendingOrAccepted && (
             <button
               onClick={() => onRequest(liveRideForViewer.id)}

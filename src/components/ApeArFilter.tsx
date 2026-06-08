@@ -12,13 +12,7 @@ import { X } from "lucide-react";
  * canvas as the LiveKit camera track requires sitting inside the
  * `<LiveKitRoom>` provider — wiring that in is a follow-up.
  */
-export function ApeArFilter({
-  pfpUrl,
-  onClose,
-}: {
-  pfpUrl: string;
-  onClose: () => void;
-}) {
+export function ApeArFilter({ pfpUrl, onClose }: { pfpUrl: string; onClose: () => void }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const pfpImgRef = useRef<HTMLImageElement | null>(null);
@@ -49,9 +43,7 @@ export function ApeArFilter({
         video.srcObject = stream;
         await video.play();
 
-        const { FilesetResolver, FaceLandmarker } = await import(
-          "@mediapipe/tasks-vision"
-        );
+        const { FilesetResolver, FaceLandmarker } = await import("@mediapipe/tasks-vision");
         const vision = await FilesetResolver.forVisionTasks(
           "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm",
         );
@@ -101,7 +93,10 @@ export function ApeArFilter({
           const res = landmarker.detectForVideo(video, performance.now());
           const lm = res.faceLandmarks?.[0];
           if (lm && pfpImgRef.current?.complete) {
-            let minX = 1, minY = 1, maxX = 0, maxY = 0;
+            let minX = 1,
+              minY = 1,
+              maxX = 0,
+              maxY = 0;
             for (const p of lm) {
               if (p.x < minX) minX = p.x;
               if (p.y < minY) minY = p.y;
@@ -117,13 +112,7 @@ export function ApeArFilter({
             const drawH = boxH * (1 + pad * 1.4);
             const cx = (mirX + (mirMaxX - mirX) / 2) * w;
             const cy = (minY + (maxY - minY) / 2) * h - boxH * 0.15;
-            ctx.drawImage(
-              pfpImgRef.current,
-              cx - drawW / 2,
-              cy - drawH / 2,
-              drawW,
-              drawH,
-            );
+            ctx.drawImage(pfpImgRef.current, cx - drawW / 2, cy - drawH / 2, drawW, drawH);
           }
         } catch {
           /* swallow per-frame errors */
@@ -178,8 +167,8 @@ export function ApeArFilter({
           )}
         </div>
         <div className="border-t border-gold/20 bg-[#0a0a0a] px-3 py-2 text-[10px] text-gold/60">
-          Your verified BAYC is locked to your face. This is a local preview —
-          publishing the AR feed into the live LiveKit stream is coming next.
+          Your verified BAYC is locked to your face. This is a local preview — publishing the AR
+          feed into the live LiveKit stream is coming next.
         </div>
       </div>
     </div>

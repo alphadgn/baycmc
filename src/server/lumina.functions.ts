@@ -21,7 +21,14 @@ import { assertSafeHttpsUrl } from "@/server/url-guard";
 export const verifyLuminaOwnership = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { wallet?: string }) =>
-    z.object({ wallet: z.string().regex(/^0x[a-fA-F0-9]{40}$/).optional() }).parse(input ?? {}),
+    z
+      .object({
+        wallet: z
+          .string()
+          .regex(/^0x[a-fA-F0-9]{40}$/)
+          .optional(),
+      })
+      .parse(input ?? {}),
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
@@ -58,7 +65,11 @@ export const verifyLuminaOwnership = createServerFn({ method: "POST" })
       assertSafeHttpsUrl(url);
     } catch (e) {
       console.error("Lumina URL rejected by SSRF guard", e);
-      return { ok: false as const, verified: false, error: "Configured Lumina URL is not allowed." };
+      return {
+        ok: false as const,
+        verified: false,
+        error: "Configured Lumina URL is not allowed.",
+      };
     }
 
     let verified = false;
@@ -86,10 +97,7 @@ export const verifyLuminaOwnership = createServerFn({ method: "POST" })
 
     await supabase
       .from("user_verifications")
-      .upsert(
-        { user_id: userId, lumina_verified: verified },
-        { onConflict: "user_id" },
-      );
+      .upsert({ user_id: userId, lumina_verified: verified }, { onConflict: "user_id" });
 
     return { ok: true as const, verified };
   });

@@ -53,7 +53,6 @@ export function AuthRedirectWatcher() {
 
       if (PUBLIC_ROUTES.has(current)) return;
 
-
       // Use `replace: true` so the back button doesn't take the user
       // straight back into a now-unauthorized route.
       void router.navigate({ to: "/", replace: true });

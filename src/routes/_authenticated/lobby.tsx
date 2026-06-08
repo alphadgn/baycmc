@@ -3,7 +3,6 @@ import { useEffect } from "react";
 import { LobbyChat } from "@/components/LobbyChat";
 import { LobbyAttendeeHero } from "@/components/LobbyAttendeeHero";
 
-
 // Lazy, optional asset import — Vite resolves the file at build time only if
 // it exists, so the lobby falls back to a gold gradient until the operator
 // drops a real image at src/assets/lobby/lobby.{jpg,png,webp}.
@@ -36,7 +35,6 @@ export const Route = createFileRoute("/_authenticated/lobby")({
 });
 
 function LobbyPage() {
-
   // Lock body scroll while the lobby is mounted so the page can't scroll
   // behind the hero — only the chat thread's own scroll container moves.
   useEffect(() => {

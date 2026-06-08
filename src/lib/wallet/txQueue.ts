@@ -149,8 +149,10 @@ export async function enqueueSend(
   tx: SendTxParams,
   opts?: QueueRequestOptions,
 ): Promise<string> {
-  const result = await enqueue(opts?.label ?? "send:eth_sendTransaction", opts?.maxAttempts ?? 3, () =>
-    provider.request({ method: "eth_sendTransaction", params: [tx] }),
+  const result = await enqueue(
+    opts?.label ?? "send:eth_sendTransaction",
+    opts?.maxAttempts ?? 3,
+    () => provider.request({ method: "eth_sendTransaction", params: [tx] }),
   );
   if (typeof result !== "string") {
     throw new Error("Unexpected sendTransaction response");

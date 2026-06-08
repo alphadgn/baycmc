@@ -59,9 +59,7 @@ function writePrefs(userId: string | null | undefined, prefs: NotificationPrefs)
  */
 export function useNotificationPrefs() {
   const { user } = useAuth();
-  const [prefs, setPrefsState] = useState<NotificationPrefs>(() =>
-    readPrefs(user?.id ?? null),
-  );
+  const [prefs, setPrefsState] = useState<NotificationPrefs>(() => readPrefs(user?.id ?? null));
 
   useEffect(() => {
     setPrefsState(readPrefs(user?.id ?? null));

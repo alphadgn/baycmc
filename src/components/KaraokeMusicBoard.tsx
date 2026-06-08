@@ -448,8 +448,6 @@ export function KaraokeMusicBoard({
         </div>
       )}
 
-
-
       {/* Screens — when playing, collapse to a single full-width video */}
       <div
         className={`gap-1 border-b border-gold/10 bg-[#050505] p-1.5 ${

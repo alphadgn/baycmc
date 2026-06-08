@@ -59,17 +59,12 @@ function ProfilePage() {
       try {
         const [profileRes, verifRes, rolesRes] = await Promise.all([
           supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
-          supabase
-            .from("user_verifications")
-            .select("*")
-            .eq("user_id", user.id)
-            .maybeSingle(),
+          supabase.from("user_verifications").select("*").eq("user_id", user.id).maybeSingle(),
           supabase.from("user_roles").select("role").eq("user_id", user.id),
         ]);
         if (cancelled) return;
 
-        const firstError =
-          profileRes.error ?? verifRes.error ?? rolesRes.error ?? null;
+        const firstError = profileRes.error ?? verifRes.error ?? rolesRes.error ?? null;
         if (firstError) {
           setLoadError(firstError.message);
           setLoadState("error");
@@ -214,11 +209,7 @@ function ProfilePage() {
                 aria-label="Change avatar"
               >
                 {avatarUrl ? (
-                  <img
-                    src={avatarUrl}
-                    alt="Your avatar"
-                    className="h-full w-full object-cover"
-                  />
+                  <img src={avatarUrl} alt="Your avatar" className="h-full w-full object-cover" />
                 ) : null}
                 <span className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition group-hover:opacity-100">
                   {uploadingAvatar ? (
@@ -312,8 +303,8 @@ function ProfilePage() {
         <section className="glass rounded-2xl p-6 shadow-card lg:col-span-2">
           <h2 className="font-display text-xl font-semibold">Verification</h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Status from your last on-chain ownership check. Re-verify any time by
-            tapping <span className="font-semibold text-foreground">Entrance</span> in the header.
+            Status from your last on-chain ownership check. Re-verify any time by tapping{" "}
+            <span className="font-semibold text-foreground">Entrance</span> in the header.
           </p>
           <ul className="mt-5 space-y-3">
             <VerifyRow
@@ -380,15 +371,7 @@ function ProfileSkeleton() {
   );
 }
 
-function VerifyRow({
-  label,
-  ok,
-  action,
-}: {
-  label: string;
-  ok: boolean;
-  action: React.ReactNode;
-}) {
+function VerifyRow({ label, ok, action }: { label: string; ok: boolean; action: React.ReactNode }) {
   return (
     <li className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/40 px-3 py-2.5">
       <div className="flex items-center gap-3">

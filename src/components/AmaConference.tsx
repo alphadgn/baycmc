@@ -47,7 +47,12 @@ const MAX_AUDIENCE_TILES = AUDIENCE_COLS * AUDIENCE_ROWS;
  * Host = the booking owner of the currently-active slot. Without a booking
  * (or before the booking owner joins) the host slot shows the room wallpaper.
  */
-export function AmaConference({ roomName, hostUserId, backgroundImage, karaoke = false }: AmaConferenceProps) {
+export function AmaConference({
+  roomName,
+  hostUserId,
+  backgroundImage,
+  karaoke = false,
+}: AmaConferenceProps) {
   const participants = useParticipants();
 
   // Two queries: every participant's camera track (with placeholders so we
@@ -166,7 +171,6 @@ function AmaGridLayout({
   // beyond the avatar size shown in the reference screenshot.
   const hostWrapperClass = "mx-auto w-20";
 
-
   return (
     <div className="flex min-h-[60vh] flex-col gap-4 p-4 sm:p-6">
       {/* Host stays affixed to the top of the room while the audience grid
@@ -197,7 +201,9 @@ function AmaGridLayout({
         {visibleCount === 0 ? (
           // Hide the "no one else here yet" copy when the host is alone —
           // their big solo card already speaks for itself.
-          hostSolo ? null : <EmptyAudience roomName={roomName} />
+          hostSolo ? null : (
+            <EmptyAudience roomName={roomName} />
+          )
         ) : (
           // Every room (conference + karaoke): render attendees at a fixed
           // 80px (w-20) footprint, wrapping naturally on mobile, so no
@@ -219,7 +225,6 @@ function AmaGridLayout({
           <OverflowStrip overflow={overflow} profiles={profiles} count={overflowCount} />
         )}
       </div>
-
     </div>
   );
 }

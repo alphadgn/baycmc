@@ -283,8 +283,6 @@ function sliceAddress(addr: string) {
 // VIP button click → opens EntranceDialog. The dialog owns the Glyph
 // connect + SIWE sign flow. Header no longer loads the SDK hooks itself.
 
-
-
 function EntranceControls({ onOpen }: { onOpen: () => void }) {
   const { isAuthenticated, user } = useAuth();
   const { isVerifiedHolder, collection, loading: verifLoading } = useVerificationStatus();
@@ -324,7 +322,6 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
       cancelled = true;
     };
   }, [glyphReady]);
-
 
   useEffect(() => {
     if (!isAuthenticated || !user) {
@@ -382,7 +379,6 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
   // Don't gate the VIP button on authLoading — render it immediately so
   // the landing-page top-right always has a visible sign-in entry point.
 
-
   if (glyph.authenticated && glyph.address) {
     // Wallet connected but not yet signed in to Supabase. The signing popup
     // can only open from a user gesture, so this is a deliberate "Sign to
@@ -437,7 +433,11 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
       onPointerDown={() => {
         // Belt-and-suspenders: if hydration is slow, a pointerdown still
         // wakes the listener once React attaches.
-        try { window.dispatchEvent(new Event("baycmc:vip-click")); } catch { /* noop */ }
+        try {
+          window.dispatchEvent(new Event("baycmc:vip-click"));
+        } catch {
+          /* noop */
+        }
       }}
       style={{
         backgroundImage:

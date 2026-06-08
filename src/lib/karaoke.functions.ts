@@ -109,8 +109,11 @@ export const searchKaraokeSongs = createServerFn({ method: "POST" })
       const results: Array<{ url?: string; title?: string; description?: string }> =
         // SDK exposes results under .web in v2
         (res as { web?: Array<{ url?: string; title?: string; description?: string }> }).web ??
-        (res as { results?: { web?: Array<{ url?: string; title?: string; description?: string }> } })
-          .results?.web ??
+        (
+          res as {
+            results?: { web?: Array<{ url?: string; title?: string; description?: string }> };
+          }
+        ).results?.web ??
         [];
 
       hits = results
@@ -137,7 +140,11 @@ export const searchKaraokeSongs = createServerFn({ method: "POST" })
       await supabaseAdmin
         .from("karaoke_search_cache")
         .upsert(
-          { query: cacheKey, results: JSON.parse(JSON.stringify(hits)), fetched_at: new Date().toISOString() },
+          {
+            query: cacheKey,
+            results: JSON.parse(JSON.stringify(hits)),
+            fetched_at: new Date().toISOString(),
+          },
           { onConflict: "query" },
         );
     }
@@ -194,7 +201,10 @@ export const seedKaraokeCatalog = createServerFn({ method: "POST" })
           onlyMainContent: true,
         })) as {
           json?: { songs?: Array<{ title?: string; artist?: string }> };
-          data?: { json?: { songs?: Array<{ title?: string; artist?: string }> }; markdown?: string };
+          data?: {
+            json?: { songs?: Array<{ title?: string; artist?: string }> };
+            markdown?: string;
+          };
           markdown?: string;
         };
 
@@ -298,9 +308,7 @@ export const getKaraokeCatalogStats = createServerFn({ method: "GET" })
       throw new Error("Admin only");
     }
     const [{ count }, { data: settings }] = await Promise.all([
-      supabaseAdmin
-        .from("karaoke_songs")
-        .select("id", { count: "exact", head: true }),
+      supabaseAdmin.from("karaoke_songs").select("id", { count: "exact", head: true }),
       supabaseAdmin
         .from("app_settings")
         .select("value,updated_at")

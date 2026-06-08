@@ -86,17 +86,17 @@ export function LobbyAttendeeHero() {
 
   if (!user) return null;
 
-  const self =
-    members.find((m) => m.user_id === user.id) ?? {
-      user_id: user.id,
-      username: null,
-      avatar_url: null,
-      wallet_address: null,
-    };
+  const self = members.find((m) => m.user_id === user.id) ?? {
+    user_id: user.id,
+    username: null,
+    avatar_url: null,
+    wallet_address: null,
+  };
   const others = members.filter((m) => m.user_id !== user.id);
 
   // Scale other-attendee tiles down as the room fills so they all fit.
-  const otherSize = others.length <= 6 ? 56 : others.length <= 12 ? 44 : others.length <= 24 ? 36 : 28;
+  const otherSize =
+    others.length <= 6 ? 56 : others.length <= 12 ? 44 : others.length <= 24 ? 36 : 28;
 
   return (
     <section
@@ -151,9 +151,7 @@ export function LobbyAttendeeHero() {
 function displayName(m: OnlineMember): string {
   return (
     m.username ??
-    (m.wallet_address
-      ? `${m.wallet_address.slice(0, 6)}…${m.wallet_address.slice(-4)}`
-      : "anon")
+    (m.wallet_address ? `${m.wallet_address.slice(0, 6)}…${m.wallet_address.slice(-4)}` : "anon")
   );
 }
 

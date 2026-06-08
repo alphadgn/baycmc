@@ -51,7 +51,7 @@ function Index() {
                 size="xl"
                 alt="Bored Apes"
                 clamp="clamp(6.5rem, 30vw, 15rem)"
-                 className="mx-auto -mt-2 w-full max-w-[calc(100vw-2rem)] sm:-mt-3"
+                className="mx-auto -mt-2 w-full max-w-[calc(100vw-2rem)] sm:-mt-3"
               />
             </h1>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground sm:mt-3 sm:text-xl">
@@ -90,8 +90,12 @@ function Index() {
               { k: "24/7", v: "Live rooms" },
             ].map((s) => (
               <div key={s.v} className="glass rounded-xl px-4 py-5">
-                <div className="font-display text-2xl font-bold text-gradient-gold sm:text-3xl">{s.k}</div>
-                <div className="mt-1 text-xs text-muted-foreground uppercase tracking-wide">{s.v}</div>
+                <div className="font-display text-2xl font-bold text-gradient-gold sm:text-3xl">
+                  {s.k}
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground uppercase tracking-wide">
+                  {s.v}
+                </div>
               </div>
             ))}
           </div>
@@ -107,9 +111,21 @@ function Index() {
           </div>
           <div className="mx-auto mt-12 grid max-w-5xl gap-6 sm:grid-cols-3">
             {[
-              { n: "01", t: "Sign in", d: "Connect any wallet or email through Privy. You're instantly inside the lobby — no waiting, no extra app." },
-              { n: "02", t: "Verify your ape", d: "Verify a BAYC or MAYC in your wallet (or a vault delegated to you on delegate.cash) to unlock the feed, conference rooms, messages, and Ape Rides." },
-              { n: "03", t: "Unlock the clubhouse lore", d: "Unlock the clubhouse lore once you're inside." },
+              {
+                n: "01",
+                t: "Sign in",
+                d: "Connect any wallet or email through Privy. You're instantly inside the lobby — no waiting, no extra app.",
+              },
+              {
+                n: "02",
+                t: "Verify your ape",
+                d: "Verify a BAYC or MAYC in your wallet (or a vault delegated to you on delegate.cash) to unlock the feed, conference rooms, messages, and Ape Rides.",
+              },
+              {
+                n: "03",
+                t: "Unlock the clubhouse lore",
+                d: "Unlock the clubhouse lore once you're inside.",
+              },
             ].map((s) => (
               <div key={s.n} className="glass rounded-2xl p-6 shadow-card">
                 <div className="font-display text-xs text-gold tracking-widest">{s.n}</div>
@@ -126,18 +142,30 @@ function Index() {
         <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-20">
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="font-display text-3xl font-bold sm:text-4xl">What's inside</h2>
-            <p className="mt-3 text-muted-foreground">A growing platform built feature-by-feature.</p>
+            <p className="mt-3 text-muted-foreground">
+              A growing platform built feature-by-feature.
+            </p>
           </div>
           <div className="mx-auto mt-12 grid max-w-6xl gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {[
               { t: "Social Feed", d: "Posts, likes, comments, follows. Realtime.", soon: true },
               { t: "Audio Rooms", d: "Drop-in voice. Hosts and listeners.", soon: true },
               { t: "Video Calls", d: "1:1 and group, powered by LiveKit.", soon: true },
-              { t: "Conference Bookings", d: "20 rooms. Calendar with conflict-free slots.", soon: true },
-              { t: "Club Chapters", d: "Apply, lead, host events for your local chapter.", soon: true },
-              
+              {
+                t: "Conference Bookings",
+                d: "20 rooms. Calendar with conflict-free slots.",
+                soon: true,
+              },
+              {
+                t: "Club Chapters",
+                d: "Apply, lead, host events for your local chapter.",
+                soon: true,
+              },
             ].map((f) => (
-              <div key={f.t} className="glass rounded-2xl p-6 shadow-card transition hover:border-gold/40">
+              <div
+                key={f.t}
+                className="glass rounded-2xl p-6 shadow-card transition hover:border-gold/40"
+              >
                 <div className="flex items-center justify-between">
                   <h3 className="font-display text-lg font-semibold">{f.t}</h3>
                   {f.soon && (

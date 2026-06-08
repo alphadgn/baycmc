@@ -83,9 +83,7 @@ export function GlyphAppProvider({ children }: { children: ReactNode }) {
       }
       const polyfills = ensureBrowserPolyfills();
       if (!polyfills.ok) {
-        console.warn(
-          "[GlyphAppProvider] Skipping Glyph init: required browser polyfills missing.",
-        );
+        console.warn("[GlyphAppProvider] Skipping Glyph init: required browser polyfills missing.");
         return;
       }
       try {
