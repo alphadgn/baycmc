@@ -241,11 +241,6 @@ function EntranceModalShell({
             : "Connect your Glyph wallet to verify holdings for access into gated areas of the BAYCmc. No gas, no transaction."}
         </p>
 
-        <p className="mt-2 flex items-center gap-1.5 text-xs text-gold/80">
-          <span className="inline-block h-1.5 w-1.5 rounded-full bg-gold animate-pulse-glow" />
-          Glyph.io vault delegations supported
-        </p>
-
         {phase === "sign" ? (
           <button
             type="button"
