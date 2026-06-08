@@ -1,5 +1,5 @@
 import { Link, useLocation, useRouter } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Loader2, Menu, X } from "lucide-react";
 import { useAuth } from "@/lib/auth/useAuth";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
@@ -51,6 +51,12 @@ const NAV_ITEMS: NavItem[] = [
 
 // Routes treated as "home" — no back arrow shown here.
 const HOME_ROUTES = new Set<string>(["/", "/lobby"]);
+
+type GlyphConnection = { connect: () => void };
+type UseNativeGlyphConnection = () => GlyphConnection;
+type HeaderEntranceHooks = {
+  useNativeGlyphConnection: UseNativeGlyphConnection;
+};
 
 // Tracks how many in-app navigations have happened since the tab opened.
 // `window.history.length` is unreliable (counts entries from before the SPA
