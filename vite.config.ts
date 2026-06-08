@@ -10,4 +10,14 @@ export default defineConfig({
       },
     },
   },
+  // Force the bare `buffer` / `process` specifiers (used by Privy's
+  // cross-app-connect crypto bundle) to resolve to the npm browser polyfills
+  // instead of Vite's default `__vite-browser-external` stub, which does not
+  // export `Buffer` and breaks the production Rollup build.
+  resolve: {
+    alias: {
+      buffer: "buffer/",
+      process: "process/browser",
+    },
+  },
 });
