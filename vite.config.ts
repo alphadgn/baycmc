@@ -12,14 +12,13 @@ export default defineConfig({
   },
   vite: {
     resolve: {
-      alias: {
-        // Force the npm `buffer` package (installed) to resolve as a real
-        // module on the client instead of Vite's empty browser-external stub.
-        // @privy-io/cross-app-connect/crypto.mjs does `import { Buffer } from "buffer"`,
-        // which otherwise breaks the client build with
-        // `"Buffer" is not exported by "__vite-browser-external"`.
-        buffer: "buffer/",
-      },
+      alias: [
+        // Force the npm `buffer` package to resolve as a real module on the
+        // client instead of Vite's empty browser-external stub. Without this,
+        // @privy-io/cross-app-connect/crypto.mjs (`import { Buffer } from "buffer"`)
+        // breaks the build with `"Buffer" is not exported by "__vite-browser-external"`.
+        { find: /^buffer$/, replacement: "buffer/index.js" },
+      ],
     },
   },
 });
