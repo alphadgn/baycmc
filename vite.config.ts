@@ -31,6 +31,13 @@ const polyfills: Record<string, string> = {
 };
 
 export default defineConfig({
+  optimizeDeps: {
+    // Vite 7 can briefly serve a stale optimized-dependency URL when lazy
+    // wallet/room modules discover a new dependency during navigation. Treat
+    // those requests as cache misses instead of returning a preview-blanking
+    // 504 "Outdated Optimize Dep" response.
+    ignoreOutdatedRequests: true,
+  },
   tanstackStart: {
     server: { entry: "server" },
     importProtection: {
