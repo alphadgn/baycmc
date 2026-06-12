@@ -1,8 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { AccessToken } from "livekit-server-sdk";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { isInsideWynwood } from "@/lib/baycmc/wynwood";
 
 /**
@@ -60,6 +58,7 @@ export const startApeRide = createServerFn({ method: "POST" })
       return { ok: false as const, error: error?.message ?? "Failed to start ride" };
     }
 
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // Store precise GPS in private locations table (server-only writes).
     await supabaseAdmin.from("ape_ride_locations").insert({
       ride_id: ride.id,
@@ -252,6 +251,7 @@ export const getApeRideToken = createServerFn({ method: "POST" })
         ? `${profile.wallet_address.slice(0, 6)}…${profile.wallet_address.slice(-4)}`
         : "Member");
 
+    const { AccessToken } = await import("livekit-server-sdk");
     const at = new AccessToken(apiKey, apiSecret, {
       identity: userId,
       name,
