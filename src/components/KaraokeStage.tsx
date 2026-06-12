@@ -332,18 +332,9 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
   }, [canForceSkip, effectivePerformerId, queue, roomId]);
 
   // ---- Queue actions ----
-  // `intentJoinedRef` survives a brief disconnect: if the user explicitly
-  // pressed "Join line" but the presence-prune effect dropped them while
-  // they were offline, we silently re-insert once they're back online and
-  // visible in presence again. Without this, a flaky network would kick
-  // users out of the queue with no obvious cause.
-  const storageKey = user ? `karaoke:intent:${roomId}:${user.id}` : null;
-  const intentJoinedRef = useRef<boolean>(false);
-  useEffect(() => {
-    if (!storageKey) return;
-    intentJoinedRef.current = window.localStorage.getItem(storageKey) === "1";
-  }, [storageKey]);
-
+  // The waiting list is room-presence only. We intentionally do not persist a
+  // "join intent" in localStorage: if a user leaves, logs out, times out, or
+  // drops from the room, they must be removed from the live line.
   async function joinLine() {
     if (!user) return;
     const { error } = await supabase
@@ -353,33 +344,11 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
       toast.error("Could not join the line", { description: error.message });
       return;
     }
-    intentJoinedRef.current = true;
-    if (storageKey) window.localStorage.setItem(storageKey, "1");
   }
   async function leaveLine() {
     if (!user) return;
     await supabase.from("karaoke_queue").delete().eq("room_id", roomId).eq("user_id", user.id);
-    intentJoinedRef.current = false;
-    if (storageKey) window.localStorage.removeItem(storageKey);
   }
-
-  // Auto-resync: if I intended to be in the queue, I'm currently present,
-  // but I'm not in the queue (because a prune ran while I was offline),
-  // re-insert me. Runs whenever queue/presence changes.
-  useEffect(() => {
-    if (!user || !intentJoinedRef.current) return;
-    if (!presentIds.has(user.id)) return;
-    if (queue.some((q) => q.user_id === user.id)) return;
-    if (effectivePerformerId === user.id) return;
-    void supabase
-      .from("karaoke_queue")
-      .insert({ room_id: roomId, user_id: user.id })
-      .then(({ error }) => {
-        if (error && !/duplicate/i.test(error.message)) {
-          console.warn("[karaoke] auto-rejoin failed", error);
-        }
-      });
-  }, [user, queue, presentIds, effectivePerformerId, roomId]);
 
   // Presence: drop the user from the waiting list AND release the stage
   // if they're the active performer the moment they leave the room — whether
