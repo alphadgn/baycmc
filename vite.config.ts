@@ -2,6 +2,9 @@ import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import { createRequire } from "node:module";
 
 const require_ = createRequire(import.meta.url);
+const { getModules } = require_("rollup-plugin-polyfill-node/dist/modules.js") as {
+  getModules: () => Map<string, string>;
+};
 
 // Map bare Node-builtin specifiers to real npm browser-polyfill packages so
 // the client bundle doesn't get Vite's empty `__vite-browser-external` stub.
@@ -9,13 +12,22 @@ const require_ = createRequire(import.meta.url);
 // `import { Buffer } from "buffer"` / `import { EventEmitter } from "events"`
 // at the top of ESM modules — Rollup then fails the production build with
 // `"X" is not exported by "__vite-browser-external"`.
+// Use ESM virtual polyfills rather than the CJS npm entrypoints; otherwise the
+// dev browser can execute `buffer/index.js` directly and crash with
+// `Can't find variable: require` before Glyph sign-in loads.
+const nodePolyfillModules = getModules();
+const NODE_POLYFILL_PREFIX = "\0lovable-node-polyfill:";
 const polyfills: Record<string, string> = {
-  buffer: require_.resolve("buffer/"),
-  "node:buffer": require_.resolve("buffer/"),
-  events: require_.resolve("events/"),
-  "node:events": require_.resolve("events/"),
-  process: require_.resolve("process/browser.js"),
-  "node:process": require_.resolve("process/browser.js"),
+  buffer: "buffer",
+  "buffer/": "buffer",
+  "node:buffer": "buffer",
+  events: "events",
+  "events/": "events",
+  "node:events": "events",
+  process: "process",
+  "process/browser": "process",
+  "process/browser.js": "process",
+  "node:process": "process",
 };
 
 export default defineConfig({
@@ -36,7 +48,12 @@ export default defineConfig({
         // Only patch the client bundle. The Cloudflare Worker SSR build uses
         // `nodejs_compat` and provides these built-ins natively at runtime.
         if (opts?.ssr) return null;
-        return polyfills[id] ?? null;
+        const polyfill = polyfills[id];
+        return polyfill ? `${NODE_POLYFILL_PREFIX}${polyfill}` : null;
+      },
+      load(id) {
+        if (!id.startsWith(NODE_POLYFILL_PREFIX)) return null;
+        return nodePolyfillModules.get(id.slice(NODE_POLYFILL_PREFIX.length)) ?? null;
       },
     },
   ],
