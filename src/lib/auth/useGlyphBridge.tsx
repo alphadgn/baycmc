@@ -184,9 +184,16 @@ function isChunkLoadError(error: unknown): boolean {
  *  - `useGlyph()` for `signMessage` (works as soon as the wallet is connected)
  *    and `logout`.
  */
+type GlyphLinkedWallet = { address: string; walletClientType?: string };
+type GlyphUser = {
+  evmWallet?: string;
+  smartWallet?: string;
+  linkedWallets?: GlyphLinkedWallet[];
+} | null;
 type GlyphHookValue = {
   logout: () => void;
   signMessage: (params: { message: string }) => Promise<string>;
+  user?: GlyphUser;
 };
 type UseGlyph = () => GlyphHookValue;
 type AccountValue = { address?: string | null; isConnected: boolean };
@@ -199,15 +206,37 @@ export function GlyphBridge({
   useGlyph: UseGlyph;
   useAccount: UseAccount;
 }) {
-  const { logout, signMessage } = useGlyph();
+  const { logout, signMessage, user } = useGlyph();
   const { address: wagmiAddress, isConnected } = useAccount();
   const verifyFn = useServerFn(verifyOwnership);
 
   const address = isConnected ? (wagmiAddress ?? null) : null;
+
+  // Collect every EVM address Glyph knows about for this account: the
+  // signing wallet, the smart wallet, and any "linked wallets" the user has
+  // attached via the Glyph modal. We pass these to verifyOwnership so the
+  // server can check BAYC/MAYC holdings + delegate.cash delegations against
+  // the entire linked set, not just the active signer.
+  const linkedWallets = (() => {
+    const out: string[] = [];
+    const push = (a?: string | null) => {
+      if (!a || !/^0x[a-fA-F0-9]{40}$/.test(a)) return;
+      if (out.some((x) => x.toLowerCase() === a.toLowerCase())) return;
+      out.push(a);
+    };
+    push(user?.evmWallet);
+    push(user?.smartWallet);
+    for (const w of user?.linkedWallets ?? []) push(w?.address);
+    return out;
+  })();
+  const linkedWalletsRef = useRef(linkedWallets);
+  linkedWalletsRef.current = linkedWallets;
+
   // Latest connected address, read inside the stable runVerify callback so we
   // don't have to thread it through deps.
   const addressRef = useRef(address);
   addressRef.current = address;
+
 
   // signMessage/verifyFn/logout are new refs every render — store them in
   // refs so we call the latest version inside the effect without putting them
@@ -332,7 +361,10 @@ export function GlyphBridge({
 
       toast.loading("Checking BAYC / MAYC ownership…", { id: toastId, position: "top-center" });
       const result = await withTimeout(
-        verifyFnRef.current({ data: { message, signature } }),
+        verifyFnRef.current({
+          data: { message, signature, linkedWallets: linkedWalletsRef.current },
+        }),
+
         20_000,
         "The verification check is taking longer than expected. Please try again.",
       );

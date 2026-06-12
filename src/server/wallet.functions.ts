@@ -278,14 +278,19 @@ export const inspectWalletHoldings = createServerFn({ method: "POST" })
   });
 
 export const verifyOwnership = createServerFn({ method: "POST" })
-  .inputValidator((input: { message: string; signature: string }) =>
+  .inputValidator((input: { message: string; signature: string; linkedWallets?: string[] }) =>
     z
       .object({
         message: z.string().min(20).max(4000),
         signature: z.string().min(20).max(400),
+        linkedWallets: z
+          .array(z.string().regex(/^0x[a-fA-F0-9]{40}$/))
+          .max(20)
+          .optional(),
       })
       .parse(input),
   )
+
   .handler(async ({ data }) => {
     // 1) Verify SIWE signature + domain + expiration to prevent replay
     //    attacks from signatures issued for other sites.
@@ -404,6 +409,21 @@ export const verifyOwnership = createServerFn({ method: "POST" })
     let totalBayc = signerBals.bayc;
     let totalMayc = signerBals.mayc;
     let delegatedFrom: `0x${string}` | null = null;
+    let linkedHolder: `0x${string}` | null = null;
+
+    // Collect every additional wallet to inspect: delegate.cash vaults that
+    // delegated to the signer, plus any Glyph "linked wallets" the user has
+    // attached to their account (signed in via the Glyph modal). For linked
+    // wallets we also walk their own incoming delegations.
+    const lowerSigner = wallet.toLowerCase();
+    const linkedAddrs: `0x${string}`[] = [];
+    for (const raw of data.linkedWallets ?? []) {
+      if (!isAddress(raw)) continue;
+      const addr = getAddress(raw) as `0x${string}`;
+      if (addr.toLowerCase() === lowerSigner) continue;
+      if (linkedAddrs.some((a) => a.toLowerCase() === addr.toLowerCase())) continue;
+      linkedAddrs.push(addr);
+    }
 
     if (totalBayc === 0n && totalMayc === 0n && vaults.length > 0) {
       for (const v of vaults) {
@@ -421,13 +441,57 @@ export const verifyOwnership = createServerFn({ method: "POST" })
       }
     }
 
-    const verificationBasis: "direct" | "delegated" = delegatedFrom ? "delegated" : "direct";
+    // Walk Glyph-linked wallets if the signer + its delegations didn't qualify.
+    if (totalBayc === 0n && totalMayc === 0n && linkedAddrs.length > 0) {
+      for (const linked of linkedAddrs) {
+        try {
+          const b = await balancesFor(c, linked);
+          if (b.bayc > 0n || b.mayc > 0n) {
+            totalBayc += b.bayc;
+            totalMayc += b.mayc;
+            linkedHolder = linked;
+            break;
+          }
+          // Also follow delegations *into* this linked wallet.
+          const linkedVaults = await resolveDelegatedVaults(c, linked).catch(
+            () => [] as `0x${string}`[],
+          );
+          let matched = false;
+          for (const v of linkedVaults) {
+            try {
+              const vb = await balancesFor(c, v);
+              if (vb.bayc > 0n || vb.mayc > 0n) {
+                totalBayc += vb.bayc;
+                totalMayc += vb.mayc;
+                delegatedFrom = v;
+                linkedHolder = linked;
+                matched = true;
+                break;
+              }
+            } catch (e) {
+              console.error("RPC balanceOf (linked-vault) failed", v, e);
+            }
+          }
+          if (matched) break;
+        } catch (e) {
+          console.error("RPC balanceOf (linked wallet) failed", linked, e);
+        }
+      }
+    }
+
+
+    const verificationBasis: "direct" | "delegated" | "linked" = delegatedFrom
+      ? "delegated"
+      : linkedHolder
+        ? "linked"
+        : "direct";
 
     const holdsApe = totalBayc > 0n || totalMayc > 0n;
     const collection: "BAYC" | "MAYC" | null = holdsApe ? (totalBayc > 0n ? "BAYC" : "MAYC") : null;
     const delegationDetailsUrl = delegatedFrom
-      ? `https://delegate.cash/registry?delegate=${wallet}&vault=${delegatedFrom}`
+      ? `https://delegate.cash/registry?delegate=${linkedHolder ?? wallet}&vault=${delegatedFrom}`
       : null;
+
 
     // 3) Mint / fetch Supabase user. Every successful signature gets a
     //    session — gated areas are still protected by RLS via the
@@ -481,7 +545,8 @@ export const verifyOwnership = createServerFn({ method: "POST" })
     );
 
     if (holdsApe) {
-      const apeHolder = delegatedFrom ?? wallet;
+      const apeHolder = delegatedFrom ?? linkedHolder ?? wallet;
+
       const [{ runLuminaCheckAndPersist }, { runOtherpageCheckAndPersist }] = await Promise.all([
         import("@/server/lumina.server"),
         import("@/server/otherpage.server"),
@@ -514,13 +579,18 @@ export const verifyOwnership = createServerFn({ method: "POST" })
       delegationLookupOk,
       directLookupOk,
       delegationVaultsChecked: vaults.length,
+      linkedWalletsChecked: linkedAddrs.length,
+      linkedHolder,
       reason: holdsApe
         ? null
-        : vaults.length > 0
-          ? "Signed in to the lobby. No BAYC/MAYC found in this wallet or its delegated vaults — gated rooms remain locked."
-          : delegationLookupOk
-            ? "Signed in to the lobby. No BAYC/MAYC in this wallet and no delegate.cash delegation found."
-            : "Signed in to the lobby. delegate.cash lookup unavailable; only direct ownership was checked.",
+        : linkedAddrs.length > 0
+          ? "Signed in to the lobby. No BAYC/MAYC found in this wallet, linked wallets, or any delegated vaults — gated rooms remain locked."
+          : vaults.length > 0
+            ? "Signed in to the lobby. No BAYC/MAYC found in this wallet or its delegated vaults — gated rooms remain locked."
+            : delegationLookupOk
+              ? "Signed in to the lobby. No BAYC/MAYC in this wallet and no delegate.cash delegation found."
+              : "Signed in to the lobby. delegate.cash lookup unavailable; only direct ownership was checked.",
+
       session: {
         access_token: signIn.session.access_token,
         refresh_token: signIn.session.refresh_token,
