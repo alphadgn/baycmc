@@ -1,9 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { AccessToken, RoomServiceClient, TrackSource } from "livekit-server-sdk";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { recomputeOwnership } from "@/server/ownership.server";
 
 type RoomRecord = {
   id: string;
@@ -31,6 +28,7 @@ type RoomAccessResult =
     };
 
 async function validateRoomAccess(userId: string, roomId: string): Promise<RoomAccessResult> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data: room, error } = await supabaseAdmin
     .from("rooms")
     .select("id,name,tier,kind,livekit_room,capacity,active,is_locked")
@@ -75,6 +73,7 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
   // Re-run on-chain BAYC/MAYC + delegate.cash and Otherpage checks at the
   // moment access is requested or refreshed. This is the hard gate that makes
   // revoked delegations/sold tokens stop future room entry and token minting.
+  const { recomputeOwnership } = await import("@/server/ownership.server");
   const fresh = await recomputeOwnership(userId).catch((e) => {
     console.error("recomputeOwnership for room access failed", e);
     return null;
@@ -126,6 +125,7 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
 }
 
 async function hasActiveBooking(roomId: string): Promise<boolean> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const nowIso = new Date().toISOString();
   const { data } = await supabaseAdmin
     .from("room_bookings")
@@ -139,6 +139,7 @@ async function hasActiveBooking(roomId: string): Promise<boolean> {
 }
 
 async function isRoomHost(userId: string, roomId: string): Promise<boolean> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   // Admin / super_admin override.
   const { data: roles } = await supabaseAdmin
     .from("user_roles")
