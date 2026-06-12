@@ -382,8 +382,10 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
       }
     }
     window.addEventListener("pagehide", cleanupSelf);
+    window.addEventListener("baycmc:karaoke-cleanup-self", cleanupSelf);
     return () => {
       window.removeEventListener("pagehide", cleanupSelf);
+      window.removeEventListener("baycmc:karaoke-cleanup-self", cleanupSelf);
       cleanupSelf();
     };
   }, [roomId]);
