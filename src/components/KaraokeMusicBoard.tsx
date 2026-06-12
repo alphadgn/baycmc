@@ -12,6 +12,7 @@ import {
   Play,
   Search,
   Square,
+  Volume2,
   X,
 } from "lucide-react";
 import { searchKaraokeSongs, type SongHit } from "@/lib/karaoke.functions";
@@ -89,11 +90,30 @@ export function KaraokeMusicBoard({
   const runSongSearch = useServerFn(searchKaraokeSongs);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
-  function postToPlayer(func: "playVideo" | "pauseVideo" | "stopVideo") {
+  function postToPlayer(
+    func: "playVideo" | "pauseVideo" | "stopVideo" | "setVolume",
+    args: (string | number)[] = [],
+  ) {
     const win = iframeRef.current?.contentWindow;
     if (!win) return;
-    win.postMessage(JSON.stringify({ event: "command", func, args: [] }), "*");
+    win.postMessage(JSON.stringify({ event: "command", func, args }), "*");
   }
+
+  // Per-source volume controls for the performer. Music volume drives the
+  // YouTube iframe via the IFrame API (audible to everyone hearing the
+  // music). Mic volume is dispatched to ConferenceRoom which applies it to
+  // the local participant's mic publication for self-monitoring.
+  const [musicVol, setMusicVol] = useState(80);
+  const [micVol, setMicVol] = useState(100);
+  useEffect(() => {
+    if (!videoId) return;
+    postToPlayer("setVolume", [musicVol]);
+  }, [musicVol, videoId]);
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent("karaoke:set-mic-volume", { detail: { value: micVol / 100 } }),
+    );
+  }, [micVol]);
 
   // Drive the iframe via YT IFrame API postMessage whenever paused flips.
   useEffect(() => {
@@ -537,6 +557,42 @@ export function KaraokeMusicBoard({
               {musicShared ? "Sharing" : "Share Music"}
             </button>
           )}
+        </div>
+      )}
+
+      {/* Per-source volume sliders — performer only. Music volume controls
+          the karaoke track everyone hears; Mic volume scales the singer's
+          own publication for in-room balance. */}
+      {videoId && isMyTurn && (
+        <div className="grid grid-cols-2 gap-3 border-b border-gold/10 bg-[#0a0a0a] px-3 py-2">
+          <label className="flex flex-col gap-1">
+            <span className="flex items-center gap-1 text-[8px] uppercase tracking-widest text-gold/70">
+              <Music className="h-2.5 w-2.5" /> Music · {musicVol}
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={musicVol}
+              onChange={(e) => setMusicVol(Number(e.target.value))}
+              aria-label="Music volume"
+              className="h-1 w-full cursor-pointer appearance-none rounded-full bg-gold/20 accent-gold"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="flex items-center gap-1 text-[8px] uppercase tracking-widest text-gold/70">
+              <Volume2 className="h-2.5 w-2.5" /> Mic · {micVol}
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={micVol}
+              onChange={(e) => setMicVol(Number(e.target.value))}
+              aria-label="Microphone volume"
+              className="h-1 w-full cursor-pointer appearance-none rounded-full bg-gold/20 accent-emerald-400"
+            />
+          </label>
         </div>
       )}
 
