@@ -11,26 +11,36 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
  * strip the v2/ prefix and substitute the right path.
  */
 
-function alchemyNftBaseUrl(): string {
+function parseAlchemyRpc(): { protocol: string; host: string; key: string } | null {
   const rpc = process.env.ETH_RPC_URL?.trim();
-  if (!rpc) throw new Error("Ethereum RPC is not configured.");
-  // Convert `https://eth-mainnet.g.alchemy.com/v2/<key>` →
-  //         `https://eth-mainnet.g.alchemy.com/nft/v3/<key>`
-  const u = new URL(rpc);
-  if (!u.hostname.endsWith("alchemy.com")) {
-    throw new Error("NFT lookup requires an Alchemy RPC endpoint.");
+  if (!rpc) return null;
+  try {
+    const u = new URL(rpc);
+    if (!u.hostname.endsWith("alchemy.com")) return null;
+    const parts = u.pathname.split("/").filter(Boolean);
+    const key = parts[parts.length - 1];
+    if (!key) return null;
+    return { protocol: u.protocol, host: u.host, key };
+  } catch {
+    return null;
   }
-  const parts = u.pathname.split("/").filter(Boolean);
-  // parts looks like ["v2", "<key>"]
-  const key = parts[parts.length - 1];
-  if (!key) throw new Error("Could not parse Alchemy key from ETH_RPC_URL.");
-  return `${u.protocol}//${u.host}/nft/v3/${key}`;
 }
 
-function alchemyCoreBaseUrl(): string {
+function alchemyNftBaseUrl(): string | null {
+  const p = parseAlchemyRpc();
+  return p ? `${p.protocol}//${p.host}/nft/v3/${p.key}` : null;
+}
+
+function alchemyCoreBaseUrl(): string | null {
   const rpc = process.env.ETH_RPC_URL?.trim();
-  if (!rpc) throw new Error("Ethereum RPC is not configured.");
-  return rpc;
+  if (!rpc) return null;
+  try {
+    const u = new URL(rpc);
+    if (!u.hostname.endsWith("alchemy.com")) return null;
+    return rpc;
+  } catch {
+    return null;
+  }
 }
 
 const fetchTimeoutMs = 12_000;
@@ -80,6 +90,13 @@ export const listWalletNfts = createServerFn({ method: "POST" })
     }
     const owner = getAddress(data.address);
     const base = alchemyNftBaseUrl();
+    if (!base) {
+      return {
+        ok: false as const,
+        reason: "NFT lookup requires an Alchemy ETH_RPC_URL.",
+        items: [],
+      };
+    }
     const url = `${base}/getNFTsForOwner?owner=${owner}&withMetadata=true&pageSize=100`;
     try {
       const resp = await fetchJson<AlchemyNftResponse>(url);
@@ -152,6 +169,13 @@ export const listWalletActivity = createServerFn({ method: "POST" })
     }
     const owner = getAddress(data.address);
     const base = alchemyCoreBaseUrl();
+    if (!base) {
+      return {
+        ok: false as const,
+        reason: "Activity lookup requires an Alchemy ETH_RPC_URL.",
+        items: [],
+      };
+    }
 
     const categories = ["external", "erc20", "erc721", "erc1155"] as const;
     const body = (direction: "from" | "to") => ({
