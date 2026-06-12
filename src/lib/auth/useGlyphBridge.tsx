@@ -361,7 +361,10 @@ export function GlyphBridge({
 
       toast.loading("Checking BAYC / MAYC ownership…", { id: toastId, position: "top-center" });
       const result = await withTimeout(
-        verifyFnRef.current({ data: { message, signature } }),
+        verifyFnRef.current({
+          data: { message, signature, linkedWallets: linkedWalletsRef.current },
+        }),
+
         20_000,
         "The verification check is taking longer than expected. Please try again.",
       );
