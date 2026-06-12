@@ -317,6 +317,7 @@ export const kickRoomParticipant = createServerFn({ method: "POST" })
     const cfg = getLivekitConfig();
     if (!cfg) return { ok: false as const, error: "LiveKit not configured" };
 
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: room } = await supabaseAdmin
       .from("rooms")
       .select("livekit_room")
@@ -324,6 +325,7 @@ export const kickRoomParticipant = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!room) return { ok: false as const, error: "Room not found" };
 
+    const { RoomServiceClient } = await import("livekit-server-sdk");
     const client = new RoomServiceClient(cfg.url, cfg.apiKey, cfg.apiSecret);
     try {
       await client.removeParticipant(room.livekit_room, data.identity);
@@ -361,6 +363,7 @@ export const muteAllRoomParticipants = createServerFn({ method: "POST" })
     const cfg = getLivekitConfig();
     if (!cfg) return { ok: false as const, error: "LiveKit not configured" };
 
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: room } = await supabaseAdmin
       .from("rooms")
       .select("livekit_room")
@@ -368,6 +371,7 @@ export const muteAllRoomParticipants = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!room) return { ok: false as const, error: "Room not found" };
 
+    const { RoomServiceClient, TrackSource } = await import("livekit-server-sdk");
     const client = new RoomServiceClient(cfg.url, cfg.apiKey, cfg.apiSecret);
 
     // Muting force-mutes every live mic; un-muting only LIFTS the lock (via
