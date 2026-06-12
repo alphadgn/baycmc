@@ -965,12 +965,29 @@ function LivePreferencesPanel({ isHost }: { isHost: boolean }) {
       const next = !!(e as CustomEvent<{ enabled: boolean }>).detail?.enabled;
       void toggleMic(next);
     }
+    function onMicVol(e: Event) {
+      const raw = (e as CustomEvent<{ value: number }>).detail?.value;
+      if (typeof raw !== "number") return;
+      const v = Math.max(0, Math.min(1, raw));
+      local.localParticipant.audioTrackPublications.forEach((pub) => {
+        const t = pub.track as unknown as { setVolume?: (n: number) => void } | undefined;
+        try {
+          t?.setVolume?.(v);
+        } catch {
+          /* noop */
+        }
+      });
+    }
     window.addEventListener("karaoke:toggle-mic", onReq as EventListener);
+    window.addEventListener("karaoke:set-mic-volume", onMicVol as EventListener);
     // Broadcast initial state so the music machine shows correct mic status.
     window.dispatchEvent(
       new CustomEvent("karaoke:mic-state", { detail: { enabled: prefs.micEnabled } }),
     );
-    return () => window.removeEventListener("karaoke:toggle-mic", onReq as EventListener);
+    return () => {
+      window.removeEventListener("karaoke:toggle-mic", onReq as EventListener);
+      window.removeEventListener("karaoke:set-mic-volume", onMicVol as EventListener);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefs.micEnabled, micLocked]);
 
