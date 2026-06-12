@@ -545,7 +545,8 @@ export const verifyOwnership = createServerFn({ method: "POST" })
     );
 
     if (holdsApe) {
-      const apeHolder = delegatedFrom ?? wallet;
+      const apeHolder = delegatedFrom ?? linkedHolder ?? wallet;
+
       const [{ runLuminaCheckAndPersist }, { runOtherpageCheckAndPersist }] = await Promise.all([
         import("@/server/lumina.server"),
         import("@/server/otherpage.server"),
