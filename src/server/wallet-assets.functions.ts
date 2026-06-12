@@ -90,6 +90,13 @@ export const listWalletNfts = createServerFn({ method: "POST" })
     }
     const owner = getAddress(data.address);
     const base = alchemyNftBaseUrl();
+    if (!base) {
+      return {
+        ok: false as const,
+        reason: "NFT lookup requires an Alchemy ETH_RPC_URL.",
+        items: [],
+      };
+    }
     const url = `${base}/getNFTsForOwner?owner=${owner}&withMetadata=true&pageSize=100`;
     try {
       const resp = await fetchJson<AlchemyNftResponse>(url);
