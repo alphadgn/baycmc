@@ -409,6 +409,21 @@ export const verifyOwnership = createServerFn({ method: "POST" })
     let totalBayc = signerBals.bayc;
     let totalMayc = signerBals.mayc;
     let delegatedFrom: `0x${string}` | null = null;
+    let linkedHolder: `0x${string}` | null = null;
+
+    // Collect every additional wallet to inspect: delegate.cash vaults that
+    // delegated to the signer, plus any Glyph "linked wallets" the user has
+    // attached to their account (signed in via the Glyph modal). For linked
+    // wallets we also walk their own incoming delegations.
+    const lowerSigner = wallet.toLowerCase();
+    const linkedAddrs: `0x${string}`[] = [];
+    for (const raw of data.linkedWallets ?? []) {
+      if (!isAddress(raw)) continue;
+      const addr = getAddress(raw) as `0x${string}`;
+      if (addr.toLowerCase() === lowerSigner) continue;
+      if (linkedAddrs.some((a) => a.toLowerCase() === addr.toLowerCase())) continue;
+      linkedAddrs.push(addr);
+    }
 
     if (totalBayc === 0n && totalMayc === 0n && vaults.length > 0) {
       for (const v of vaults) {
@@ -425,6 +440,45 @@ export const verifyOwnership = createServerFn({ method: "POST" })
         }
       }
     }
+
+    // Walk Glyph-linked wallets if the signer + its delegations didn't qualify.
+    if (totalBayc === 0n && totalMayc === 0n && linkedAddrs.length > 0) {
+      for (const linked of linkedAddrs) {
+        try {
+          const b = await balancesFor(c, linked);
+          if (b.bayc > 0n || b.mayc > 0n) {
+            totalBayc += b.bayc;
+            totalMayc += b.mayc;
+            linkedHolder = linked;
+            break;
+          }
+          // Also follow delegations *into* this linked wallet.
+          const linkedVaults = await resolveDelegatedVaults(c, linked).catch(
+            () => [] as `0x${string}`[],
+          );
+          let matched = false;
+          for (const v of linkedVaults) {
+            try {
+              const vb = await balancesFor(c, v);
+              if (vb.bayc > 0n || vb.mayc > 0n) {
+                totalBayc += vb.bayc;
+                totalMayc += vb.mayc;
+                delegatedFrom = v;
+                linkedHolder = linked;
+                matched = true;
+                break;
+              }
+            } catch (e) {
+              console.error("RPC balanceOf (linked-vault) failed", v, e);
+            }
+          }
+          if (matched) break;
+        } catch (e) {
+          console.error("RPC balanceOf (linked wallet) failed", linked, e);
+        }
+      }
+    }
+
 
     const verificationBasis: "direct" | "delegated" = delegatedFrom ? "delegated" : "direct";
 
