@@ -278,14 +278,19 @@ export const inspectWalletHoldings = createServerFn({ method: "POST" })
   });
 
 export const verifyOwnership = createServerFn({ method: "POST" })
-  .inputValidator((input: { message: string; signature: string }) =>
+  .inputValidator((input: { message: string; signature: string; linkedWallets?: string[] }) =>
     z
       .object({
         message: z.string().min(20).max(4000),
         signature: z.string().min(20).max(400),
+        linkedWallets: z
+          .array(z.string().regex(/^0x[a-fA-F0-9]{40}$/))
+          .max(20)
+          .optional(),
       })
       .parse(input),
   )
+
   .handler(async ({ data }) => {
     // 1) Verify SIWE signature + domain + expiration to prevent replay
     //    attacks from signatures issued for other sites.
