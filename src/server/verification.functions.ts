@@ -4,8 +4,6 @@ import { createPublicClient, http, getAddress, parseAbi } from "viem";
 import { mainnet } from "viem/chains";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { BAYC_CONTRACT, DELEGATE_REGISTRY_V2 } from "@/lib/web3/constants";
-import { requireTokenProof, invalidateTokenProof } from "@/server/token-proof.server";
-import { recomputeOwnership } from "@/server/ownership.server";
 
 /**
  * Force-recompute ownership for the authenticated user. Updates
@@ -16,6 +14,7 @@ import { recomputeOwnership } from "@/server/ownership.server";
 export const revalidateOwnership = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    const { recomputeOwnership } = await import("@/server/ownership.server");
     return recomputeOwnership(context.userId);
   });
 
@@ -78,6 +77,7 @@ export const verifyDelegation = createServerFn({ method: "POST" })
 
     if (!isDelegated) return { verified: false, error: "No active BAYC delegation" };
 
+    const { requireTokenProof, invalidateTokenProof } = await import("@/server/token-proof.server");
     invalidateTokenProof({ wallet: vault, contract: BAYC_CONTRACT });
     const vaultProof = await requireTokenProof({
       wallet: vault,
@@ -147,6 +147,7 @@ export const checkPremiumAccess = createServerFn({ method: "POST" })
     if (!gate || !gate.contract) {
       return { allowed: false, reason: "Premium gating not configured" };
     }
+    const { requireTokenProof } = await import("@/server/token-proof.server");
     const proof = await requireTokenProof({
       wallet,
       contract: gate.contract,
