@@ -12,6 +12,7 @@ import {
   Play,
   Search,
   Square,
+  Volume2,
   X,
 } from "lucide-react";
 import { searchKaraokeSongs, type SongHit } from "@/lib/karaoke.functions";
@@ -89,11 +90,30 @@ export function KaraokeMusicBoard({
   const runSongSearch = useServerFn(searchKaraokeSongs);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
-  function postToPlayer(func: "playVideo" | "pauseVideo" | "stopVideo") {
+  function postToPlayer(
+    func: "playVideo" | "pauseVideo" | "stopVideo" | "setVolume",
+    args: (string | number)[] = [],
+  ) {
     const win = iframeRef.current?.contentWindow;
     if (!win) return;
-    win.postMessage(JSON.stringify({ event: "command", func, args: [] }), "*");
+    win.postMessage(JSON.stringify({ event: "command", func, args }), "*");
   }
+
+  // Per-source volume controls for the performer. Music volume drives the
+  // YouTube iframe via the IFrame API (audible to everyone hearing the
+  // music). Mic volume is dispatched to ConferenceRoom which applies it to
+  // the local participant's mic publication for self-monitoring.
+  const [musicVol, setMusicVol] = useState(80);
+  const [micVol, setMicVol] = useState(100);
+  useEffect(() => {
+    if (!videoId) return;
+    postToPlayer("setVolume", [musicVol]);
+  }, [musicVol, videoId]);
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent("karaoke:set-mic-volume", { detail: { value: micVol / 100 } }),
+    );
+  }, [micVol]);
 
   // Drive the iframe via YT IFrame API postMessage whenever paused flips.
   useEffect(() => {
