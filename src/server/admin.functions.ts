@@ -183,6 +183,7 @@ export const deleteUser = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await requireSuperAdmin(context.userId);
+    const supabaseAdmin = await getSupabaseAdmin();
     if (data.targetUserId === context.userId) {
       throw new Error("You cannot delete your own account");
     }
@@ -224,6 +225,7 @@ export const listChapterSubmissions = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await requireAdmin(context.userId);
+    const supabaseAdmin = await getSupabaseAdmin();
     let q = supabaseAdmin
       .from("chapter_submissions")
       .select(
@@ -264,6 +266,7 @@ export const reviewChapterSubmission = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await requireAdmin(context.userId);
+    const supabaseAdmin = await getSupabaseAdmin();
 
     const { data: sub, error: fetchErr } = await supabaseAdmin
       .from("chapter_submissions")
