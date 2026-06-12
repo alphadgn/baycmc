@@ -215,6 +215,7 @@ export const getLivekitToken = createServerFn({ method: "POST" })
 
     const host = await isRoomHost(userId, data.roomId);
 
+    const { AccessToken } = await import("livekit-server-sdk");
     const at = new AccessToken(cfg.apiKey, cfg.apiSecret, { identity, name, ttl: "2h" });
     at.addGrant({
       room: room.livekit_room,
@@ -230,6 +231,7 @@ export const getLivekitToken = createServerFn({ method: "POST" })
 
     const token = await at.toJwt();
 
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin.from("audit_logs").insert({
       event_type: "room.join",
       actor_id: userId,
@@ -251,6 +253,7 @@ async function listActiveParticipants(
   cfg: { apiKey: string; apiSecret: string; url: string },
   livekitRoom: string,
 ): Promise<number | null> {
+  const { RoomServiceClient } = await import("livekit-server-sdk");
   const client = new RoomServiceClient(cfg.url, cfg.apiKey, cfg.apiSecret);
   try {
     const participants = await client.listParticipants(livekitRoom);
@@ -282,6 +285,7 @@ export const setRoomLocked = createServerFn({ method: "POST" })
     if (!(await isRoomHost(userId, data.roomId))) {
       return { ok: false as const, error: "Host-only action" };
     }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin
       .from("rooms")
       .update({ is_locked: data.locked })
