@@ -33,20 +33,26 @@ const delegateRegistryAbi = parseAbi([
 ]);
 
 function client() {
+  const configured = process.env.ETH_RPC_URL?.trim();
+  // Try the admin-provisioned RPC first, then fall back through several
+  // public mainnet RPCs so a single provider outage doesn't break sign-in.
+  const urls = [
+    configured,
+    "https://eth.llamarpc.com",
+    "https://ethereum-rpc.publicnode.com",
+    "https://rpc.ankr.com/eth",
+    "https://cloudflare-eth.com",
+  ].filter((u): u is string => Boolean(u));
+  if (!configured) {
+    console.warn("[wallet.functions] ETH_RPC_URL not set — using public RPC fallbacks");
+  }
   return createPublicClient({
     chain: mainnet,
-    transport: http(ethRpcUrl(), { timeout: 8_000, retryCount: 1 }),
+    transport: fallback(
+      urls.map((u) => http(u, { timeout: 6_000, retryCount: 1 })),
+      { rank: false, retryCount: 1 },
+    ),
   });
-}
-
-function ethRpcUrl() {
-  const url = process.env.ETH_RPC_URL?.trim();
-  if (url) return url;
-  // Fall back to a public RPC so verification still works in environments
-  // where the admin hasn't provisioned a dedicated Alchemy/Infura endpoint.
-  // Rate-limited, but fine for low-volume ownership checks.
-  console.warn("[wallet.functions] ETH_RPC_URL not set — using public llamarpc fallback");
-  return "https://eth.llamarpc.com";
 }
 
 /**
