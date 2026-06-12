@@ -560,6 +560,42 @@ export function KaraokeMusicBoard({
         </div>
       )}
 
+      {/* Per-source volume sliders — performer only. Music volume controls
+          the karaoke track everyone hears; Mic volume scales the singer's
+          own publication for in-room balance. */}
+      {videoId && isMyTurn && (
+        <div className="grid grid-cols-2 gap-3 border-b border-gold/10 bg-[#0a0a0a] px-3 py-2">
+          <label className="flex flex-col gap-1">
+            <span className="flex items-center gap-1 text-[8px] uppercase tracking-widest text-gold/70">
+              <Music className="h-2.5 w-2.5" /> Music · {musicVol}
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={musicVol}
+              onChange={(e) => setMusicVol(Number(e.target.value))}
+              aria-label="Music volume"
+              className="h-1 w-full cursor-pointer appearance-none rounded-full bg-gold/20 accent-gold"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="flex items-center gap-1 text-[8px] uppercase tracking-widest text-gold/70">
+              <Volume2 className="h-2.5 w-2.5" /> Mic · {micVol}
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={micVol}
+              onChange={(e) => setMicVol(Number(e.target.value))}
+              aria-label="Microphone volume"
+              className="h-1 w-full cursor-pointer appearance-none rounded-full bg-gold/20 accent-emerald-400"
+            />
+          </label>
+        </div>
+      )}
+
       {/* Mobile-only one-time hint overlay */}
       {showHint && (
         <div className="border-b border-gold/20 bg-gradient-to-b from-gold/15 to-transparent p-2 text-[10px] text-gold sm:hidden">
