@@ -579,13 +579,18 @@ export const verifyOwnership = createServerFn({ method: "POST" })
       delegationLookupOk,
       directLookupOk,
       delegationVaultsChecked: vaults.length,
+      linkedWalletsChecked: linkedAddrs.length,
+      linkedHolder,
       reason: holdsApe
         ? null
-        : vaults.length > 0
-          ? "Signed in to the lobby. No BAYC/MAYC found in this wallet or its delegated vaults — gated rooms remain locked."
-          : delegationLookupOk
-            ? "Signed in to the lobby. No BAYC/MAYC in this wallet and no delegate.cash delegation found."
-            : "Signed in to the lobby. delegate.cash lookup unavailable; only direct ownership was checked.",
+        : linkedAddrs.length > 0
+          ? "Signed in to the lobby. No BAYC/MAYC found in this wallet, linked wallets, or any delegated vaults — gated rooms remain locked."
+          : vaults.length > 0
+            ? "Signed in to the lobby. No BAYC/MAYC found in this wallet or its delegated vaults — gated rooms remain locked."
+            : delegationLookupOk
+              ? "Signed in to the lobby. No BAYC/MAYC in this wallet and no delegate.cash delegation found."
+              : "Signed in to the lobby. delegate.cash lookup unavailable; only direct ownership was checked.",
+
       session: {
         access_token: signIn.session.access_token,
         refresh_token: signIn.session.refresh_token,
