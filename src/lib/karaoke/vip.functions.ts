@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 /**
  * Resolve which of the given user IDs are verified BAYC/MAYC holders
@@ -23,6 +22,7 @@ export const fetchVipUserIds = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     if (data.userIds.length === 0) return { vipUserIds: [] as string[] };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: rows, error } = await supabaseAdmin
       .from("user_verifications")
       .select("user_id,bayc_verified")

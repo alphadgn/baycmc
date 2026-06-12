@@ -4,11 +4,7 @@ import { z } from "zod";
 import { SiweMessage } from "siwe";
 import { createPublicClient, http, getAddress, parseAbi, isAddress } from "viem";
 import { mainnet } from "viem/chains";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { DELEGATE_REGISTRY_V2 } from "@/lib/web3/constants";
-import { runLuminaCheckAndPersist } from "@/server/lumina.server";
-import { runOtherpageCheckAndPersist } from "@/server/otherpage.server";
-import { deriveWalletPassword } from "@/server/wallet-password";
 
 /**
  * Glyph / SIWE entrance verification.
@@ -434,7 +430,9 @@ export const verifyOwnership = createServerFn({ method: "POST" })
     //    only see the main lobby and direct messages.
     const lower = wallet.toLowerCase();
     const email = `${lower}@wallet.baycmc.local`;
+    const { deriveWalletPassword } = await import("@/server/wallet-password");
     const password = await deriveWalletPassword(lower);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
       email,
@@ -479,6 +477,10 @@ export const verifyOwnership = createServerFn({ method: "POST" })
 
     if (holdsApe) {
       const apeHolder = delegatedFrom ?? wallet;
+      const [{ runLuminaCheckAndPersist }, { runOtherpageCheckAndPersist }] = await Promise.all([
+        import("@/server/lumina.server"),
+        import("@/server/otherpage.server"),
+      ]);
       await Promise.all([
         runLuminaCheckAndPersist({ userId, wallet: apeHolder }).catch((e) =>
           console.error("Lumina post-verify check failed", e),

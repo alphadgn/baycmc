@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 /**
  * Create a room booking. Server-side conflict prevention via DB trigger.
@@ -100,6 +99,7 @@ export const createBooking = createServerFn({ method: "POST" })
       return { ok: false as const, error: error.message };
     }
 
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin.from("audit_logs").insert({
       event_type: "booking.create",
       actor_id: userId,
@@ -132,6 +132,7 @@ export const cancelBooking = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const { error } = await supabase.from("room_bookings").delete().eq("id", data.bookingId);
     if (error) return { ok: false as const, error: error.message };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin.from("audit_logs").insert({
       event_type: "booking.cancel",
       actor_id: userId,

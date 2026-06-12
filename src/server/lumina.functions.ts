@@ -2,7 +2,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getAddress, isAddress } from "viem";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { assertSafeHttpsUrl } from "@/server/url-guard";
 
 /**
  * Lumina ownership verification — public REST.
@@ -62,6 +61,7 @@ export const verifyLuminaOwnership = createServerFn({ method: "POST" })
       .replace("{contract}", encodeURIComponent(cfg.contract ?? ""));
 
     try {
+      const { assertSafeHttpsUrl } = await import("@/server/url-guard");
       assertSafeHttpsUrl(url);
     } catch (e) {
       console.error("Lumina URL rejected by SSRF guard", e);
