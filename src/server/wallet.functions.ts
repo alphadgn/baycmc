@@ -41,13 +41,12 @@ function client() {
 
 function ethRpcUrl() {
   const url = process.env.ETH_RPC_URL?.trim();
-  if (!url) {
-    console.error("[wallet.functions] ETH_RPC_URL is not set");
-    throw new Error(
-      "Server isn't configured for on-chain checks yet (missing ETH_RPC_URL). Ask an admin to finish setup.",
-    );
-  }
-  return url;
+  if (url) return url;
+  // Fall back to a public RPC so verification still works in environments
+  // where the admin hasn't provisioned a dedicated Alchemy/Infura endpoint.
+  // Rate-limited, but fine for low-volume ownership checks.
+  console.warn("[wallet.functions] ETH_RPC_URL not set — using public llamarpc fallback");
+  return "https://eth.llamarpc.com";
 }
 
 /**
