@@ -1,11 +1,16 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 type AppRole = "super_admin" | "admin" | "verified_user" | "chapter_leader";
 
+async function getSupabaseAdmin() {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  return supabaseAdmin;
+}
+
 async function getRoles(userId: string): Promise<AppRole[]> {
+  const supabaseAdmin = await getSupabaseAdmin();
   const { data } = await supabaseAdmin.from("user_roles").select("role").eq("user_id", userId);
   return (data?.map((r) => r.role) ?? []) as AppRole[];
 }
@@ -35,6 +40,7 @@ export const listUsers = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await requireAdmin(context.userId);
+    const supabaseAdmin = await getSupabaseAdmin();
 
     let q = supabaseAdmin
       .from("profiles")
@@ -94,6 +100,7 @@ export const setUserRole = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await requireSuperAdmin(context.userId);
+    const supabaseAdmin = await getSupabaseAdmin();
 
     if (
       data.targetUserId === context.userId &&
@@ -141,6 +148,7 @@ export const overrideVerification = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await requireAdmin(context.userId);
+    const supabaseAdmin = await getSupabaseAdmin();
 
     const patch: {
       user_id: string;
@@ -175,6 +183,7 @@ export const deleteUser = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await requireSuperAdmin(context.userId);
+    const supabaseAdmin = await getSupabaseAdmin();
     if (data.targetUserId === context.userId) {
       throw new Error("You cannot delete your own account");
     }
@@ -216,6 +225,7 @@ export const listChapterSubmissions = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await requireAdmin(context.userId);
+    const supabaseAdmin = await getSupabaseAdmin();
     let q = supabaseAdmin
       .from("chapter_submissions")
       .select(
@@ -256,6 +266,7 @@ export const reviewChapterSubmission = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await requireAdmin(context.userId);
+    const supabaseAdmin = await getSupabaseAdmin();
 
     const { data: sub, error: fetchErr } = await supabaseAdmin
       .from("chapter_submissions")

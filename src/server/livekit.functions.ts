@@ -1,9 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { AccessToken, RoomServiceClient, TrackSource } from "livekit-server-sdk";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { recomputeOwnership } from "@/server/ownership.server";
 
 type RoomRecord = {
   id: string;
@@ -31,6 +28,7 @@ type RoomAccessResult =
     };
 
 async function validateRoomAccess(userId: string, roomId: string): Promise<RoomAccessResult> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data: room, error } = await supabaseAdmin
     .from("rooms")
     .select("id,name,tier,kind,livekit_room,capacity,active,is_locked")
@@ -75,6 +73,7 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
   // Re-run on-chain BAYC/MAYC + delegate.cash and Otherpage checks at the
   // moment access is requested or refreshed. This is the hard gate that makes
   // revoked delegations/sold tokens stop future room entry and token minting.
+  const { recomputeOwnership } = await import("@/server/ownership.server");
   const fresh = await recomputeOwnership(userId).catch((e) => {
     console.error("recomputeOwnership for room access failed", e);
     return null;
@@ -126,6 +125,7 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
 }
 
 async function hasActiveBooking(roomId: string): Promise<boolean> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const nowIso = new Date().toISOString();
   const { data } = await supabaseAdmin
     .from("room_bookings")
@@ -139,6 +139,7 @@ async function hasActiveBooking(roomId: string): Promise<boolean> {
 }
 
 async function isRoomHost(userId: string, roomId: string): Promise<boolean> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   // Admin / super_admin override.
   const { data: roles } = await supabaseAdmin
     .from("user_roles")
@@ -214,6 +215,7 @@ export const getLivekitToken = createServerFn({ method: "POST" })
 
     const host = await isRoomHost(userId, data.roomId);
 
+    const { AccessToken } = await import("livekit-server-sdk");
     const at = new AccessToken(cfg.apiKey, cfg.apiSecret, { identity, name, ttl: "2h" });
     at.addGrant({
       room: room.livekit_room,
@@ -229,6 +231,7 @@ export const getLivekitToken = createServerFn({ method: "POST" })
 
     const token = await at.toJwt();
 
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin.from("audit_logs").insert({
       event_type: "room.join",
       actor_id: userId,
@@ -250,6 +253,7 @@ async function listActiveParticipants(
   cfg: { apiKey: string; apiSecret: string; url: string },
   livekitRoom: string,
 ): Promise<number | null> {
+  const { RoomServiceClient } = await import("livekit-server-sdk");
   const client = new RoomServiceClient(cfg.url, cfg.apiKey, cfg.apiSecret);
   try {
     const participants = await client.listParticipants(livekitRoom);
@@ -281,6 +285,7 @@ export const setRoomLocked = createServerFn({ method: "POST" })
     if (!(await isRoomHost(userId, data.roomId))) {
       return { ok: false as const, error: "Host-only action" };
     }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin
       .from("rooms")
       .update({ is_locked: data.locked })
@@ -312,6 +317,7 @@ export const kickRoomParticipant = createServerFn({ method: "POST" })
     const cfg = getLivekitConfig();
     if (!cfg) return { ok: false as const, error: "LiveKit not configured" };
 
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: room } = await supabaseAdmin
       .from("rooms")
       .select("livekit_room")
@@ -319,6 +325,7 @@ export const kickRoomParticipant = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!room) return { ok: false as const, error: "Room not found" };
 
+    const { RoomServiceClient } = await import("livekit-server-sdk");
     const client = new RoomServiceClient(cfg.url, cfg.apiKey, cfg.apiSecret);
     try {
       await client.removeParticipant(room.livekit_room, data.identity);
@@ -356,6 +363,7 @@ export const muteAllRoomParticipants = createServerFn({ method: "POST" })
     const cfg = getLivekitConfig();
     if (!cfg) return { ok: false as const, error: "LiveKit not configured" };
 
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: room } = await supabaseAdmin
       .from("rooms")
       .select("livekit_room")
@@ -363,6 +371,7 @@ export const muteAllRoomParticipants = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!room) return { ok: false as const, error: "Room not found" };
 
+    const { RoomServiceClient, TrackSource } = await import("livekit-server-sdk");
     const client = new RoomServiceClient(cfg.url, cfg.apiKey, cfg.apiSecret);
 
     // Muting force-mutes every live mic; un-muting only LIFTS the lock (via
