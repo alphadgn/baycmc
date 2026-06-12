@@ -169,6 +169,13 @@ export const listWalletActivity = createServerFn({ method: "POST" })
     }
     const owner = getAddress(data.address);
     const base = alchemyCoreBaseUrl();
+    if (!base) {
+      return {
+        ok: false as const,
+        reason: "Activity lookup requires an Alchemy ETH_RPC_URL.",
+        items: [],
+      };
+    }
 
     const categories = ["external", "erc20", "erc721", "erc1155"] as const;
     const body = (direction: "from" | "to") => ({
