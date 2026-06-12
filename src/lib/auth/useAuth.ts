@@ -55,6 +55,11 @@ export function useAuth() {
  */
 export async function signOut() {
   try {
+    window.dispatchEvent(new Event("baycmc:karaoke-cleanup-self"));
+  } catch {
+    /* noop */
+  }
+  try {
     await supabase.auth.signOut();
   } catch (e) {
     console.warn("[signOut] supabase signOut failed", e);
