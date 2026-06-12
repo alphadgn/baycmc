@@ -39,6 +39,11 @@ export function InactivityWatcher() {
       if (signedOutRef.current) return;
       signedOutRef.current = true;
       try {
+        window.dispatchEvent(new Event("baycmc:karaoke-cleanup-self"));
+      } catch {
+        /* noop */
+      }
+      try {
         await supabase.auth.signOut();
       } catch (e) {
         console.warn("[InactivityWatcher] supabase signOut failed", e);
