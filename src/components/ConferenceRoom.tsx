@@ -164,6 +164,15 @@ export function ConferenceRoom({
   const goBack = useCallback(() => {
     // "Leave room" always returns the user to the main lobby (the app's home),
     // regardless of which room (karaoke / conference / game) they came from.
+    // Fire the karaoke self-cleanup event synchronously BEFORE navigating so
+    // the user's waiting-list row is deleted the instant they leave the room.
+    // Re-entry requires a manual rejoin — joinLine() is only ever called from
+    // an explicit user click.
+    try {
+      window.dispatchEvent(new Event("baycmc:karaoke-cleanup-self"));
+    } catch {
+      /* noop */
+    }
     void navigate({ to: "/lobby" });
   }, [navigate]);
 
