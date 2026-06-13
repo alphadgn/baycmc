@@ -538,7 +538,7 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
                 <div className="flex items-center gap-1 text-gold/80">
                   <Users className="h-3 w-3" />
                   <span className="text-[10px] uppercase tracking-wider">
-                    Waiting · {queue.length}
+                    Waiting · {visibleQueue.length}
                   </span>
                 </div>
                 {meInQueue ? (
