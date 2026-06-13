@@ -410,10 +410,32 @@ export function GlyphBridge({
       }
       logEvent("auth", "info", "verify: signature obtained — calling verifyFn");
 
+      // Pull the freshest linked-wallets list from Glyph before verifying. Try
+      // a refreshUser() so React state catches up, then hit Glyph's REST API
+      // directly using the stored widget token — the REST result is the
+      // source of truth and is independent of React render timing. Fall back
+      // to whatever we already had on state if the REST call returns empty.
+      try {
+        await refreshUserRef.current?.(true);
+      } catch (e) {
+        logEvent("auth", "debug", "verify: refreshUser threw (non-fatal)", {
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
+      const liveLinked = await fetchGlyphLinkedWallets(addr);
+      const merged: string[] = [];
+      dedupePush(merged, addr);
+      for (const w of liveLinked) dedupePush(merged, w);
+      for (const w of linkedWalletsRef.current) dedupePush(merged, w);
+      logEvent("auth", "info", "verify: linked wallets resolved", {
+        count: merged.length,
+        liveCount: liveLinked.length,
+      });
+
       toast.loading("Checking BAYC / MAYC ownership…", { id: toastId, position: "top-center" });
       const result = await withTimeout(
         verifyFnRef.current({
-          data: { message, signature, linkedWallets: linkedWalletsRef.current },
+          data: { message, signature, linkedWallets: merged },
         }),
 
         20_000,
