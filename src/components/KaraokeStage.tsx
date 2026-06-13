@@ -244,7 +244,7 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
   }, [bookingHostUserId, session.performer_user_id, visibleQueue, roomId]);
 
   const isMyTurn = !!user && !!effectivePerformerId && user.id === effectivePerformerId;
-  const meInQueue = !!user && queue.some((q) => q.user_id === user.id);
+  const meInQueue = !!user && visibleQueue.some((q) => q.user_id === user.id);
 
   // ---- Performer actions: change track, end song ----
   // If the stage is free (no booking, no performer), the user auto-claims it
