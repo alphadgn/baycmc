@@ -224,7 +224,7 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
   useEffect(() => {
     if (bookingHostUserId) return;
     if (session.performer_user_id) return;
-    const next = queue[0];
+    const next = visibleQueue[0];
     if (!next) return;
     void supabase
       .from("karaoke_sessions")
