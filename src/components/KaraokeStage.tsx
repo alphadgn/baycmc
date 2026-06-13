@@ -601,7 +601,7 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
             ? 0
             : (() => {
                 if (!user) return null;
-                const idx = queue.findIndex((q) => q.user_id === user.id);
+                const idx = visibleQueue.findIndex((q) => q.user_id === user.id);
                 if (idx < 0) return null;
                 // If there's an active performer in front, add 1; otherwise
                 // queue index 0 is up next immediately.
