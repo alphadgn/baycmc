@@ -194,13 +194,29 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
     };
   }, [session.performer_user_id, bookingHostUserId, queue, profiles]);
 
+  // ---- Visible queue ----
+  // The waitlist must only show users who satisfy ALL three rules:
+  //   (1) signed in, (2) present in the room, (3) signed up for the line.
+  // Presence (realtime) covers (1)+(2): anonymous viewers use `anon-*` keys
+  // and are filtered out of `presentIds` at sync time. Intersecting with
+  // the persisted queue covers (3). Stale rows from force-killed tabs are
+  // hidden immediately — no DB write needed, and no one else can mutate
+  // another user's row (RLS unchanged).
+  const visibleQueue = useMemo(
+    () => queue.filter((q) => presentIds.has(q.user_id)),
+    [queue, presentIds],
+  );
+
   // ---- Determine the effective performer ----
-  // Booking always wins. Otherwise: stored performer, or front of queue.
+  // Booking always wins. Otherwise: stored performer (only if still present),
+  // or front of the visible queue.
   const effectivePerformerId = useMemo(() => {
     if (bookingHostUserId) return bookingHostUserId;
-    if (session.performer_user_id) return session.performer_user_id;
-    return queue[0]?.user_id ?? null;
-  }, [bookingHostUserId, session.performer_user_id, queue]);
+    if (session.performer_user_id && presentIds.has(session.performer_user_id)) {
+      return session.performer_user_id;
+    }
+    return visibleQueue[0]?.user_id ?? null;
+  }, [bookingHostUserId, session.performer_user_id, visibleQueue, presentIds]);
 
   // If nobody is the recorded performer but the queue has someone, promote
   // the front of the queue (open-mic auto-start). Anyone in the room can
@@ -208,7 +224,7 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
   useEffect(() => {
     if (bookingHostUserId) return;
     if (session.performer_user_id) return;
-    const next = queue[0];
+    const next = visibleQueue[0];
     if (!next) return;
     void supabase
       .from("karaoke_sessions")
@@ -225,10 +241,10 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
       .then(({ error }) => {
         if (error) console.warn("[karaoke] auto-promote failed", error);
       });
-  }, [bookingHostUserId, session.performer_user_id, queue, roomId]);
+  }, [bookingHostUserId, session.performer_user_id, visibleQueue, roomId]);
 
   const isMyTurn = !!user && !!effectivePerformerId && user.id === effectivePerformerId;
-  const meInQueue = !!user && queue.some((q) => q.user_id === user.id);
+  const meInQueue = !!user && visibleQueue.some((q) => q.user_id === user.id);
 
   // ---- Performer actions: change track, end song ----
   // If the stage is free (no booking, no performer), the user auto-claims it
@@ -522,7 +538,7 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
                 <div className="flex items-center gap-1 text-gold/80">
                   <Users className="h-3 w-3" />
                   <span className="text-[10px] uppercase tracking-wider">
-                    Waiting · {queue.length}
+                    Waiting · {visibleQueue.length}
                   </span>
                 </div>
                 {meInQueue ? (
@@ -544,9 +560,9 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
                   </button>
                 )}
               </div>
-              {queue.length > 0 && (
+              {visibleQueue.length > 0 && (
                 <ol className="mt-2 space-y-0.5 text-[11px] text-muted-foreground">
-                  {queue.slice(0, 6).map((q, i) => {
+                  {visibleQueue.slice(0, 6).map((q, i) => {
                     const p = profiles[q.user_id];
                     const name = p?.username ?? short(p?.wallet_address) ?? q.user_id.slice(0, 6);
                     return (
@@ -585,7 +601,7 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
             ? 0
             : (() => {
                 if (!user) return null;
-                const idx = queue.findIndex((q) => q.user_id === user.id);
+                const idx = visibleQueue.findIndex((q) => q.user_id === user.id);
                 if (idx < 0) return null;
                 // If there's an active performer in front, add 1; otherwise
                 // queue index 0 is up next immediately.
