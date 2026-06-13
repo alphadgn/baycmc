@@ -241,7 +241,7 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
       .then(({ error }) => {
         if (error) console.warn("[karaoke] auto-promote failed", error);
       });
-  }, [bookingHostUserId, session.performer_user_id, queue, roomId]);
+  }, [bookingHostUserId, session.performer_user_id, visibleQueue, roomId]);
 
   const isMyTurn = !!user && !!effectivePerformerId && user.id === effectivePerformerId;
   const meInQueue = !!user && queue.some((q) => q.user_id === user.id);
