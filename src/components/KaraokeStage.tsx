@@ -194,13 +194,29 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
     };
   }, [session.performer_user_id, bookingHostUserId, queue, profiles]);
 
+  // ---- Visible queue ----
+  // The waitlist must only show users who satisfy ALL three rules:
+  //   (1) signed in, (2) present in the room, (3) signed up for the line.
+  // Presence (realtime) covers (1)+(2): anonymous viewers use `anon-*` keys
+  // and are filtered out of `presentIds` at sync time. Intersecting with
+  // the persisted queue covers (3). Stale rows from force-killed tabs are
+  // hidden immediately — no DB write needed, and no one else can mutate
+  // another user's row (RLS unchanged).
+  const visibleQueue = useMemo(
+    () => queue.filter((q) => presentIds.has(q.user_id)),
+    [queue, presentIds],
+  );
+
   // ---- Determine the effective performer ----
-  // Booking always wins. Otherwise: stored performer, or front of queue.
+  // Booking always wins. Otherwise: stored performer (only if still present),
+  // or front of the visible queue.
   const effectivePerformerId = useMemo(() => {
     if (bookingHostUserId) return bookingHostUserId;
-    if (session.performer_user_id) return session.performer_user_id;
-    return queue[0]?.user_id ?? null;
-  }, [bookingHostUserId, session.performer_user_id, queue]);
+    if (session.performer_user_id && presentIds.has(session.performer_user_id)) {
+      return session.performer_user_id;
+    }
+    return visibleQueue[0]?.user_id ?? null;
+  }, [bookingHostUserId, session.performer_user_id, visibleQueue, presentIds]);
 
   // If nobody is the recorded performer but the queue has someone, promote
   // the front of the queue (open-mic auto-start). Anyone in the room can
