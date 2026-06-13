@@ -194,10 +194,67 @@ type GlyphHookValue = {
   logout: () => void;
   signMessage: (params: { message: string }) => Promise<string>;
   user?: GlyphUser;
+  refreshUser?: (force?: boolean) => Promise<void>;
 };
 type UseGlyph = () => GlyphHookValue;
 type AccountValue = { address?: string | null; isConnected: boolean };
 type UseAccount = () => AccountValue;
+
+const GLYPH_API_BASE = "https://useglyph.io";
+const GLYPH_TOKEN_KEY = "__glyph-widget-token__";
+const GLYPH_NONCE_KEY = "__glyph-widget-nonce__";
+
+function dedupePush(out: string[], a?: string | null) {
+  if (!a || !/^0x[a-fA-F0-9]{40}$/.test(a)) return;
+  if (out.some((x) => x.toLowerCase() === a.toLowerCase())) return;
+  out.push(a);
+}
+
+/**
+ * Pull the current Glyph "widget user" directly from Glyph's REST API. We do
+ * this in addition to reading `useGlyph().user` because that React state may
+ * not be hydrated yet when the user taps "Sign to enter" — Glyph runs its own
+ * SIWE to mint a session token, then asynchronously fetches /api/widget/user.
+ * Hitting the endpoint ourselves with the stored token guarantees we have the
+ * freshest linked-wallets list before we call verifyOwnership.
+ */
+async function fetchGlyphLinkedWallets(address: string): Promise<string[]> {
+  if (typeof window === "undefined") return [];
+  let token: string | null = null;
+  let nonce: string | null = null;
+  try {
+    token = window.localStorage.getItem(GLYPH_TOKEN_KEY);
+    nonce = window.localStorage.getItem(GLYPH_NONCE_KEY);
+  } catch {
+    return [];
+  }
+  if (!token || !nonce) return [];
+  try {
+    const res = await fetch(`${GLYPH_API_BASE}/api/widget/user`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "x-evm-address": address,
+        "x-glyph-nonce": nonce,
+        "Content-Type": "application/json",
+      },
+    });
+    if (!res.ok) {
+      logEvent("auth", "warn", "glyph /widget/user fetch failed", { status: res.status });
+      return [];
+    }
+    const json = (await res.json()) as GlyphUser;
+    const out: string[] = [];
+    dedupePush(out, json?.evmWallet);
+    dedupePush(out, json?.smartWallet);
+    for (const w of json?.linkedWallets ?? []) dedupePush(out, w?.address);
+    return out;
+  } catch (e) {
+    logEvent("auth", "warn", "glyph /widget/user fetch threw", {
+      message: e instanceof Error ? e.message : String(e),
+    });
+    return [];
+  }
+}
 
 export function GlyphBridge({
   useGlyph,
@@ -206,31 +263,25 @@ export function GlyphBridge({
   useGlyph: UseGlyph;
   useAccount: UseAccount;
 }) {
-  const { logout, signMessage, user } = useGlyph();
+  const { logout, signMessage, user, refreshUser } = useGlyph();
   const { address: wagmiAddress, isConnected } = useAccount();
   const verifyFn = useServerFn(verifyOwnership);
 
   const address = isConnected ? (wagmiAddress ?? null) : null;
 
-  // Collect every EVM address Glyph knows about for this account: the
-  // signing wallet, the smart wallet, and any "linked wallets" the user has
-  // attached via the Glyph modal. We pass these to verifyOwnership so the
-  // server can check BAYC/MAYC holdings + delegate.cash delegations against
-  // the entire linked set, not just the active signer.
-  const linkedWallets = (() => {
+  // Cached snapshot from useGlyph().user — used as a fallback if the live
+  // REST fetch in runVerify() comes back empty (e.g. token expired).
+  const linkedWalletsFromState = (() => {
     const out: string[] = [];
-    const push = (a?: string | null) => {
-      if (!a || !/^0x[a-fA-F0-9]{40}$/.test(a)) return;
-      if (out.some((x) => x.toLowerCase() === a.toLowerCase())) return;
-      out.push(a);
-    };
-    push(user?.evmWallet);
-    push(user?.smartWallet);
-    for (const w of user?.linkedWallets ?? []) push(w?.address);
+    dedupePush(out, user?.evmWallet);
+    dedupePush(out, user?.smartWallet);
+    for (const w of user?.linkedWallets ?? []) dedupePush(out, w?.address);
     return out;
   })();
-  const linkedWalletsRef = useRef(linkedWallets);
-  linkedWalletsRef.current = linkedWallets;
+  const linkedWalletsRef = useRef(linkedWalletsFromState);
+  linkedWalletsRef.current = linkedWalletsFromState;
+  const refreshUserRef = useRef(refreshUser);
+  refreshUserRef.current = refreshUser;
 
   // Latest connected address, read inside the stable runVerify callback so we
   // don't have to thread it through deps.
