@@ -560,9 +560,9 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
                   </button>
                 )}
               </div>
-              {queue.length > 0 && (
+              {visibleQueue.length > 0 && (
                 <ol className="mt-2 space-y-0.5 text-[11px] text-muted-foreground">
-                  {queue.slice(0, 6).map((q, i) => {
+                  {visibleQueue.slice(0, 6).map((q, i) => {
                     const p = profiles[q.user_id];
                     const name = p?.username ?? short(p?.wallet_address) ?? q.user_id.slice(0, 6);
                     return (
