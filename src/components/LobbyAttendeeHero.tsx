@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
+import karaokeLobbyBg from "@/assets/karaoke-lobby-bg.png.asset.json";
 
 interface OnlineMember {
   user_id: string;
@@ -102,17 +103,24 @@ export function LobbyAttendeeHero() {
     <section
       aria-label="Lobby attendees"
       className="relative flex w-full shrink-0 flex-col items-center justify-start overflow-hidden border-b border-gold/20"
-      style={{ height: "50%", minHeight: 180 }}
+      style={{ height: 220 }}
     >
-      {/* Featured background */}
+      {/* Featured background — karaoke lounge photo, darkened so the
+          avatar + name stay legible on top. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 bg-gradient-to-br from-gold/25 via-background to-background"
+        className="pointer-events-none absolute inset-0 bg-cover bg-center"
+        style={{ backgroundImage: `url(${karaokeLobbyBg.url})` }}
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-gradient-to-b from-background/40 via-background/55 to-background/85"
       />
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 opacity-30 [background:radial-gradient(circle_at_50%_0%,hsl(var(--gold)/0.4),transparent_60%)]"
       />
+
 
       <div className="relative z-10 flex h-full w-full flex-col items-center justify-between px-4 py-3">
         {/* Self avatar — top center, prominent */}

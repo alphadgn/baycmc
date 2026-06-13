@@ -1178,7 +1178,11 @@ function ToggleRow({
         aria-checked={checked}
         disabled={disabled}
         onClick={() => onChange(!checked)}
-        className={`relative h-5 w-9 rounded-full transition disabled:cursor-not-allowed ${checked ? "bg-gradient-gold" : "bg-secondary"}`}
+        // Both states use the gold palette so the track is always visible
+        // against the dark panel. The selected position itself is unchanged
+        // — `checked` still drives the knob; users keep whatever they had
+        // set before entering the room until they explicitly toggle.
+        className={`relative h-5 w-9 rounded-full border border-gold/60 transition disabled:cursor-not-allowed ${checked ? "bg-gradient-gold" : "bg-gold/30"}`}
       >
         <span
           className={`absolute top-0.5 h-4 w-4 rounded-full bg-background shadow transition ${checked ? "left-4" : "left-0.5"}`}
