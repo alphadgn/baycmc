@@ -62,6 +62,7 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
   // or otherwise drops out without explicitly leaving the line.
   const [presentIds, setPresentIds] = useState<Set<string>>(() => new Set());
   const lastSeenRef = useRef<Map<string, number>>(new Map());
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   // ---- Initial load + realtime subscriptions ----
   useEffect(() => {
