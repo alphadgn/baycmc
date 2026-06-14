@@ -166,7 +166,7 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
           { onConflict: "room_id" },
         );
       }
-    }, 5_000 + jitter);
+    }, 1_500 + jitter);
     return () => window.clearInterval(timer);
   }, [presentIds, queue, session.performer_user_id, bookingHostUserId, roomId]);
 
