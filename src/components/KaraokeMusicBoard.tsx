@@ -70,7 +70,9 @@ export function KaraokeMusicBoard({
   myQueuePosition = null,
   bookingActive = false,
 }: KaraokeMusicBoardProps) {
-  const [open, setOpen] = useState(true);
+  // Start CLOSED — the room shows the "Karaoke Machine" pill above the
+  // Room panels strip; the user opens the machine by tapping it.
+  const [open, setOpen] = useState(false);
   // When a video is playing the machine collapses to just the screen +
   // transport. The performer can re-expand to access search / pads.
   const [forceExpanded, setForceExpanded] = useState(false);
