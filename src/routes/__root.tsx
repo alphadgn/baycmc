@@ -129,6 +129,7 @@ function RootComponent() {
         <GatedToaster />
         <InactivityWatcher />
         <AuthRedirectWatcher />
+        <AccountMergeWatcher />
       </div>
     </GlyphAppProvider>
   );
