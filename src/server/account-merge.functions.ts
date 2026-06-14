@@ -244,8 +244,12 @@ export const mergeAccounts = createServerFn({ method: "POST" })
       { table: "notifications", column: "user_id" },
     ];
     for (const { table, column } of reassignTables) {
-      const { error } = await admin
-        .from(table)
+      // Dynamic table name — typed Supabase client can't narrow this; cast.
+      const { error } = await (admin.from(table as never) as unknown as {
+        update: (v: Record<string, string>) => {
+          eq: (c: string, v: string) => Promise<{ error: { message: string } | null }>;
+        };
+      })
         .update({ [column]: survivor })
         .eq(column, removed);
       if (error) console.warn("[mergeAccounts] reassign", table, column, error.message);
