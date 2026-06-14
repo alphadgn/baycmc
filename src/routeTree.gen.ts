@@ -21,6 +21,7 @@ import { Route as AuthenticatedLifersRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedKaraokeRouteImport } from './routes/_authenticated/karaoke'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedActivityRouteImport } from './routes/_authenticated/activity'
+import { Route as AuthenticatedAccountMergeRouteImport } from './routes/_authenticated/account-merge'
 import { Route as AuthenticatedVerifiedRouteImport } from './routes/_authenticated/_verified'
 import { Route as AuthenticatedLifersIndexRouteImport } from './routes/_authenticated/lifers/index'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
@@ -99,6 +100,12 @@ const AuthenticatedActivityRoute = AuthenticatedActivityRouteImport.update({
   path: '/activity',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedAccountMergeRoute =
+  AuthenticatedAccountMergeRouteImport.update({
+    id: '/account-merge',
+    path: '/account-merge',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedVerifiedRoute = AuthenticatedVerifiedRouteImport.update({
   id: '/_verified',
   getParentRoute: () => AuthenticatedRoute,
@@ -206,6 +213,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/diagnostics': typeof DiagnosticsRoute
   '/login': typeof LoginRoute
+  '/account-merge': typeof AuthenticatedAccountMergeRoute
   '/activity': typeof AuthenticatedActivityRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/karaoke': typeof AuthenticatedKaraokeRouteWithChildren
@@ -236,6 +244,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/diagnostics': typeof DiagnosticsRoute
   '/login': typeof LoginRoute
+  '/account-merge': typeof AuthenticatedAccountMergeRoute
   '/activity': typeof AuthenticatedActivityRoute
   '/karaoke': typeof AuthenticatedKaraokeRouteWithChildren
   '/lobby': typeof AuthenticatedLobbyRoute
@@ -267,6 +276,7 @@ export interface FileRoutesById {
   '/diagnostics': typeof DiagnosticsRoute
   '/login': typeof LoginRoute
   '/_authenticated/_verified': typeof AuthenticatedVerifiedRouteWithChildren
+  '/_authenticated/account-merge': typeof AuthenticatedAccountMergeRoute
   '/_authenticated/activity': typeof AuthenticatedActivityRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/karaoke': typeof AuthenticatedKaraokeRouteWithChildren
@@ -299,6 +309,7 @@ export interface FileRouteTypes {
     | '/'
     | '/diagnostics'
     | '/login'
+    | '/account-merge'
     | '/activity'
     | '/admin'
     | '/karaoke'
@@ -329,6 +340,7 @@ export interface FileRouteTypes {
     | '/'
     | '/diagnostics'
     | '/login'
+    | '/account-merge'
     | '/activity'
     | '/karaoke'
     | '/lobby'
@@ -359,6 +371,7 @@ export interface FileRouteTypes {
     | '/diagnostics'
     | '/login'
     | '/_authenticated/_verified'
+    | '/_authenticated/account-merge'
     | '/_authenticated/activity'
     | '/_authenticated/admin'
     | '/_authenticated/karaoke'
@@ -478,6 +491,13 @@ declare module '@tanstack/react-router' {
       path: '/activity'
       fullPath: '/activity'
       preLoaderRoute: typeof AuthenticatedActivityRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/account-merge': {
+      id: '/_authenticated/account-merge'
+      path: '/account-merge'
+      fullPath: '/account-merge'
+      preLoaderRoute: typeof AuthenticatedAccountMergeRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/_verified': {
@@ -695,6 +715,7 @@ const AuthenticatedLifersRouteWithChildren =
 
 interface AuthenticatedRouteChildren {
   AuthenticatedVerifiedRoute: typeof AuthenticatedVerifiedRouteWithChildren
+  AuthenticatedAccountMergeRoute: typeof AuthenticatedAccountMergeRoute
   AuthenticatedActivityRoute: typeof AuthenticatedActivityRoute
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
   AuthenticatedKaraokeRoute: typeof AuthenticatedKaraokeRouteWithChildren
@@ -707,6 +728,7 @@ interface AuthenticatedRouteChildren {
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedVerifiedRoute: AuthenticatedVerifiedRouteWithChildren,
+  AuthenticatedAccountMergeRoute: AuthenticatedAccountMergeRoute,
   AuthenticatedActivityRoute: AuthenticatedActivityRoute,
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
   AuthenticatedKaraokeRoute: AuthenticatedKaraokeRouteWithChildren,
