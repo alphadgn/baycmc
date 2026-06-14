@@ -707,6 +707,29 @@ function LiveBottomBar({
     void cam.setActiveMediaDevice(prefs.videoInputDeviceId);
   }, [cam.devices, cam.activeDeviceId, prefs.videoInputDeviceId, cam]);
 
+  // ENFORCE saved on/off preferences forever. The browser permission grant
+  // and LiveKit's auto-publish flow can flip a track ON on first entry even
+  // when the user previously turned it OFF. Reconcile on every change of
+  // the participant's actual track state — granting permission is NOT the
+  // same as the user wanting the device live.
+  useEffect(() => {
+    const p = local.localParticipant;
+    if (!p) return;
+    if (!micLocked && p.isMicrophoneEnabled !== prefs.micEnabled) {
+      void p.setMicrophoneEnabled(prefs.micEnabled).catch(() => {});
+    }
+    if (p.isCameraEnabled !== prefs.cameraEnabled) {
+      void p.setCameraEnabled(prefs.cameraEnabled).catch(() => {});
+    }
+  }, [
+    local.localParticipant,
+    local.isMicrophoneEnabled,
+    local.isCameraEnabled,
+    prefs.micEnabled,
+    prefs.cameraEnabled,
+    micLocked,
+  ]);
+
   async function toggleMic() {
     const v = !prefs.micEnabled;
     if (v && micLocked) {
