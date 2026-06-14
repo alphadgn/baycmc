@@ -127,8 +127,11 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
         }
       });
 
+    channelRef.current = ch;
+
     return () => {
       cancelled = true;
+      channelRef.current = null;
       void supabase.removeChannel(ch);
     };
   }, [roomId, user?.id]);
