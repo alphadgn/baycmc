@@ -6,6 +6,7 @@ import { GlyphBridgeMount } from "@/lib/auth/useGlyphBridge";
 import { AppHeader } from "@/components/AppHeader";
 import { InactivityWatcher } from "@/components/InactivityWatcher";
 import { AuthRedirectWatcher } from "@/components/AuthRedirectWatcher";
+import { AccountMergeWatcher } from "@/components/AccountMergeWatcher";
 import { Toaster } from "@/components/ui/sonner";
 import { installDiagnostics } from "@/lib/diagnostics";
 import { useNotificationPrefs } from "@/lib/baycmc/useNotificationPrefs";
