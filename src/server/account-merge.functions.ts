@@ -263,10 +263,15 @@ export const mergeAccounts = createServerFn({ method: "POST" })
     if (removedWallet) {
       await admin.from("profiles").update({ wallet_address: null }).eq("id", removed);
     }
-    const survivorPatch: Record<string, unknown> = {
-      username: pick("username"),
-      avatar_url: pick("avatar_url"),
-      bio: pick("bio"),
+    const survivorPatch: {
+      username: string | null;
+      avatar_url: string | null;
+      bio: string | null;
+      wallet_address?: string | null;
+    } = {
+      username: pick("username") ?? null,
+      avatar_url: pick("avatar_url") ?? null,
+      bio: pick("bio") ?? null,
     };
     // If survivor has no wallet, inherit the removed one.
     const survivorProf = survivor === me ? myProf : otherProf;
