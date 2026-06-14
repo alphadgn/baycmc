@@ -382,12 +382,53 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
   const bookingRef = useRef<string | null>(bookingHostUserId);
   bookingRef.current = bookingHostUserId;
   useEffect(() => {
+    function beaconDelete(uid: string) {
+      // Fire-and-forget DELETE that survives navigation / tab close. We use
+      // fetch with keepalive (sendBeacon doesn't support DELETE) against the
+      // PostgREST endpoint with the publishable key + user's bearer token.
+      try {
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/karaoke_queue?room_id=eq.${roomId}&user_id=eq.${uid}`;
+        const apikey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+        const session = (supabase.auth as unknown as { storage?: never }).getSession;
+        // Best-effort sync read of the current access token from storage
+        // (avoids an async hop during pagehide).
+        let token: string | null = null;
+        try {
+          const raw = localStorage.getItem(`sb-${import.meta.env.VITE_SUPABASE_PROJECT_ID}-auth-token`);
+          if (raw) token = (JSON.parse(raw)?.access_token as string) ?? null;
+        } catch {
+          /* noop */
+        }
+        void fetch(url, {
+          method: "DELETE",
+          keepalive: true,
+          headers: {
+            apikey,
+            Authorization: `Bearer ${token ?? apikey}`,
+            "Content-Type": "application/json",
+          },
+        });
+        void session;
+      } catch {
+        /* noop */
+      }
+    }
     function cleanupSelf() {
       const uid = userIdRef.current;
       if (!uid) return;
+      // 1. Untrack presence immediately so every other viewer drops us from
+      //    `presentIds` on their next sync — `visibleQueue` filters us out
+      //    of the rendered waitlist within ~1 frame, regardless of whether
+      //    the DB delete has propagated yet.
+      try {
+        void channelRef.current?.untrack();
+      } catch {
+        /* noop */
+      }
+      // 2. Standard supabase delete (works on in-app navigation).
       void supabase.from("karaoke_queue").delete().eq("room_id", roomId).eq("user_id", uid);
-      // If I was the performer, clear the stage so the next person in line
-      // can be promoted automatically by other clients' auto-promote effect.
+      // 3. Keepalive fetch fallback (works on tab close / hard nav).
+      beaconDelete(uid);
       if (!bookingRef.current && performerIdRef.current === uid) {
         void supabase.from("karaoke_sessions").upsert(
           {
@@ -401,14 +442,32 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
         );
       }
     }
+    function onVisibility() {
+      if (document.visibilityState === "hidden") cleanupSelf();
+    }
     window.addEventListener("pagehide", cleanupSelf);
+    window.addEventListener("beforeunload", cleanupSelf);
     window.addEventListener("baycmc:karaoke-cleanup-self", cleanupSelf);
+    document.addEventListener("visibilitychange", onVisibility);
     return () => {
       window.removeEventListener("pagehide", cleanupSelf);
+      window.removeEventListener("beforeunload", cleanupSelf);
       window.removeEventListener("baycmc:karaoke-cleanup-self", cleanupSelf);
+      document.removeEventListener("visibilitychange", onVisibility);
       cleanupSelf();
     };
   }, [roomId]);
+
+  // Sign-out: if the auth user disappears while the stage is still mounted,
+  // drop the row immediately — an unauthenticated viewer fails condition (1).
+  useEffect(() => {
+    if (user?.id) return;
+    try {
+      void channelRef.current?.untrack();
+    } catch {
+      /* noop */
+    }
+  }, [user?.id]);
 
   const performerProfile = effectivePerformerId ? profiles[effectivePerformerId] : null;
   const performerName =
