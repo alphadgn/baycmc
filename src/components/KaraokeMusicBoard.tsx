@@ -347,11 +347,11 @@ export function KaraokeMusicBoard({
           setOpen(true);
         }}
         aria-label="Open music machine"
-        // Centered mid-stage so the pulsing reopen pill is reachable without
-        // overlapping the waiting-list panel (top-left) or the room toolbar
-        // (bottom). Sits roughly halfway between the On Stage card and the
-        // bottom Room Panels strip.
-        className="group fixed left-1/2 top-1/2 z-50 inline-flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-full border border-gold/60 bg-background/80 px-3 py-1.5 text-[11px] font-semibold text-gold shadow-gold backdrop-blur transition hover:bg-gold/10"
+        // Anchored just above the Room Panels toolbar at the bottom of the
+        // screen so it's always reachable without overlapping the stage,
+        // waiting list, or singer banner.
+        style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 8.5rem)" }}
+        className="group fixed left-1/2 z-50 inline-flex -translate-x-1/2 items-center gap-2 rounded-full border border-gold/60 bg-background/80 px-3 py-1.5 text-[11px] font-semibold text-gold shadow-gold backdrop-blur transition hover:bg-gold/10"
       >
         {/* Pulsing rings — pure CSS, no extra deps */}
         <span
