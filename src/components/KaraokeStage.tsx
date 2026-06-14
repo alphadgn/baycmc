@@ -389,12 +389,11 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
       try {
         const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/karaoke_queue?room_id=eq.${roomId}&user_id=eq.${uid}`;
         const apikey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
-        const session = (supabase.auth as unknown as { storage?: never }).getSession;
-        // Best-effort sync read of the current access token from storage
-        // (avoids an async hop during pagehide).
         let token: string | null = null;
         try {
-          const raw = localStorage.getItem(`sb-${import.meta.env.VITE_SUPABASE_PROJECT_ID}-auth-token`);
+          const raw = localStorage.getItem(
+            `sb-${import.meta.env.VITE_SUPABASE_PROJECT_ID}-auth-token`,
+          );
           if (raw) token = (JSON.parse(raw)?.access_token as string) ?? null;
         } catch {
           /* noop */
@@ -408,7 +407,6 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
             "Content-Type": "application/json",
           },
         });
-        void session;
       } catch {
         /* noop */
       }
