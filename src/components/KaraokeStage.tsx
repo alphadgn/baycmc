@@ -141,8 +141,8 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
   // no-ops if the row is already gone, upserts converge on the same state)
   // and we add a tiny per-client jitter to avoid thundering-herd writes.
   useEffect(() => {
-    const GRACE_MS = 15_000;
-    const jitter = Math.floor(Math.random() * 2000);
+    const GRACE_MS = 3_000;
+    const jitter = Math.floor(Math.random() * 500);
     const timer = window.setInterval(() => {
       const now = Date.now();
       const isAbsent = (uid: string) => {
