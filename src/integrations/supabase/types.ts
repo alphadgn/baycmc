@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_merge_decisions: {
+        Row: {
+          decided_at: string
+          decided_by: string
+          decision: string
+          user_a_id: string
+          user_b_id: string
+        }
+        Insert: {
+          decided_at?: string
+          decided_by: string
+          decision: string
+          user_a_id: string
+          user_b_id: string
+        }
+        Update: {
+          decided_at?: string
+          decided_by?: string
+          decision?: string
+          user_a_id?: string
+          user_b_id?: string
+        }
+        Relationships: []
+      }
       ape_ride_locations: {
         Row: {
           host_id: string
