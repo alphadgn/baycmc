@@ -56,7 +56,7 @@ function Index() {
             </h1>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground sm:mt-3 sm:text-xl">
               Yacht Club social network, live audio rooms, conference bookings, and local chapter
-              sub communities — all from proof of ownership by trusted Privy verification.
+              sub communities — all gated by on-chain proof of BAYC / MAYC ownership.
             </p>
             <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
               {isAuthenticated ? (
