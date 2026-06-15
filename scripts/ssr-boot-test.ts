@@ -2,9 +2,15 @@
 /**
  * SSR / Cloudflare Worker boot test.
  *
- * Boots `vite preview` against the production build and asserts that the
- * Worker entry (`src/server.ts` → `@tanstack/react-start/server-entry`)
- * evaluates without throwing at module init.
+ * Boots the production worker bundle under `wrangler dev --local` and
+ * asserts the Worker entry (`src/server.ts` → `@tanstack/react-start/
+ * server-entry`) evaluates without throwing at module init and that the
+ * router dispatches (no h3 swallowed-error envelope on `/`, no 5xx on the
+ * server-route health endpoint).
+ *
+ * We use wrangler — not `vite preview` — because the Cloudflare/Nitro
+ * preset emits `dist/server/index.mjs` (a Worker bundle), not the Node
+ * `dist/server/server.js` entry that `vite preview` would expect.
  *
  * On failure, captures the worker's full stdout/stderr and the boot-error
  * stack trace as plain files at the repo root so the CI workflow can
@@ -14,11 +20,15 @@
  *   - boot-error.log   (the error from this script, including stack)
  */
 import { spawn } from "node:child_process";
-import { writeFileSync, appendFileSync } from "node:fs";
+import { writeFileSync, appendFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
 
 const PORT = Number(process.env.BOOT_PORT ?? 4174);
 const BASE = `http://127.0.0.1:${PORT}`;
-const TIMEOUT_MS = 60_000;
+const TIMEOUT_MS = 180_000;
+const WORKER_DIR = join(process.cwd(), "dist", "server");
+const WORKER_ENTRY = join(WORKER_DIR, "index.mjs");
+const WRANGLER_CONFIG = join(WORKER_DIR, "wrangler.json");
 
 const STDOUT_LOG = "worker-stdout.log";
 const STDERR_LOG = "worker-stderr.log";
@@ -29,38 +39,59 @@ writeFileSync(STDOUT_LOG, "");
 writeFileSync(STDERR_LOG, "");
 writeFileSync(ERROR_LOG, "");
 
-const child = spawn("bunx", ["vite", "preview", "--port", String(PORT), "--strictPort"], {
-  stdio: ["ignore", "pipe", "pipe"],
-  env: { ...process.env, NODE_ENV: "production" },
-});
+if (!existsSync(WORKER_ENTRY) || !existsSync(WRANGLER_CONFIG)) {
+  const msg = `[ssr-boot-test] missing worker build output (${WORKER_ENTRY}). Run \`bun run build\` first.`;
+  console.error(msg);
+  appendFileSync(ERROR_LOG, msg + "\n");
+  process.exit(1);
+}
 
-let serverReady = false;
+const child = spawn(
+  "bunx",
+  [
+    "wrangler",
+    "dev",
+    "--local",
+    "--config",
+    WRANGLER_CONFIG,
+    "--port",
+    String(PORT),
+    "--ip",
+    "127.0.0.1",
+    "--log-level",
+    "warn",
+  ],
+  {
+    stdio: ["ignore", "pipe", "pipe"],
+    env: { ...process.env, NODE_ENV: "production", CI: "1" },
+  },
+);
+
 child.stdout.on("data", (d) => {
   const s = d.toString();
-  process.stdout.write(`[preview] ${s}`);
+  process.stdout.write(`[wrangler] ${s}`);
   appendFileSync(STDOUT_LOG, s);
-  if (/Local:\s+http/.test(s)) serverReady = true;
 });
 child.stderr.on("data", (d) => {
   const s = d.toString();
-  process.stderr.write(`[preview!] ${s}`);
+  process.stderr.write(`[wrangler!] ${s}`);
   appendFileSync(STDERR_LOG, s);
 });
 
 async function waitReady() {
   const deadline = Date.now() + TIMEOUT_MS;
+  let lastErr: unknown;
   while (Date.now() < deadline) {
-    if (serverReady) {
-      try {
-        const r = await fetch(`${BASE}/api/public/health`);
-        if (r.status < 500) return;
-      } catch {
-        /* keep polling */
-      }
+    try {
+      const r = await fetch(`${BASE}/api/public/health`, { signal: AbortSignal.timeout(2_000) });
+      if (r.status < 500) return;
+      lastErr = `health → ${r.status}`;
+    } catch (e) {
+      lastErr = e;
     }
-    await new Promise((r) => setTimeout(r, 500));
+    await new Promise((r) => setTimeout(r, 750));
   }
-  throw new Error("preview server did not become ready in time");
+  throw new Error(`wrangler worker did not become ready in time (last: ${String(lastErr)})`);
 }
 
 async function main() {
