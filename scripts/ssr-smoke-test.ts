@@ -12,7 +12,7 @@
  * vite preview here.
  */
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
 const PORT = Number(process.env.SMOKE_PORT ?? 4173);
@@ -22,6 +22,7 @@ const TIMEOUT_MS = 180_000;
 const WORKER_DIR = join(process.cwd(), "dist", "server");
 const WORKER_ENTRY = join(WORKER_DIR, "index.mjs");
 const WRANGLER_CONFIG = join(WORKER_DIR, "wrangler.json");
+const DEV_VARS = join(WORKER_DIR, ".dev.vars");
 
 if (!existsSync(WORKER_ENTRY) || !existsSync(WRANGLER_CONFIG)) {
   console.error(
@@ -29,6 +30,27 @@ if (!existsSync(WORKER_ENTRY) || !existsSync(WRANGLER_CONFIG)) {
   );
   process.exit(1);
 }
+
+// Inject runtime env into the worker via `.dev.vars` so server routes that
+// assert on `process.env.SUPABASE_URL` etc. (e.g. /api/public/health) see
+// the same values they would in production. Only forward server-safe vars.
+const FORWARD_VARS = [
+  "SUPABASE_URL",
+  "SUPABASE_PUBLISHABLE_KEY",
+  "SUPABASE_SERVICE_ROLE_KEY",
+  "SUPABASE_PROJECT_ID",
+  "LIVEKIT_URL",
+  "LIVEKIT_API_KEY",
+  "LIVEKIT_API_SECRET",
+  "ETH_RPC_URL",
+  "GIPHY_API_KEY",
+  "LOVABLE_API_KEY",
+] as const;
+const devVarLines = FORWARD_VARS.filter((k) => typeof process.env[k] === "string" && process.env[k]!.length > 0).map(
+  (k) => `${k}=${JSON.stringify(process.env[k])}`,
+);
+writeFileSync(DEV_VARS, devVarLines.join("\n") + "\n");
+
 
 const child = spawn(
   "bunx",
