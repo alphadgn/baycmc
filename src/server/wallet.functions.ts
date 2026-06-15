@@ -528,9 +528,31 @@ export const verifyOwnership = createServerFn({ method: "POST" })
       if (updateErr) throw updateErr;
     }
 
-    await supabaseAdmin
+    // Build the canonical set of wallet addresses associated with this account:
+    // the signing wallet + every Glyph-linked wallet + any delegate.cash vault
+    // that delegated ape ownership to it. Used for account-merge collision
+    // detection so a duplicate account that shares ANY of these wallets is
+    // surfaced — not just the primary signer.
+    const allLinked = new Set<string>();
+    allLinked.add(lower);
+    for (const a of linkedAddrs) allLinked.add(a.toLowerCase());
+    if (delegatedFrom) allLinked.add(delegatedFrom.toLowerCase());
+    const { data: existingProf } = await supabaseAdmin
       .from("profiles")
-      .upsert({ id: userId, wallet_address: lower }, { onConflict: "id" });
+      .select("linked_wallets")
+      .eq("id", userId)
+      .maybeSingle();
+    for (const w of (existingProf?.linked_wallets as string[] | null) ?? []) {
+      if (w) allLinked.add(w.toLowerCase());
+    }
+    await supabaseAdmin.from("profiles").upsert(
+      {
+        id: userId,
+        wallet_address: lower,
+        linked_wallets: Array.from(allLinked),
+      },
+      { onConflict: "id" },
+    );
 
     await supabaseAdmin.from("user_verifications").upsert(
       {
