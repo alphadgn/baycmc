@@ -74,12 +74,13 @@ function Index() {
                   Main Entrance
                 </Link>
               )}
-              <a
-                href="#features"
+              <Link
+                to="/verify"
                 className="rounded-md border border-border bg-secondary/30 px-3 py-1.5 text-sm font-medium hover:bg-secondary"
               >
-                What's inside
-              </a>
+                How verification works
+              </Link>
+
             </div>
           </div>
 
