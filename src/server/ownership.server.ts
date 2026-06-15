@@ -131,9 +131,11 @@ export interface OwnershipSnapshot {
   collection: "BAYC" | "MAYC" | null;
   delegationVerified: boolean;
   delegationVault: string | null;
+  linkedHolder: string | null;
   otherpageVerified: boolean;
   reason: string | null;
 }
+
 
 /**
  * Recompute and persist ownership for a Supabase user. Always returns the
