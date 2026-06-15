@@ -46,6 +46,28 @@ if (!existsSync(WORKER_ENTRY) || !existsSync(WRANGLER_CONFIG)) {
   process.exit(1);
 }
 
+// Inject runtime env into the worker via `.dev.vars` so server routes that
+// assert on `process.env.X` (e.g. /api/public/health) see the same values
+// they would in production. Only forwards server-safe vars.
+const DEV_VARS = join(WORKER_DIR, ".dev.vars");
+const FORWARD_VARS = [
+  "SUPABASE_URL",
+  "SUPABASE_PUBLISHABLE_KEY",
+  "SUPABASE_SERVICE_ROLE_KEY",
+  "SUPABASE_PROJECT_ID",
+  "LIVEKIT_URL",
+  "LIVEKIT_API_KEY",
+  "LIVEKIT_API_SECRET",
+  "ETH_RPC_URL",
+  "GIPHY_API_KEY",
+  "LOVABLE_API_KEY",
+] as const;
+const devVarLines = FORWARD_VARS.filter(
+  (k) => typeof process.env[k] === "string" && process.env[k]!.length > 0,
+).map((k) => `${k}=${JSON.stringify(process.env[k])}`);
+writeFileSync(DEV_VARS, devVarLines.join("\n") + "\n");
+
+
 const child = spawn(
   "bunx",
   [
