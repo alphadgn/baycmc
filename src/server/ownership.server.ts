@@ -131,9 +131,11 @@ export interface OwnershipSnapshot {
   collection: "BAYC" | "MAYC" | null;
   delegationVerified: boolean;
   delegationVault: string | null;
+  linkedHolder: string | null;
   otherpageVerified: boolean;
   reason: string | null;
 }
+
 
 /**
  * Recompute and persist ownership for a Supabase user. Always returns the
@@ -156,10 +158,12 @@ export async function recomputeOwnership(userId: string): Promise<OwnershipSnaps
       collection: null,
       delegationVerified: false,
       delegationVault: null,
+      linkedHolder: null,
       otherpageVerified: false,
       reason: "no-wallet-on-profile",
     };
   }
+
 
   const wallet = getAddress(walletRaw) as `0x${string}`;
   const c = publicClient();
@@ -184,6 +188,7 @@ export async function recomputeOwnership(userId: string): Promise<OwnershipSnaps
   let totalMayc = signer.mayc;
   let delegatedFrom: `0x${string}` | null = null;
   let basisDelegated = false;
+  let linkedHolder: `0x${string}` | null = null;
 
   if (totalBayc === 0n && totalMayc === 0n && vaults.length > 0) {
     for (const v of vaults) {
@@ -201,6 +206,68 @@ export async function recomputeOwnership(userId: string): Promise<OwnershipSnaps
       }
     }
   }
+
+  // Walk user-attested linked wallets (and each one's delegate.cash vaults).
+  // Only consider rows the user has cryptographically proved control of
+  // (`verified_at IS NOT NULL`).
+  if (totalBayc === 0n && totalMayc === 0n) {
+    const { data: links } = await supabaseAdmin
+      .from("linked_wallets")
+      .select("address")
+      .eq("user_id", userId)
+      .not("verified_at", "is", null);
+    const seen = new Set<string>([wallet.toLowerCase()]);
+    for (const v of vaults) seen.add(v.toLowerCase());
+    for (const row of links ?? []) {
+      const raw = row.address;
+      if (!raw || !isAddress(raw)) continue;
+      const linked = getAddress(raw) as `0x${string}`;
+      const key = linked.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      try {
+        const b = await balancesFor(c, linked);
+        if (b.bayc > 0n || b.mayc > 0n) {
+          totalBayc += b.bayc;
+          totalMayc += b.mayc;
+          linkedHolder = linked;
+          break;
+        }
+        const linkedVaults = await resolveDelegatedVaults(c, linked).catch(
+          () => [] as `0x${string}`[],
+        );
+        let foundInVault = false;
+        for (const lv of linkedVaults) {
+          if (seen.has(lv.toLowerCase())) continue;
+          seen.add(lv.toLowerCase());
+          try {
+            const vb = await balancesFor(c, lv);
+            if (vb.bayc > 0n || vb.mayc > 0n) {
+              totalBayc += vb.bayc;
+              totalMayc += vb.mayc;
+              linkedHolder = linked;
+              delegatedFrom = lv;
+              basisDelegated = true;
+              foundInVault = true;
+              break;
+            }
+          } catch (e) {
+            console.error("recompute: linked-vault balanceOf failed", lv, e);
+          }
+        }
+        if (foundInVault) break;
+      } catch (e) {
+        console.error("recompute: linked-wallet balanceOf failed", linked, e);
+      }
+    }
+    if (links && links.length > 0) {
+      await supabaseAdmin
+        .from("linked_wallets")
+        .update({ last_checked_at: new Date().toISOString() })
+        .eq("user_id", userId);
+    }
+  }
+
 
   const holds = totalBayc > 0n || totalMayc > 0n;
   const collection: "BAYC" | "MAYC" | null = holds ? (totalBayc > 0n ? "BAYC" : "MAYC") : null;
@@ -251,7 +318,9 @@ export async function recomputeOwnership(userId: string): Promise<OwnershipSnaps
     collection,
     delegationVerified: basisDelegated,
     delegationVault: delegatedFrom,
+    linkedHolder,
     otherpageVerified,
+
     reason: holds
       ? null
       : confirmedZero

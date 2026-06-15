@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as VerifyRouteImport } from './routes/verify'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DiagnosticsRouteImport } from './routes/diagnostics'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
@@ -41,6 +42,11 @@ import { Route as AuthenticatedVerifiedApeRidesRouteImport } from './routes/_aut
 import { Route as AuthenticatedVerifiedRoomsRoomIdRouteImport } from './routes/_authenticated/_verified/rooms_.$roomId'
 import { Route as AuthenticatedVerifiedApeRidesRideIdRouteImport } from './routes/_authenticated/_verified/ape-rides.$rideId'
 
+const VerifyRoute = VerifyRouteImport.update({
+  id: '/verify',
+  path: '/verify',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -213,6 +219,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/diagnostics': typeof DiagnosticsRoute
   '/login': typeof LoginRoute
+  '/verify': typeof VerifyRoute
   '/account-merge': typeof AuthenticatedAccountMergeRoute
   '/activity': typeof AuthenticatedActivityRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
@@ -244,6 +251,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/diagnostics': typeof DiagnosticsRoute
   '/login': typeof LoginRoute
+  '/verify': typeof VerifyRoute
   '/account-merge': typeof AuthenticatedAccountMergeRoute
   '/activity': typeof AuthenticatedActivityRoute
   '/karaoke': typeof AuthenticatedKaraokeRouteWithChildren
@@ -275,6 +283,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/diagnostics': typeof DiagnosticsRoute
   '/login': typeof LoginRoute
+  '/verify': typeof VerifyRoute
   '/_authenticated/_verified': typeof AuthenticatedVerifiedRouteWithChildren
   '/_authenticated/account-merge': typeof AuthenticatedAccountMergeRoute
   '/_authenticated/activity': typeof AuthenticatedActivityRoute
@@ -309,6 +318,7 @@ export interface FileRouteTypes {
     | '/'
     | '/diagnostics'
     | '/login'
+    | '/verify'
     | '/account-merge'
     | '/activity'
     | '/admin'
@@ -340,6 +350,7 @@ export interface FileRouteTypes {
     | '/'
     | '/diagnostics'
     | '/login'
+    | '/verify'
     | '/account-merge'
     | '/activity'
     | '/karaoke'
@@ -370,6 +381,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/diagnostics'
     | '/login'
+    | '/verify'
     | '/_authenticated/_verified'
     | '/_authenticated/account-merge'
     | '/_authenticated/activity'
@@ -404,11 +416,19 @@ export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   DiagnosticsRoute: typeof DiagnosticsRoute
   LoginRoute: typeof LoginRoute
+  VerifyRoute: typeof VerifyRoute
   ApiPublicHealthRoute: typeof ApiPublicHealthRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/verify': {
+      id: '/verify'
+      path: '/verify'
+      fullPath: '/verify'
+      preLoaderRoute: typeof VerifyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -748,18 +768,9 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   DiagnosticsRoute: DiagnosticsRoute,
   LoginRoute: LoginRoute,
+  VerifyRoute: VerifyRoute,
   ApiPublicHealthRoute: ApiPublicHealthRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
