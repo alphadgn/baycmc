@@ -89,10 +89,11 @@ export function LinkedWalletsPanel() {
       // must have switched the active account in the wallet extension to
       // match `target` — we do NOT trust eth_accounts since the linked
       // wallet is by definition distinct from the BAYCMC sign-in wallet.
-      const signature = (await window.ethereum.request({
+      const signature = (await provider.request({
         method: "personal_sign",
         params: [message, target],
       })) as string;
+
       const res = await verify({
         data: { address: target, nonce, signature, label: label.trim() || undefined },
       });
