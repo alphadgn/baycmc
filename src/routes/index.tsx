@@ -114,7 +114,7 @@ function Index() {
               {
                 n: "01",
                 t: "Sign in",
-                d: "Connect any wallet or email through Privy. You're instantly inside the lobby — no waiting, no extra app.",
+                d: "Connect your wallet through Glyph — or use email if you're not a holder. You're inside the lobby instantly, no extra app.",
               },
               {
                 n: "02",
