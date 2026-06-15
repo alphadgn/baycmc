@@ -158,10 +158,12 @@ export async function recomputeOwnership(userId: string): Promise<OwnershipSnaps
       collection: null,
       delegationVerified: false,
       delegationVault: null,
+      linkedHolder: null,
       otherpageVerified: false,
       reason: "no-wallet-on-profile",
     };
   }
+
 
   const wallet = getAddress(walletRaw) as `0x${string}`;
   const c = publicClient();
