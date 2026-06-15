@@ -60,10 +60,14 @@ export const findAccountCollision = createServerFn({ method: "POST" })
     const myEmail = myAuth?.user?.email?.toLowerCase() ?? null;
     const { data: myProf } = await admin
       .from("profiles")
-      .select("id,username,avatar_url,wallet_address,bio,created_at")
+      .select("id,username,avatar_url,wallet_address,bio,created_at,linked_wallets")
       .eq("id", me)
       .maybeSingle();
-    const myWallet = (myProf?.wallet_address ?? "").toLowerCase() || null;
+    const myWallets = new Set<string>();
+    if (myProf?.wallet_address) myWallets.add(myProf.wallet_address.toLowerCase());
+    for (const w of ((myProf?.linked_wallets as string[] | null) ?? [])) {
+      if (w) myWallets.add(w.toLowerCase());
+    }
 
     // 1. Email collision — paginate auth list, filter manually (admin API
     //    has no email-exact filter for non-primary entries).
@@ -81,13 +85,17 @@ export const findAccountCollision = createServerFn({ method: "POST" })
       }
     }
 
-    // 2. Wallet collision — same wallet on another profile.
-    if (!otherId && myWallet) {
+    // 2. Wallet collision — any of my linked wallets appears on another
+    //    profile's primary wallet OR linked_wallets list.
+    if (!otherId && myWallets.size > 0) {
+      const walletArr = Array.from(myWallets);
       const { data: walletDupes } = await admin
         .from("profiles")
-        .select("id")
-        .ilike("wallet_address", myWallet)
+        .select("id,wallet_address,linked_wallets")
         .neq("id", me)
+        .or(
+          `wallet_address.in.(${walletArr.map((w) => `"${w}"`).join(",")}),linked_wallets.ov.{${walletArr.join(",")}}`,
+        )
         .limit(1);
       if (walletDupes && walletDupes.length > 0) {
         otherId = walletDupes[0].id as string;
