@@ -121,7 +121,6 @@ export function LobbyAttendeeHero() {
         className="pointer-events-none absolute inset-0 opacity-30 [background:radial-gradient(circle_at_50%_0%,hsl(var(--gold)/0.4),transparent_60%)]"
       />
 
-
       <div className="relative z-10 flex h-full w-full flex-col items-center justify-between px-4 py-3">
         {/* Self avatar — top center, prominent */}
         <div className="flex flex-col items-center gap-1">

@@ -64,9 +64,7 @@ describe.runIf(process.env.SKIP_LIVE_RPC !== "1")(
 
       const client = createPublicClient({
         chain: mainnet,
-        transport: fallback(
-          RPC_URLS.map((u) => http(u, { timeout: 8_000, retryCount: 1 })),
-        ),
+        transport: fallback(RPC_URLS.map((u) => http(u, { timeout: 8_000, retryCount: 1 }))),
       });
 
       // 1) Fetch the real owner of BAYC #2931 directly from the contract.

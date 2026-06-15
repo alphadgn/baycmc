@@ -288,7 +288,6 @@ export function GlyphBridge({
   const addressRef = useRef(address);
   addressRef.current = address;
 
-
   // signMessage/verifyFn/logout are new refs every render — store them in
   // refs so we call the latest version inside the effect without putting them
   // in the dep array (which would re-fire the effect on every render and

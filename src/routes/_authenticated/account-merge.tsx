@@ -131,12 +131,10 @@ function AccountMergePage() {
 
         {step === "pickSurvivor" && (
           <div className="mt-6 space-y-4">
-            <h2 className="font-display text-lg text-gold">
-              Which account should survive?
-            </h2>
+            <h2 className="font-display text-lg text-gold">Which account should survive?</h2>
             <p className="text-xs text-muted-foreground">
-              All content, wallets, and verifications from the other account will be moved to
-              the survivor. The other account is permanently deleted.
+              All content, wallets, and verifications from the other account will be moved to the
+              survivor. The other account is permanently deleted.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <AccountCard
@@ -208,8 +206,7 @@ function AccountMergePage() {
               onChange={(v) => setKeep((k) => ({ ...k, bio: v }))}
             />
             <p className="text-[11px] text-muted-foreground">
-              All wallet addresses from both accounts will be merged onto the surviving
-              account.
+              All wallet addresses from both accounts will be merged onto the surviving account.
             </p>
             <div className="flex justify-between gap-2">
               <button
@@ -234,8 +231,8 @@ function AccountMergePage() {
           <div className="mt-6 space-y-4">
             <h2 className="font-display text-lg text-gold">Confirm merge</h2>
             <p className="text-sm">
-              You're about to <strong className="text-foreground">permanently delete</strong>{" "}
-              the {survivor === "mine" ? "other" : "current"} account. This cannot be undone.
+              You're about to <strong className="text-foreground">permanently delete</strong> the{" "}
+              {survivor === "mine" ? "other" : "current"} account. This cannot be undone.
             </p>
             <div className="flex justify-between gap-2">
               <button
@@ -317,7 +314,8 @@ function FieldPicker<T extends string | null>({
   onChange: (v: "mine" | "other") => void;
   renderValue?: (v: T) => React.ReactNode;
 }) {
-  const render = renderValue ?? ((v: T) => v ?? <span className="text-xs text-muted-foreground">(empty)</span>);
+  const render =
+    renderValue ?? ((v: T) => v ?? <span className="text-xs text-muted-foreground">(empty)</span>);
   return (
     <div>
       <div className="text-xs font-semibold text-foreground">{label}</div>

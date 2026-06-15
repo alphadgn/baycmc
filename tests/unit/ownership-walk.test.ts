@@ -123,8 +123,7 @@ describe("walkOwnership – verification of BAYC/MAYC holdings", () => {
   });
 
   it("ignores delegations with custom rights (entry requires the no-rights default)", async () => {
-    const SCOPED_RIGHTS =
-      "0x736f6d655f7363696665645f72696768745f737472696e670000000000000000";
+    const SCOPED_RIGHTS = "0x736f6d655f7363696665645f72696768745f737472696e670000000000000000";
     const { client } = makeClient({
       ...bal(SIGNER, 0n, 0n),
       ...delegations(SIGNER, [
