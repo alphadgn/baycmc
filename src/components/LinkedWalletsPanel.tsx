@@ -18,13 +18,14 @@ interface LinkedWalletRow {
   created_at: string;
 }
 
-declare global {
-  interface Window {
-    ethereum?: {
-      request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
-    };
-  }
+interface InjectedProvider {
+  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
 }
+function getInjectedProvider(): InjectedProvider | null {
+  const w = window as unknown as { ethereum?: InjectedProvider };
+  return w.ethereum ?? null;
+}
+
 
 /**
  * UI for managing additional wallets linked to the user's account.
