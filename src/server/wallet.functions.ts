@@ -479,7 +479,6 @@ export const verifyOwnership = createServerFn({ method: "POST" })
       }
     }
 
-
     const verificationBasis: "direct" | "delegated" | "linked" = delegatedFrom
       ? "delegated"
       : linkedHolder
@@ -491,7 +490,6 @@ export const verifyOwnership = createServerFn({ method: "POST" })
     const delegationDetailsUrl = delegatedFrom
       ? `https://delegate.cash/registry?delegate=${linkedHolder ?? wallet}&vault=${delegatedFrom}`
       : null;
-
 
     // 3) Mint / fetch Supabase user. Every successful signature gets a
     //    session — gated areas are still protected by RLS via the

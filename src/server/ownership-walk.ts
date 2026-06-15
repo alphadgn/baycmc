@@ -25,9 +25,7 @@ import { DELEGATE_REGISTRY_V2 } from "@/lib/web3/constants";
 export const BAYC = "0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D" as const;
 export const MAYC = "0x60E4d786628Fea6478F785A6d7e704777c86a7c6" as const;
 
-export const erc721Abi = parseAbi([
-  "function balanceOf(address owner) view returns (uint256)",
-]);
+export const erc721Abi = parseAbi(["function balanceOf(address owner) view returns (uint256)"]);
 
 export const delegateRegistryAbi = parseAbi([
   "struct Delegation { uint8 type_; address to; address from; bytes32 rights; address contract_; uint256 tokenId; uint256 amount; }",
@@ -79,10 +77,7 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
  */
 export type OwnershipClient = Pick<PublicClient, "readContract">;
 
-export async function balancesFor(
-  c: OwnershipClient,
-  owner: `0x${string}`,
-): Promise<BalancePair> {
+export async function balancesFor(c: OwnershipClient, owner: `0x${string}`): Promise<BalancePair> {
   const now = Date.now();
   const key = `1:${owner.toLowerCase()}:bayc-mayc`;
   const hit = balanceCache.get(key);
@@ -232,9 +227,7 @@ export async function walkOwnership(c: OwnershipClient, input: WalkInput): Promi
   }
 
   // delegate.cash vaults that delegated to the signer.
-  const vaults = await resolveDelegatedVaults(c, input.signer).catch(
-    () => [] as `0x${string}`[],
-  );
+  const vaults = await resolveDelegatedVaults(c, input.signer).catch(() => [] as `0x${string}`[]);
 
   for (const v of vaults) {
     try {

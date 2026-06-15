@@ -65,7 +65,7 @@ export const findAccountCollision = createServerFn({ method: "POST" })
       .maybeSingle();
     const myWallets = new Set<string>();
     if (myProf?.wallet_address) myWallets.add(myProf.wallet_address.toLowerCase());
-    for (const w of ((myProf?.linked_wallets as string[] | null) ?? [])) {
+    for (const w of (myProf?.linked_wallets as string[] | null) ?? []) {
       if (w) myWallets.add(w.toLowerCase());
     }
 
@@ -253,11 +253,13 @@ export const mergeAccounts = createServerFn({ method: "POST" })
     ];
     for (const { table, column } of reassignTables) {
       // Dynamic table name — typed Supabase client can't narrow this; cast.
-      const { error } = await (admin.from(table as never) as unknown as {
-        update: (v: Record<string, string>) => {
-          eq: (c: string, v: string) => Promise<{ error: { message: string } | null }>;
-        };
-      })
+      const { error } = await (
+        admin.from(table as never) as unknown as {
+          update: (v: Record<string, string>) => {
+            eq: (c: string, v: string) => Promise<{ error: { message: string } | null }>;
+          };
+        }
+      )
         .update({ [column]: survivor })
         .eq(column, removed);
       if (error) console.warn("[mergeAccounts] reassign", table, column, error.message);
@@ -302,10 +304,7 @@ export const mergeAccounts = createServerFn({ method: "POST" })
       .eq("user_id", survivor)
       .maybeSingle();
     if (!survVer) {
-      await admin
-        .from("user_verifications")
-        .update({ user_id: survivor })
-        .eq("user_id", removed);
+      await admin.from("user_verifications").update({ user_id: survivor }).eq("user_id", removed);
     }
 
     // 4. Record decision (canonical pair).

@@ -62,7 +62,6 @@ jobs:
         env:
           BOOT_PORT: "4174"
 
-
       - name: Upload build artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -77,4 +76,3 @@ jobs:
             .output/**
           if-no-files-found: ignore
           retention-days: 7
-

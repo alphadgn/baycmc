@@ -295,14 +295,6 @@ export function MessageThread({
     void send({ gifUrl: gif.url });
   }
 
-  if (denied) {
-    return (
-      <div className="glass rounded-2xl p-8 text-center text-sm text-muted-foreground">
-        You don't have access to this thread.
-      </div>
-    );
-  }
-
   // Effective attachments shown in the edit dock (new pending > kept existing).
   const editShownImageUrl = pendingImagePreview ?? editingImageUrl;
   const editShownGifUrl = pendingGifUrl ?? editingGifUrl;
@@ -311,6 +303,7 @@ export function MessageThread({
   //  - "@username" → only messages from users whose username/wallet matches
   //  - "#tag"      → only messages whose body contains that hashtag
   //  - plain text  → matches body OR author name (case-insensitive)
+  // NOTE: This hook MUST run on every render — keep it above any early return.
   const filteredMessages = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return messages;
@@ -327,6 +320,14 @@ export function MessageThread({
       return body.includes(needle) || name.includes(needle);
     });
   }, [messages, profiles, query]);
+
+  if (denied) {
+    return (
+      <div className="glass rounded-2xl p-8 text-center text-sm text-muted-foreground">
+        You don't have access to this thread.
+      </div>
+    );
+  }
 
   return (
     <div className="glass relative flex h-[70vh] flex-col overflow-hidden rounded-2xl shadow-card">
