@@ -318,7 +318,9 @@ export async function recomputeOwnership(userId: string): Promise<OwnershipSnaps
     collection,
     delegationVerified: basisDelegated,
     delegationVault: delegatedFrom,
+    linkedHolder,
     otherpageVerified,
+
     reason: holds
       ? null
       : confirmedZero
