@@ -463,6 +463,36 @@ export type Database = {
         }
         Relationships: []
       }
+      linked_wallets: {
+        Row: {
+          address: string
+          created_at: string
+          id: string
+          label: string | null
+          last_checked_at: string | null
+          user_id: string
+          verified_at: string | null
+        }
+        Insert: {
+          address: string
+          created_at?: string
+          id?: string
+          label?: string | null
+          last_checked_at?: string | null
+          user_id: string
+          verified_at?: string | null
+        }
+        Update: {
+          address?: string
+          created_at?: string
+          id?: string
+          label?: string | null
+          last_checked_at?: string | null
+          user_id?: string
+          verified_at?: string | null
+        }
+        Relationships: []
+      }
       lobby_message_reactions: {
         Row: {
           created_at: string
