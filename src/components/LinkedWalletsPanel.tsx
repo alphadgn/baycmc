@@ -73,7 +73,9 @@ export function LinkedWalletsPanel() {
       setErr("Enter a valid Ethereum address (0x…40 hex chars)");
       return;
     }
-    if (!window.ethereum) {
+    const provider = getInjectedProvider();
+    if (!provider) {
+
       setErr(
         "No browser wallet detected. Open this page in a browser with MetaMask, Rainbow, or another EIP-1193 wallet to sign the link challenge.",
       );
