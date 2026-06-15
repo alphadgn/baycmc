@@ -112,6 +112,11 @@ async function main() {
     console.log("\n[ssr-smoke-test] all routes healthy");
   } finally {
     child.kill("SIGTERM");
+    try {
+      rmSync(DEV_VARS, { force: true });
+    } catch {
+      /* best effort */
+    }
   }
 }
 
