@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { createPublicClient, http, getAddress, parseAbi } from "viem";
+import { createPublicClient, http, fallback, getAddress, parseAbi } from "viem";
 import { mainnet } from "viem/chains";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { BAYC_CONTRACT, DELEGATE_REGISTRY_V2 } from "@/lib/web3/constants";
