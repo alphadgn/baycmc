@@ -25,7 +25,7 @@ import {
   X,
 } from "lucide-react";
 import { signOut, useAuth } from "@/lib/auth/useAuth";
-import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
+import { useAuthGate } from "@/state/authGate";
 import { useRoomPreferences } from "@/lib/baycmc/useRoomPreferences";
 import { useNotificationPrefs } from "@/lib/baycmc/useNotificationPrefs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -247,7 +247,10 @@ function Sidebar({
   const location = useLocation();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
-  const { isVerifiedHolder, isLifer, isAdmin } = useVerificationStatus();
+  const gate = useAuthGate();
+  const isVerifiedHolder = gate.ownsRequiredAsset;
+  const isLifer = gate.showLifers;
+  const isAdmin = gate.isAdmin;
 
   async function handleSignOut() {
     await signOut();

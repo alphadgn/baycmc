@@ -186,5 +186,34 @@ describe("resolveDelegations (incoming + outgoing walk)", () => {
     });
     const r = await resolveDelegations(client, SIGNER);
     expect(r.incomingVaults).toEqual([]);
+});
+
+describe("ownership lifecycle (scenarios 9 + 10)", () => {
+  let block = 2_000_000n;
+  const next = () => ++block;
+
+  it("9. Ownership removed → access revoked on next scan", async () => {
+    let owns = true;
+    const c = mockClient(({ args }) =>
+      (args![0] as string).toLowerCase() === SIGNER.toLowerCase() && owns ? 1n : 0n,
+    );
+    const first = await scanCollections(c, [SIGNER], REQUIRED_COLLECTIONS, next());
+    expect(first.length).toBeGreaterThan(0);
+    owns = false;
+    const second = await scanCollections(c, [SIGNER], REQUIRED_COLLECTIONS, next());
+    expect(second).toEqual([]);
   });
+
+  it("10. Cache invalidation (new block) re-queries RPC", async () => {
+    let rpcCalls = 0;
+    const c = mockClient(({ args }) => {
+      rpcCalls++;
+      return (args![0] as string).toLowerCase() === SIGNER.toLowerCase() ? 1n : 0n;
+    });
+    await scanCollections(c, [SIGNER], REQUIRED_COLLECTIONS, next());
+    const cached = rpcCalls;
+    await scanCollections(c, [SIGNER], REQUIRED_COLLECTIONS, next()); // new block ⇒ cache miss
+    expect(rpcCalls).toBeGreaterThan(cached);
+  });
+});
 });

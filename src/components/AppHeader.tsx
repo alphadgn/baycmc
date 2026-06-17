@@ -3,6 +3,7 @@ import { useEffect, useState, type MouseEvent } from "react";
 import { ArrowLeft, Loader2, Menu, X } from "lucide-react";
 import { useAuth } from "@/lib/auth/useAuth";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
+import { useAuthGate } from "@/state/authGate";
 import { useGlyphAuthState } from "@/lib/auth/useGlyphBridge";
 import { useGlyphReady } from "@/components/GlyphAppProvider";
 import { supabase } from "@/integrations/supabase/client";
@@ -67,7 +68,9 @@ let internalNavCount = 0;
 
 export function AppHeader() {
   const { isAuthenticated, user } = useAuth();
-  const { isVerifiedHolder, isLifer } = useVerificationStatus();
+  const gate = useAuthGate();
+  const isVerifiedHolder = gate.ownsRequiredAsset;
+  const isLifer = gate.showLifers;
   const [entranceOpen, setEntranceOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
