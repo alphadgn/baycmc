@@ -3,6 +3,7 @@ import { useEffect, useState, type MouseEvent } from "react";
 import { ArrowLeft, Loader2, Menu, X } from "lucide-react";
 import { useAuth } from "@/lib/auth/useAuth";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
+import { useAuthGate } from "@/state/authGate";
 import { useGlyphAuthState } from "@/lib/auth/useGlyphBridge";
 import { useGlyphReady } from "@/components/GlyphAppProvider";
 import { supabase } from "@/integrations/supabase/client";
