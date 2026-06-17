@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,18 +10,26 @@ import { findAccountCollision } from "@/server/account-merge.functions";
  * the user to /account-merge before they can reach the app. The collision
  * server fn returns null once a permanent decision has been recorded for
  * the pair, so this is a one-shot prompt.
+ *
+ * `useServerFn` returns a NEW function reference on every render. Keeping it
+ * in the effect dependency array tore down and re-armed the auth listener on
+ * every parent render, which on iOS Safari produced a flood of
+ * `findAccountCollision` RPCs surfacing as `TypeError: Load failed`. We stash
+ * it in a ref so the effect runs exactly once per mount.
  */
 export function AccountMergeWatcher() {
   const router = useRouter();
   const findFn = useServerFn(findAccountCollision);
+  const findFnRef = useRef(findFn);
+  findFnRef.current = findFn;
   const checkedForUserRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    async function check(userId: string) {
+  const check = useCallback(
+    async (userId: string) => {
       if (checkedForUserRef.current === userId) return;
       checkedForUserRef.current = userId;
       try {
-        const collision = await findFn();
+        const collision = await findFnRef.current();
         if (!collision) return;
         const path = router.state.location.pathname;
         if (path === "/account-merge") return;
@@ -29,8 +37,11 @@ export function AccountMergeWatcher() {
       } catch (e) {
         console.warn("[AccountMergeWatcher]", e);
       }
-    }
+    },
+    [router],
+  );
 
+  useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => {
       if (data.session?.user?.id) void check(data.session.user.id);
     });
@@ -45,7 +56,7 @@ export function AccountMergeWatcher() {
       }
     });
     return () => sub.subscription.unsubscribe();
-  }, [router, findFn]);
+  }, [check]);
 
   return null;
 }
