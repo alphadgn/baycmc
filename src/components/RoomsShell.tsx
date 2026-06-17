@@ -25,7 +25,7 @@ import {
   X,
 } from "lucide-react";
 import { signOut, useAuth } from "@/lib/auth/useAuth";
-import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
+import { useAuthGate } from "@/state/authGate";
 import { useRoomPreferences } from "@/lib/baycmc/useRoomPreferences";
 import { useNotificationPrefs } from "@/lib/baycmc/useNotificationPrefs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
