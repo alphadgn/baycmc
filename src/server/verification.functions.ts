@@ -43,13 +43,22 @@ export const getOwnershipGraph = createServerFn({ method: "GET" })
  */
 
 function client() {
-  const url = process.env.ETH_RPC_URL;
-  if (!url) {
-    throw new Error("Ethereum RPC is not configured.");
+  const configured = process.env.ETH_RPC_URL?.trim();
+  if (!configured) {
+    console.warn("[verification] ETH_RPC_URL not set — using public RPC fallbacks");
   }
+  const urls = [
+    configured,
+    "https://eth.llamarpc.com",
+    "https://ethereum-rpc.publicnode.com",
+    "https://rpc.ankr.com/eth",
+  ].filter((u): u is string => Boolean(u));
   return createPublicClient({
     chain: mainnet,
-    transport: http(url, { timeout: 8_000, retryCount: 1 }),
+    transport: fallback(
+      urls.map((u) => http(u, { timeout: 8_000, retryCount: 1 })),
+      { rank: false, retryCount: 1 },
+    ),
   });
 }
 
