@@ -6,9 +6,17 @@ import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import { LinkedWalletsPanel } from "@/components/LinkedWalletsPanel";
 import { VerificationStatusPanel } from "@/components/VerificationStatusPanel";
 import { getOwnershipGraph } from "@/server/verification.functions";
-import { collectionLabel } from "@/server/ownership/collections";
+import { BAYC_CONTRACT } from "@/lib/web3/constants";
 
 type Graph = Awaited<ReturnType<typeof getOwnershipGraph>>;
+
+function shortAddr(a: string) {
+  return `${a.slice(0, 6)}…${a.slice(-4)}`;
+}
+
+function labelFor(contract: string): "BAYC" | "MAYC" {
+  return contract.toLowerCase() === BAYC_CONTRACT.toLowerCase() ? "BAYC" : "MAYC";
+}
 
 export const Route = createFileRoute("/verify")({
   head: () => ({
