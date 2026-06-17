@@ -1,4 +1,4 @@
-import { createPublicClient, http, getAddress, isAddress, type PublicClient } from "viem";
+import { createPublicClient, http, fallback, getAddress, isAddress, type PublicClient } from "viem";
 import { mainnet } from "viem/chains";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { REQUIRED_COLLECTIONS } from "./collections";
