@@ -247,7 +247,10 @@ function Sidebar({
   const location = useLocation();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
-  const { isVerifiedHolder, isLifer, isAdmin } = useVerificationStatus();
+  const gate = useAuthGate();
+  const isVerifiedHolder = gate.ownsRequiredAsset;
+  const isLifer = gate.showLifers;
+  const isAdmin = gate.isAdmin;
 
   async function handleSignOut() {
     await signOut();
