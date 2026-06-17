@@ -19,6 +19,20 @@ export const revalidateOwnership = createServerFn({ method: "POST" })
   });
 
 /**
+ * Returns the full wallet graph that drove the latest ownership decision —
+ * connected wallet, verified linked wallets, delegate.cash edges, every
+ * address scanned, and which (wallet, contract) pairs returned a positive
+ * balance. Used by the /verify walkthrough so users can see exactly why
+ * they did or did not get access.
+ */
+export const getOwnershipGraph = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { resolveOwnership } = await import("@/server/ownership/resolveOwnership");
+    return resolveOwnership(context.userId);
+  });
+
+/**
  * Server-side verification helpers.
  *
  * Note: BAYC/MAYC ownership verification at the entrance is handled by
