@@ -1,9 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ShieldCheck, Wallet, KeyRound, DoorOpen, ExternalLink } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth/useAuth";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import { LinkedWalletsPanel } from "@/components/LinkedWalletsPanel";
 import { VerificationStatusPanel } from "@/components/VerificationStatusPanel";
+import { getOwnershipGraph } from "@/server/verification.functions";
+import { collectionLabel } from "@/server/ownership/collections";
+
+type Graph = Awaited<ReturnType<typeof getOwnershipGraph>>;
 
 export const Route = createFileRoute("/verify")({
   head: () => ({
