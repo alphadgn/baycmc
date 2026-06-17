@@ -68,7 +68,9 @@ let internalNavCount = 0;
 
 export function AppHeader() {
   const { isAuthenticated, user } = useAuth();
-  const { isVerifiedHolder, isLifer } = useVerificationStatus();
+  const gate = useAuthGate();
+  const isVerifiedHolder = gate.ownsRequiredAsset;
+  const isLifer = gate.showLifers;
   const [entranceOpen, setEntranceOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
