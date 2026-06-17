@@ -77,6 +77,7 @@ export function useVerificationStatus(): VerificationStatus {
     setCollection((ver?.bayc_collection as BaycCollection | undefined) ?? null);
     setIsAdmin(!!roles?.some((r) => r.role === "admin" || r.role === "super_admin"));
     setLoading(false);
+    loadingRef.current = false;
   }
 
   useEffect(() => {
