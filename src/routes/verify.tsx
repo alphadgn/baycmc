@@ -138,6 +138,31 @@ const STEPS: Step[] = [
 function VerifyPage() {
   const { isAuthenticated, loading } = useAuth();
   const { isVerifiedHolder, isLifer, collection, loading: verifLoading } = useVerificationStatus();
+  const [graph, setGraph] = useState<Graph | null>(null);
+  const [graphErr, setGraphErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isAuthenticated || loading) return;
+    let cancelled = false;
+    setGraphErr(null);
+    getOwnershipGraph()
+      .then((g) => {
+        if (!cancelled) setGraph(g);
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setGraphErr(e instanceof Error ? e.message : "Failed to load graph");
+      });
+    const refresh = () => {
+      getOwnershipGraph()
+        .then((g) => !cancelled && setGraph(g))
+        .catch(() => {});
+    };
+    window.addEventListener("baycmc:verification-refresh", refresh);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("baycmc:verification-refresh", refresh);
+    };
+  }, [isAuthenticated, loading]);
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-10 sm:px-6 sm:py-16">
