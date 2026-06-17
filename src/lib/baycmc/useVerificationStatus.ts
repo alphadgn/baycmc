@@ -37,6 +37,10 @@ export interface VerificationStatus {
  */
 export function useVerificationStatus(): VerificationStatus {
   const { user, loading: authLoading, isAuthenticated } = useAuth();
+  const revalidateFn = useServerFn(revalidateOwnership);
+  const revalidateFnRef = useRef(revalidateFn);
+  revalidateFnRef.current = revalidateFn;
+  const loadingRef = useRef(false);
   const [baycVerified, setBaycVerified] = useState(false);
   const [collection, setCollection] = useState<BaycCollection>(null);
   const [otherpage, setOtherpage] = useState(false);
@@ -44,6 +48,7 @@ export function useVerificationStatus(): VerificationStatus {
   const [loading, setLoading] = useState(true);
 
   async function load() {
+    if (loadingRef.current) return; // prevent concurrent revalidate storms
     if (!user) {
       setBaycVerified(false);
       setCollection(null);
@@ -52,9 +57,10 @@ export function useVerificationStatus(): VerificationStatus {
       setLoading(false);
       return;
     }
+    loadingRef.current = true;
     setLoading(true);
     try {
-      await revalidateOwnership();
+      await revalidateFnRef.current();
     } catch (e) {
       console.warn("revalidateOwnership failed, using cached row", e);
     }
