@@ -262,6 +262,88 @@ function VerifyPage() {
         <section className="mt-10 space-y-4">
           <h2 className="font-display text-xl font-semibold">Live verification</h2>
           <VerificationStatusPanel />
+
+          {/* Wallet graph — exactly what the ownership engine scanned */}
+          <div className="rounded-2xl border border-border bg-card/30 p-5 shadow-card sm:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="font-display text-base font-semibold">Ownership graph</h3>
+              {graph && (
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                    graph.allowed
+                      ? "border border-success/40 bg-success/10 text-success"
+                      : "border border-border bg-secondary/30 text-muted-foreground"
+                  }`}
+                >
+                  {graph.allowed ? "Access granted" : "No qualifying tokens"}
+                </span>
+              )}
+            </div>
+            {graphErr && <p className="mt-2 text-xs text-destructive">{graphErr}</p>}
+            {!graph && !graphErr && (
+              <p className="mt-2 text-xs text-muted-foreground">Walking your wallet graph…</p>
+            )}
+            {graph && (
+              <div className="mt-3 space-y-3 text-xs">
+                <div>
+                  <div className="text-muted-foreground">Connected wallet</div>
+                  <div className="font-mono">
+                    {graph.connected ? shortAddr(graph.connected) : "—"}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground">
+                    Linked wallets ({graph.linked.length})
+                  </div>
+                  <div className="font-mono">
+                    {graph.linked.length === 0
+                      ? "—"
+                      : graph.linked.map(shortAddr).join(", ")}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground">
+                    Addresses scanned ({graph.scanned.length})
+                  </div>
+                  <div className="font-mono break-all">
+                    {graph.scanned.length === 0
+                      ? "—"
+                      : graph.scanned.map(shortAddr).join(", ")}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground">Holdings detected</div>
+                  {graph.ownership.length === 0 ? (
+                    <div className="font-mono">None</div>
+                  ) : (
+                    <ul className="mt-1 space-y-1">
+                      {graph.ownership.map((o) => (
+                        <li key={`${o.wallet}-${o.contract}`} className="font-mono">
+                          {labelFor(o.contract)} · {o.balance} · {shortAddr(o.wallet)}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                {graph.edges.length > 0 && (
+                  <div>
+                    <div className="text-muted-foreground">Graph edges</div>
+                    <ul className="mt-1 space-y-1">
+                      {graph.edges.map((e, i) => (
+                        <li key={i} className="font-mono">
+                          {shortAddr(e.from)} → {shortAddr(e.to)} · {e.via}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <div className="text-muted-foreground">
+                  Block #{graph.blockNumber === "0" ? "n/a" : graph.blockNumber}
+                </div>
+              </div>
+            )}
+          </div>
+
           <LinkedWalletsPanel />
         </section>
       )}
