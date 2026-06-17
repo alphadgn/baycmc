@@ -10,6 +10,9 @@ import { revalidateOwnership } from "@/server/verification.functions";
  */
 export const Route = createFileRoute("/_authenticated/lifers")({
   beforeLoad: async () => {
+    // Skip during SSR — localStorage is unavailable, so getSession() returns
+    // null and we'd hard-redirect every refresh (iOS black-screen symptom).
+    if (typeof window === "undefined") return;
     const { data: sess } = await supabase.auth.getSession();
     if (!sess.session) {
       throw redirect({ to: "/" });
