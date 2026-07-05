@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VerifyRouteImport } from './routes/verify'
+import { Route as McpRouteImport } from './routes/mcp'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DiagnosticsRouteImport } from './routes/diagnostics'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
@@ -24,6 +25,8 @@ import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedActivityRouteImport } from './routes/_authenticated/activity'
 import { Route as AuthenticatedAccountMergeRouteImport } from './routes/_authenticated/account-merge'
 import { Route as AuthenticatedVerifiedRouteImport } from './routes/_authenticated/_verified'
+import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
+import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as AuthenticatedLifersIndexRouteImport } from './routes/_authenticated/lifers/index'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
 import { Route as ApiPublicHealthRouteImport } from './routes/api/public/health'
@@ -39,12 +42,18 @@ import { Route as AuthenticatedVerifiedRoomsRouteImport } from './routes/_authen
 import { Route as AuthenticatedVerifiedFeedRouteImport } from './routes/_authenticated/_verified/feed'
 import { Route as AuthenticatedVerifiedCalendarRouteImport } from './routes/_authenticated/_verified/calendar'
 import { Route as AuthenticatedVerifiedApeRidesRouteImport } from './routes/_authenticated/_verified/ape-rides'
+import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as AuthenticatedVerifiedRoomsRoomIdRouteImport } from './routes/_authenticated/_verified/rooms_.$roomId'
 import { Route as AuthenticatedVerifiedApeRidesRideIdRouteImport } from './routes/_authenticated/_verified/ape-rides.$rideId'
 
 const VerifyRoute = VerifyRouteImport.update({
   id: '/verify',
   path: '/verify',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const McpRoute = McpRouteImport.update({
+  id: '/mcp',
+  path: '/mcp',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -116,6 +125,18 @@ const AuthenticatedVerifiedRoute = AuthenticatedVerifiedRouteImport.update({
   id: '/_verified',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const Char91DotwellKnownChar93OauthProtectedResourceRoute =
+  Char91DotwellKnownChar93OauthProtectedResourceRouteImport.update({
+    id: '/.well-known/oauth-protected-resource',
+    path: '/.well-known/oauth-protected-resource',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const Char91DotmcpChar93ListToolsRoute =
+  Char91DotmcpChar93ListToolsRouteImport.update({
+    id: '/.mcp/list-tools',
+    path: '/.mcp/list-tools',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AuthenticatedLifersIndexRoute =
   AuthenticatedLifersIndexRouteImport.update({
     id: '/',
@@ -202,6 +223,12 @@ const AuthenticatedVerifiedApeRidesRoute =
     path: '/ape-rides',
     getParentRoute: () => AuthenticatedVerifiedRoute,
   } as any)
+const Char91DotmcpChar93InvokeToolToolRoute =
+  Char91DotmcpChar93InvokeToolToolRouteImport.update({
+    id: '/.mcp/invoke-tool/$tool',
+    path: '/.mcp/invoke-tool/$tool',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AuthenticatedVerifiedRoomsRoomIdRoute =
   AuthenticatedVerifiedRoomsRoomIdRouteImport.update({
     id: '/rooms_/$roomId',
@@ -219,7 +246,10 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/diagnostics': typeof DiagnosticsRoute
   '/login': typeof LoginRoute
+  '/mcp': typeof McpRoute
   '/verify': typeof VerifyRoute
+  '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
+  '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/account-merge': typeof AuthenticatedAccountMergeRoute
   '/activity': typeof AuthenticatedActivityRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
@@ -229,6 +259,7 @@ export interface FileRoutesByFullPath {
   '/profile': typeof AuthenticatedProfileRoute
   '/super-admin': typeof AuthenticatedSuperAdminRoute
   '/support': typeof AuthenticatedSupportRoute
+  '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/ape-rides': typeof AuthenticatedVerifiedApeRidesRouteWithChildren
   '/calendar': typeof AuthenticatedVerifiedCalendarRoute
   '/feed': typeof AuthenticatedVerifiedFeedRoute
@@ -251,7 +282,10 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/diagnostics': typeof DiagnosticsRoute
   '/login': typeof LoginRoute
+  '/mcp': typeof McpRoute
   '/verify': typeof VerifyRoute
+  '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
+  '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/account-merge': typeof AuthenticatedAccountMergeRoute
   '/activity': typeof AuthenticatedActivityRoute
   '/karaoke': typeof AuthenticatedKaraokeRouteWithChildren
@@ -259,6 +293,7 @@ export interface FileRoutesByTo {
   '/profile': typeof AuthenticatedProfileRoute
   '/super-admin': typeof AuthenticatedSuperAdminRoute
   '/support': typeof AuthenticatedSupportRoute
+  '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/ape-rides': typeof AuthenticatedVerifiedApeRidesRouteWithChildren
   '/calendar': typeof AuthenticatedVerifiedCalendarRoute
   '/feed': typeof AuthenticatedVerifiedFeedRoute
@@ -283,7 +318,10 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/diagnostics': typeof DiagnosticsRoute
   '/login': typeof LoginRoute
+  '/mcp': typeof McpRoute
   '/verify': typeof VerifyRoute
+  '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
+  '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/_authenticated/_verified': typeof AuthenticatedVerifiedRouteWithChildren
   '/_authenticated/account-merge': typeof AuthenticatedAccountMergeRoute
   '/_authenticated/activity': typeof AuthenticatedActivityRoute
@@ -294,6 +332,7 @@ export interface FileRoutesById {
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/super-admin': typeof AuthenticatedSuperAdminRoute
   '/_authenticated/support': typeof AuthenticatedSupportRoute
+  '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/_authenticated/_verified/ape-rides': typeof AuthenticatedVerifiedApeRidesRouteWithChildren
   '/_authenticated/_verified/calendar': typeof AuthenticatedVerifiedCalendarRoute
   '/_authenticated/_verified/feed': typeof AuthenticatedVerifiedFeedRoute
@@ -318,7 +357,10 @@ export interface FileRouteTypes {
     | '/'
     | '/diagnostics'
     | '/login'
+    | '/mcp'
     | '/verify'
+    | '/.mcp/list-tools'
+    | '/.well-known/oauth-protected-resource'
     | '/account-merge'
     | '/activity'
     | '/admin'
@@ -328,6 +370,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/super-admin'
     | '/support'
+    | '/.mcp/invoke-tool/$tool'
     | '/ape-rides'
     | '/calendar'
     | '/feed'
@@ -350,7 +393,10 @@ export interface FileRouteTypes {
     | '/'
     | '/diagnostics'
     | '/login'
+    | '/mcp'
     | '/verify'
+    | '/.mcp/list-tools'
+    | '/.well-known/oauth-protected-resource'
     | '/account-merge'
     | '/activity'
     | '/karaoke'
@@ -358,6 +404,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/super-admin'
     | '/support'
+    | '/.mcp/invoke-tool/$tool'
     | '/ape-rides'
     | '/calendar'
     | '/feed'
@@ -381,7 +428,10 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/diagnostics'
     | '/login'
+    | '/mcp'
     | '/verify'
+    | '/.mcp/list-tools'
+    | '/.well-known/oauth-protected-resource'
     | '/_authenticated/_verified'
     | '/_authenticated/account-merge'
     | '/_authenticated/activity'
@@ -392,6 +442,7 @@ export interface FileRouteTypes {
     | '/_authenticated/profile'
     | '/_authenticated/super-admin'
     | '/_authenticated/support'
+    | '/.mcp/invoke-tool/$tool'
     | '/_authenticated/_verified/ape-rides'
     | '/_authenticated/_verified/calendar'
     | '/_authenticated/_verified/feed'
@@ -416,7 +467,11 @@ export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   DiagnosticsRoute: typeof DiagnosticsRoute
   LoginRoute: typeof LoginRoute
+  McpRoute: typeof McpRoute
   VerifyRoute: typeof VerifyRoute
+  Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
+  Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   ApiPublicHealthRoute: typeof ApiPublicHealthRoute
 }
 
@@ -427,6 +482,13 @@ declare module '@tanstack/react-router' {
       path: '/verify'
       fullPath: '/verify'
       preLoaderRoute: typeof VerifyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mcp': {
+      id: '/mcp'
+      path: '/mcp'
+      fullPath: '/mcp'
+      preLoaderRoute: typeof McpRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -526,6 +588,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedVerifiedRouteImport
       parentRoute: typeof AuthenticatedRoute
+    }
+    '/.well-known/oauth-protected-resource': {
+      id: '/.well-known/oauth-protected-resource'
+      path: '/.well-known/oauth-protected-resource'
+      fullPath: '/.well-known/oauth-protected-resource'
+      preLoaderRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/.mcp/list-tools': {
+      id: '/.mcp/list-tools'
+      path: '/.mcp/list-tools'
+      fullPath: '/.mcp/list-tools'
+      preLoaderRoute: typeof Char91DotmcpChar93ListToolsRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/lifers/': {
       id: '/_authenticated/lifers/'
@@ -631,6 +707,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/ape-rides'
       preLoaderRoute: typeof AuthenticatedVerifiedApeRidesRouteImport
       parentRoute: typeof AuthenticatedVerifiedRoute
+    }
+    '/.mcp/invoke-tool/$tool': {
+      id: '/.mcp/invoke-tool/$tool'
+      path: '/.mcp/invoke-tool/$tool'
+      fullPath: '/.mcp/invoke-tool/$tool'
+      preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/_verified/rooms_/$roomId': {
       id: '/_authenticated/_verified/rooms_/$roomId'
@@ -768,9 +851,24 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   DiagnosticsRoute: DiagnosticsRoute,
   LoginRoute: LoginRoute,
+  McpRoute: McpRoute,
   VerifyRoute: VerifyRoute,
+  Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
+  Char91DotwellKnownChar93OauthProtectedResourceRoute:
+    Char91DotwellKnownChar93OauthProtectedResourceRoute,
+  Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   ApiPublicHealthRoute: ApiPublicHealthRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

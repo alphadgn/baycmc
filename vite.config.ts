@@ -1,4 +1,5 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import { mcpPlugin } from "@lovable.dev/mcp-js/stacks/tanstack/vite";
 import { createRequire } from "node:module";
 
 const require_ = createRequire(import.meta.url);
@@ -50,6 +51,7 @@ export default defineConfig({
     },
   },
   plugins: [
+    mcpPlugin(),
     {
       name: "lovable:force-node-builtin-polyfills",
       enforce: "pre",
