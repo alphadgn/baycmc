@@ -8,6 +8,7 @@ import { InactivityWatcher } from "@/components/InactivityWatcher";
 import { AuthRedirectWatcher } from "@/components/AuthRedirectWatcher";
 import { AccountMergeWatcher } from "@/components/AccountMergeWatcher";
 import { Toaster } from "@/components/ui/sonner";
+import { AiAssistant } from "@/components/AiAssistant";
 import { installDiagnostics } from "@/lib/diagnostics";
 import { useNotificationPrefs } from "@/lib/baycmc/useNotificationPrefs";
 
@@ -130,6 +131,7 @@ function RootComponent() {
         <InactivityWatcher />
         <AuthRedirectWatcher />
         <AccountMergeWatcher />
+        <AiAssistant />
       </div>
     </GlyphAppProvider>
   );
