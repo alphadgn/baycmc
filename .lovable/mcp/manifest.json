@@ -3,12 +3,16 @@
   "sdk_version": "0.20.0",
   "path": "/mcp",
   "auth": {
-    "type": "none"
+    "type": "oauth",
+    "issuer": "https://nbuvvjhewlxqvqdtwang.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
   },
   "mcp": {
     "server": {
       "name": "baycmc-mcp",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "title": "BAYCMC MCP"
     },
     "tools": [
@@ -34,6 +38,276 @@
           "required": [
             "text"
           ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_rooms",
+        "title": "List clubhouse rooms",
+        "description": "List active BAYCMC clubhouse rooms (conference/Zoom-style rooms, karaoke rooms, and other tiered rooms) the signed-in user can see.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "description": "Optional filter on room kind, e.g. 'conference' or 'karaoke'.",
+              "type": "string"
+            },
+            "limit": {
+              "description": "Max rooms to return (default 50).",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_room_bookings",
+        "title": "List conference room bookings",
+        "description": "List upcoming and currently-active bookings across the signed-in user's visible rooms. Useful for finding scheduled Zoom-style conferences and karaoke sessions.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "room_id": {
+              "description": "Optional room UUID to filter to.",
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "mine_only": {
+              "description": "If true, only return bookings hosted by the caller.",
+              "type": "boolean"
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "book_room",
+        "title": "Book a clubhouse room",
+        "description": "Reserve a BAYCMC clubhouse room (conference/karaoke) for a time window. The booking is created as the signed-in user; RLS and the overlap trigger reject conflicts.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "room_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "description": "The room to book."
+            },
+            "starts_at": {
+              "type": "string",
+              "description": "Booking start (ISO 8601 timestamp)."
+            },
+            "ends_at": {
+              "type": "string",
+              "description": "Booking end (ISO 8601 timestamp)."
+            },
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "description": "Short title for the booking."
+            },
+            "notes": {
+              "type": "string",
+              "maxLength": 2000
+            }
+          },
+          "required": [
+            "room_id",
+            "starts_at",
+            "ends_at",
+            "title"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_karaoke_sessions",
+        "title": "List active karaoke sessions",
+        "description": "Show current karaoke sessions across karaoke rooms, including who is performing and what video is queued.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "room_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_karaoke_queue",
+        "title": "Get karaoke queue for a room",
+        "description": "Return the current karaoke queue (users waiting to sing) for a specific karaoke room, ordered by join time.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "room_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "description": "Karaoke room UUID."
+            }
+          },
+          "required": [
+            "room_id"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_karaoke_recordings",
+        "title": "List karaoke recordings",
+        "description": "List recent karaoke performance recordings visible to the signed-in user, newest first.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "performer_id": {
+              "description": "Filter to a specific performer.",
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_ape_rides",
+        "title": "List Ape Rides streams",
+        "description": "List Ape Rides live/scheduled streaming sessions visible to the signed-in user.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "status": {
+              "description": "Filter by status.",
+              "type": "string",
+              "enum": [
+                "live",
+                "ended"
+              ]
+            },
+            "host_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_ape_ride",
+        "title": "Get Ape Rides stream detail",
+        "description": "Return details for a single Ape Rides stream, including its current viewer requests.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "ride_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "ride_id"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_my_verification_status",
+        "title": "Get my verification status",
+        "description": "Return the signed-in user's BAYCMC verification state (BAYC / OtherPage / delegation / Lumina) and role summary.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {}
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_linked_wallets",
+        "title": "List my linked wallets",
+        "description": "List wallets the signed-in user has linked to their BAYCMC account, with verification and last-checked timestamps.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {}
         },
         "outputSchema": null
       }
