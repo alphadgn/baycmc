@@ -236,8 +236,12 @@
           "type": "object",
           "properties": {
             "status": {
-              "description": "Filter by status (e.g. 'live', 'scheduled', 'ended').",
-              "type": "string"
+              "description": "Filter by status.",
+              "type": "string",
+              "enum": [
+                "live",
+                "ended"
+              ]
             },
             "host_id": {
               "type": "string",

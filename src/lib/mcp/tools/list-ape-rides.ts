@@ -7,7 +7,7 @@ export default defineTool({
   title: "List Ape Rides streams",
   description: "List Ape Rides live/scheduled streaming sessions visible to the signed-in user.",
   inputSchema: {
-    status: z.string().optional().describe("Filter by status (e.g. 'live', 'scheduled', 'ended')."),
+    status: z.enum(["live", "ended"]).optional().describe("Filter by status."),
     host_id: z.string().uuid().optional(),
     limit: z.number().int().min(1).max(100).optional(),
   },
