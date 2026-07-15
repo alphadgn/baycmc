@@ -17,6 +17,8 @@
     "build:verbose": "DEBUG=vite:*,rollup:* NODE_OPTIONS=--max-old-space-size=6144 vite build 2>&1 | tee build.log"
   },
   "dependencies": {
+    "@ai-sdk/openai-compatible": "^3.0.11",
+    "@ai-sdk/react": "^4.0.32",
     "@cloudflare/vite-plugin": "^1.25.5",
     "@hookform/resolvers": "^5.2.2",
     "@livekit/components-react": "^2.9.20",
@@ -61,6 +63,7 @@
     "@tanstack/react-start": "^1.167.14",
     "@tanstack/router-plugin": "^1.167.10",
     "@use-glyph/sdk-react": "^2.1.0-beta.1",
+    "ai": "^7.0.29",
     "buffer": "^6.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
