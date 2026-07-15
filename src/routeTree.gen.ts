@@ -15,6 +15,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as DiagnosticsRouteImport } from './routes/diagnostics'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as AuthenticatedSupportRouteImport } from './routes/_authenticated/support'
 import { Route as AuthenticatedSuperAdminRouteImport } from './routes/_authenticated/super-admin'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
@@ -29,6 +30,7 @@ import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } fr
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as AuthenticatedLifersIndexRouteImport } from './routes/_authenticated/lifers/index'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
+import { Route as ApiPublicSecurityScanRouteImport } from './routes/api/public/security-scan'
 import { Route as ApiPublicHealthRouteImport } from './routes/api/public/health'
 import { Route as AuthenticatedLifersRoomRouteImport } from './routes/_authenticated/lifers/room'
 import { Route as AuthenticatedLifersMessagesRouteImport } from './routes/_authenticated/lifers/messages'
@@ -74,6 +76,11 @@ const AuthenticatedRoute = AuthenticatedRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiChatRoute = ApiChatRouteImport.update({
+  id: '/api/chat',
+  path: '/api/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedSupportRoute = AuthenticatedSupportRouteImport.update({
@@ -148,6 +155,11 @@ const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
+const ApiPublicSecurityScanRoute = ApiPublicSecurityScanRouteImport.update({
+  id: '/api/public/security-scan',
+  path: '/api/public/security-scan',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicHealthRoute = ApiPublicHealthRouteImport.update({
   id: '/api/public/health',
@@ -265,6 +277,7 @@ export interface FileRoutesByFullPath {
   '/profile': typeof AuthenticatedProfileRoute
   '/super-admin': typeof AuthenticatedSuperAdminRoute
   '/support': typeof AuthenticatedSupportRoute
+  '/api/chat': typeof ApiChatRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/ape-rides': typeof AuthenticatedVerifiedApeRidesRouteWithChildren
@@ -280,6 +293,7 @@ export interface FileRoutesByFullPath {
   '/lifers/messages': typeof AuthenticatedLifersMessagesRoute
   '/lifers/room': typeof AuthenticatedLifersRoomRoute
   '/api/public/health': typeof ApiPublicHealthRoute
+  '/api/public/security-scan': typeof ApiPublicSecurityScanRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/lifers/': typeof AuthenticatedLifersIndexRoute
   '/ape-rides/$rideId': typeof AuthenticatedVerifiedApeRidesRideIdRoute
@@ -300,6 +314,7 @@ export interface FileRoutesByTo {
   '/profile': typeof AuthenticatedProfileRoute
   '/super-admin': typeof AuthenticatedSuperAdminRoute
   '/support': typeof AuthenticatedSupportRoute
+  '/api/chat': typeof ApiChatRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/ape-rides': typeof AuthenticatedVerifiedApeRidesRouteWithChildren
@@ -315,6 +330,7 @@ export interface FileRoutesByTo {
   '/lifers/messages': typeof AuthenticatedLifersMessagesRoute
   '/lifers/room': typeof AuthenticatedLifersRoomRoute
   '/api/public/health': typeof ApiPublicHealthRoute
+  '/api/public/security-scan': typeof ApiPublicSecurityScanRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/lifers': typeof AuthenticatedLifersIndexRoute
   '/ape-rides/$rideId': typeof AuthenticatedVerifiedApeRidesRideIdRoute
@@ -340,6 +356,7 @@ export interface FileRoutesById {
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/super-admin': typeof AuthenticatedSuperAdminRoute
   '/_authenticated/support': typeof AuthenticatedSupportRoute
+  '/api/chat': typeof ApiChatRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/_authenticated/_verified/ape-rides': typeof AuthenticatedVerifiedApeRidesRouteWithChildren
@@ -355,6 +372,7 @@ export interface FileRoutesById {
   '/_authenticated/lifers/messages': typeof AuthenticatedLifersMessagesRoute
   '/_authenticated/lifers/room': typeof AuthenticatedLifersRoomRoute
   '/api/public/health': typeof ApiPublicHealthRoute
+  '/api/public/security-scan': typeof ApiPublicSecurityScanRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/lifers/': typeof AuthenticatedLifersIndexRoute
   '/_authenticated/_verified/ape-rides/$rideId': typeof AuthenticatedVerifiedApeRidesRideIdRoute
@@ -379,6 +397,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/super-admin'
     | '/support'
+    | '/api/chat'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/ape-rides'
@@ -394,6 +413,7 @@ export interface FileRouteTypes {
     | '/lifers/messages'
     | '/lifers/room'
     | '/api/public/health'
+    | '/api/public/security-scan'
     | '/admin/'
     | '/lifers/'
     | '/ape-rides/$rideId'
@@ -414,6 +434,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/super-admin'
     | '/support'
+    | '/api/chat'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/ape-rides'
@@ -429,6 +450,7 @@ export interface FileRouteTypes {
     | '/lifers/messages'
     | '/lifers/room'
     | '/api/public/health'
+    | '/api/public/security-scan'
     | '/admin'
     | '/lifers'
     | '/ape-rides/$rideId'
@@ -453,6 +475,7 @@ export interface FileRouteTypes {
     | '/_authenticated/profile'
     | '/_authenticated/super-admin'
     | '/_authenticated/support'
+    | '/api/chat'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/_authenticated/_verified/ape-rides'
@@ -468,6 +491,7 @@ export interface FileRouteTypes {
     | '/_authenticated/lifers/messages'
     | '/_authenticated/lifers/room'
     | '/api/public/health'
+    | '/api/public/security-scan'
     | '/_authenticated/admin/'
     | '/_authenticated/lifers/'
     | '/_authenticated/_verified/ape-rides/$rideId'
@@ -483,9 +507,11 @@ export interface RootRouteChildren {
   VerifyRoute: typeof VerifyRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  ApiChatRoute: typeof ApiChatRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   ApiPublicHealthRoute: typeof ApiPublicHealthRoute
+  ApiPublicSecurityScanRoute: typeof ApiPublicSecurityScanRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -530,6 +556,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/chat': {
+      id: '/api/chat'
+      path: '/api/chat'
+      fullPath: '/api/chat'
+      preLoaderRoute: typeof ApiChatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/support': {
@@ -629,6 +662,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/'
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/api/public/security-scan': {
+      id: '/api/public/security-scan'
+      path: '/api/public/security-scan'
+      fullPath: '/api/public/security-scan'
+      preLoaderRoute: typeof ApiPublicSecurityScanRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/public/health': {
       id: '/api/public/health'
@@ -876,9 +916,11 @@ const rootRouteChildren: RootRouteChildren = {
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
+  ApiChatRoute: ApiChatRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   ApiPublicHealthRoute: ApiPublicHealthRoute,
+  ApiPublicSecurityScanRoute: ApiPublicSecurityScanRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
