@@ -857,6 +857,36 @@ export type Database = {
         }
         Relationships: []
       }
+      security_scan_findings: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          message: string
+          metadata: Json
+          resolved: boolean
+          severity: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          id?: string
+          message: string
+          metadata?: Json
+          resolved?: boolean
+          severity: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          message?: string
+          metadata?: Json
+          resolved?: boolean
+          severity?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
