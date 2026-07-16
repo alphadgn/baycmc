@@ -80,11 +80,22 @@ function LinkedWalletsPanelInner() {
           name: "BAYCmc",
           url: window.location.origin,
         },
+        // useDeeplink:false forces the SDK to render its wallet-picker modal
+        // (with QR + "Open MetaMask" + install options) on mobile browsers
+        // instead of silently deep-linking, which is why nothing appeared to
+        // happen before.
+        useDeeplink: false,
         preferDesktop: false,
         checkInstallationImmediately: false,
         enableAnalytics: false,
         extensionOnly: false,
       });
+      // Ensure the SDK has finished bootstrapping its modal UI before we ask
+      // it to connect — otherwise `connect()` can resolve/reject before the
+      // modal ever mounts.
+      if (typeof (sdk as unknown as { init?: () => Promise<void> }).init === "function") {
+        await (sdk as unknown as { init: () => Promise<void> }).init();
+      }
 
       const accounts = await sdk.connect();
       const target = accounts[0];
