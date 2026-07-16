@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Loader2, Plus, Trash2, CheckCircle2, Wallet } from "lucide-react";
+import { Loader2, Trash2, CheckCircle2, Wallet } from "lucide-react";
 import {
   listLinkedWallets,
   requestLinkedWalletNonce,
@@ -80,6 +80,7 @@ function LinkedWalletsPanelInner() {
           name: "BAYCmc",
           url: window.location.origin,
         },
+        preferDesktop: false,
         checkInstallationImmediately: false,
         enableAnalytics: false,
         extensionOnly: false,
@@ -149,11 +150,22 @@ function LinkedWalletsPanelInner() {
           onClick={handleAddWalletClick}
           disabled={busy}
           aria-label="Add wallet with MetaMask"
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-6 py-2.5 text-sm font-semibold text-gold-foreground ring-1 ring-gold/50 transition hover:brightness-110 active:brightness-95 disabled:opacity-60"
-          style={{ background: "var(--gradient-gold)", boxShadow: "var(--shadow-gold)" }}
+          className="inline-flex h-12 w-full select-none items-center justify-center rounded-full border border-gold/70 px-8 text-[15px] font-bold leading-none text-gold-foreground transition hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:translate-y-px active:brightness-95 disabled:pointer-events-none disabled:opacity-70 sm:w-auto sm:min-w-40"
+          style={{
+            background: "var(--gradient-gold)",
+            boxShadow: "0 8px 24px -12px oklch(0.78 0.14 78 / 55%)",
+            color: "var(--gold-foreground)",
+            letterSpacing: 0,
+          }}
         >
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-          Add wallet
+          {busy ? (
+            <span className="inline-flex items-center justify-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Opening MetaMask…
+            </span>
+          ) : (
+            <span className="block translate-y-px whitespace-nowrap">Add wallet</span>
+          )}
         </button>
       </div>
       <p className="mt-1 text-sm text-muted-foreground">
