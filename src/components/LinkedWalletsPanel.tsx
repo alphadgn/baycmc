@@ -154,6 +154,7 @@ function LinkedWalletsPanelInner() {
           style={{
             background: "var(--gradient-gold)",
             boxShadow: "0 8px 24px -12px oklch(0.78 0.14 78 / 55%)",
+            color: "var(--gold-foreground)",
             letterSpacing: 0,
           }}
         >
