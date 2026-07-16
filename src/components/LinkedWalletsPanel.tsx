@@ -175,10 +175,11 @@ function LinkedWalletsPanelInner() {
 
       <button
         type="button"
-        onClick={openAdd}
-        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-gold px-4 py-3 text-sm font-semibold text-gold-foreground shadow-sm transition hover:brightness-110 active:brightness-95 sm:w-auto"
+        onClick={handleAddWalletClick}
+        disabled={busy}
+        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-gold px-6 py-3 text-sm font-semibold text-gold-foreground shadow-lg ring-1 ring-gold/40 transition hover:brightness-110 active:brightness-95 disabled:opacity-60 sm:w-auto"
       >
-        <Plus className="h-4 w-4" />
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
         Add wallet
       </button>
 
