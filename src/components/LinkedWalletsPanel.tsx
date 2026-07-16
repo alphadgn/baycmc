@@ -195,7 +195,7 @@ function LinkedWalletsPanelInner() {
           onClick={handleAddWalletClick}
           disabled={busy}
           aria-label="Add wallet with MetaMask"
-          className="inline-flex h-9 w-auto select-none items-center justify-center rounded-full border border-gold/70 px-4 text-[13px] font-bold leading-none text-gold-foreground transition hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:translate-y-px active:brightness-95 disabled:pointer-events-none disabled:opacity-70"
+          className="inline-flex h-8 w-auto select-none items-center justify-center rounded-full border border-gold/70 px-3.5 text-xs font-medium leading-none text-gold-foreground transition hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:translate-y-px active:brightness-95 disabled:pointer-events-none disabled:opacity-70"
           style={{
             background: "var(--gradient-gold)",
             boxShadow: "0 8px 24px -12px oklch(0.78 0.14 78 / 55%)",
