@@ -149,6 +149,25 @@ function LinkedWalletsPanelInner() {
     }
   }
 
+  function handleAddWalletClick() {
+    // Prefer MetaMask / injected connector so mobile users go straight to
+    // the wallet's connect prompt (via deep-link on iOS/Android), skipping
+    // the Glyph login modal. Fall back to the connector picker only if no
+    // injected/MetaMask connector is registered.
+    const pick =
+      connectors.find((c) => c.id === "metaMask" || c.id === "metamask") ??
+      connectors.find((c) => c.id === "injected") ??
+      connectors.find((c) => /metamask/i.test(c.name)) ??
+      connectors.find((c) => /injected/i.test(c.name));
+    if (pick) {
+      setErr(null);
+      setLabel("");
+      void handlePickConnector(pick.id);
+      return;
+    }
+    openAdd();
+  }
+
   async function handleRemove(address: string) {
     if (!window.confirm("Remove this linked wallet? It will no longer count toward verification."))
       return;
@@ -175,10 +194,11 @@ function LinkedWalletsPanelInner() {
 
       <button
         type="button"
-        onClick={openAdd}
-        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-gold px-4 py-3 text-sm font-semibold text-gold-foreground shadow-sm transition hover:brightness-110 active:brightness-95 sm:w-auto"
+        onClick={handleAddWalletClick}
+        disabled={busy}
+        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-gold px-6 py-3 text-sm font-semibold text-gold-foreground shadow-lg ring-1 ring-gold/40 transition hover:brightness-110 active:brightness-95 disabled:opacity-60 sm:w-auto"
       >
-        <Plus className="h-4 w-4" />
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
         Add wallet
       </button>
 
