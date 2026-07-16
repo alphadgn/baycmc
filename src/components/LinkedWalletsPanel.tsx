@@ -170,12 +170,12 @@ function LinkedWalletsPanelInner() {
           }}
         >
           {busy ? (
-            <span className="inline-flex items-center justify-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Opening MetaMask…
+            <span className="inline-flex items-center justify-center gap-1.5">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Opening…
             </span>
           ) : (
-            <span className="block translate-y-px whitespace-nowrap">Add wallet</span>
+            <span className="block whitespace-nowrap">Add wallet</span>
           )}
         </button>
       </div>
