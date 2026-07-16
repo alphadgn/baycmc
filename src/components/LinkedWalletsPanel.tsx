@@ -67,8 +67,11 @@ function LinkedWalletsPanelInner() {
   async function handleAddWalletClick() {
     setErr(null);
     setBusy(true);
-    let sdk: { getProvider: () => MetaMaskProvider | undefined; terminate?: () => Promise<void> } | null =
-      null;
+    let sdk: {
+      connect: () => Promise<string[]>;
+      getProvider: () => MetaMaskProvider | undefined;
+      terminate?: () => Promise<void>;
+    } | null = null;
     try {
       await import("@/lib/polyfill-shim").then((m) => m.installBrowserPolyfills());
       const { MetaMaskSDK } = await import("@metamask/sdk");
