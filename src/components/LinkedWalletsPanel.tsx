@@ -149,6 +149,25 @@ function LinkedWalletsPanelInner() {
     }
   }
 
+  function handleAddWalletClick() {
+    // Prefer MetaMask / injected connector so mobile users go straight to
+    // the wallet's connect prompt (via deep-link on iOS/Android), skipping
+    // the Glyph login modal. Fall back to the connector picker only if no
+    // injected/MetaMask connector is registered.
+    const pick =
+      connectors.find((c) => c.id === "metaMask" || c.id === "metamask") ??
+      connectors.find((c) => c.id === "injected") ??
+      connectors.find((c) => /metamask/i.test(c.name)) ??
+      connectors.find((c) => /injected/i.test(c.name));
+    if (pick) {
+      setErr(null);
+      setLabel("");
+      void handlePickConnector(pick.id);
+      return;
+    }
+    openAdd();
+  }
+
   async function handleRemove(address: string) {
     if (!window.confirm("Remove this linked wallet? It will no longer count toward verification."))
       return;
