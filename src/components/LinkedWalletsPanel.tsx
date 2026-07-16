@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Loader2, Plus, Trash2, CheckCircle2, Wallet } from "lucide-react";
+import { useConnect, useSignMessage, useDisconnect, useAccount } from "wagmi";
+import { Loader2, Plus, Trash2, CheckCircle2, Wallet, X } from "lucide-react";
+import { useGlyphReady } from "@/components/GlyphAppProvider";
 import {
   listLinkedWallets,
   requestLinkedWalletNonce,
@@ -18,37 +20,48 @@ interface LinkedWalletRow {
   created_at: string;
 }
 
-interface InjectedProvider {
-  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
-}
-function getInjectedProvider(): InjectedProvider | null {
-  const w = window as unknown as { ethereum?: InjectedProvider };
-  return w.ethereum ?? null;
-}
-
-
 /**
  * UI for managing additional wallets linked to the user's account.
  *
- * Each wallet must prove control via a personal_sign challenge before the
- * server walks it for BAYC/MAYC ownership. The signature happens through any
- * EIP-1193 provider (`window.ethereum`) — e.g. MetaMask, Rainbow,
- * WalletConnect-injected providers. The flow does NOT require switching the
- * primary BAYCMC session wallet.
+ * The "Add wallet" flow opens a wallet-connect picker (via wagmi connectors
+ * mounted by the Glyph provider) so mobile users can attach a wallet through
+ * WalletConnect / Coinbase / MetaMask deep-links, rather than requiring an
+ * injected `window.ethereum` provider.
  */
 export function LinkedWalletsPanel() {
+  const ready = useGlyphReady();
+
+  return (
+    <div className="rounded-xl border border-border bg-secondary/20 p-5">
+      {ready ? (
+        <LinkedWalletsPanelInner />
+      ) : (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading wallet connector…
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LinkedWalletsPanelInner() {
   const [rows, setRows] = useState<LinkedWalletRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
-  const [addr, setAddr] = useState("");
   const [label, setLabel] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [step, setStep] = useState<"pick" | "signing">("pick");
 
   const list = useServerFn(listLinkedWallets);
   const requestNonce = useServerFn(requestLinkedWalletNonce);
   const verify = useServerFn(verifyAndLinkWallet);
   const remove = useServerFn(removeLinkedWallet);
+
+  const { connectors, connectAsync } = useConnect();
+  const { signMessageAsync } = useSignMessage();
+  const { disconnectAsync } = useDisconnect();
+  const { address: connectedAddress, connector: activeConnector } = useAccount();
 
   async function reload() {
     setLoading(true);
@@ -67,47 +80,71 @@ export function LinkedWalletsPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function handleAdd() {
+  function openAdd() {
     setErr(null);
-    if (!/^0x[a-fA-F0-9]{40}$/.test(addr.trim())) {
-      setErr("Enter a valid Ethereum address (0x…40 hex chars)");
-      return;
-    }
-    const provider = getInjectedProvider();
-    if (!provider) {
+    setLabel("");
+    setStep("pick");
+    setAddOpen(true);
+  }
 
-      setErr(
-        "No browser wallet detected. Open this page in a browser with MetaMask, Rainbow, or another EIP-1193 wallet to sign the link challenge.",
-      );
+  function closeAdd() {
+    if (busy) return;
+    setAddOpen(false);
+    setErr(null);
+  }
+
+  async function handlePickConnector(connectorId: string) {
+    setErr(null);
+    const chosen = connectors.find((c) => c.id === connectorId);
+    if (!chosen) {
+      setErr("Connector unavailable");
       return;
     }
     setBusy(true);
+    setStep("signing");
+    const previousConnector = activeConnector;
+    let connectedForLink: { address: string; connectorId: string } | null = null;
     try {
-      const target = addr.trim();
+      const result = await connectAsync({ connector: chosen });
+      const target = result.accounts[0];
+      if (!target) throw new Error("No account returned from wallet");
+      connectedForLink = { address: target, connectorId: chosen.id };
+
       const { message, nonce } = await requestNonce({ data: { address: target } });
-      // Ask the injected provider to sign with the target wallet. The user
-      // must have switched the active account in the wallet extension to
-      // match `target` — we do NOT trust eth_accounts since the linked
-      // wallet is by definition distinct from the BAYCMC sign-in wallet.
-      const signature = (await provider.request({
-        method: "personal_sign",
-        params: [message, target],
-      })) as string;
+      const signature = await signMessageAsync({ account: target, message });
 
       const res = await verify({
-        data: { address: target, nonce, signature, label: label.trim() || undefined },
+        data: {
+          address: target,
+          nonce,
+          signature,
+          label: label.trim() || undefined,
+        },
       });
       if (!res.ok) throw new Error("Verification failed");
       toast.success("Wallet linked. Refreshing ownership…");
       window.dispatchEvent(new Event("baycmc:verification-refresh"));
       setAddOpen(false);
-      setAddr("");
       setLabel("");
       await reload();
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Failed to link wallet";
       setErr(msg);
+      setStep("pick");
     } finally {
+      // Disconnect the ad-hoc connector so the primary Glyph session isn't
+      // replaced. If the user linked their existing session wallet somehow,
+      // leave it connected.
+      if (
+        connectedForLink &&
+        (!previousConnector || previousConnector.id !== connectedForLink.connectorId)
+      ) {
+        try {
+          await disconnectAsync({ connector: chosen });
+        } catch {
+          /* non-fatal */
+        }
+      }
       setBusy(false);
     }
   }
@@ -126,73 +163,24 @@ export function LinkedWalletsPanel() {
   }
 
   return (
-    <div className="rounded-xl border border-border bg-secondary/20 p-5">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Wallet className="h-4 w-4 text-gold" />
-          <div className="text-lg font-semibold">Linked wallets</div>
-        </div>
-        <button
-          onClick={() => setAddOpen((v) => !v)}
-          className="inline-flex items-center gap-1 rounded-md border border-gold/40 bg-gold/10 px-2 py-1 text-xs font-semibold text-gold hover:bg-gold/20"
-        >
-          <Plus className="h-3 w-3" /> Add wallet
-        </button>
+    <>
+      <div className="flex items-center gap-2">
+        <Wallet className="h-4 w-4 text-gold" />
+        <div className="text-lg font-semibold">Linked wallets</div>
       </div>
       <p className="mt-1 text-sm text-muted-foreground">
         Attach additional wallets to your account. Each is checked on-chain for BAYC / MAYC
         (and incoming delegate.cash delegations) on every sign-in.
       </p>
 
-      {addOpen && (
-        <div className="mt-4 rounded-md border border-border bg-background/40 p-3">
-          <label className="block text-xs font-semibold text-muted-foreground">Wallet address</label>
-          <input
-            value={addr}
-            onChange={(e) => setAddr(e.target.value)}
-            placeholder="0x…"
-            spellCheck={false}
-            autoComplete="off"
-            className="mt-1 w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm font-mono"
-          />
-          <label className="mt-3 block text-xs font-semibold text-muted-foreground">
-            Label (optional)
-          </label>
-          <input
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            placeholder="Vault, hardware wallet, etc."
-            maxLength={64}
-            className="mt-1 w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
-          />
-          {err && (
-            <div className="mt-2 rounded border border-destructive/40 bg-destructive/10 px-2 py-1 text-xs text-destructive">
-              {err}
-            </div>
-          )}
-          <div className="mt-3 flex justify-end gap-2">
-            <button
-              onClick={() => setAddOpen(false)}
-              disabled={busy}
-              className="rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-secondary"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleAdd}
-              disabled={busy}
-              className="inline-flex items-center gap-1 rounded-md bg-gradient-gold px-3 py-1.5 text-xs font-semibold text-gold-foreground disabled:opacity-50"
-            >
-              {busy && <Loader2 className="h-3 w-3 animate-spin" />}
-              {busy ? "Waiting for signature…" : "Sign & link"}
-            </button>
-          </div>
-          <p className="mt-2 text-[11px] text-muted-foreground">
-            Switch the active account in your wallet extension to{" "}
-            <span className="font-mono">{addr || "0x…"}</span> before clicking Sign &amp; link.
-          </p>
-        </div>
-      )}
+      <button
+        type="button"
+        onClick={openAdd}
+        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-gold px-4 py-3 text-sm font-semibold text-gold-foreground shadow-sm transition hover:brightness-110 active:brightness-95 sm:w-auto"
+      >
+        <Plus className="h-4 w-4" />
+        Add wallet
+      </button>
 
       <div className="mt-4 space-y-2">
         {loading ? (
@@ -233,6 +221,91 @@ export function LinkedWalletsPanel() {
           ))
         )}
       </div>
-    </div>
+
+      {addOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-0 sm:items-center sm:p-4"
+          onClick={closeAdd}
+        >
+          <div
+            className="w-full max-w-md rounded-t-2xl border border-gold/30 bg-background p-5 shadow-xl sm:rounded-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <div className="text-base font-semibold">Connect a wallet to link</div>
+              <button
+                type="button"
+                onClick={closeAdd}
+                disabled={busy}
+                className="rounded-md p-1 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Choose how to connect. We'll ask that wallet to sign a link challenge — no on-chain
+              transaction, no gas.
+            </p>
+
+            <label className="mt-4 block text-xs font-semibold text-muted-foreground">
+              Label (optional)
+            </label>
+            <input
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="Vault, hardware wallet, etc."
+              maxLength={64}
+              disabled={busy}
+              className="mt-1 w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+            />
+
+            <div className="mt-4 space-y-2">
+              {connectors.length === 0 ? (
+                <div className="rounded-md border border-border bg-secondary/30 px-3 py-2 text-xs text-muted-foreground">
+                  No wallet connectors are available in this environment.
+                </div>
+              ) : (
+                connectors.map((c) => (
+                  <button
+                    key={c.uid}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => handlePickConnector(c.id)}
+                    className="flex w-full items-center justify-between gap-3 rounded-lg border border-border bg-secondary/30 px-3 py-3 text-left text-sm font-medium transition hover:border-gold/40 hover:bg-secondary/60 disabled:opacity-60"
+                  >
+                    <span className="flex items-center gap-2">
+                      {c.icon ? (
+                        <img src={c.icon} alt="" className="h-5 w-5 rounded" />
+                      ) : (
+                        <Wallet className="h-5 w-5 text-gold" />
+                      )}
+                      {c.name}
+                    </span>
+                    {busy && step === "signing" ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    ) : (
+                      <Plus className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
+
+            {err && (
+              <div className="mt-3 rounded border border-destructive/40 bg-destructive/10 px-2 py-1 text-xs text-destructive">
+                {err}
+              </div>
+            )}
+
+            {busy && step === "signing" && (
+              <p className="mt-3 text-[11px] text-muted-foreground">
+                Waiting for signature from your wallet…
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
