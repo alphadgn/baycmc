@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth/useAuth";
 import { toast } from "sonner";
 import { VerificationStatusPanel } from "@/components/VerificationStatusPanel";
 import { NftGallery } from "@/components/NftGallery";
+import { LinkedWalletsPanel } from "@/components/LinkedWalletsPanel";
 
 export const Route = createFileRoute("/_authenticated/profile")({
   head: () => ({
