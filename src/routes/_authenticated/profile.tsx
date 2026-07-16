@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth/useAuth";
 import { toast } from "sonner";
 import { VerificationStatusPanel } from "@/components/VerificationStatusPanel";
 import { NftGallery } from "@/components/NftGallery";
+import { LinkedWalletsPanel } from "@/components/LinkedWalletsPanel";
 
 export const Route = createFileRoute("/_authenticated/profile")({
   head: () => ({
@@ -327,6 +328,17 @@ function ProfilePage() {
           </div>
         </section>
       </div>
+
+      <section id="linked-wallets" className="mt-10">
+        <div className="mb-4 flex items-baseline justify-between">
+          <h2 className="font-display text-2xl font-bold">Linked wallets</h2>
+          <p className="text-xs text-muted-foreground">
+            Add wallets you also control (e.g. a delegate.xyz vault) to prove ownership across them.
+          </p>
+        </div>
+        <LinkedWalletsPanel />
+      </section>
+
 
       {wallet && (
         <section className="mt-10">
