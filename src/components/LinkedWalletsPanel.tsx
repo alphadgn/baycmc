@@ -64,6 +64,25 @@ function LinkedWalletsPanelInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  async function connectWithProvider(provider: MetaMaskProvider, sourceLabel: string) {
+    const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
+    const target = accounts?.[0];
+    if (!target) throw new Error("No account returned from wallet");
+    const { message, nonce } = await requestNonce({ data: { address: target } });
+    const signature = await provider.request({
+      method: "personal_sign",
+      params: [message, target],
+    });
+    if (typeof signature !== "string") throw new Error("No signature returned");
+    const res = await verify({
+      data: { address: target, nonce, signature, label: sourceLabel },
+    });
+    if (!res.ok) throw new Error("Verification failed");
+    toast.success("Wallet linked. Refreshing ownership…");
+    window.dispatchEvent(new Event("baycmc:verification-refresh"));
+    await reload();
+  }
+
   async function handleAddWalletClick() {
     setErr(null);
     setBusy(true);
@@ -73,50 +92,65 @@ function LinkedWalletsPanelInner() {
       terminate?: () => Promise<void>;
     } | null = null;
     try {
+      // 1) If an injected EIP-1193 provider exists (desktop MetaMask, in-app
+      //    browsers like MetaMask Mobile / Rainbow / Trust), use it directly.
+      const injected = (window as unknown as { ethereum?: MetaMaskProvider }).ethereum;
+      if (injected && typeof injected.request === "function") {
+        await connectWithProvider(injected, "Injected wallet");
+        return;
+      }
+
+      // 2) Otherwise open the MetaMask SDK modal, which renders a
+      //    WalletConnect-style QR + "Open MetaMask" + install options.
       await import("@/lib/polyfill-shim").then((m) => m.installBrowserPolyfills());
       const { MetaMaskSDK } = await import("@metamask/sdk");
       sdk = new MetaMaskSDK({
-        dappMetadata: {
-          name: "BAYCmc",
-          url: window.location.origin,
-        },
-        // useDeeplink:false forces the SDK to render its wallet-picker modal
-        // (with QR + "Open MetaMask" + install options) on mobile browsers
-        // instead of silently deep-linking, which is why nothing appeared to
-        // happen before.
+        dappMetadata: { name: "BAYCmc", url: window.location.origin },
         useDeeplink: false,
         preferDesktop: false,
         checkInstallationImmediately: false,
         enableAnalytics: false,
         extensionOnly: false,
-      });
-      // Ensure the SDK has finished bootstrapping its modal UI before we ask
-      // it to connect — otherwise `connect()` can resolve/reject before the
-      // modal ever mounts.
+        openDeeplink: (link: string) => {
+          // Fallback: if the SDK modal never mounts (some mobile Safari
+          // configs), navigate the user into MetaMask's in-app browser at
+          // this dapp so window.ethereum becomes available there.
+          window.open(link, "_blank", "noopener");
+        },
+      } as unknown as ConstructorParameters<typeof MetaMaskSDK>[0]);
       if (typeof (sdk as unknown as { init?: () => Promise<void> }).init === "function") {
         await (sdk as unknown as { init: () => Promise<void> }).init();
       }
-
-      const accounts = await sdk.connect();
-      const target = accounts[0];
+      // Race the SDK connect against a timeout so we can surface a clear
+      // error + fallback link instead of hanging forever.
+      const connectPromise = sdk.connect();
+      const timeout = new Promise<never>((_, rej) =>
+        setTimeout(() => rej(new Error("timeout")), 45_000),
+      );
+      let accounts: string[];
+      try {
+        accounts = (await Promise.race([connectPromise, timeout])) as string[];
+      } catch (raceErr) {
+        // Offer an escape hatch: open the dapp in MetaMask's in-app browser.
+        const host = window.location.host + window.location.pathname;
+        const universal = `https://metamask.app.link/dapp/${host}`;
+        window.open(universal, "_blank", "noopener");
+        throw raceErr instanceof Error && raceErr.message === "timeout"
+          ? new Error("Wallet modal didn't respond — opening MetaMask in-app browser instead")
+          : raceErr;
+      }
+      const target = accounts?.[0];
       if (!target) throw new Error("No account returned from wallet");
-
-      const { message, nonce } = await requestNonce({ data: { address: target } });
       const provider = sdk.getProvider();
-      if (!provider) throw new Error("MetaMask provider unavailable");
+      if (!provider) throw new Error("Wallet provider unavailable");
+      const { message, nonce } = await requestNonce({ data: { address: target } });
       const signature = await provider.request({
         method: "personal_sign",
         params: [message, target],
       });
-      if (typeof signature !== "string") throw new Error("No signature returned from MetaMask");
-
+      if (typeof signature !== "string") throw new Error("No signature returned");
       const res = await verify({
-        data: {
-          address: target,
-          nonce,
-          signature,
-          label: "MetaMask",
-        },
+        data: { address: target, nonce, signature, label: "WalletConnect" },
       });
       if (!res.ok) throw new Error("Verification failed");
       toast.success("Wallet linked. Refreshing ownership…");
@@ -161,7 +195,7 @@ function LinkedWalletsPanelInner() {
           onClick={handleAddWalletClick}
           disabled={busy}
           aria-label="Add wallet with MetaMask"
-          className="inline-flex h-9 w-auto select-none items-center justify-center rounded-full border border-gold/70 px-4 text-[13px] font-bold leading-none text-gold-foreground transition hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:translate-y-px active:brightness-95 disabled:pointer-events-none disabled:opacity-70"
+          className="inline-flex h-8 w-auto select-none items-center justify-center rounded-full border border-gold/70 px-3.5 text-xs font-medium leading-none text-gold-foreground transition hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:translate-y-px active:brightness-95 disabled:pointer-events-none disabled:opacity-70"
           style={{
             background: "var(--gradient-gold)",
             boxShadow: "0 8px 24px -12px oklch(0.78 0.14 78 / 55%)",
