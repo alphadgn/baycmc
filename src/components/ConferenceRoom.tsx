@@ -8,9 +8,11 @@ import {
   kickRoomParticipant,
   muteAllRoomParticipants,
 } from "@/server/livekit.functions";
+import { MicGainProcessor } from "@/lib/karaoke/micGainProcessor";
 import {
   LiveKitRoom,
   RoomAudioRenderer,
+  StartAudio,
   useConnectionQualityIndicator,
   useLocalParticipant,
   useMediaDeviceSelect,
@@ -188,21 +190,9 @@ export function ConferenceRoom({
         // before LiveKit would acquire the device.
         audio={prefs.micEnabled}
         video={prefs.cameraEnabled}
-        // In karaoke rooms, disable browser echo-cancellation/NS/AGC on the
-        // mic so the singer's voice isn't suppressed while karaoke music
-        // plays from the same device. Conference/game rooms keep the
-        // browser defaults (AEC on) so meetings stay echo-free.
-        options={
-          kind === "karaoke"
-            ? {
-                audioCaptureDefaults: {
-                  echoCancellation: false,
-                  noiseSuppression: false,
-                  autoGainControl: false,
-                },
-              }
-            : undefined
-        }
+        // Keep browser echo cancellation on for everyone. Disabling it
+        // globally made listeners on speakers re-broadcast the room audio.
+        // Audience mics in karaoke rooms still follow saved preferences.
         data-lk-theme="default"
         onDisconnected={() => setState({ phase: "idle" })}
         // We render the LiveKit toolbar ourselves so the bottom bar matches
@@ -239,9 +229,12 @@ export function ConferenceRoom({
             hostUserId={hostUserId}
           />
           {kind === "karaoke" && <KaraokeMusicAudioBridge />}
+          {/* Exactly one renderer per room — a second one plays every voice twice. */}
           <RoomAudioRenderer />
-
-          <RoomAudioRenderer />
+          <StartAudio
+            label="Enable room sound"
+            className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-lg"
+          />
         </RoomsShell>
       </LiveKitRoom>
     );
@@ -1001,13 +994,21 @@ function LivePreferencesPanel({ isHost }: { isHost: boolean }) {
       const raw = (e as CustomEvent<{ value: number }>).detail?.value;
       if (typeof raw !== "number") return;
       const v = Math.max(0, Math.min(1, raw));
+      micGainValue = v;
       local.localParticipant.audioTrackPublications.forEach((pub) => {
-        const t = pub.track as unknown as { setVolume?: (n: number) => void } | undefined;
-        try {
-          t?.setVolume?.(v);
-        } catch {
-          /* noop */
+        if (pub.source !== Track.Source.Microphone) return;
+        const t = pub.track;
+        if (!(t instanceof LocalAudioTrack)) return;
+        const existing = t.getProcessor();
+        if (existing instanceof MicGainProcessor) {
+          existing.setGain(v);
+          return;
         }
+        const proc = new MicGainProcessor(v);
+        t.setProcessor(proc).catch((err) => {
+          console.warn("[karaoke] mic gain processor failed", err);
+          toast.error("Couldn't change your mic level on this device.");
+        });
       });
     }
     window.addEventListener("karaoke:toggle-mic", onReq as EventListener);
@@ -1410,14 +1411,10 @@ function KaraokeMusicAudioBridge() {
         typeof navigator === "undefined" ||
         typeof navigator.mediaDevices?.getDisplayMedia !== "function"
       ) {
-        // Mobile / iOS Safari path: tab-audio capture is unavailable. The
-        // performer's mic already has echo-cancellation/NS/AGC disabled
-        // (see audioCaptureDefaults above), so the device speaker → mic
-        // path carries both the music and the singer's voice into LiveKit
-        // and into recordings. Just nudge the user to keep volume up.
-        toast.message("Singing live", {
+        // No speaker-to-microphone pickup: it creates echo and poor sound.
+        toast.error("This device can't broadcast YouTube music", {
           description:
-            "Keep your device speaker on — your mic will broadcast both your voice and the music to the room.",
+            "Only your voice will reach the room. Music broadcasting needs a desktop browser for now.",
         });
         return;
       }
@@ -1496,7 +1493,11 @@ function KaraokeMusicAudioBridge() {
       const anyMusic =
         Array.from(room.remoteParticipants.values()).some((p) =>
           Array.from(p.trackPublications.values()).some(
-            (pub) => pub.source === Track.Source.ScreenShareAudio,
+            (pub) =>
+              pub.source === Track.Source.ScreenShareAudio &&
+              pub.trackName === "karaoke-music" &&
+              !pub.isMuted &&
+              pub.isSubscribed,
           ),
         ) || !!trackRef.current;
       window.dispatchEvent(
