@@ -19,7 +19,7 @@ export const Route = createFileRoute("/_authenticated/contract-auditor")({
 type AuditRow = { id: string; role: "user" | "assistant"; parts: unknown; created_at: string };
 
 function ContractAuditorPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [input, setInput] = useState("");
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -27,7 +27,7 @@ function ContractAuditorPage() {
   const { messages, sendMessage, status, setMessages, stop } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/contract-audit",
-      headers: async () => {
+      headers: async (): Promise<Record<string, string>> => {
         const { data } = await supabase.auth.getSession();
         return data.session?.access_token
           ? { Authorization: `Bearer ${data.session.access_token}` }
@@ -41,7 +41,11 @@ function ContractAuditorPage() {
 
   // Load the single persisted conversation once.
   useEffect(() => {
-    if (!user || historyLoaded) return;
+    if (historyLoaded || authLoading) return;
+    if (!user) {
+      setHistoryLoaded(true);
+      return;
+    }
     let cancelled = false;
     (async () => {
       const { data, error } = await supabase
@@ -66,7 +70,7 @@ function ContractAuditorPage() {
     return () => {
       cancelled = true;
     };
-  }, [user, historyLoaded, setMessages]);
+  }, [user, authLoading, historyLoaded, setMessages]);
 
   // Keep the composer focused during normal use.
   useEffect(() => {
@@ -120,10 +124,12 @@ function ContractAuditorPage() {
       </div>
 
       <ScrollArea className="flex-1 rounded-md border p-3">
-        {!historyLoaded ? (
+        {!historyLoaded || authLoading ? (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Loader2 className="h-3 w-3 animate-spin" /> Loading your audit history…
           </div>
+        ) : !user ? (
+          <p className="text-sm text-muted-foreground">Sign in to use the contract auditor.</p>
         ) : messages.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             No audits yet. Paste a contract below to start — findings come back grouped by

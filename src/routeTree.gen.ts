@@ -9,61 +9,55 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as VerifyRouteImport } from './routes/verify'
-import { Route as McpRouteImport } from './routes/mcp'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as DiagnosticsRouteImport } from './routes/diagnostics'
-import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ApiContractAuditRouteImport } from './routes/api/contract-audit'
-import { Route as ApiChatRouteImport } from './routes/api/chat'
-import { Route as AuthenticatedSupportRouteImport } from './routes/_authenticated/support'
-import { Route as AuthenticatedSuperAdminRouteImport } from './routes/_authenticated/super-admin'
-import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
-import { Route as AuthenticatedLobbyRouteImport } from './routes/_authenticated/lobby'
-import { Route as AuthenticatedLifersRouteImport } from './routes/_authenticated/lifers'
-import { Route as AuthenticatedKaraokeRouteImport } from './routes/_authenticated/karaoke'
-import { Route as AuthenticatedContractAuditorRouteImport } from './routes/_authenticated/contract-auditor'
-import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
-import { Route as AuthenticatedActivityRouteImport } from './routes/_authenticated/activity'
-import { Route as AuthenticatedAccountMergeRouteImport } from './routes/_authenticated/account-merge'
-import { Route as AuthenticatedVerifiedRouteImport } from './routes/_authenticated/_verified'
-import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
+import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
+import { Route as DiagnosticsRouteImport } from './routes/diagnostics'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as McpRouteImport } from './routes/mcp'
+import { Route as VerifyRouteImport } from './routes/verify'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
-import { Route as AuthenticatedLifersIndexRouteImport } from './routes/_authenticated/lifers/index'
-import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
-import { Route as ApiPublicSecurityScanRouteImport } from './routes/api/public/security-scan'
-import { Route as ApiPublicHealthRouteImport } from './routes/api/public/health'
-import { Route as AuthenticatedLifersRoomRouteImport } from './routes/_authenticated/lifers/room'
-import { Route as AuthenticatedLifersMessagesRouteImport } from './routes/_authenticated/lifers/messages'
-import { Route as AuthenticatedKaraokeRoomIdRouteImport } from './routes/_authenticated/karaoke.$roomId'
-import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin.users'
-import { Route as AuthenticatedAdminSupportRouteImport } from './routes/_authenticated/admin.support'
-import { Route as AuthenticatedAdminOtherpageRouteImport } from './routes/_authenticated/admin.otherpage'
-import { Route as AuthenticatedAdminLuminaRouteImport } from './routes/_authenticated/admin.lumina'
-import { Route as AuthenticatedAdminKaraokeRouteImport } from './routes/_authenticated/admin.karaoke'
-import { Route as AuthenticatedVerifiedRoomsRouteImport } from './routes/_authenticated/_verified/rooms'
-import { Route as AuthenticatedVerifiedFeedRouteImport } from './routes/_authenticated/_verified/feed'
-import { Route as AuthenticatedVerifiedCalendarRouteImport } from './routes/_authenticated/_verified/calendar'
-import { Route as AuthenticatedVerifiedApeRidesRouteImport } from './routes/_authenticated/_verified/ape-rides'
-import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
+import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
+import { Route as AuthenticatedVerifiedRouteImport } from './routes/_authenticated/_verified'
+import { Route as AuthenticatedAccountMergeRouteImport } from './routes/_authenticated/account-merge'
+import { Route as AuthenticatedActivityRouteImport } from './routes/_authenticated/activity'
+import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AuthenticatedContractAuditorRouteImport } from './routes/_authenticated/contract-auditor'
+import { Route as AuthenticatedKaraokeRouteImport } from './routes/_authenticated/karaoke'
+import { Route as AuthenticatedLifersRouteImport } from './routes/_authenticated/lifers'
+import { Route as AuthenticatedLobbyRouteImport } from './routes/_authenticated/lobby'
+import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
+import { Route as AuthenticatedSuperAdminRouteImport } from './routes/_authenticated/super-admin'
+import { Route as AuthenticatedSupportRouteImport } from './routes/_authenticated/support'
+import { Route as ApiChatRouteImport } from './routes/api/chat'
+import { Route as ApiContractAuditRouteImport } from './routes/api/contract-audit'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
-import { Route as AuthenticatedVerifiedRoomsRoomIdRouteImport } from './routes/_authenticated/_verified/rooms_.$roomId'
+import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
+import { Route as AuthenticatedVerifiedApeRidesRouteImport } from './routes/_authenticated/_verified/ape-rides'
+import { Route as AuthenticatedVerifiedCalendarRouteImport } from './routes/_authenticated/_verified/calendar'
+import { Route as AuthenticatedVerifiedFeedRouteImport } from './routes/_authenticated/_verified/feed'
+import { Route as AuthenticatedVerifiedRoomsRouteImport } from './routes/_authenticated/_verified/rooms'
+import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
+import { Route as AuthenticatedAdminKaraokeRouteImport } from './routes/_authenticated/admin.karaoke'
+import { Route as AuthenticatedAdminLuminaRouteImport } from './routes/_authenticated/admin.lumina'
+import { Route as AuthenticatedAdminOtherpageRouteImport } from './routes/_authenticated/admin.otherpage'
+import { Route as AuthenticatedAdminSupportRouteImport } from './routes/_authenticated/admin.support'
+import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin.users'
+import { Route as AuthenticatedKaraokeRoomIdRouteImport } from './routes/_authenticated/karaoke.$roomId'
+import { Route as AuthenticatedLifersIndexRouteImport } from './routes/_authenticated/lifers/index'
+import { Route as AuthenticatedLifersMessagesRouteImport } from './routes/_authenticated/lifers/messages'
+import { Route as AuthenticatedLifersRoomRouteImport } from './routes/_authenticated/lifers/room'
+import { Route as ApiPublicHealthRouteImport } from './routes/api/public/health'
+import { Route as ApiPublicSecurityScanRouteImport } from './routes/api/public/security-scan'
 import { Route as AuthenticatedVerifiedApeRidesRideIdRouteImport } from './routes/_authenticated/_verified/ape-rides.$rideId'
+import { Route as AuthenticatedVerifiedRoomsRoomIdRouteImport } from './routes/_authenticated/_verified/rooms_.$roomId'
 
-const VerifyRoute = VerifyRouteImport.update({
-  id: '/verify',
-  path: '/verify',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const McpRoute = McpRouteImport.update({
-  id: '/mcp',
-  path: '/mcp',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
+const AuthenticatedRoute = AuthenticatedRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DiagnosticsRoute = DiagnosticsRouteImport.update({
@@ -71,69 +65,35 @@ const DiagnosticsRoute = DiagnosticsRouteImport.update({
   path: '/diagnostics',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedRoute = AuthenticatedRouteImport.update({
-  id: '/_authenticated',
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const McpRoute = McpRouteImport.update({
+  id: '/mcp',
+  path: '/mcp',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiContractAuditRoute = ApiContractAuditRouteImport.update({
-  id: '/api/contract-audit',
-  path: '/api/contract-audit',
+const VerifyRoute = VerifyRouteImport.update({
+  id: '/verify',
+  path: '/verify',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiChatRoute = ApiChatRouteImport.update({
-  id: '/api/chat',
-  path: '/api/chat',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthenticatedSupportRoute = AuthenticatedSupportRouteImport.update({
-  id: '/support',
-  path: '/support',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedSuperAdminRoute = AuthenticatedSuperAdminRouteImport.update({
-  id: '/super-admin',
-  path: '/super-admin',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
-  id: '/profile',
-  path: '/profile',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedLobbyRoute = AuthenticatedLobbyRouteImport.update({
-  id: '/lobby',
-  path: '/lobby',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedLifersRoute = AuthenticatedLifersRouteImport.update({
-  id: '/lifers',
-  path: '/lifers',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedKaraokeRoute = AuthenticatedKaraokeRouteImport.update({
-  id: '/karaoke',
-  path: '/karaoke',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedContractAuditorRoute =
-  AuthenticatedContractAuditorRouteImport.update({
-    id: '/contract-auditor',
-    path: '/contract-auditor',
-    getParentRoute: () => AuthenticatedRoute,
+const Char91DotmcpChar93ListToolsRoute =
+  Char91DotmcpChar93ListToolsRouteImport.update({
+    id: '/.mcp/list-tools',
+    path: '/.mcp/list-tools',
+    getParentRoute: () => rootRouteImport,
   } as any)
-const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedActivityRoute = AuthenticatedActivityRouteImport.update({
-  id: '/activity',
-  path: '/activity',
+const Char91DotwellKnownChar93OauthProtectedResourceRoute =
+  Char91DotwellKnownChar93OauthProtectedResourceRouteImport.update({
+    id: '/.well-known/oauth-protected-resource',
+    path: '/.well-known/oauth-protected-resource',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const AuthenticatedVerifiedRoute = AuthenticatedVerifiedRouteImport.update({
+  id: '/_verified',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedAccountMergeRoute =
@@ -142,99 +102,77 @@ const AuthenticatedAccountMergeRoute =
     path: '/account-merge',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedVerifiedRoute = AuthenticatedVerifiedRouteImport.update({
-  id: '/_verified',
+const AuthenticatedActivityRoute = AuthenticatedActivityRouteImport.update({
+  id: '/activity',
+  path: '/activity',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const Char91DotwellKnownChar93OauthProtectedResourceRoute =
-  Char91DotwellKnownChar93OauthProtectedResourceRouteImport.update({
-    id: '/.well-known/oauth-protected-resource',
-    path: '/.well-known/oauth-protected-resource',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const Char91DotmcpChar93ListToolsRoute =
-  Char91DotmcpChar93ListToolsRouteImport.update({
-    id: '/.mcp/list-tools',
-    path: '/.mcp/list-tools',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const AuthenticatedLifersIndexRoute =
-  AuthenticatedLifersIndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => AuthenticatedLifersRoute,
-  } as any)
-const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => AuthenticatedAdminRoute,
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AuthenticatedRoute,
 } as any)
-const ApiPublicSecurityScanRoute = ApiPublicSecurityScanRouteImport.update({
-  id: '/api/public/security-scan',
-  path: '/api/public/security-scan',
+const AuthenticatedContractAuditorRoute =
+  AuthenticatedContractAuditorRouteImport.update({
+    id: '/contract-auditor',
+    path: '/contract-auditor',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedKaraokeRoute = AuthenticatedKaraokeRouteImport.update({
+  id: '/karaoke',
+  path: '/karaoke',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedLifersRoute = AuthenticatedLifersRouteImport.update({
+  id: '/lifers',
+  path: '/lifers',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedLobbyRoute = AuthenticatedLobbyRouteImport.update({
+  id: '/lobby',
+  path: '/lobby',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedSuperAdminRoute = AuthenticatedSuperAdminRouteImport.update({
+  id: '/super-admin',
+  path: '/super-admin',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedSupportRoute = AuthenticatedSupportRouteImport.update({
+  id: '/support',
+  path: '/support',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const ApiChatRoute = ApiChatRouteImport.update({
+  id: '/api/chat',
+  path: '/api/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicHealthRoute = ApiPublicHealthRouteImport.update({
-  id: '/api/public/health',
-  path: '/api/public/health',
+const ApiContractAuditRoute = ApiContractAuditRouteImport.update({
+  id: '/api/contract-audit',
+  path: '/api/contract-audit',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedLifersRoomRoute = AuthenticatedLifersRoomRouteImport.update({
-  id: '/room',
-  path: '/room',
-  getParentRoute: () => AuthenticatedLifersRoute,
+const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
+  id: '/.lovable/oauth/consent',
+  path: '/.lovable/oauth/consent',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedLifersMessagesRoute =
-  AuthenticatedLifersMessagesRouteImport.update({
-    id: '/messages',
-    path: '/messages',
-    getParentRoute: () => AuthenticatedLifersRoute,
+const Char91DotmcpChar93InvokeToolToolRoute =
+  Char91DotmcpChar93InvokeToolToolRouteImport.update({
+    id: '/.mcp/invoke-tool/$tool',
+    path: '/.mcp/invoke-tool/$tool',
+    getParentRoute: () => rootRouteImport,
   } as any)
-const AuthenticatedKaraokeRoomIdRoute =
-  AuthenticatedKaraokeRoomIdRouteImport.update({
-    id: '/$roomId',
-    path: '/$roomId',
-    getParentRoute: () => AuthenticatedKaraokeRoute,
-  } as any)
-const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
-  id: '/users',
-  path: '/users',
-  getParentRoute: () => AuthenticatedAdminRoute,
-} as any)
-const AuthenticatedAdminSupportRoute =
-  AuthenticatedAdminSupportRouteImport.update({
-    id: '/support',
-    path: '/support',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminOtherpageRoute =
-  AuthenticatedAdminOtherpageRouteImport.update({
-    id: '/otherpage',
-    path: '/otherpage',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminLuminaRoute =
-  AuthenticatedAdminLuminaRouteImport.update({
-    id: '/lumina',
-    path: '/lumina',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminKaraokeRoute =
-  AuthenticatedAdminKaraokeRouteImport.update({
-    id: '/karaoke',
-    path: '/karaoke',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedVerifiedRoomsRoute =
-  AuthenticatedVerifiedRoomsRouteImport.update({
-    id: '/rooms',
-    path: '/rooms',
-    getParentRoute: () => AuthenticatedVerifiedRoute,
-  } as any)
-const AuthenticatedVerifiedFeedRoute =
-  AuthenticatedVerifiedFeedRouteImport.update({
-    id: '/feed',
-    path: '/feed',
+const AuthenticatedVerifiedApeRidesRoute =
+  AuthenticatedVerifiedApeRidesRouteImport.update({
+    id: '/ape-rides',
+    path: '/ape-rides',
     getParentRoute: () => AuthenticatedVerifiedRoute,
   } as any)
 const AuthenticatedVerifiedCalendarRoute =
@@ -243,34 +181,96 @@ const AuthenticatedVerifiedCalendarRoute =
     path: '/calendar',
     getParentRoute: () => AuthenticatedVerifiedRoute,
   } as any)
-const AuthenticatedVerifiedApeRidesRoute =
-  AuthenticatedVerifiedApeRidesRouteImport.update({
-    id: '/ape-rides',
-    path: '/ape-rides',
+const AuthenticatedVerifiedFeedRoute =
+  AuthenticatedVerifiedFeedRouteImport.update({
+    id: '/feed',
+    path: '/feed',
     getParentRoute: () => AuthenticatedVerifiedRoute,
   } as any)
-const Char91DotmcpChar93InvokeToolToolRoute =
-  Char91DotmcpChar93InvokeToolToolRouteImport.update({
-    id: '/.mcp/invoke-tool/$tool',
-    path: '/.mcp/invoke-tool/$tool',
-    getParentRoute: () => rootRouteImport,
+const AuthenticatedVerifiedRoomsRoute =
+  AuthenticatedVerifiedRoomsRouteImport.update({
+    id: '/rooms',
+    path: '/rooms',
+    getParentRoute: () => AuthenticatedVerifiedRoute,
   } as any)
-const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
-  id: '/.lovable/oauth/consent',
-  path: '/.lovable/oauth/consent',
+const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
+const AuthenticatedAdminKaraokeRoute =
+  AuthenticatedAdminKaraokeRouteImport.update({
+    id: '/karaoke',
+    path: '/karaoke',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminLuminaRoute =
+  AuthenticatedAdminLuminaRouteImport.update({
+    id: '/lumina',
+    path: '/lumina',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminOtherpageRoute =
+  AuthenticatedAdminOtherpageRouteImport.update({
+    id: '/otherpage',
+    path: '/otherpage',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminSupportRoute =
+  AuthenticatedAdminSupportRouteImport.update({
+    id: '/support',
+    path: '/support',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
+const AuthenticatedKaraokeRoomIdRoute =
+  AuthenticatedKaraokeRoomIdRouteImport.update({
+    id: '/$roomId',
+    path: '/$roomId',
+    getParentRoute: () => AuthenticatedKaraokeRoute,
+  } as any)
+const AuthenticatedLifersIndexRoute =
+  AuthenticatedLifersIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedLifersRoute,
+  } as any)
+const AuthenticatedLifersMessagesRoute =
+  AuthenticatedLifersMessagesRouteImport.update({
+    id: '/messages',
+    path: '/messages',
+    getParentRoute: () => AuthenticatedLifersRoute,
+  } as any)
+const AuthenticatedLifersRoomRoute = AuthenticatedLifersRoomRouteImport.update({
+  id: '/room',
+  path: '/room',
+  getParentRoute: () => AuthenticatedLifersRoute,
+} as any)
+const ApiPublicHealthRoute = ApiPublicHealthRouteImport.update({
+  id: '/api/public/health',
+  path: '/api/public/health',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedVerifiedRoomsRoomIdRoute =
-  AuthenticatedVerifiedRoomsRoomIdRouteImport.update({
-    id: '/rooms_/$roomId',
-    path: '/rooms/$roomId',
-    getParentRoute: () => AuthenticatedVerifiedRoute,
-  } as any)
+const ApiPublicSecurityScanRoute = ApiPublicSecurityScanRouteImport.update({
+  id: '/api/public/security-scan',
+  path: '/api/public/security-scan',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedVerifiedApeRidesRideIdRoute =
   AuthenticatedVerifiedApeRidesRideIdRouteImport.update({
     id: '/$rideId',
     path: '/$rideId',
     getParentRoute: () => AuthenticatedVerifiedApeRidesRoute,
+  } as any)
+const AuthenticatedVerifiedRoomsRoomIdRoute =
+  AuthenticatedVerifiedRoomsRoomIdRouteImport.update({
+    id: '/rooms_/$roomId',
+    path: '/rooms/$roomId',
+    getParentRoute: () => AuthenticatedVerifiedRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -542,32 +542,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/verify': {
-      id: '/verify'
-      path: '/verify'
-      fullPath: '/verify'
-      preLoaderRoute: typeof VerifyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/mcp': {
-      id: '/mcp'
-      path: '/mcp'
-      fullPath: '/mcp'
-      preLoaderRoute: typeof McpRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/diagnostics': {
-      id: '/diagnostics'
-      path: '/diagnostics'
-      fullPath: '/diagnostics'
-      preLoaderRoute: typeof DiagnosticsRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -577,109 +556,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/diagnostics': {
+      id: '/diagnostics'
+      path: '/diagnostics'
+      fullPath: '/diagnostics'
+      preLoaderRoute: typeof DiagnosticsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/contract-audit': {
-      id: '/api/contract-audit'
-      path: '/api/contract-audit'
-      fullPath: '/api/contract-audit'
-      preLoaderRoute: typeof ApiContractAuditRouteImport
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/chat': {
-      id: '/api/chat'
-      path: '/api/chat'
-      fullPath: '/api/chat'
-      preLoaderRoute: typeof ApiChatRouteImport
+    '/mcp': {
+      id: '/mcp'
+      path: '/mcp'
+      fullPath: '/mcp'
+      preLoaderRoute: typeof McpRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/support': {
-      id: '/_authenticated/support'
-      path: '/support'
-      fullPath: '/support'
-      preLoaderRoute: typeof AuthenticatedSupportRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/super-admin': {
-      id: '/_authenticated/super-admin'
-      path: '/super-admin'
-      fullPath: '/super-admin'
-      preLoaderRoute: typeof AuthenticatedSuperAdminRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/profile': {
-      id: '/_authenticated/profile'
-      path: '/profile'
-      fullPath: '/profile'
-      preLoaderRoute: typeof AuthenticatedProfileRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/lobby': {
-      id: '/_authenticated/lobby'
-      path: '/lobby'
-      fullPath: '/lobby'
-      preLoaderRoute: typeof AuthenticatedLobbyRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/lifers': {
-      id: '/_authenticated/lifers'
-      path: '/lifers'
-      fullPath: '/lifers'
-      preLoaderRoute: typeof AuthenticatedLifersRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/karaoke': {
-      id: '/_authenticated/karaoke'
-      path: '/karaoke'
-      fullPath: '/karaoke'
-      preLoaderRoute: typeof AuthenticatedKaraokeRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/contract-auditor': {
-      id: '/_authenticated/contract-auditor'
-      path: '/contract-auditor'
-      fullPath: '/contract-auditor'
-      preLoaderRoute: typeof AuthenticatedContractAuditorRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/admin': {
-      id: '/_authenticated/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AuthenticatedAdminRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/activity': {
-      id: '/_authenticated/activity'
-      path: '/activity'
-      fullPath: '/activity'
-      preLoaderRoute: typeof AuthenticatedActivityRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/account-merge': {
-      id: '/_authenticated/account-merge'
-      path: '/account-merge'
-      fullPath: '/account-merge'
-      preLoaderRoute: typeof AuthenticatedAccountMergeRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/_verified': {
-      id: '/_authenticated/_verified'
-      path: ''
-      fullPath: '/'
-      preLoaderRoute: typeof AuthenticatedVerifiedRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/.well-known/oauth-protected-resource': {
-      id: '/.well-known/oauth-protected-resource'
-      path: '/.well-known/oauth-protected-resource'
-      fullPath: '/.well-known/oauth-protected-resource'
-      preLoaderRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRouteImport
+    '/verify': {
+      id: '/verify'
+      path: '/verify'
+      fullPath: '/verify'
+      preLoaderRoute: typeof VerifyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/.mcp/list-tools': {
@@ -689,123 +591,102 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char91DotmcpChar93ListToolsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/lifers/': {
-      id: '/_authenticated/lifers/'
-      path: '/'
-      fullPath: '/lifers/'
-      preLoaderRoute: typeof AuthenticatedLifersIndexRouteImport
-      parentRoute: typeof AuthenticatedLifersRoute
-    }
-    '/_authenticated/admin/': {
-      id: '/_authenticated/admin/'
-      path: '/'
-      fullPath: '/admin/'
-      preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/api/public/security-scan': {
-      id: '/api/public/security-scan'
-      path: '/api/public/security-scan'
-      fullPath: '/api/public/security-scan'
-      preLoaderRoute: typeof ApiPublicSecurityScanRouteImport
+    '/.well-known/oauth-protected-resource': {
+      id: '/.well-known/oauth-protected-resource'
+      path: '/.well-known/oauth-protected-resource'
+      fullPath: '/.well-known/oauth-protected-resource'
+      preLoaderRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/health': {
-      id: '/api/public/health'
-      path: '/api/public/health'
-      fullPath: '/api/public/health'
-      preLoaderRoute: typeof ApiPublicHealthRouteImport
-      parentRoute: typeof rootRouteImport
+    '/_authenticated/_verified': {
+      id: '/_authenticated/_verified'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedVerifiedRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/lifers/room': {
-      id: '/_authenticated/lifers/room'
-      path: '/room'
-      fullPath: '/lifers/room'
-      preLoaderRoute: typeof AuthenticatedLifersRoomRouteImport
-      parentRoute: typeof AuthenticatedLifersRoute
+    '/_authenticated/account-merge': {
+      id: '/_authenticated/account-merge'
+      path: '/account-merge'
+      fullPath: '/account-merge'
+      preLoaderRoute: typeof AuthenticatedAccountMergeRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/lifers/messages': {
-      id: '/_authenticated/lifers/messages'
-      path: '/messages'
-      fullPath: '/lifers/messages'
-      preLoaderRoute: typeof AuthenticatedLifersMessagesRouteImport
-      parentRoute: typeof AuthenticatedLifersRoute
+    '/_authenticated/activity': {
+      id: '/_authenticated/activity'
+      path: '/activity'
+      fullPath: '/activity'
+      preLoaderRoute: typeof AuthenticatedActivityRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/karaoke/$roomId': {
-      id: '/_authenticated/karaoke/$roomId'
-      path: '/$roomId'
-      fullPath: '/karaoke/$roomId'
-      preLoaderRoute: typeof AuthenticatedKaraokeRoomIdRouteImport
-      parentRoute: typeof AuthenticatedKaraokeRoute
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/admin/users': {
-      id: '/_authenticated/admin/users'
-      path: '/users'
-      fullPath: '/admin/users'
-      preLoaderRoute: typeof AuthenticatedAdminUsersRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
+    '/_authenticated/contract-auditor': {
+      id: '/_authenticated/contract-auditor'
+      path: '/contract-auditor'
+      fullPath: '/contract-auditor'
+      preLoaderRoute: typeof AuthenticatedContractAuditorRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/admin/support': {
-      id: '/_authenticated/admin/support'
-      path: '/support'
-      fullPath: '/admin/support'
-      preLoaderRoute: typeof AuthenticatedAdminSupportRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/otherpage': {
-      id: '/_authenticated/admin/otherpage'
-      path: '/otherpage'
-      fullPath: '/admin/otherpage'
-      preLoaderRoute: typeof AuthenticatedAdminOtherpageRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/lumina': {
-      id: '/_authenticated/admin/lumina'
-      path: '/lumina'
-      fullPath: '/admin/lumina'
-      preLoaderRoute: typeof AuthenticatedAdminLuminaRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/karaoke': {
-      id: '/_authenticated/admin/karaoke'
+    '/_authenticated/karaoke': {
+      id: '/_authenticated/karaoke'
       path: '/karaoke'
-      fullPath: '/admin/karaoke'
-      preLoaderRoute: typeof AuthenticatedAdminKaraokeRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
+      fullPath: '/karaoke'
+      preLoaderRoute: typeof AuthenticatedKaraokeRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/_verified/rooms': {
-      id: '/_authenticated/_verified/rooms'
-      path: '/rooms'
-      fullPath: '/rooms'
-      preLoaderRoute: typeof AuthenticatedVerifiedRoomsRouteImport
-      parentRoute: typeof AuthenticatedVerifiedRoute
+    '/_authenticated/lifers': {
+      id: '/_authenticated/lifers'
+      path: '/lifers'
+      fullPath: '/lifers'
+      preLoaderRoute: typeof AuthenticatedLifersRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/_verified/feed': {
-      id: '/_authenticated/_verified/feed'
-      path: '/feed'
-      fullPath: '/feed'
-      preLoaderRoute: typeof AuthenticatedVerifiedFeedRouteImport
-      parentRoute: typeof AuthenticatedVerifiedRoute
+    '/_authenticated/lobby': {
+      id: '/_authenticated/lobby'
+      path: '/lobby'
+      fullPath: '/lobby'
+      preLoaderRoute: typeof AuthenticatedLobbyRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/_verified/calendar': {
-      id: '/_authenticated/_verified/calendar'
-      path: '/calendar'
-      fullPath: '/calendar'
-      preLoaderRoute: typeof AuthenticatedVerifiedCalendarRouteImport
-      parentRoute: typeof AuthenticatedVerifiedRoute
+    '/_authenticated/profile': {
+      id: '/_authenticated/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof AuthenticatedProfileRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/_verified/ape-rides': {
-      id: '/_authenticated/_verified/ape-rides'
-      path: '/ape-rides'
-      fullPath: '/ape-rides'
-      preLoaderRoute: typeof AuthenticatedVerifiedApeRidesRouteImport
-      parentRoute: typeof AuthenticatedVerifiedRoute
+    '/_authenticated/super-admin': {
+      id: '/_authenticated/super-admin'
+      path: '/super-admin'
+      fullPath: '/super-admin'
+      preLoaderRoute: typeof AuthenticatedSuperAdminRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
-    '/.mcp/invoke-tool/$tool': {
-      id: '/.mcp/invoke-tool/$tool'
-      path: '/.mcp/invoke-tool/$tool'
-      fullPath: '/.mcp/invoke-tool/$tool'
-      preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
+    '/_authenticated/support': {
+      id: '/_authenticated/support'
+      path: '/support'
+      fullPath: '/support'
+      preLoaderRoute: typeof AuthenticatedSupportRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/api/chat': {
+      id: '/api/chat'
+      path: '/api/chat'
+      fullPath: '/api/chat'
+      preLoaderRoute: typeof ApiChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/contract-audit': {
+      id: '/api/contract-audit'
+      path: '/api/contract-audit'
+      fullPath: '/api/contract-audit'
+      preLoaderRoute: typeof ApiContractAuditRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/.lovable/oauth/consent': {
@@ -815,12 +696,124 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DotlovableOauthConsentRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/_verified/rooms_/$roomId': {
-      id: '/_authenticated/_verified/rooms_/$roomId'
-      path: '/rooms/$roomId'
-      fullPath: '/rooms/$roomId'
-      preLoaderRoute: typeof AuthenticatedVerifiedRoomsRoomIdRouteImport
+    '/.mcp/invoke-tool/$tool': {
+      id: '/.mcp/invoke-tool/$tool'
+      path: '/.mcp/invoke-tool/$tool'
+      fullPath: '/.mcp/invoke-tool/$tool'
+      preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/_verified/ape-rides': {
+      id: '/_authenticated/_verified/ape-rides'
+      path: '/ape-rides'
+      fullPath: '/ape-rides'
+      preLoaderRoute: typeof AuthenticatedVerifiedApeRidesRouteImport
       parentRoute: typeof AuthenticatedVerifiedRoute
+    }
+    '/_authenticated/_verified/calendar': {
+      id: '/_authenticated/_verified/calendar'
+      path: '/calendar'
+      fullPath: '/calendar'
+      preLoaderRoute: typeof AuthenticatedVerifiedCalendarRouteImport
+      parentRoute: typeof AuthenticatedVerifiedRoute
+    }
+    '/_authenticated/_verified/feed': {
+      id: '/_authenticated/_verified/feed'
+      path: '/feed'
+      fullPath: '/feed'
+      preLoaderRoute: typeof AuthenticatedVerifiedFeedRouteImport
+      parentRoute: typeof AuthenticatedVerifiedRoute
+    }
+    '/_authenticated/_verified/rooms': {
+      id: '/_authenticated/_verified/rooms'
+      path: '/rooms'
+      fullPath: '/rooms'
+      preLoaderRoute: typeof AuthenticatedVerifiedRoomsRouteImport
+      parentRoute: typeof AuthenticatedVerifiedRoute
+    }
+    '/_authenticated/admin/': {
+      id: '/_authenticated/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/karaoke': {
+      id: '/_authenticated/admin/karaoke'
+      path: '/karaoke'
+      fullPath: '/admin/karaoke'
+      preLoaderRoute: typeof AuthenticatedAdminKaraokeRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/lumina': {
+      id: '/_authenticated/admin/lumina'
+      path: '/lumina'
+      fullPath: '/admin/lumina'
+      preLoaderRoute: typeof AuthenticatedAdminLuminaRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/otherpage': {
+      id: '/_authenticated/admin/otherpage'
+      path: '/otherpage'
+      fullPath: '/admin/otherpage'
+      preLoaderRoute: typeof AuthenticatedAdminOtherpageRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/support': {
+      id: '/_authenticated/admin/support'
+      path: '/support'
+      fullPath: '/admin/support'
+      preLoaderRoute: typeof AuthenticatedAdminSupportRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/users': {
+      id: '/_authenticated/admin/users'
+      path: '/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AuthenticatedAdminUsersRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/karaoke/$roomId': {
+      id: '/_authenticated/karaoke/$roomId'
+      path: '/$roomId'
+      fullPath: '/karaoke/$roomId'
+      preLoaderRoute: typeof AuthenticatedKaraokeRoomIdRouteImport
+      parentRoute: typeof AuthenticatedKaraokeRoute
+    }
+    '/_authenticated/lifers/': {
+      id: '/_authenticated/lifers/'
+      path: '/'
+      fullPath: '/lifers/'
+      preLoaderRoute: typeof AuthenticatedLifersIndexRouteImport
+      parentRoute: typeof AuthenticatedLifersRoute
+    }
+    '/_authenticated/lifers/messages': {
+      id: '/_authenticated/lifers/messages'
+      path: '/messages'
+      fullPath: '/lifers/messages'
+      preLoaderRoute: typeof AuthenticatedLifersMessagesRouteImport
+      parentRoute: typeof AuthenticatedLifersRoute
+    }
+    '/_authenticated/lifers/room': {
+      id: '/_authenticated/lifers/room'
+      path: '/room'
+      fullPath: '/lifers/room'
+      preLoaderRoute: typeof AuthenticatedLifersRoomRouteImport
+      parentRoute: typeof AuthenticatedLifersRoute
+    }
+    '/api/public/health': {
+      id: '/api/public/health'
+      path: '/api/public/health'
+      fullPath: '/api/public/health'
+      preLoaderRoute: typeof ApiPublicHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/security-scan': {
+      id: '/api/public/security-scan'
+      path: '/api/public/security-scan'
+      fullPath: '/api/public/security-scan'
+      preLoaderRoute: typeof ApiPublicSecurityScanRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/_verified/ape-rides/$rideId': {
       id: '/_authenticated/_verified/ape-rides/$rideId'
@@ -828,6 +821,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/ape-rides/$rideId'
       preLoaderRoute: typeof AuthenticatedVerifiedApeRidesRideIdRouteImport
       parentRoute: typeof AuthenticatedVerifiedApeRidesRoute
+    }
+    '/_authenticated/_verified/rooms_/$roomId': {
+      id: '/_authenticated/_verified/rooms_/$roomId'
+      path: '/rooms/$roomId'
+      fullPath: '/rooms/$roomId'
+      preLoaderRoute: typeof AuthenticatedVerifiedRoomsRoomIdRouteImport
+      parentRoute: typeof AuthenticatedVerifiedRoute
     }
   }
 }
