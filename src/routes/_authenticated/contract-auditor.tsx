@@ -41,7 +41,11 @@ function ContractAuditorPage() {
 
   // Load the single persisted conversation once.
   useEffect(() => {
-    if (!user || historyLoaded) return;
+    if (historyLoaded || authLoading) return;
+    if (!user) {
+      setHistoryLoaded(true);
+      return;
+    }
     let cancelled = false;
     (async () => {
       const { data, error } = await supabase
