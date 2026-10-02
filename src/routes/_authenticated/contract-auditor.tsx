@@ -70,7 +70,7 @@ function ContractAuditorPage() {
     return () => {
       cancelled = true;
     };
-  }, [user, historyLoaded, setMessages]);
+  }, [user, authLoading, historyLoaded, setMessages]);
 
   // Keep the composer focused during normal use.
   useEffect(() => {
