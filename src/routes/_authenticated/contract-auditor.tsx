@@ -27,7 +27,7 @@ function ContractAuditorPage() {
   const { messages, sendMessage, status, setMessages, stop } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/contract-audit",
-      headers: async () => {
+      headers: async (): Promise<Record<string, string>> => {
         const { data } = await supabase.auth.getSession();
         return data.session?.access_token
           ? { Authorization: `Bearer ${data.session.access_token}` }
