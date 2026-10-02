@@ -19,7 +19,7 @@ export const Route = createFileRoute("/_authenticated/contract-auditor")({
 type AuditRow = { id: string; role: "user" | "assistant"; parts: unknown; created_at: string };
 
 function ContractAuditorPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [input, setInput] = useState("");
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -120,10 +120,12 @@ function ContractAuditorPage() {
       </div>
 
       <ScrollArea className="flex-1 rounded-md border p-3">
-        {!historyLoaded ? (
+        {!historyLoaded || authLoading ? (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Loader2 className="h-3 w-3 animate-spin" /> Loading your audit history…
           </div>
+        ) : !user ? (
+          <p className="text-sm text-muted-foreground">Sign in to use the contract auditor.</p>
         ) : messages.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             No audits yet. Paste a contract below to start — findings come back grouped by
