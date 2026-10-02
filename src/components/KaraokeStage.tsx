@@ -440,18 +440,15 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
         );
       }
     }
-    function onVisibility() {
-      if (document.visibilityState === "hidden") cleanupSelf();
-    }
+    // Hiding the tab (switching apps, opening a share picker) must NOT
+    // release the stage, so only real page exits clean up.
     window.addEventListener("pagehide", cleanupSelf);
     window.addEventListener("beforeunload", cleanupSelf);
     window.addEventListener("baycmc:karaoke-cleanup-self", cleanupSelf);
-    document.addEventListener("visibilitychange", onVisibility);
     return () => {
       window.removeEventListener("pagehide", cleanupSelf);
       window.removeEventListener("beforeunload", cleanupSelf);
       window.removeEventListener("baycmc:karaoke-cleanup-self", cleanupSelf);
-      document.removeEventListener("visibilitychange", onVisibility);
       cleanupSelf();
     };
   }, [roomId]);
