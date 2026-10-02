@@ -15,6 +15,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as DiagnosticsRouteImport } from './routes/diagnostics'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiContractAuditRouteImport } from './routes/api/contract-audit'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as AuthenticatedSupportRouteImport } from './routes/_authenticated/support'
 import { Route as AuthenticatedSuperAdminRouteImport } from './routes/_authenticated/super-admin'
@@ -22,6 +23,7 @@ import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedLobbyRouteImport } from './routes/_authenticated/lobby'
 import { Route as AuthenticatedLifersRouteImport } from './routes/_authenticated/lifers'
 import { Route as AuthenticatedKaraokeRouteImport } from './routes/_authenticated/karaoke'
+import { Route as AuthenticatedContractAuditorRouteImport } from './routes/_authenticated/contract-auditor'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedActivityRouteImport } from './routes/_authenticated/activity'
 import { Route as AuthenticatedAccountMergeRouteImport } from './routes/_authenticated/account-merge'
@@ -78,6 +80,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiContractAuditRoute = ApiContractAuditRouteImport.update({
+  id: '/api/contract-audit',
+  path: '/api/contract-audit',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiChatRoute = ApiChatRouteImport.update({
   id: '/api/chat',
   path: '/api/chat',
@@ -113,6 +120,12 @@ const AuthenticatedKaraokeRoute = AuthenticatedKaraokeRouteImport.update({
   path: '/karaoke',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedContractAuditorRoute =
+  AuthenticatedContractAuditorRouteImport.update({
+    id: '/contract-auditor',
+    path: '/contract-auditor',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -271,6 +284,7 @@ export interface FileRoutesByFullPath {
   '/account-merge': typeof AuthenticatedAccountMergeRoute
   '/activity': typeof AuthenticatedActivityRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/contract-auditor': typeof AuthenticatedContractAuditorRoute
   '/karaoke': typeof AuthenticatedKaraokeRouteWithChildren
   '/lifers': typeof AuthenticatedLifersRouteWithChildren
   '/lobby': typeof AuthenticatedLobbyRoute
@@ -278,6 +292,7 @@ export interface FileRoutesByFullPath {
   '/super-admin': typeof AuthenticatedSuperAdminRoute
   '/support': typeof AuthenticatedSupportRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/contract-audit': typeof ApiContractAuditRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/ape-rides': typeof AuthenticatedVerifiedApeRidesRouteWithChildren
@@ -309,12 +324,14 @@ export interface FileRoutesByTo {
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/account-merge': typeof AuthenticatedAccountMergeRoute
   '/activity': typeof AuthenticatedActivityRoute
+  '/contract-auditor': typeof AuthenticatedContractAuditorRoute
   '/karaoke': typeof AuthenticatedKaraokeRouteWithChildren
   '/lobby': typeof AuthenticatedLobbyRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/super-admin': typeof AuthenticatedSuperAdminRoute
   '/support': typeof AuthenticatedSupportRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/contract-audit': typeof ApiContractAuditRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/ape-rides': typeof AuthenticatedVerifiedApeRidesRouteWithChildren
@@ -350,6 +367,7 @@ export interface FileRoutesById {
   '/_authenticated/account-merge': typeof AuthenticatedAccountMergeRoute
   '/_authenticated/activity': typeof AuthenticatedActivityRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/_authenticated/contract-auditor': typeof AuthenticatedContractAuditorRoute
   '/_authenticated/karaoke': typeof AuthenticatedKaraokeRouteWithChildren
   '/_authenticated/lifers': typeof AuthenticatedLifersRouteWithChildren
   '/_authenticated/lobby': typeof AuthenticatedLobbyRoute
@@ -357,6 +375,7 @@ export interface FileRoutesById {
   '/_authenticated/super-admin': typeof AuthenticatedSuperAdminRoute
   '/_authenticated/support': typeof AuthenticatedSupportRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/contract-audit': typeof ApiContractAuditRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/_authenticated/_verified/ape-rides': typeof AuthenticatedVerifiedApeRidesRouteWithChildren
@@ -391,6 +410,7 @@ export interface FileRouteTypes {
     | '/account-merge'
     | '/activity'
     | '/admin'
+    | '/contract-auditor'
     | '/karaoke'
     | '/lifers'
     | '/lobby'
@@ -398,6 +418,7 @@ export interface FileRouteTypes {
     | '/super-admin'
     | '/support'
     | '/api/chat'
+    | '/api/contract-audit'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/ape-rides'
@@ -429,12 +450,14 @@ export interface FileRouteTypes {
     | '/.well-known/oauth-protected-resource'
     | '/account-merge'
     | '/activity'
+    | '/contract-auditor'
     | '/karaoke'
     | '/lobby'
     | '/profile'
     | '/super-admin'
     | '/support'
     | '/api/chat'
+    | '/api/contract-audit'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/ape-rides'
@@ -469,6 +492,7 @@ export interface FileRouteTypes {
     | '/_authenticated/account-merge'
     | '/_authenticated/activity'
     | '/_authenticated/admin'
+    | '/_authenticated/contract-auditor'
     | '/_authenticated/karaoke'
     | '/_authenticated/lifers'
     | '/_authenticated/lobby'
@@ -476,6 +500,7 @@ export interface FileRouteTypes {
     | '/_authenticated/super-admin'
     | '/_authenticated/support'
     | '/api/chat'
+    | '/api/contract-audit'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/_authenticated/_verified/ape-rides'
@@ -508,6 +533,7 @@ export interface RootRouteChildren {
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   ApiChatRoute: typeof ApiChatRoute
+  ApiContractAuditRoute: typeof ApiContractAuditRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   ApiPublicHealthRoute: typeof ApiPublicHealthRoute
@@ -558,6 +584,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/contract-audit': {
+      id: '/api/contract-audit'
+      path: '/api/contract-audit'
+      fullPath: '/api/contract-audit'
+      preLoaderRoute: typeof ApiContractAuditRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/chat': {
       id: '/api/chat'
       path: '/api/chat'
@@ -605,6 +638,13 @@ declare module '@tanstack/react-router' {
       path: '/karaoke'
       fullPath: '/karaoke'
       preLoaderRoute: typeof AuthenticatedKaraokeRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/contract-auditor': {
+      id: '/_authenticated/contract-auditor'
+      path: '/contract-auditor'
+      fullPath: '/contract-auditor'
+      preLoaderRoute: typeof AuthenticatedContractAuditorRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/admin': {
@@ -881,6 +921,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAccountMergeRoute: typeof AuthenticatedAccountMergeRoute
   AuthenticatedActivityRoute: typeof AuthenticatedActivityRoute
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
+  AuthenticatedContractAuditorRoute: typeof AuthenticatedContractAuditorRoute
   AuthenticatedKaraokeRoute: typeof AuthenticatedKaraokeRouteWithChildren
   AuthenticatedLifersRoute: typeof AuthenticatedLifersRouteWithChildren
   AuthenticatedLobbyRoute: typeof AuthenticatedLobbyRoute
@@ -894,6 +935,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAccountMergeRoute: AuthenticatedAccountMergeRoute,
   AuthenticatedActivityRoute: AuthenticatedActivityRoute,
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
+  AuthenticatedContractAuditorRoute: AuthenticatedContractAuditorRoute,
   AuthenticatedKaraokeRoute: AuthenticatedKaraokeRouteWithChildren,
   AuthenticatedLifersRoute: AuthenticatedLifersRouteWithChildren,
   AuthenticatedLobbyRoute: AuthenticatedLobbyRoute,
@@ -917,6 +959,7 @@ const rootRouteChildren: RootRouteChildren = {
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
   ApiChatRoute: ApiChatRoute,
+  ApiContractAuditRoute: ApiContractAuditRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   ApiPublicHealthRoute: ApiPublicHealthRoute,
