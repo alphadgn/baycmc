@@ -994,7 +994,6 @@ function LivePreferencesPanel({ isHost }: { isHost: boolean }) {
       const raw = (e as CustomEvent<{ value: number }>).detail?.value;
       if (typeof raw !== "number") return;
       const v = Math.max(0, Math.min(1, raw));
-      micGainValue = v;
       local.localParticipant.audioTrackPublications.forEach((pub) => {
         if (pub.source !== Track.Source.Microphone) return;
         const t = pub.track;
