@@ -264,6 +264,30 @@ export type Database = {
         }
         Relationships: []
       }
+      contract_audit_messages: {
+        Row: {
+          created_at: string
+          id: string
+          parts: Json
+          role: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          parts: Json
+          role: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          parts?: Json
+          role?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       karaoke_queue: {
         Row: {
           id: string
