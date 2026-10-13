@@ -222,13 +222,10 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
   // ---- Determine the effective performer ----
   // Booking always wins. Otherwise: stored performer (only if still present),
   // or front of the visible queue.
-  const effectivePerformerId = useMemo(() => {
-    if (bookingHostUserId) return bookingHostUserId;
-    if (session.performer_user_id && presentIds.has(session.performer_user_id)) {
-      return session.performer_user_id;
-    }
-    return visibleQueue[0]?.user_id ?? null;
-  }, [bookingHostUserId, session.performer_user_id, visibleQueue, presentIds]);
+  const effectivePerformerId = useMemo(
+    () => bookingHostUserId ?? session.performer_user_id ?? null,
+    [bookingHostUserId, session.performer_user_id],
+  );
 
   // Promotion of the next singer happens on the server (heartbeat / end
   // turn), never by competing client writes.
