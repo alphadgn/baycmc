@@ -1,0 +1,1 @@
+- Karaoke stage/queue changes go only through the karaoke_* SECURITY DEFINER database functions (claim, control, end_turn, heartbeat lease); clients never write karaoke_sessions/karaoke_queue directly — avoids competing client writes and RLS conflicts.
