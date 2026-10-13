@@ -292,18 +292,21 @@ export type Database = {
         Row: {
           id: string
           joined_at: string
+          last_seen_at: string
           room_id: string
           user_id: string
         }
         Insert: {
           id?: string
           joined_at?: string
+          last_seen_at?: string
           room_id: string
           user_id: string
         }
         Update: {
           id?: string
           joined_at?: string
+          last_seen_at?: string
           room_id?: string
           user_id?: string
         }
@@ -388,21 +391,39 @@ export type Database = {
       }
       karaoke_sessions: {
         Row: {
+          generation: number
+          performer_heartbeat_at: string | null
           performer_user_id: string | null
+          playback_status: string
+          position_at: string
+          position_ms: number
+          revision: number
           room_id: string
           search_query: string | null
           updated_at: string
           video_id: string | null
         }
         Insert: {
+          generation?: number
+          performer_heartbeat_at?: string | null
           performer_user_id?: string | null
+          playback_status?: string
+          position_at?: string
+          position_ms?: number
+          revision?: number
           room_id: string
           search_query?: string | null
           updated_at?: string
           video_id?: string | null
         }
         Update: {
+          generation?: number
+          performer_heartbeat_at?: string | null
           performer_user_id?: string | null
+          playback_status?: string
+          position_at?: string
+          position_ms?: number
+          revision?: number
           room_id?: string
           search_query?: string | null
           updated_at?: string
@@ -1022,6 +1043,134 @@ export type Database = {
       }
       is_token_proof_verified: { Args: { _user_id: string }; Returns: boolean }
       is_verified_holder: { Args: { _user_id: string }; Returns: boolean }
+      karaoke_booking_host: { Args: { _room: string }; Returns: string }
+      karaoke_claim_stage: {
+        Args: { _room: string }
+        Returns: {
+          generation: number
+          performer_heartbeat_at: string | null
+          performer_user_id: string | null
+          playback_status: string
+          position_at: string
+          position_ms: number
+          revision: number
+          room_id: string
+          search_query: string | null
+          updated_at: string
+          video_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "karaoke_sessions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      karaoke_control: {
+        Args: {
+          _action: string
+          _expected_revision: number
+          _position_ms?: number
+          _room: string
+          _search_query?: string
+          _video_id?: string
+        }
+        Returns: {
+          generation: number
+          performer_heartbeat_at: string | null
+          performer_user_id: string | null
+          playback_status: string
+          position_at: string
+          position_ms: number
+          revision: number
+          room_id: string
+          search_query: string | null
+          updated_at: string
+          video_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "karaoke_sessions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      karaoke_end_turn: {
+        Args: { _expected_generation?: number; _room: string }
+        Returns: {
+          generation: number
+          performer_heartbeat_at: string | null
+          performer_user_id: string | null
+          playback_status: string
+          position_at: string
+          position_ms: number
+          revision: number
+          room_id: string
+          search_query: string | null
+          updated_at: string
+          video_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "karaoke_sessions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      karaoke_heartbeat: {
+        Args: { _grace_s?: number; _room: string }
+        Returns: {
+          generation: number
+          performer_heartbeat_at: string | null
+          performer_user_id: string | null
+          playback_status: string
+          position_at: string
+          position_ms: number
+          revision: number
+          room_id: string
+          search_query: string | null
+          updated_at: string
+          video_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "karaoke_sessions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      karaoke_is_moderator: {
+        Args: { _room: string; _uid: string }
+        Returns: boolean
+      }
+      karaoke_join_queue: { Args: { _room: string }; Returns: undefined }
+      karaoke_leave_queue: { Args: { _room: string }; Returns: undefined }
+      karaoke_lock_session: {
+        Args: { _room: string }
+        Returns: {
+          generation: number
+          performer_heartbeat_at: string | null
+          performer_user_id: string | null
+          playback_status: string
+          position_at: string
+          position_ms: number
+          revision: number
+          room_id: string
+          search_query: string | null
+          updated_at: string
+          video_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "karaoke_sessions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      karaoke_promote_next: {
+        Args: { _grace_s?: number; _room: string }
+        Returns: string
+      }
       log_audit_event: {
         Args: { _event_type: string; _metadata?: Json; _target_id?: string }
         Returns: string

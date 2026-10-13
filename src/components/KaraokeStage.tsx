@@ -20,6 +20,32 @@ interface KaraokeSession {
   performer_user_id: string | null;
   video_id: string | null;
   search_query: string | null;
+  playback_status: string;
+  position_ms: number;
+  position_at: string;
+  generation: number;
+  revision: number;
+}
+type SessionRow = KaraokeSession;
+
+const SESSION_COLUMNS =
+  "performer_user_id,video_id,search_query,playback_status,position_ms,position_at,generation,revision";
+
+const EMPTY_SESSION: KaraokeSession = {
+  performer_user_id: null,
+  video_id: null,
+  search_query: null,
+  playback_status: "idle",
+  position_ms: 0,
+  position_at: new Date(0).toISOString(),
+  generation: 0,
+  revision: -1,
+};
+
+function friendly(msg: string | undefined) {
+  if (!msg) return "Please try again.";
+  if (msg.includes("STALE_REVISION")) return "The stage just changed — try again.";
+  return msg;
 }
 
 interface QueueRow {
@@ -48,11 +74,12 @@ function short(addr: string | undefined | null) {
  */
 export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
   const { user } = useAuth();
-  const [session, setSession] = useState<KaraokeSession>({
-    performer_user_id: null,
-    video_id: null,
-    search_query: null,
-  });
+  const [session, setSession] = useState<KaraokeSession>(EMPTY_SESSION);
+  // Only accept snapshots that are newer than what we already have, so a
+  // slow response can never roll the room state backwards.
+  const applySession = useCallback((row: SessionRow) => {
+    setSession((prev) => (row.revision < prev.revision ? prev : { ...row }));
+  }, []);
   const [queue, setQueue] = useState<QueueRow[]>([]);
   const [profiles, setProfiles] = useState<Record<string, Profile>>({});
 
@@ -71,17 +98,11 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
     async function loadSession() {
       const { data } = await supabase
         .from("karaoke_sessions")
-        .select("performer_user_id,video_id,search_query")
+        .select(SESSION_COLUMNS)
         .eq("room_id", roomId)
         .maybeSingle();
       if (cancelled) return;
-      if (data) {
-        setSession({
-          performer_user_id: data.performer_user_id,
-          video_id: data.video_id,
-          search_query: data.search_query,
-        });
-      }
+      if (data) applySession(data as SessionRow);
     }
     async function loadQueue() {
       const { data } = await supabase
@@ -136,39 +157,26 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
     };
   }, [roomId, user?.id]);
 
-  // ---- Auto-advance: prune absent performer / queued users ----
-  // Any client can run the prune; the writes are idempotent (deletes are
-  // no-ops if the row is already gone, upserts converge on the same state)
-  // and we add a tiny per-client jitter to avoid thundering-herd writes.
+  // ---- Heartbeat lease ----
+  // Every 15s each signed-in viewer renews its queue row / performer lease.
+  // The server promotes the next singer when a performer's lease expires
+  // (45s grace), so crashed tabs recover without unload requests and a
+  // hidden tab keeps the stage.
+  const heartbeat = useCallback(async () => {
+    if (!user?.id) return;
+    const { data, error } = await supabase.rpc("karaoke_heartbeat", { _room: roomId });
+    if (error) {
+      console.warn("[karaoke] heartbeat failed", error.message);
+      return;
+    }
+    if (data) applySession(data as SessionRow);
+  }, [roomId, user?.id, applySession]);
   useEffect(() => {
-    const GRACE_MS = 3_000;
-    const jitter = Math.floor(Math.random() * 500);
-    const timer = window.setInterval(() => {
-      const now = Date.now();
-      const isAbsent = (uid: string) => {
-        if (presentIds.has(uid)) return false;
-        const seen = lastSeenRef.current.get(uid) ?? 0;
-        return now - seen > GRACE_MS;
-      };
-      const stale = queue.filter((q) => isAbsent(q.user_id));
-      stale.forEach((row) => {
-        void supabase.from("karaoke_queue").delete().eq("id", row.id);
-      });
-      if (!bookingHostUserId && session.performer_user_id && isAbsent(session.performer_user_id)) {
-        void supabase.from("karaoke_sessions").upsert(
-          {
-            room_id: roomId,
-            performer_user_id: null,
-            video_id: null,
-            search_query: null,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "room_id" },
-        );
-      }
-    }, 1_500 + jitter);
-    return () => window.clearInterval(timer);
-  }, [presentIds, queue, session.performer_user_id, bookingHostUserId, roomId]);
+    if (!user?.id) return;
+    void heartbeat();
+    const t = window.setInterval(() => void heartbeat(), 15_000);
+    return () => window.clearInterval(t);
+  }, [heartbeat, user?.id]);
 
   // ---- Resolve display names for performer + queue ----
   useEffect(() => {
@@ -214,38 +222,13 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
   // ---- Determine the effective performer ----
   // Booking always wins. Otherwise: stored performer (only if still present),
   // or front of the visible queue.
-  const effectivePerformerId = useMemo(() => {
-    if (bookingHostUserId) return bookingHostUserId;
-    if (session.performer_user_id && presentIds.has(session.performer_user_id)) {
-      return session.performer_user_id;
-    }
-    return visibleQueue[0]?.user_id ?? null;
-  }, [bookingHostUserId, session.performer_user_id, visibleQueue, presentIds]);
+  const effectivePerformerId = useMemo(
+    () => bookingHostUserId ?? session.performer_user_id ?? null,
+    [bookingHostUserId, session.performer_user_id],
+  );
 
-  // If nobody is the recorded performer but the queue has someone, promote
-  // the front of the queue (open-mic auto-start). Anyone in the room can
-  // perform this promotion — RLS permits any verified user to update.
-  useEffect(() => {
-    if (bookingHostUserId) return;
-    if (session.performer_user_id) return;
-    const next = visibleQueue[0];
-    if (!next) return;
-    void supabase
-      .from("karaoke_sessions")
-      .upsert(
-        {
-          room_id: roomId,
-          performer_user_id: next.user_id,
-          video_id: null,
-          search_query: null,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "room_id" },
-      )
-      .then(({ error }) => {
-        if (error) console.warn("[karaoke] auto-promote failed", error);
-      });
-  }, [bookingHostUserId, session.performer_user_id, visibleQueue, roomId]);
+  // Promotion of the next singer happens on the server (heartbeat / end
+  // turn), never by competing client writes.
 
   const isMyTurn = !!user && !!effectivePerformerId && user.id === effectivePerformerId;
   const meInQueue = !!user && visibleQueue.some((q) => q.user_id === user.id);
@@ -263,43 +246,41 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
         });
         return;
       }
-      const performerId = isMyTurn ? effectivePerformerId : user.id;
-      const { error } = await supabase.from("karaoke_sessions").upsert(
-        {
-          room_id: roomId,
-          performer_user_id: performerId,
-          video_id: next.videoId,
-          search_query: next.activeQuery,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "room_id" },
-      );
-      if (error) toast.error("Could not sync track", { description: error.message });
+      let revision = session.revision;
+      if (stageFree) {
+        const { data, error } = await supabase.rpc("karaoke_claim_stage", { _room: roomId });
+        if (error || !data) {
+          toast.error("Couldn't take the stage", { description: friendly(error?.message) });
+          return;
+        }
+        revision = (data as { revision: number }).revision;
+      }
+      const { data, error } = await supabase.rpc("karaoke_control", {
+        _room: roomId,
+        _expected_revision: revision,
+        _action: "song",
+        _video_id: next.videoId ?? undefined,
+        _search_query: next.activeQuery ?? undefined,
+      });
+      if (error) {
+        toast.error("Could not sync track", { description: friendly(error.message) });
+        return;
+      }
+      if (data) applySession(data as SessionRow);
     },
-    [isMyTurn, user, roomId, effectivePerformerId, bookingHostUserId],
+    [isMyTurn, user, roomId, effectivePerformerId, bookingHostUserId, session.revision],
   );
 
   const onEndSong = useCallback(async () => {
     if (!isMyTurn || !user) return;
-    // Open-mic mode only: pop self from queue and promote next user.
-    // During a booking the performer keeps the stage so this is a no-op.
-    if (bookingHostUserId) return;
-    const myRow = queue.find((q) => q.user_id === user.id);
-    if (myRow) {
-      await supabase.from("karaoke_queue").delete().eq("id", myRow.id);
-    }
-    const next = queue.find((q) => q.user_id !== user.id);
-    await supabase.from("karaoke_sessions").upsert(
-      {
-        room_id: roomId,
-        performer_user_id: next?.user_id ?? null,
-        video_id: null,
-        search_query: null,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "room_id" },
-    );
-  }, [isMyTurn, user, bookingHostUserId, queue, roomId]);
+    // Server pops us off the line and atomically promotes the next singer.
+    // During a booking the booked performer keeps the stage.
+    const { error } = await supabase.rpc("karaoke_end_turn", {
+      _room: roomId,
+      _expected_generation: session.generation,
+    });
+    if (error) toast.error("Couldn't end the song", { description: friendly(error.message) });
+  }, [isMyTurn, user, roomId, session.generation]);
 
   // ---- Host / super-admin force-skip ----
   // The booking holder always counts as the room host. Outside of bookings,
@@ -332,42 +313,31 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
 
   const forceSkip = useCallback(async () => {
     if (!canForceSkip || !effectivePerformerId) return;
-    const skipped = effectivePerformerId;
-    // Pull the current performer out of the line and promote the next
-    // eligible user. The auto-promote effect will fill in if `next` is
-    // also absent for any reason.
-    await supabase.from("karaoke_queue").delete().eq("room_id", roomId).eq("user_id", skipped);
-    const next = queue.find((q) => q.user_id !== skipped);
-    await supabase.from("karaoke_sessions").upsert(
-      {
-        room_id: roomId,
-        performer_user_id: next?.user_id ?? null,
-        video_id: null,
-        search_query: null,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "room_id" },
-    );
-    toast.success("Skipped current performer");
-  }, [canForceSkip, effectivePerformerId, queue, roomId]);
-
-  // ---- Queue actions ----
-  // The waiting list is room-presence only. We intentionally do not persist a
-  // "join intent" in localStorage: if a user leaves, logs out, times out, or
-  // drops from the room, they must be removed from the live line.
-  async function joinLine() {
-    if (!user) return;
-    const { error } = await supabase
-      .from("karaoke_queue")
-      .insert({ room_id: roomId, user_id: user.id });
-    if (error && !/duplicate/i.test(error.message)) {
-      toast.error("Could not join the line", { description: error.message });
+    const { error } = await supabase.rpc("karaoke_end_turn", {
+      _room: roomId,
+      _expected_generation: session.generation,
+    });
+    if (error) {
+      toast.error("Couldn't skip", { description: friendly(error.message) });
       return;
     }
+    toast.success("Skipped current performer");
+  }, [canForceSkip, effectivePerformerId, roomId, session.generation]);
+
+  // ---- Queue actions (server-enforced) ----
+  async function joinLine() {
+    if (!user) return;
+    const { error } = await supabase.rpc("karaoke_join_queue", { _room: roomId });
+    if (error) {
+      toast.error("Could not join the line", { description: friendly(error.message) });
+      return;
+    }
+    void heartbeat();
   }
   async function leaveLine() {
     if (!user) return;
-    await supabase.from("karaoke_queue").delete().eq("room_id", roomId).eq("user_id", user.id);
+    const { error } = await supabase.rpc("karaoke_leave_queue", { _room: roomId });
+    if (error) toast.error("Could not leave the line", { description: friendly(error.message) });
   }
 
   // Presence: drop the user from the waiting list AND release the stage
@@ -382,63 +352,18 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
   const bookingRef = useRef<string | null>(bookingHostUserId);
   bookingRef.current = bookingHostUserId;
   useEffect(() => {
-    function beaconDelete(uid: string) {
-      // Fire-and-forget DELETE that survives navigation / tab close. We use
-      // fetch with keepalive (sendBeacon doesn't support DELETE) against the
-      // PostgREST endpoint with the publishable key + user's bearer token.
-      try {
-        const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/karaoke_queue?room_id=eq.${roomId}&user_id=eq.${uid}`;
-        const apikey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
-        let token: string | null = null;
-        try {
-          const raw = localStorage.getItem(
-            `sb-${import.meta.env.VITE_SUPABASE_PROJECT_ID}-auth-token`,
-          );
-          if (raw) token = (JSON.parse(raw)?.access_token as string) ?? null;
-        } catch {
-          /* noop */
-        }
-        void fetch(url, {
-          method: "DELETE",
-          keepalive: true,
-          headers: {
-            apikey,
-            Authorization: `Bearer ${token ?? apikey}`,
-            "Content-Type": "application/json",
-          },
-        });
-      } catch {
-        /* noop */
-      }
-    }
     function cleanupSelf() {
       const uid = userIdRef.current;
       if (!uid) return;
-      // 1. Untrack presence immediately so every other viewer drops us from
-      //    `presentIds` on their next sync — `visibleQueue` filters us out
-      //    of the rendered waitlist within ~1 frame, regardless of whether
-      //    the DB delete has propagated yet.
+      // Untrack presence so others drop us from the visible line instantly.
       try {
         void channelRef.current?.untrack();
       } catch {
         /* noop */
       }
-      // 2. Standard supabase delete (works on in-app navigation).
-      void supabase.from("karaoke_queue").delete().eq("room_id", roomId).eq("user_id", uid);
-      // 3. Keepalive fetch fallback (works on tab close / hard nav).
-      beaconDelete(uid);
-      if (!bookingRef.current && performerIdRef.current === uid) {
-        void supabase.from("karaoke_sessions").upsert(
-          {
-            room_id: roomId,
-            performer_user_id: null,
-            video_id: null,
-            search_query: null,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "room_id" },
-        );
-      }
+      // Server-side leave: removes our queue row and hands the stage on if
+      // we were singing. Crashed tabs are recovered by the heartbeat lease.
+      void supabase.rpc("karaoke_leave_queue", { _room: roomId });
     }
     // Hiding the tab (switching apps, opening a share picker) must NOT
     // release the stage, so only real page exits clean up.
@@ -492,13 +417,25 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
     dragRef.current = null;
   }
 
-  // Pause is a local UI signal — when the performer pauses, restore the
-  // waiting-list panel and expand the music machine. Reset whenever the
-  // track changes so the next song starts cleanly.
-  const [paused, setPaused] = useState(false);
-  useEffect(() => {
-    setPaused(false);
-  }, [session.video_id]);
+  // Pause is shared room state: persisted on the server with a revision,
+  // so every viewer (and late joiners) see the same play/pause.
+  const paused = session.playback_status === "paused";
+  const setPaused = useCallback(
+    async (next: boolean) => {
+      if (!isMyTurn) return;
+      const { data, error } = await supabase.rpc("karaoke_control", {
+        _room: roomId,
+        _expected_revision: session.revision,
+        _action: next ? "pause" : "play",
+      });
+      if (error) {
+        toast.error("Couldn't update playback", { description: friendly(error.message) });
+        return;
+      }
+      if (data) applySession(data as SessionRow);
+    },
+    [isMyTurn, roomId, session.revision, applySession],
+  );
   const isPlaying = !!session.video_id && !paused;
   // Slide the waiting list off to the left edge while playing, leaving
   // ~32px peeking out as a tap-target. Clicking it brings it back without
