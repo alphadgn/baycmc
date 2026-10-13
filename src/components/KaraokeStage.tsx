@@ -417,13 +417,25 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
     dragRef.current = null;
   }
 
-  // Pause is a local UI signal — when the performer pauses, restore the
-  // waiting-list panel and expand the music machine. Reset whenever the
-  // track changes so the next song starts cleanly.
-  const [paused, setPaused] = useState(false);
-  useEffect(() => {
-    setPaused(false);
-  }, [session.video_id]);
+  // Pause is shared room state: persisted on the server with a revision,
+  // so every viewer (and late joiners) see the same play/pause.
+  const paused = session.playback_status === "paused";
+  const setPaused = useCallback(
+    async (next: boolean) => {
+      if (!isMyTurn) return;
+      const { data, error } = await supabase.rpc("karaoke_control", {
+        _room: roomId,
+        _expected_revision: session.revision,
+        _action: next ? "pause" : "play",
+      });
+      if (error) {
+        toast.error("Couldn't update playback", { description: friendly(error.message) });
+        return;
+      }
+      if (data) applySession(data as SessionRow);
+    },
+    [isMyTurn, roomId, session.revision, applySession],
+  );
   const isPlaying = !!session.video_id && !paused;
   // Slide the waiting list off to the left edge while playing, leaving
   // ~32px peeking out as a tap-target. Clicking it brings it back without
