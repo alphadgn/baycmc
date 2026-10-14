@@ -1,5 +1,10 @@
 # Karaoke overhaul roadmap
 
+## Screenshot fixes
+- [ ] Securely configure Alchemy connection and verify NFT lookup
+- [ ] Synchronize profile badges and global verification displays
+- [ ] Shrink floating help button and move left above room controls
+
 - [x] Sound fixes (single renderer, Enable room sound, real mic gain, AEC on, no speaker pickup, tab-hide keeps stage)
 - [x] Shared stage state: versioned session (play/pause/seek/stop/song, revision) via server functions
 - [x] Queue/handoff via transactional DB functions (join/leave, claim, end+promote, force-skip, lease recovery)
