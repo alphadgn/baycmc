@@ -10,6 +10,7 @@ import {
 } from "@/server/livekit.functions";
 import { MicGainProcessor } from "@/lib/karaoke/micGainProcessor";
 import { KaraokePerformerEngine } from "@/components/karaoke/KaraokePerformerEngine";
+import { KaraokeErrorBoundary } from "@/components/karaoke/KaraokeErrorBoundary";
 import { getKaraokeStage, useKaraokeStage } from "@/lib/karaoke/stageStore";
 import {
   LiveKitRoom,
@@ -248,7 +249,11 @@ export function ConferenceRoom({
             roomName={roomName}
             hostUserId={hostUserId}
           />
-          {kind === "karaoke" && <KaraokePerformerEngine roomId={roomId} />}
+          {kind === "karaoke" && (
+            <KaraokeErrorBoundary name="audio engine">
+              <KaraokePerformerEngine roomId={roomId} />
+            </KaraokeErrorBoundary>
+          )}
           {/* Exactly one renderer per room — a second one plays every voice twice. */}
           <RoomAudioRenderer />
           <StartAudio

@@ -65,20 +65,30 @@ function writePrefs(userId: string | null | undefined, prefs: RoomPreferences) {
  * music started, then stopped). Now all callers read and write the same
  * store, so every mic control in the app shows and drives the same state.
  */
-let cache: { key: string; prefs: RoomPreferences } | null = null;
+// One entry PER storage key. A single shared slot thrashed when two mounted
+// components briefly disagreed about the signed-in user (null vs id while
+// auth hydrates): each getSnapshot call evicted the other's entry and
+// returned a fresh object, which useSyncExternalStore treats as "the store
+// changed during render" → endless re-render → React error #185 on join.
+const cache = new Map<string, RoomPreferences>();
 const listeners = new Set<() => void>();
+let lastUserId: string | null = null;
 
 function current(userId: string | null | undefined): RoomPreferences {
   const key = storageKey(userId);
-  if (!cache || cache.key !== key) cache = { key, prefs: readPrefs(userId) };
-  return cache.prefs;
+  let prefs = cache.get(key);
+  if (!prefs) {
+    prefs = readPrefs(userId);
+    cache.set(key, prefs);
+  }
+  return prefs;
 }
 
 function subscribe(cb: () => void) {
   listeners.add(cb);
   const onStorage = (e: StorageEvent) => {
-    if (cache && e.key === cache.key) {
-      cache = null;
+    if (e.key && cache.has(e.key)) {
+      cache.delete(e.key);
       cb();
     }
   };
@@ -97,14 +107,19 @@ export function setRoomPreferences(
   const prev = current(userId);
   const next = { ...prev, ...patch };
   if ((Object.keys(next) as (keyof RoomPreferences)[]).every((k) => next[k] === prev[k])) return;
-  cache = { key: storageKey(userId), prefs: next };
+  cache.set(storageKey(userId), next);
   writePrefs(userId, next);
   for (const l of listeners) l();
 }
 
 export function useRoomPreferences() {
-  const { user } = useAuth();
-  const userId = user?.id ?? null;
+  const { user, loading } = useAuth();
+  // useAuth() is per-component and starts at null until the session loads.
+  // While it loads, keep using the last signed-in user's prefs so a freshly
+  // mounted control doesn't briefly apply the anonymous prefs (and flip the
+  // mic) as the room connects.
+  if (user?.id) lastUserId = user.id;
+  const userId = user?.id ?? (loading ? lastUserId : null);
   const prefs = useSyncExternalStore(
     subscribe,
     () => current(userId),
