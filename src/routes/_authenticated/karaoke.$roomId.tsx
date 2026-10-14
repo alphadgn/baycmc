@@ -4,7 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { ConferenceRoom } from "@/components/ConferenceRoom";
 import { KaraokeStage } from "@/components/KaraokeStage";
 import { SingerLiveIndicator } from "@/components/karaoke/SingerLiveIndicator";
-import { KaraokeRecordingsPanel } from "@/components/karaoke/KaraokeRecordingsPanel";
+import { KaraokeHub } from "@/components/karaoke/KaraokeHub";
+import { useKaraokeStage } from "@/lib/karaoke/stageStore";
 import { getRoomThemeImage, getRoomThemeAmbience } from "@/lib/baycmc/roomThemes";
 
 interface RoomMeta {
@@ -27,10 +28,13 @@ function KaraokeRoomPage() {
   const [hostUserId, setHostUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Live performer tracking for the SingerLiveIndicator banner.
-  const [performerId, setPerformerId] = useState<string | null>(null);
+  // Who is on stage / on air comes from the shared karaoke store, written by
+  // <KaraokeStage> (DB session) and <KaraokePerformerEngine> (LiveKit tracks).
+  // The old banner used the VIEWER's own mic state, so it said "Singer Live"
+  // whenever an audience member unmuted.
+  const stage = useKaraokeStage();
+  const performerId = stage.session?.performer_user_id ?? null;
   const [performerName, setPerformerName] = useState<string>("—");
-  const [micLive, setMicLive] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,34 +63,6 @@ function KaraokeRoomPage() {
     };
   }, [roomId]);
 
-  // Track current performer from karaoke_sessions (realtime).
-  useEffect(() => {
-    let cancelled = false;
-    async function refresh() {
-      const { data } = await supabase
-        .from("karaoke_sessions")
-        .select("performer_user_id")
-        .eq("room_id", roomId)
-        .maybeSingle();
-      if (cancelled) return;
-      setPerformerId(((data?.performer_user_id as string | null) ?? null) || null);
-    }
-    void refresh();
-    const channel = supabase
-      .channel(`karaoke-session-${roomId}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "karaoke_sessions", filter: `room_id=eq.${roomId}` },
-        () => void refresh(),
-      )
-      .subscribe();
-    return () => {
-      cancelled = true;
-      void supabase.removeChannel(channel);
-    };
-  }, [roomId]);
-
-  // Resolve performer profile name.
   useEffect(() => {
     let cancelled = false;
     if (!performerId) {
@@ -100,23 +76,14 @@ function KaraokeRoomPage() {
       .maybeSingle()
       .then(({ data }) => {
         if (cancelled) return;
-        setPerformerName(((data?.username as string | null) ?? null) || "Performer");
+        setPerformerName(
+          ((data?.username as string | null) ?? null) || `Member ${performerId.slice(0, 4)}`,
+        );
       });
     return () => {
       cancelled = true;
     };
   }, [performerId]);
-
-  // Listen to the karaoke:mic-state custom event ConferenceRoom dispatches
-  // whenever the local participant toggles their mic. For non-performers
-  // this stays false (they never broadcast as the singer).
-  useEffect(() => {
-    function onState(e: Event) {
-      setMicLive(!!(e as CustomEvent<{ enabled: boolean }>).detail?.enabled);
-    }
-    window.addEventListener("karaoke:mic-state", onState as EventListener);
-    return () => window.removeEventListener("karaoke:mic-state", onState as EventListener);
-  }, []);
 
   if (loading) {
     return (
@@ -150,11 +117,13 @@ function KaraokeRoomPage() {
       />
       <KaraokeStage roomId={roomId} bookingHostUserId={hostUserId} />
       {performerId && (
-        <SingerLiveIndicator singerName={performerName} live={micLive} recording={false} />
+        <SingerLiveIndicator
+          singerName={performerName}
+          live={stage.performerLive}
+          recording={stage.isMyTurn && stage.recording}
+        />
       )}
-      <div className="px-4 pb-16">
-        <KaraokeRecordingsPanel roomId={roomId} />
-      </div>
+      <KaraokeHub roomId={roomId} roomName={meta.name} bookingHostUserId={hostUserId} />
     </>
   );
 }

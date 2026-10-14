@@ -35,7 +35,7 @@ export const createBooking = createServerFn({ method: "POST" })
     // but we want a clean error message instead of an opaque RLS denial.
     const { data: room } = await supabase
       .from("rooms")
-      .select("tier, active")
+      .select("tier, active, kind")
       .eq("id", data.roomId)
       .maybeSingle();
     if (!room || !room.active) {
@@ -57,7 +57,11 @@ export const createBooking = createServerFn({ method: "POST" })
     const isAdmin = !!roleRows?.some((r) => r.role === "super_admin" || r.role === "admin");
     const bypassesBaycGate = isAdmin || !!roleRows?.some((r) => r.role === "verified_user");
 
-    if (!ver?.bayc_verified && !bypassesBaycGate) {
+    // Karaoke / public rooms are open to every signed-in member (matches the
+    // room_bookings INSERT policy). Previously this check ran for every room,
+    // so non-holders could never book a karaoke room even though RLS allowed it.
+    const openRoom = room.kind === "karaoke" || room.tier === "public";
+    if (!openRoom && !ver?.bayc_verified && !bypassesBaycGate) {
       return { ok: false as const, error: "Verified BAYC/MAYC holder access required to book." };
     }
     if (room.tier === "lifer" && !isAdmin && !(ver?.bayc_verified && ver?.otherpage_verified)) {

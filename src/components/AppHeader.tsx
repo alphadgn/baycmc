@@ -1,17 +1,16 @@
 import { Link, useLocation, useRouter } from "@tanstack/react-router";
-import { useEffect, useState, type MouseEvent } from "react";
-import { ArrowLeft, Loader2, Menu, X } from "lucide-react";
-import { useAuth } from "@/lib/auth/useAuth";
+import { useEffect, useState } from "react";
+import { ArrowLeft, Loader2, LogOut, Menu, User as UserIcon, Wallet, X } from "lucide-react";
+import { signOut, useAuth } from "@/lib/auth/useAuth";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import { useAuthGate } from "@/state/authGate";
 import { useGlyphAuthState } from "@/lib/auth/useGlyphBridge";
-import { useGlyphReady } from "@/components/GlyphAppProvider";
 import { supabase } from "@/integrations/supabase/client";
 import { EntranceDialog } from "@/components/EntranceDialog";
 import { EmbroideredImage } from "@/components/EmbroideredImage";
 import { WalletPill } from "@/components/WalletPill";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { importWithRetry } from "@/lib/import-with-retry";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface NavItem {
   to:
@@ -52,12 +51,6 @@ const NAV_ITEMS: NavItem[] = [
 
 // Routes treated as "home" — no back arrow shown here.
 const HOME_ROUTES = new Set<string>(["/", "/lobby"]);
-
-type GlyphConnection = { connect: () => void };
-type UseNativeGlyphConnection = () => GlyphConnection;
-type HeaderEntranceHooks = {
-  useNativeGlyphConnection: UseNativeGlyphConnection;
-};
 
 // Tracks how many in-app navigations have happened since the tab opened.
 // `window.history.length` is unreliable (counts entries from before the SPA
@@ -283,126 +276,67 @@ function sliceAddress(addr: string) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 }
 
-// VIP button click → opens EntranceDialog. The dialog owns the Glyph
-// connect + SIWE sign flow. Header no longer loads the SDK hooks itself.
-
+// VIP button → opens the EntranceDialog, which owns the Glyph / wallet
+// choice and the single SIWE signature. (The old button ALSO fired Glyph's
+// connect() on the same click, so users never got to choose and the
+// promise rejection was unhandled.)
 function EntranceControls({ onOpen }: { onOpen: () => void }) {
   const { isAuthenticated, user } = useAuth();
   const { isVerifiedHolder, collection, loading: verifLoading } = useVerificationStatus();
   const glyph = useGlyphAuthState();
-  const glyphReady = useGlyphReady();
-  const [hooks, setHooks] = useState<HeaderEntranceHooks | null>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [, setProfileLoaded] = useState(false);
 
-  // Allow other code (e.g. queued taps before mount) to request the modal.
   useEffect(() => {
-    function openFromQueuedVipTap() {
-      onOpen();
-    }
-    window.addEventListener("baycmc:vip-click", openFromQueuedVipTap);
-    return () => window.removeEventListener("baycmc:vip-click", openFromQueuedVipTap);
+    window.addEventListener("baycmc:vip-click", onOpen);
+    return () => window.removeEventListener("baycmc:vip-click", onOpen);
   }, [onOpen]);
-
-  useEffect(() => {
-    if (!glyphReady) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const glyphMod = await importWithRetry(() => import("@use-glyph/sdk-react"), {
-          label: "glyph-sdk-react-header",
-        });
-        if (cancelled) return;
-        setHooks(() => ({
-          useNativeGlyphConnection:
-            glyphMod.useNativeGlyphConnection as unknown as UseNativeGlyphConnection,
-        }));
-      } catch {
-        /* EntranceDialog still opens and can load Glyph itself. */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [glyphReady]);
 
   useEffect(() => {
     if (!isAuthenticated || !user) {
       setWalletAddress(null);
-      setProfileLoaded(false);
       return;
     }
     let cancelled = false;
-    setProfileLoaded(false);
-    (async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("wallet_address")
-        .eq("id", user.id)
-        .maybeSingle();
-      if (cancelled) return;
-      setWalletAddress(data?.wallet_address ?? null);
-      setProfileLoaded(true);
-    })();
+    void supabase
+      .from("profiles")
+      .select("wallet_address")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled) setWalletAddress(data?.wallet_address ?? null);
+      });
     return () => {
       cancelled = true;
     };
   }, [isAuthenticated, user]);
 
-  const verifying = glyph.verifying;
-
-  // Re-verification (lobby → holder): hands off to the Glyph bridge,
-  // which pops a fresh SIWE signature and re-runs the on-chain check.
-  // The bridge dispatches "baycmc:verification-refresh" on success so
-  // useVerificationStatus reloads — no manual refresh needed here.
-  function requestReverify() {
-    window.dispatchEvent(new Event("baycmc:wallet-verify"));
-  }
-
   if (isAuthenticated) {
     if (walletAddress) {
-      // Always render the sliced-address pill once authenticated. Lobby
-      // users (Tier 1) get a "Verify holder access" action inside the
-      // pill's dropdown which triggers a fresh signature + on-chain check.
       return (
         <WalletPill
           address={walletAddress}
           collection={isVerifiedHolder ? (collection ?? null) : null}
           isVerifiedHolder={isVerifiedHolder}
-          onVerify={requestReverify}
-          verifying={verifying || verifLoading}
+          onVerify={() => window.dispatchEvent(new Event("baycmc:wallet-verify"))}
+          verifying={glyph.verifying || verifLoading}
         />
       );
     }
-    // Email-authenticated user with no wallet linked yet — render nothing
-    // in the header. They can manage their account from the profile page.
-    return null;
+    // Email account: previously rendered NOTHING, so email members had no
+    // way to reach their account or sign out from the header.
+    return <EmailAccountPill email={user?.email ?? ""} onLinkWallet={onOpen} />;
   }
 
-  // Don't gate the VIP button on authLoading — render it immediately so
-  // the landing-page top-right always has a visible sign-in entry point.
-
   if (glyph.authenticated && glyph.address) {
-    // Wallet connected but not yet signed in to Supabase. The signing popup
-    // can only open from a user gesture, so this is a deliberate "Sign to
-    // enter" tap: clicking dispatches the verify event, whose listener calls
-    // signMessage synchronously inside this click.
     return (
       <button
         type="button"
-        disabled={verifying}
-        onClick={() => {
-          window.dispatchEvent(new Event("baycmc:wallet-verify"));
-        }}
+        disabled={glyph.verifying}
+        onClick={() => window.dispatchEvent(new Event("baycmc:wallet-verify"))}
         className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-full border border-gold/40 bg-gold/10 px-3 text-xs font-semibold text-gold transition hover:border-gold/70 hover:bg-gold/20 disabled:cursor-wait disabled:opacity-70"
-        title={verifying ? "Signing in…" : `Sign to enter (${sliceAddress(glyph.address)})`}
-        aria-label={
-          verifying
-            ? `Signing in with wallet ${sliceAddress(glyph.address)}`
-            : `Sign to enter with wallet ${sliceAddress(glyph.address)}`
-        }
+        title={`Sign to enter (${sliceAddress(glyph.address)})`}
       >
-        {verifying ? (
+        {glyph.verifying ? (
           <>
             <Loader2 className="h-3.5 w-3.5 animate-spin text-gold/70" /> Signing…
           </>
@@ -413,34 +347,13 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
     );
   }
 
-  // Single VIP button. First action on click is ALWAYS to open the
-  // EntranceDialog — no gating on glyph.ready, wallet connection, auth, or
-  // SDK init. The modal owns the connect / sign flow. Inline styles guarantee
-  // the gold treatment renders even if a downstream CSS rule shadows the
-  // Tailwind utility classes (matches the Main Entrance button).
-  if (hooks) {
-    return <VipButtonWithGlyphConnect hooks={hooks} onOpen={onOpen} />;
-  }
-
   return (
     <button
       type="button"
       data-vip-trigger="true"
       onClick={(e) => {
         e.preventDefault();
-        e.stopPropagation();
-        console.log("[VIP CLICKED]");
-        console.log("[MODAL OPEN REQUESTED]");
         onOpen();
-      }}
-      onPointerDown={() => {
-        // Belt-and-suspenders: if hydration is slow, a pointerdown still
-        // wakes the listener once React attaches.
-        try {
-          window.dispatchEvent(new Event("baycmc:vip-click"));
-        } catch {
-          /* noop */
-        }
       }}
       style={{
         backgroundImage:
@@ -455,52 +368,51 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
   );
 }
 
-function VipButtonWithGlyphConnect({
-  hooks,
-  onOpen,
-}: {
-  hooks: HeaderEntranceHooks;
-  onOpen: () => void;
-}) {
-  const { connect } = hooks.useNativeGlyphConnection();
-
-  function handleVipClick(e: MouseEvent<HTMLButtonElement>) {
-    e.preventDefault();
-    e.stopPropagation();
-    console.log("[VIP CLICKED]");
-    console.log("[MODAL OPEN REQUESTED]");
-    onOpen();
-    try {
-      console.log("[GLYPH CONNECT START]");
-      connect();
-      console.log("[GLYPH CONNECT SUCCESS]");
-    } catch (error) {
-      console.warn("[AppHeader] Glyph connect() threw:", error);
-    }
-  }
-
+function EmailAccountPill({ email, onLinkWallet }: { email: string; onLinkWallet: () => void }) {
+  const [open, setOpen] = useState(false);
   return (
-    <button
-      type="button"
-      data-vip-trigger="true"
-      onClick={handleVipClick}
-      onPointerDown={() => {
-        try {
-          window.dispatchEvent(new Event("baycmc:vip-click"));
-        } catch {
-          /* noop */
-        }
-      }}
-      style={{
-        backgroundImage:
-          "linear-gradient(135deg, oklch(0.85 0.16 82) 0%, oklch(0.68 0.18 50) 100%)",
-        color: "oklch(0.14 0.01 80)",
-        boxShadow: "0 10px 40px -10px oklch(0.78 0.14 78 / 35%)",
-      }}
-      className="shrink-0 cursor-pointer rounded-md bg-gradient-gold px-3 py-2 text-xs font-semibold text-gold-foreground shadow-gold transition hover:opacity-90 sm:px-4 sm:text-sm"
-    >
-      VIP
-    </button>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex h-9 max-w-[11rem] items-center gap-2 rounded-full border border-gold/30 bg-secondary/40 px-3 text-xs text-foreground hover:border-gold/60"
+          aria-label="Account menu"
+        >
+          <UserIcon className="h-3.5 w-3.5 text-gold" />
+          <span className="truncate">{email.split("@")[0] || "Account"}</span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" sideOffset={8} className="w-60 border-gold/20 p-2">
+        <p className="truncate px-3 py-2 text-xs text-muted-foreground">{email}</p>
+        <Link
+          to="/profile"
+          onClick={() => setOpen(false)}
+          className="flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-secondary"
+        >
+          <UserIcon className="h-4 w-4 text-muted-foreground" /> Profile
+        </Link>
+        <button
+          type="button"
+          onClick={() => {
+            setOpen(false);
+            onLinkWallet();
+          }}
+          className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-secondary"
+        >
+          <Wallet className="h-4 w-4 text-muted-foreground" /> Link a wallet (holders)
+        </button>
+        <button
+          type="button"
+          onClick={async () => {
+            setOpen(false);
+            await signOut();
+          }}
+          className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-destructive hover:bg-destructive/10"
+        >
+          <LogOut className="h-4 w-4" /> Sign out
+        </button>
+      </PopoverContent>
+    </Popover>
   );
 }
 

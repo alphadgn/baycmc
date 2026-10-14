@@ -1,50 +1,55 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { GripVertical, Mic, Users } from "lucide-react";
+import { CalendarClock, GripVertical, Mic, Users } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
-import { KaraokeMusicBoard } from "@/components/KaraokeMusicBoard";
+import { KaraokeMusicBoard, type TrackChange } from "@/components/KaraokeMusicBoard";
+import {
+  DEFAULT_ROOM_SETTINGS,
+  getKaraokeStage,
+  patchKaraokeStage,
+  resetKaraokeStage,
+  type BackingTrackMeta,
+  type KaraokeRoomSettings,
+  type KaraokeSessionRow,
+} from "@/lib/karaoke/stageStore";
 
 interface KaraokeStageProps {
   roomId: string;
   /**
-   * The user_id of the active booking holder, if any. When set, that user
-   * is the sole performer for the duration of the booking — the queue is
-   * bypassed entirely. When null, the room is "open mic" and the front of
-   * the queue gets the stage one song at a time.
+   * user_id of the active WHOLE-ROOM booking (room_bookings), if any. Used
+   * only for host affordances (skip). Who is on stage is decided by the
+   * server (karaoke_sessions.performer_user_id + stage_source), which already
+   * accounts for reservations, bookings, mutes and the open-mic line.
    */
   bookingHostUserId: string | null;
 }
 
-interface KaraokeSession {
-  performer_user_id: string | null;
-  video_id: string | null;
-  search_query: string | null;
-  playback_status: string;
-  position_ms: number;
-  position_at: string;
-  generation: number;
-  revision: number;
-}
-type SessionRow = KaraokeSession;
-
 const SESSION_COLUMNS =
-  "performer_user_id,video_id,search_query,playback_status,position_ms,position_at,generation,revision";
+  "performer_user_id,video_id,search_query,backing_track_id,song_title,song_artist,playback_status,position_ms,position_at,generation,revision,stage_source,reservation_id";
 
-const EMPTY_SESSION: KaraokeSession = {
+const EMPTY_SESSION: KaraokeSessionRow = {
   performer_user_id: null,
   video_id: null,
   search_query: null,
+  backing_track_id: null,
+  song_title: null,
+  song_artist: null,
   playback_status: "idle",
   position_ms: 0,
   position_at: new Date(0).toISOString(),
   generation: 0,
   revision: -1,
+  stage_source: "open",
+  reservation_id: null,
 };
 
 function friendly(msg: string | undefined) {
   if (!msg) return "Please try again.";
   if (msg.includes("STALE_REVISION")) return "The stage just changed — try again.";
+  if (msg.includes("function") && msg.includes("does not exist")) {
+    return "Karaoke isn't set up on the database yet — run the karaoke v2 migration.";
+  }
   return msg;
 }
 
@@ -53,43 +58,60 @@ interface QueueRow {
   user_id: string;
   joined_at: string;
 }
+interface ReservationRow {
+  id: string;
+  singer_user_id: string;
+  starts_at: string;
+  ends_at: string;
+  song_title: string | null;
+}
 
-type Profile = { id: string; username: string | null; wallet_address: string };
+type Profile = { id: string; username: string | null };
 
-function short(addr: string | undefined | null) {
-  if (!addr) return "";
-  return addr.length > 12 ? `${addr.slice(0, 6)}…${addr.slice(-4)}` : addr;
+export function displayName(p: Profile | undefined | null, id?: string | null) {
+  if (p?.username) return p.username;
+  const key = p?.id ?? id ?? "";
+  return key ? `Member ${key.slice(0, 4)}` : "—";
+}
+
+function hhmm(iso: string) {
+  return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
 /**
- * Coordinates the Karaoke Room's shared "now playing" state and turn-taking.
+ * Coordinates the karaoke room's shared "now playing" state and turn-taking.
  *
- * - Subscribes to `karaoke_sessions` (one row per room) so every viewer
- *   renders the same iframe / search query in real time.
- * - Subscribes to `karaoke_queue` so the waiting list refreshes for everyone
- *   instantly as users join, leave, or rotate.
- * - When a booking is active, the booking holder is the sole performer.
- *   Otherwise the front of the queue becomes the performer; ending a song
- *   pops that user off the queue and promotes the next one.
+ * All writes go through the karaoke_* SECURITY DEFINER RPCs (see
+ * supabase/migrations/20261013000001_karaoke_v2_authoritative_stage.sql);
+ * this component renders server state, heart-beats presence every 15s and
+ * mirrors the session into the karaoke stage store for the audio engine.
  */
 export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
   const { user } = useAuth();
-  const [session, setSession] = useState<KaraokeSession>(EMPTY_SESSION);
-  // Only accept snapshots that are newer than what we already have, so a
-  // slow response can never roll the room state backwards.
-  const applySession = useCallback((row: SessionRow) => {
-    setSession((prev) => (row.revision < prev.revision ? prev : { ...row }));
+  const [session, setSession] = useState<KaraokeSessionRow>(EMPTY_SESSION);
+  const applySession = useCallback((row: KaraokeSessionRow) => {
+    setSession((prev) => (row.revision < prev.revision ? prev : { ...EMPTY_SESSION, ...row }));
   }, []);
   const [queue, setQueue] = useState<QueueRow[]>([]);
   const [profiles, setProfiles] = useState<Record<string, Profile>>({});
+  const [settings, setSettings] = useState<KaraokeRoomSettings>(DEFAULT_ROOM_SETTINGS);
+  const [nextReservation, setNextReservation] = useState<ReservationRow | null>(null);
+  const [currentReservation, setCurrentReservation] = useState<ReservationRow | null>(null);
+  const [backingTrack, setBackingTrack] = useState<BackingTrackMeta | null>(null);
 
-  // Track which user IDs are currently present on the karaoke page (via
-  // Supabase Realtime presence). Used to auto-advance the turn queue when
-  // the active performer (or a queued user) disconnects, navigates away,
-  // or otherwise drops out without explicitly leaving the line.
   const [presentIds, setPresentIds] = useState<Set<string>>(() => new Set());
-  const lastSeenRef = useRef<Map<string, number>>(new Map());
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
+  // ---- Server clock skew (once) ----
+  useEffect(() => {
+    const t0 = Date.now();
+    void supabase.rpc("karaoke_server_time").then(({ data }) => {
+      if (!data) return;
+      const t1 = Date.now();
+      const server = new Date(data as string).getTime();
+      if (Number.isFinite(server)) patchKaraokeStage({ clockOffsetMs: server - (t0 + t1) / 2 });
+    });
+  }, []);
 
   // ---- Initial load + realtime subscriptions ----
   useEffect(() => {
@@ -102,7 +124,7 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
         .eq("room_id", roomId)
         .maybeSingle();
       if (cancelled) return;
-      if (data) applySession(data as SessionRow);
+      if (data) applySession(data as unknown as KaraokeSessionRow);
     }
     async function loadQueue() {
       const { data } = await supabase
@@ -113,8 +135,41 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
       if (cancelled) return;
       setQueue(data ?? []);
     }
+    async function loadSettings() {
+      const { data } = await supabase
+        .from("karaoke_room_settings")
+        .select("*")
+        .eq("room_id", roomId)
+        .maybeSingle();
+      if (cancelled) return;
+      setSettings(
+        data
+          ? { ...DEFAULT_ROOM_SETTINGS, ...(data as Partial<KaraokeRoomSettings>) }
+          : DEFAULT_ROOM_SETTINGS,
+      );
+    }
+    async function loadReservations() {
+      const nowIso = new Date().toISOString();
+      const { data } = await supabase
+        .from("karaoke_reservations")
+        .select("id,singer_user_id,starts_at,ends_at,song_title")
+        .eq("room_id", roomId)
+        .eq("status", "booked")
+        .gt("ends_at", nowIso)
+        .order("starts_at", { ascending: true })
+        .limit(2);
+      if (cancelled) return;
+      const rows = (data ?? []) as ReservationRow[];
+      const now = Date.now();
+      const cur = rows.find((r) => new Date(r.starts_at).getTime() <= now) ?? null;
+      setCurrentReservation(cur);
+      setNextReservation(rows.find((r) => r !== cur) ?? null);
+    }
     void loadSession();
     void loadQueue();
+    void loadSettings();
+    void loadReservations();
+    const resTimer = window.setInterval(() => void loadReservations(), 60_000);
 
     const presenceKey = user?.id ?? `anon-${Math.random().toString(36).slice(2)}`;
     const ch = supabase
@@ -129,16 +184,32 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
         { event: "*", schema: "public", table: "karaoke_queue", filter: `room_id=eq.${roomId}` },
         () => void loadQueue(),
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "karaoke_room_settings",
+          filter: `room_id=eq.${roomId}`,
+        },
+        () => void loadSettings(),
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "karaoke_reservations",
+          filter: `room_id=eq.${roomId}`,
+        },
+        () => void loadReservations(),
+      )
       .on("presence", { event: "sync" }, () => {
         const state = ch.presenceState() as Record<string, Array<{ user_id?: string }>>;
         const ids = new Set<string>();
-        const now = Date.now();
         Object.entries(state).forEach(([key, metas]) => {
           const uid = metas?.[0]?.user_id ?? key;
-          if (uid && !uid.startsWith("anon-")) {
-            ids.add(uid);
-            lastSeenRef.current.set(uid, now);
-          }
+          if (uid && !uid.startsWith("anon-")) ids.add(uid);
         });
         setPresentIds(ids);
       })
@@ -152,24 +223,27 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
 
     return () => {
       cancelled = true;
+      window.clearInterval(resTimer);
       channelRef.current = null;
       void supabase.removeChannel(ch);
     };
-  }, [roomId, user?.id]);
+  }, [roomId, user?.id, applySession]);
 
-  // ---- Heartbeat lease ----
-  // Every 15s each signed-in viewer renews its queue row / performer lease.
-  // The server promotes the next singer when a performer's lease expires
-  // (45s grace), so crashed tabs recover without unload requests and a
-  // hidden tab keeps the stage.
+  // ---- Heartbeat lease (presence + performer lease + server-side promotion) ----
   const heartbeat = useCallback(async () => {
     if (!user?.id) return;
     const { data, error } = await supabase.rpc("karaoke_heartbeat", { _room: roomId });
     if (error) {
       console.warn("[karaoke] heartbeat failed", error.message);
+      if (error.message.includes("does not exist")) {
+        toast.error("Karaoke backend missing", {
+          description: friendly(error.message),
+          id: "kara-missing",
+        });
+      }
       return;
     }
-    if (data) applySession(data as SessionRow);
+    if (data) applySession(data as unknown as KaraokeSessionRow);
   }, [roomId, user?.id, applySession]);
   useEffect(() => {
     if (!user?.id) return;
@@ -178,24 +252,22 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
     return () => window.clearInterval(t);
   }, [heartbeat, user?.id]);
 
-  // ---- Resolve display names for performer + queue ----
+  // ---- Resolve display names ----
   useEffect(() => {
     const ids = new Set<string>();
     if (session.performer_user_id) ids.add(session.performer_user_id);
-    if (bookingHostUserId) ids.add(bookingHostUserId);
+    if (nextReservation) ids.add(nextReservation.singer_user_id);
     queue.forEach((q) => ids.add(q.user_id));
     const missing = [...ids].filter((id) => !profiles[id]);
     if (missing.length === 0) return;
     let cancelled = false;
     void (async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("id,username,wallet_address")
-        .in("id", missing);
-      if (cancelled || !data) return;
+      const { data } = await supabase.from("profiles").select("id,username").in("id", missing);
+      if (cancelled) return;
       setProfiles((prev) => {
         const next = { ...prev };
-        data.forEach((p) => {
+        for (const id of missing) next[id] = { id, username: null };
+        (data ?? []).forEach((p) => {
           next[p.id] = p as Profile;
         });
         return next;
@@ -204,45 +276,78 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
     return () => {
       cancelled = true;
     };
-  }, [session.performer_user_id, bookingHostUserId, queue, profiles]);
+  }, [session.performer_user_id, nextReservation, queue, profiles]);
 
-  // ---- Visible queue ----
-  // The waitlist must only show users who satisfy ALL three rules:
-  //   (1) signed in, (2) present in the room, (3) signed up for the line.
-  // Presence (realtime) covers (1)+(2): anonymous viewers use `anon-*` keys
-  // and are filtered out of `presentIds` at sync time. Intersecting with
-  // the persisted queue covers (3). Stale rows from force-killed tabs are
-  // hidden immediately — no DB write needed, and no one else can mutate
-  // another user's row (RLS unchanged).
+  // Visible queue = signed in + present + in line.
   const visibleQueue = useMemo(
     () => queue.filter((q) => presentIds.has(q.user_id)),
     [queue, presentIds],
   );
 
-  // ---- Determine the effective performer ----
-  // Booking always wins. Otherwise: stored performer (only if still present),
-  // or front of the visible queue.
-  const effectivePerformerId = useMemo(
-    () => bookingHostUserId ?? session.performer_user_id ?? null,
-    [bookingHostUserId, session.performer_user_id],
-  );
-
-  // Promotion of the next singer happens on the server (heartbeat / end
-  // turn), never by competing client writes.
-
-  const isMyTurn = !!user && !!effectivePerformerId && user.id === effectivePerformerId;
+  const performerId = session.performer_user_id;
+  const reserved = session.stage_source !== "open";
+  const isMyTurn = !!user && !!performerId && user.id === performerId;
   const meInQueue = !!user && visibleQueue.some((q) => q.user_id === user.id);
 
-  // ---- Performer actions: change track, end song ----
-  // If the stage is free (no booking, no performer), the user auto-claims it
-  // when they hit play. Otherwise only the active performer can mutate.
+  // ---- Backing-track metadata (+ signed URL for the performer only) ----
+  useEffect(() => {
+    let cancelled = false;
+    const id = session.backing_track_id;
+    if (!id) {
+      setBackingTrack(null);
+      return;
+    }
+    void (async () => {
+      const { data } = await supabase
+        .from("karaoke_backing_tracks")
+        .select("id,title,artist,lyrics,storage_path")
+        .eq("id", id)
+        .maybeSingle();
+      let url: string | null = null;
+      if (data && isMyTurn) {
+        const signed = await supabase.storage
+          .from("karaoke-backing-tracks")
+          .createSignedUrl(data.storage_path as string, 60 * 60 * 2);
+        url = signed.data?.signedUrl ?? null;
+      }
+      if (cancelled) return;
+      setBackingTrack({
+        id,
+        title: (data?.title as string | undefined) ?? session.song_title ?? "Backing track",
+        artist: (data?.artist as string | null | undefined) ?? session.song_artist ?? null,
+        lyrics: (data?.lyrics as string | null | undefined) ?? null,
+        url,
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [session.backing_track_id, session.song_title, session.song_artist, isMyTurn]);
+
+  // ---- Mirror into the shared store for the audio engine / UI ----
+  useEffect(() => {
+    patchKaraokeStage({
+      roomId,
+      userId: user?.id ?? null,
+      isMyTurn,
+      session,
+      settings,
+      backingTrack,
+    });
+  }, [roomId, user?.id, isMyTurn, session, settings, backingTrack]);
+  useEffect(() => {
+    if (!isMyTurn) patchKaraokeStage({ micWanted: false });
+  }, [isMyTurn]);
+  useEffect(() => () => resetKaraokeStage(), [roomId]);
+
+  // ---- Performer actions ----
   const onChangeTrack = useCallback(
-    async (next: { videoId: string | null; activeQuery: string | null }) => {
+    async (next: TrackChange) => {
       if (!user) return;
-      const stageFree = !bookingHostUserId && !effectivePerformerId;
+      const stageFree = !performerId;
       if (!isMyTurn && !stageFree) {
         toast.message("Someone else is on stage", {
-          description: "Join the line to take your turn.",
+          description: "Join the line (or book a slot) to take your turn.",
         });
         return;
       }
@@ -260,32 +365,60 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
         _expected_revision: revision,
         _action: "song",
         _video_id: next.videoId ?? undefined,
-        _search_query: next.activeQuery ?? undefined,
+        _backing_track_id: next.backingTrackId ?? undefined,
+        _song_title: next.title ?? undefined,
+        _song_artist: next.artist ?? undefined,
       });
       if (error) {
-        toast.error("Could not sync track", { description: friendly(error.message) });
+        toast.error("Could not start the track", { description: friendly(error.message) });
         return;
       }
-      if (data) applySession(data as SessionRow);
+      if (data) applySession(data as unknown as KaraokeSessionRow);
     },
-    [isMyTurn, user, roomId, effectivePerformerId, bookingHostUserId, session.revision],
+    [user, performerId, isMyTurn, roomId, session.revision, applySession],
+  );
+
+  const control = useCallback(
+    async (action: "play" | "pause" | "seek" | "stop", positionMs?: number) => {
+      if (!isMyTurn) return;
+      const { data, error } = await supabase.rpc("karaoke_control", {
+        _room: roomId,
+        _expected_revision: session.revision,
+        _action: action,
+        _position_ms: positionMs,
+      });
+      if (error) {
+        toast.error("Couldn't update playback", { description: friendly(error.message) });
+        return;
+      }
+      if (data) applySession(data as unknown as KaraokeSessionRow);
+    },
+    [isMyTurn, roomId, session.revision, applySession],
   );
 
   const onEndSong = useCallback(async () => {
     if (!isMyTurn || !user) return;
-    // Server pops us off the line and atomically promotes the next singer.
-    // During a booking the booked performer keeps the stage.
-    const { error } = await supabase.rpc("karaoke_end_turn", {
+    // Open mic: server pops us and promotes the next singer. Reserved slot:
+    // the server just stops the song — the singer keeps the stage until the
+    // slot ends.
+    const { data, error } = await supabase.rpc("karaoke_end_turn", {
       _room: roomId,
       _expected_generation: session.generation,
     });
     if (error) toast.error("Couldn't end the song", { description: friendly(error.message) });
-  }, [isMyTurn, user, roomId, session.generation]);
+    else if (data) applySession(data as unknown as KaraokeSessionRow);
+  }, [isMyTurn, user, roomId, session.generation, applySession]);
 
-  // ---- Host / super-admin force-skip ----
-  // The booking holder always counts as the room host. Outside of bookings,
-  // anyone with `admin` / `super_admin` role can advance the queue when it
-  // stalls (e.g. a performer's tab froze before presence prune kicked in).
+  // Uploaded backing track reached its end → finish the song automatically.
+  useEffect(() => {
+    function onEnded() {
+      void onEndSong();
+    }
+    window.addEventListener("karaoke:backing-ended", onEnded);
+    return () => window.removeEventListener("karaoke:backing-ended", onEnded);
+  }, [onEndSong]);
+
+  // ---- Moderator force-skip ----
   const [isAdmin, setIsAdmin] = useState(false);
   useEffect(() => {
     if (!user?.id) {
@@ -307,12 +440,12 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
   }, [user?.id]);
   const canForceSkip =
     !!user &&
-    !!effectivePerformerId &&
-    effectivePerformerId !== user.id &&
+    !!performerId &&
+    performerId !== user.id &&
     (isAdmin || (bookingHostUserId ? bookingHostUserId === user.id : false));
 
   const forceSkip = useCallback(async () => {
-    if (!canForceSkip || !effectivePerformerId) return;
+    if (!canForceSkip) return;
     const { error } = await supabase.rpc("karaoke_end_turn", {
       _room: roomId,
       _expected_generation: session.generation,
@@ -322,11 +455,13 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
       return;
     }
     toast.success("Skipped current performer");
-  }, [canForceSkip, effectivePerformerId, roomId, session.generation]);
+  }, [canForceSkip, roomId, session.generation]);
 
   // ---- Queue actions (server-enforced) ----
   async function joinLine() {
     if (!user) return;
+    // You can only sing if you're connected to the room's audio.
+    if (!getKaraokeStage().engineMounted) window.dispatchEvent(new Event("karaoke:request-join"));
     const { error } = await supabase.rpc("karaoke_join_queue", { _room: roomId });
     if (error) {
       toast.error("Could not join the line", { description: friendly(error.message) });
@@ -340,46 +475,30 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
     if (error) toast.error("Could not leave the line", { description: friendly(error.message) });
   }
 
-  // Presence: drop the user from the waiting list AND release the stage
-  // if they're the active performer the moment they leave the room — whether
-  // by navigating away (component unmounts) or closing/hiding the tab
-  // (pagehide). Without this, the room would stall on a departed performer
-  // until the presence-based prune timer (above) catches up.
+  // Leave the line / release an open-mic stage on real page exits. Hiding
+  // the tab must NOT release the stage; crashed tabs are recovered by the
+  // 45s heartbeat lease on the server.
   const userIdRef = useRef<string | null>(user?.id ?? null);
   userIdRef.current = user?.id ?? null;
-  const performerIdRef = useRef<string | null>(session.performer_user_id);
-  performerIdRef.current = session.performer_user_id;
-  const bookingRef = useRef<string | null>(bookingHostUserId);
-  bookingRef.current = bookingHostUserId;
   useEffect(() => {
     function cleanupSelf() {
-      const uid = userIdRef.current;
-      if (!uid) return;
-      // Untrack presence so others drop us from the visible line instantly.
+      if (!userIdRef.current) return;
       try {
         void channelRef.current?.untrack();
       } catch {
         /* noop */
       }
-      // Server-side leave: removes our queue row and hands the stage on if
-      // we were singing. Crashed tabs are recovered by the heartbeat lease.
       void supabase.rpc("karaoke_leave_queue", { _room: roomId });
     }
-    // Hiding the tab (switching apps, opening a share picker) must NOT
-    // release the stage, so only real page exits clean up.
     window.addEventListener("pagehide", cleanupSelf);
-    window.addEventListener("beforeunload", cleanupSelf);
     window.addEventListener("baycmc:karaoke-cleanup-self", cleanupSelf);
     return () => {
       window.removeEventListener("pagehide", cleanupSelf);
-      window.removeEventListener("beforeunload", cleanupSelf);
       window.removeEventListener("baycmc:karaoke-cleanup-self", cleanupSelf);
       cleanupSelf();
     };
   }, [roomId]);
 
-  // Sign-out: if the auth user disappears while the stage is still mounted,
-  // drop the row immediately — an unauthenticated viewer fails condition (1).
   useEffect(() => {
     if (user?.id) return;
     try {
@@ -389,9 +508,7 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
     }
   }, [user?.id]);
 
-  const performerProfile = effectivePerformerId ? profiles[effectivePerformerId] : null;
-  const performerName =
-    performerProfile?.username ?? short(performerProfile?.wallet_address) ?? "—";
+  const performerName = performerId ? displayName(profiles[performerId], performerId) : "—";
 
   // Drag state — anchored top-left, offsets in CSS pixels.
   const [pos, setPos] = useState<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
@@ -417,29 +534,9 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
     dragRef.current = null;
   }
 
-  // Pause is shared room state: persisted on the server with a revision,
-  // so every viewer (and late joiners) see the same play/pause.
   const paused = session.playback_status === "paused";
-  const setPaused = useCallback(
-    async (next: boolean) => {
-      if (!isMyTurn) return;
-      const { data, error } = await supabase.rpc("karaoke_control", {
-        _room: roomId,
-        _expected_revision: session.revision,
-        _action: next ? "pause" : "play",
-      });
-      if (error) {
-        toast.error("Couldn't update playback", { description: friendly(error.message) });
-        return;
-      }
-      if (data) applySession(data as SessionRow);
-    },
-    [isMyTurn, roomId, session.revision, applySession],
-  );
-  const isPlaying = !!session.video_id && !paused;
-  // Slide the waiting list off to the left edge while playing, leaving
-  // ~32px peeking out as a tap-target. Clicking it brings it back without
-  // disturbing the pause state.
+  const hasSong = !!session.video_id || !!session.backing_track_id;
+  const isPlaying = hasSong && !paused;
   const [forceWaitlistVisible, setForceWaitlistVisible] = useState(false);
   useEffect(() => {
     if (!isPlaying) setForceWaitlistVisible(false);
@@ -449,33 +546,24 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
   const resetAllPanels = useCallback(() => {
     setPos({ dx: 0, dy: 0 });
     setForceWaitlistVisible(true);
-    setPaused(false);
-    // Tell the music machine to reopen + expand.
     window.dispatchEvent(new CustomEvent("karaoke:reset-panels"));
   }, []);
-  // Expose so any other panel (or a future affordance) can request a reset
-  // now that the dedicated "Show all panels" button has been removed in
-  // favour of the Participants pill.
   useEffect(() => {
-    function onReq() {
-      resetAllPanels();
-    }
-    window.addEventListener("karaoke:request-reset-panels", onReq);
-    return () => window.removeEventListener("karaoke:request-reset-panels", onReq);
+    window.addEventListener("karaoke:request-reset-panels", resetAllPanels);
+    return () => window.removeEventListener("karaoke:request-reset-panels", resetAllPanels);
   }, [resetAllPanels]);
+
+  const myQueuePosition = isMyTurn
+    ? 0
+    : (() => {
+        if (!user) return null;
+        const idx = visibleQueue.findIndex((q) => q.user_id === user.id);
+        if (idx < 0) return null;
+        return performerId && performerId !== user.id ? idx + 1 : idx;
+      })();
 
   return (
     <>
-      {/* "Show all panels" was previously here. Per design update IMG_2966
-          it has been replaced by the room Participants pill, which now
-          lives in the same bottom-right slot (rendered from LiveBottomBar
-          since it needs LiveKit room context). Panel-reset is still
-          available via the waiting-list "On stage" handle.
-          We expose resetAllPanels on window so any panel that needs an
-          escape hatch can still call it. */}
-
-      {/* Queue + status strip — draggable from the top handle.
-          Slides off to the left edge while the song is playing. */}
       <div
         className="fixed left-4 top-20 z-40 w-[min(90vw,18rem)] overflow-hidden rounded-xl border border-gold/30 bg-background/85 text-xs shadow-gold backdrop-blur transition-transform duration-500 ease-out"
         style={{
@@ -505,29 +593,35 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
         </div>
         <div className="p-3 pt-2">
           <div className="mt-1 truncate text-sm font-semibold text-foreground">
-            {effectivePerformerId ? performerName : "Nobody — first in line goes up"}
-            {bookingHostUserId && (
+            {performerId ? performerName : "Nobody — first in line goes up"}
+            {reserved && (
               <span className="ml-1 rounded-sm bg-gold/15 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wider text-gold">
-                Booked
+                {session.stage_source === "reservation" ? "Reserved" : "Booked"}
               </span>
             )}
           </div>
+          {(session.song_title || backingTrack?.title) && hasSong && (
+            <p className="truncate text-[11px] text-muted-foreground">
+              ♪ {session.song_title ?? backingTrack?.title}
+              {session.song_artist ? ` · ${session.song_artist}` : ""}
+            </p>
+          )}
+          {currentReservation && reserved && (
+            <p className="mt-1 text-[10px] text-gold/80">
+              Slot ends {hhmm(currentReservation.ends_at)}
+            </p>
+          )}
           {canForceSkip && (
             <button
               type="button"
               onClick={forceSkip}
               className="mt-2 w-full rounded-sm border border-amber-400/40 bg-amber-400/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-amber-200 hover:bg-amber-400/20"
-              title={
-                isAdmin
-                  ? "Admin override: skip the current performer"
-                  : "Host override: skip the current performer"
-              }
             >
               Skip performer →
             </button>
           )}
 
-          {!bookingHostUserId && (
+          {!reserved && (
             <>
               <div className="mt-3 flex items-center justify-between">
                 <div className="flex items-center gap-1 text-gold/80">
@@ -547,8 +641,9 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
                 ) : (
                   <button
                     type="button"
-                    disabled={!user || isMyTurn}
+                    disabled={!user || isMyTurn || settings.require_booking}
                     onClick={joinLine}
+                    title={settings.require_booking ? "This room is booking-only" : undefined}
                     className="rounded-sm bg-gradient-gold px-2 py-0.5 text-[10px] font-semibold text-gold-foreground disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     Join line
@@ -557,53 +652,49 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
               </div>
               {visibleQueue.length > 0 && (
                 <ol className="mt-2 space-y-0.5 text-[11px] text-muted-foreground">
-                  {visibleQueue.slice(0, 6).map((q, i) => {
-                    const p = profiles[q.user_id];
-                    const name = p?.username ?? short(p?.wallet_address) ?? q.user_id.slice(0, 6);
-                    return (
-                      <li key={q.id} className="flex justify-between">
-                        <span>
-                          {i + 1}. {name}
-                        </span>
-                        {user?.id === q.user_id && <span className="text-gold/70">you</span>}
-                      </li>
-                    );
-                  })}
+                  {visibleQueue.slice(0, 6).map((q, i) => (
+                    <li key={q.id} className="flex justify-between">
+                      <span>
+                        {i + 1}. {displayName(profiles[q.user_id], q.user_id)}
+                      </span>
+                      {user?.id === q.user_id && <span className="text-gold/70">you</span>}
+                    </li>
+                  ))}
                 </ol>
               )}
               <p className="mt-2 text-[10px] leading-snug text-muted-foreground">
-                One song per turn. The line auto-advances when the performer ends their song.
+                {settings.require_booking
+                  ? "Booking-only room — reserve a slot in the Room hub."
+                  : `One song per turn${settings.max_song_seconds ? ` (max ${Math.round(settings.max_song_seconds / 60)} min)` : ""}. The line auto-advances.`}
               </p>
             </>
+          )}
+          {nextReservation && (
+            <p className="mt-2 flex items-center gap-1 text-[10px] text-gold/80">
+              <CalendarClock className="h-3 w-3" />
+              Next booked:{" "}
+              {displayName(
+                profiles[nextReservation.singer_user_id],
+                nextReservation.singer_user_id,
+              )}{" "}
+              · {hhmm(nextReservation.starts_at)}
+            </p>
           )}
         </div>
       </div>
 
       <KaraokeMusicBoard
+        roomId={roomId}
         isMyTurn={isMyTurn}
-        videoId={session.video_id}
-        activeQuery={session.search_query}
+        session={session}
+        settings={settings}
+        backingTrack={backingTrack}
         onChangeTrack={onChangeTrack}
-        onEndSong={bookingHostUserId ? undefined : onEndSong}
-        paused={paused}
-        onPauseToggle={setPaused}
-        performerName={effectivePerformerId ? performerName : null}
-        // Position: 0 = currently performing, N>=1 = N turns away from the
-        // stage (counts the active performer + everyone queued ahead), or
-        // null when the viewer is neither performing nor in line.
-        myQueuePosition={
-          isMyTurn
-            ? 0
-            : (() => {
-                if (!user) return null;
-                const idx = visibleQueue.findIndex((q) => q.user_id === user.id);
-                if (idx < 0) return null;
-                // If there's an active performer in front, add 1; otherwise
-                // queue index 0 is up next immediately.
-                return effectivePerformerId && effectivePerformerId !== user.id ? idx + 1 : idx;
-              })()
-        }
-        bookingActive={!!bookingHostUserId}
+        onControl={control}
+        onEndSong={onEndSong}
+        performerName={performerId ? performerName : null}
+        myQueuePosition={myQueuePosition}
+        reserved={reserved}
       />
     </>
   );

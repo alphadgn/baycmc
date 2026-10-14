@@ -322,6 +322,7 @@ export type Database = {
       }
       karaoke_recordings: {
         Row: {
+          backing_track_id: string | null
           created_at: string
           duration_ms: number | null
           has_instrumental: boolean
@@ -329,14 +330,18 @@ export type Database = {
           mime_type: string
           performer_id: string
           public_url: string
+          reservation_id: string | null
           room_id: string
+          session_generation: number | null
           song_artist: string | null
           song_title: string | null
           storage_path: string
           updated_at: string
+          visibility: string
           youtube_id: string | null
         }
         Insert: {
+          backing_track_id?: string | null
           created_at?: string
           duration_ms?: number | null
           has_instrumental?: boolean
@@ -344,14 +349,18 @@ export type Database = {
           mime_type?: string
           performer_id: string
           public_url: string
+          reservation_id?: string | null
           room_id: string
+          session_generation?: number | null
           song_artist?: string | null
           song_title?: string | null
           storage_path: string
           updated_at?: string
+          visibility?: string
           youtube_id?: string | null
         }
         Update: {
+          backing_track_id?: string | null
           created_at?: string
           duration_ms?: number | null
           has_instrumental?: boolean
@@ -359,12 +368,210 @@ export type Database = {
           mime_type?: string
           performer_id?: string
           public_url?: string
+          reservation_id?: string | null
           room_id?: string
+          session_generation?: number | null
           song_artist?: string | null
           song_title?: string | null
           storage_path?: string
           updated_at?: string
+          visibility?: string
           youtube_id?: string | null
+        }
+        Relationships: []
+      }
+      karaoke_backing_tracks: {
+        Row: {
+          artist: string | null
+          created_at: string
+          duration_ms: number | null
+          id: string
+          is_public: boolean
+          lyrics: string | null
+          mime_type: string
+          owner_id: string
+          size_bytes: number
+          storage_path: string
+          title: string
+        }
+        Insert: {
+          artist?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          id?: string
+          is_public?: boolean
+          lyrics?: string | null
+          mime_type: string
+          owner_id: string
+          size_bytes: number
+          storage_path: string
+          title: string
+        }
+        Update: {
+          artist?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          id?: string
+          is_public?: boolean
+          lyrics?: string | null
+          mime_type?: string
+          owner_id?: string
+          size_bytes?: number
+          storage_path?: string
+          title?: string
+        }
+        Relationships: []
+      }
+      karaoke_presence: {
+        Row: {
+          last_seen_at: string
+          room_id: string
+          user_id: string
+        }
+        Insert: {
+          last_seen_at?: string
+          room_id: string
+          user_id: string
+        }
+        Update: {
+          last_seen_at?: string
+          room_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      karaoke_reservations: {
+        Row: {
+          backing_track_id: string | null
+          booked_by: string
+          created_at: string
+          ends_at: string
+          id: string
+          notes: string | null
+          room_id: string
+          singer_user_id: string
+          song_artist: string | null
+          song_title: string | null
+          starts_at: string
+          status: string
+          video_id: string | null
+        }
+        Insert: {
+          backing_track_id?: string | null
+          booked_by: string
+          created_at?: string
+          ends_at: string
+          id?: string
+          notes?: string | null
+          room_id: string
+          singer_user_id: string
+          song_artist?: string | null
+          song_title?: string | null
+          starts_at: string
+          status?: string
+          video_id?: string | null
+        }
+        Update: {
+          backing_track_id?: string | null
+          booked_by?: string
+          created_at?: string
+          ends_at?: string
+          id?: string
+          notes?: string | null
+          room_id?: string
+          singer_user_id?: string
+          song_artist?: string | null
+          song_title?: string | null
+          starts_at?: string
+          status?: string
+          video_id?: string | null
+        }
+        Relationships: []
+      }
+      karaoke_room_sanctions: {
+        Row: {
+          created_at: string
+          created_by: string
+          expires_at: string | null
+          id: string
+          kind: string
+          lifted_at: string | null
+          lifted_by: string | null
+          reason: string | null
+          room_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          expires_at?: string | null
+          id?: string
+          kind: string
+          lifted_at?: string | null
+          lifted_by?: string | null
+          reason?: string | null
+          room_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          expires_at?: string | null
+          id?: string
+          kind?: string
+          lifted_at?: string | null
+          lifted_by?: string | null
+          reason?: string | null
+          room_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      karaoke_room_settings: {
+        Row: {
+          allow_uploads: boolean
+          allow_youtube: boolean
+          booking_window_days: number
+          holders_priority: boolean
+          max_future_bookings: number
+          max_slot_minutes: number
+          max_song_seconds: number
+          recording_enabled: boolean
+          require_booking: boolean
+          room_id: string
+          rules: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          allow_uploads?: boolean
+          allow_youtube?: boolean
+          booking_window_days?: number
+          holders_priority?: boolean
+          max_future_bookings?: number
+          max_slot_minutes?: number
+          max_song_seconds?: number
+          recording_enabled?: boolean
+          require_booking?: boolean
+          room_id: string
+          rules?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          allow_uploads?: boolean
+          allow_youtube?: boolean
+          booking_window_days?: number
+          holders_priority?: boolean
+          max_future_bookings?: number
+          max_slot_minutes?: number
+          max_song_seconds?: number
+          recording_enabled?: boolean
+          require_booking?: boolean
+          room_id?: string
+          rules?: string
+          updated_at?: string
+          updated_by?: string | null
         }
         Relationships: []
       }
@@ -391,41 +598,56 @@ export type Database = {
       }
       karaoke_sessions: {
         Row: {
+          backing_track_id: string | null
           generation: number
           performer_heartbeat_at: string | null
           performer_user_id: string | null
           playback_status: string
           position_at: string
           position_ms: number
+          reservation_id: string | null
           revision: number
           room_id: string
           search_query: string | null
+          song_artist: string | null
+          song_title: string | null
+          stage_source: string
           updated_at: string
           video_id: string | null
         }
         Insert: {
+          backing_track_id?: string | null
           generation?: number
           performer_heartbeat_at?: string | null
           performer_user_id?: string | null
           playback_status?: string
           position_at?: string
           position_ms?: number
+          reservation_id?: string | null
           revision?: number
           room_id: string
           search_query?: string | null
+          song_artist?: string | null
+          song_title?: string | null
+          stage_source?: string
           updated_at?: string
           video_id?: string | null
         }
         Update: {
+          backing_track_id?: string | null
           generation?: number
           performer_heartbeat_at?: string | null
           performer_user_id?: string | null
           playback_status?: string
           position_at?: string
           position_ms?: number
+          reservation_id?: string | null
           revision?: number
           room_id?: string
           search_query?: string | null
+          song_artist?: string | null
+          song_title?: string | null
+          stage_source?: string
           updated_at?: string
           video_id?: string | null
         }
@@ -1043,19 +1265,94 @@ export type Database = {
       }
       is_token_proof_verified: { Args: { _user_id: string }; Returns: boolean }
       is_verified_holder: { Args: { _user_id: string }; Returns: boolean }
+      karaoke_admin_clear_queue: { Args: { _room: string }; Returns: undefined }
+      karaoke_admin_create_room: {
+        Args: { _capacity?: number; _description?: string; _name: string }
+        Returns: string
+      }
+      karaoke_admin_delete_room: { Args: { _room: string }; Returns: string }
+      karaoke_book_slot: {
+        Args: {
+          _backing_track_id?: string
+          _minutes: number
+          _notes?: string
+          _room: string
+          _singer?: string
+          _song_artist?: string
+          _song_title?: string
+          _starts_at: string
+          _video_id?: string
+        }
+        Returns: {
+          backing_track_id: string | null
+          booked_by: string
+          created_at: string
+          ends_at: string
+          id: string
+          notes: string | null
+          room_id: string
+          singer_user_id: string
+          song_artist: string | null
+          song_title: string | null
+          starts_at: string
+          status: string
+          video_id: string | null
+        }
+      }
+      karaoke_cancel_reservation: { Args: { _id: string }; Returns: undefined }
+      karaoke_is_admin: { Args: { _uid: string }; Returns: boolean }
+      karaoke_is_sanctioned: {
+        Args: { _kind: string; _room: string; _uid: string }
+        Returns: boolean
+      }
+      karaoke_set_sanction: {
+        Args: {
+          _active: boolean
+          _kind: string
+          _minutes?: number
+          _reason?: string
+          _room: string
+          _user: string
+        }
+        Returns: undefined
+      }
+      karaoke_update_settings: {
+        Args: { _patch: Json; _room: string }
+        Returns: {
+          allow_uploads: boolean
+          allow_youtube: boolean
+          booking_window_days: number
+          holders_priority: boolean
+          max_future_bookings: number
+          max_slot_minutes: number
+          max_song_seconds: number
+          recording_enabled: boolean
+          require_booking: boolean
+          room_id: string
+          rules: string
+          updated_at: string
+          updated_by: string | null
+        }
+      }
+      karaoke_server_time: { Args: never; Returns: string }
       karaoke_booking_host: { Args: { _room: string }; Returns: string }
       karaoke_claim_stage: {
         Args: { _room: string }
         Returns: {
+          backing_track_id: string | null
           generation: number
           performer_heartbeat_at: string | null
           performer_user_id: string | null
           playback_status: string
           position_at: string
           position_ms: number
+          reservation_id: string | null
           revision: number
           room_id: string
           search_query: string | null
+          song_artist: string | null
+          song_title: string | null
+          stage_source: string
           updated_at: string
           video_id: string | null
         }
@@ -1069,22 +1366,30 @@ export type Database = {
       karaoke_control: {
         Args: {
           _action: string
+          _backing_track_id?: string
           _expected_revision: number
           _position_ms?: number
           _room: string
           _search_query?: string
+          _song_artist?: string
+          _song_title?: string
           _video_id?: string
         }
         Returns: {
+          backing_track_id: string | null
           generation: number
           performer_heartbeat_at: string | null
           performer_user_id: string | null
           playback_status: string
           position_at: string
           position_ms: number
+          reservation_id: string | null
           revision: number
           room_id: string
           search_query: string | null
+          song_artist: string | null
+          song_title: string | null
+          stage_source: string
           updated_at: string
           video_id: string | null
         }
@@ -1098,15 +1403,20 @@ export type Database = {
       karaoke_end_turn: {
         Args: { _expected_generation?: number; _room: string }
         Returns: {
+          backing_track_id: string | null
           generation: number
           performer_heartbeat_at: string | null
           performer_user_id: string | null
           playback_status: string
           position_at: string
           position_ms: number
+          reservation_id: string | null
           revision: number
           room_id: string
           search_query: string | null
+          song_artist: string | null
+          song_title: string | null
+          stage_source: string
           updated_at: string
           video_id: string | null
         }
@@ -1118,17 +1428,22 @@ export type Database = {
         }
       }
       karaoke_heartbeat: {
-        Args: { _grace_s?: number; _room: string }
+        Args: { _room: string }
         Returns: {
+          backing_track_id: string | null
           generation: number
           performer_heartbeat_at: string | null
           performer_user_id: string | null
           playback_status: string
           position_at: string
           position_ms: number
+          reservation_id: string | null
           revision: number
           room_id: string
           search_query: string | null
+          song_artist: string | null
+          song_title: string | null
+          stage_source: string
           updated_at: string
           video_id: string | null
         }
@@ -1148,15 +1463,20 @@ export type Database = {
       karaoke_lock_session: {
         Args: { _room: string }
         Returns: {
+          backing_track_id: string | null
           generation: number
           performer_heartbeat_at: string | null
           performer_user_id: string | null
           playback_status: string
           position_at: string
           position_ms: number
+          reservation_id: string | null
           revision: number
           room_id: string
           search_query: string | null
+          song_artist: string | null
+          song_title: string | null
+          stage_source: string
           updated_at: string
           video_id: string | null
         }
@@ -1167,10 +1487,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      karaoke_promote_next: {
-        Args: { _grace_s?: number; _room: string }
-        Returns: string
-      }
+      karaoke_promote_next: { Args: { _room: string }; Returns: string }
       log_audit_event: {
         Args: { _event_type: string; _metadata?: Json; _target_id?: string }
         Returns: string

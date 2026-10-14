@@ -102,6 +102,8 @@ function LinkedWalletsPanelInner() {
 
       // 2) Otherwise open the MetaMask SDK modal, which renders a
       //    WalletConnect-style QR + "Open MetaMask" + install options.
+      // Compile-time constant — keeps the MetaMask SDK out of the server bundle.
+      if (import.meta.env.SSR) throw new Error("Wallet linking is browser-only");
       await import("@/lib/polyfill-shim").then((m) => m.installBrowserPolyfills());
       const { MetaMaskSDK } = await import("@metamask/sdk");
       sdk = new MetaMaskSDK({
@@ -214,8 +216,8 @@ function LinkedWalletsPanelInner() {
         </button>
       </div>
       <p className="mt-1 text-sm text-muted-foreground">
-        Attach additional wallets to your account. Each is checked on-chain for BAYC / MAYC
-        (and incoming delegate.cash delegations) on every sign-in.
+        Attach additional wallets to your account. Each is checked on-chain for BAYC / MAYC (and
+        incoming delegate.cash delegations) on every sign-in.
       </p>
 
       <div className="mt-4 space-y-2">

@@ -23,6 +23,7 @@ type RoomAccessResult =
         | "room_locked"
         | "room_booked"
         | "room_full"
+        | "room_banned"
         | "bayc_revoked"
         | "otherpage_revoked";
     };
@@ -54,15 +55,24 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
     }
   }
 
-  // Karaoke is open for drop-in participation except during an active booking;
-  // the booking owner/admin is treated as host and may still enter.
-  if (isKaraoke && (await hasActiveBooking(roomId)) && !(await isRoomHost(userId, roomId))) {
-    return {
-      ok: false,
-      error:
-        "This karaoke room is currently reserved for a booked session. Try again after the booking ends.",
-      code: "room_booked",
-    };
+  // Karaoke: a booking/reservation reserves the STAGE (enforced by the
+  // karaoke_* RPCs), not the room — the audience can always come watch, the
+  // way a real karaoke lounge works. Previously any active booking locked
+  // every non-host out of LiveKit entirely, which is why rooms looked
+  // "broken" whenever a slot was booked. Only room bans keep someone out.
+  if (isKaraoke) {
+    const { data: banned } = await supabaseAdmin.rpc("karaoke_is_sanctioned", {
+      _room: roomId,
+      _uid: userId,
+      _kind: "ban",
+    });
+    if (banned) {
+      return {
+        ok: false,
+        error: "You've been removed from this karaoke room by a moderator.",
+        code: "room_banned",
+      };
+    }
   }
 
   // Public rooms (including Karaoke) must not run BAYC/Lumina/Otherpage gates.
@@ -122,20 +132,6 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
   }
 
   return { ok: true, room };
-}
-
-async function hasActiveBooking(roomId: string): Promise<boolean> {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const nowIso = new Date().toISOString();
-  const { data } = await supabaseAdmin
-    .from("room_bookings")
-    .select("id")
-    .eq("room_id", roomId)
-    .lte("starts_at", nowIso)
-    .gte("ends_at", nowIso)
-    .limit(1)
-    .maybeSingle();
-  return !!data;
 }
 
 async function isRoomHost(userId: string, roomId: string): Promise<boolean> {
@@ -215,14 +211,30 @@ export const getLivekitToken = createServerFn({ method: "POST" })
 
     const host = await isRoomHost(userId, data.roomId);
 
+    // Muted karaoke members join as listeners: LiveKit itself refuses their
+    // tracks, so a mute can't be bypassed from devtools.
+    let canPublish = true;
+    if (room.kind === "karaoke" && !host) {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: muted } = await supabaseAdmin.rpc("karaoke_is_sanctioned", {
+        _room: data.roomId,
+        _uid: userId,
+        _kind: "mute",
+      });
+      canPublish = !muted;
+    }
+
     const { AccessToken } = await import("livekit-server-sdk");
     const at = new AccessToken(cfg.apiKey, cfg.apiSecret, { identity, name, ttl: "2h" });
     at.addGrant({
       room: room.livekit_room,
       roomJoin: true,
-      canPublish: true,
+      canPublish,
       canSubscribe: true,
       canPublishData: true,
+      // Lets the singer flag "music is in my mix" via participant attributes
+      // so listeners mute their local YouTube copy (no double audio).
+      canUpdateOwnMetadata: true,
       // Hosts get room-admin grants so the client SDK exposes the kick/mute
       // surface. The server-side fns still re-check is_room_host before
       // acting — the grant alone is not a permission.
@@ -246,6 +258,7 @@ export const getLivekitToken = createServerFn({ method: "POST" })
       roomName: room.livekit_room,
       isHost: host,
       isLocked: room.is_locked,
+      canPublish,
     };
   });
 

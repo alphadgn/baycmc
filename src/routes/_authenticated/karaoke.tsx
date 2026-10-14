@@ -34,17 +34,17 @@ export const Route = createFileRoute("/_authenticated/karaoke")({
     const isKaraokeIndex = (location.pathname.replace(/\/+$/, "") || "/") === "/karaoke";
     if (!isKaraokeIndex) return;
 
-    // Single public karaoke room — skip listing, jump straight in.
-    const { data: room } = await supabase
+    // Exactly one karaoke room → skip the listing and jump straight in.
+    // With several (admins can now create rooms) show the lounge list.
+    const { data: rooms } = await supabase
       .from("rooms")
       .select("id")
       .eq("kind", "karaoke")
       .eq("active", true)
       .order("display_order", { ascending: true, nullsFirst: false })
-      .limit(1)
-      .maybeSingle();
-    if (room?.id) {
-      throw redirect({ to: "/karaoke/$roomId", params: { roomId: room.id } });
+      .limit(2);
+    if (rooms && rooms.length === 1) {
+      throw redirect({ to: "/karaoke/$roomId", params: { roomId: rooms[0].id } });
     }
   },
   component: KaraokeRoute,

@@ -49,59 +49,89 @@ export interface CollisionInfo {
  * Returns null when no collision exists OR when a prior decision already
  * resolved this pair.
  */
+/**
+ * Server-side collision detection. Used by findAccountCollision AND re-run by
+ * mergeAccounts / recordKeepSeparate so a caller can never act on an
+ * arbitrary `otherUserId`.
+ *
+ * SECURITY: wallet matches use only server-verified sources —
+ * profiles.wallet_address (written by the SIWE server fn) and
+ * linked_wallets rows with verified_at (signature-proven). The old
+ * profiles.linked_wallets array was populated from client input and could be
+ * poisoned to "collide" with any victim.
+ */
+async function detectCollision(
+  me: string,
+): Promise<{ otherId: string; reason: "email" | "wallet" } | null> {
+  const admin = await getAdmin();
+  const { data: myAuth } = await admin.auth.admin.getUserById(me);
+  const myEmail = myAuth?.user?.email?.toLowerCase() ?? null;
+
+  const myWallets = new Set<string>();
+  const { data: myProf } = await admin
+    .from("profiles")
+    .select("wallet_address")
+    .eq("id", me)
+    .maybeSingle();
+  if (myProf?.wallet_address) myWallets.add(String(myProf.wallet_address).toLowerCase());
+  const { data: myLinked } = await admin
+    .from("linked_wallets")
+    .select("address")
+    .eq("user_id", me)
+    .not("verified_at", "is", null);
+  for (const r of myLinked ?? []) myWallets.add(String(r.address).toLowerCase());
+
+  // 1. Email collision (synthetic wallet emails never collide with real ones).
+  if (myEmail && !myEmail.endsWith("@wallet.baycmc.local")) {
+    for (let page = 1; page <= 50; page++) {
+      const { data: list } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+      const dupe = list?.users.find(
+        (u) => u.id !== me && (u.email ?? "").toLowerCase() === myEmail,
+      );
+      if (dupe) return { otherId: dupe.id, reason: "email" };
+      if (!list || list.users.length < 1000) break;
+    }
+  }
+
+  // 2. Wallet collision against verified data only.
+  if (myWallets.size > 0) {
+    const walletArr = Array.from(myWallets).filter((w) => /^0x[0-9a-f]{40}$/.test(w));
+    if (walletArr.length > 0) {
+      const { data: primaryDupes } = await admin
+        .from("profiles")
+        .select("id")
+        .neq("id", me)
+        .in("wallet_address", walletArr)
+        .limit(1);
+      if (primaryDupes && primaryDupes.length > 0) {
+        return { otherId: primaryDupes[0].id as string, reason: "wallet" };
+      }
+      const { data: linkedDupes } = await admin
+        .from("linked_wallets")
+        .select("user_id,address")
+        .neq("user_id", me)
+        .not("verified_at", "is", null)
+        .limit(200);
+      const hit = (linkedDupes ?? []).find((r) => myWallets.has(String(r.address).toLowerCase()));
+      if (hit) return { otherId: hit.user_id as string, reason: "wallet" };
+    }
+  }
+  return null;
+}
+
 export const findAccountCollision = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<CollisionInfo | null> => {
     const me = context.userId;
     const admin = await getAdmin();
-
-    // Pull current user's email + wallet.
-    const { data: myAuth } = await admin.auth.admin.getUserById(me);
-    const myEmail = myAuth?.user?.email?.toLowerCase() ?? null;
     const { data: myProf } = await admin
       .from("profiles")
-      .select("id,username,avatar_url,wallet_address,bio,created_at,linked_wallets")
+      .select("id,username,avatar_url,wallet_address,bio,created_at")
       .eq("id", me)
       .maybeSingle();
-    const myWallets = new Set<string>();
-    if (myProf?.wallet_address) myWallets.add(myProf.wallet_address.toLowerCase());
-    for (const w of (myProf?.linked_wallets as string[] | null) ?? []) {
-      if (w) myWallets.add(w.toLowerCase());
-    }
-
-    // 1. Email collision — paginate auth list, filter manually (admin API
-    //    has no email-exact filter for non-primary entries).
-    let otherId: string | null = null;
-    let reason: "email" | "wallet" | null = null;
-    if (myEmail) {
-      // listUsers max 1000 per page; for our scale a single page suffices.
-      const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-      const dupe = list?.users.find(
-        (u) => u.id !== me && (u.email ?? "").toLowerCase() === myEmail,
-      );
-      if (dupe) {
-        otherId = dupe.id;
-        reason = "email";
-      }
-    }
-
-    // 2. Wallet collision — any of my linked wallets appears on another
-    //    profile's primary wallet OR linked_wallets list.
-    if (!otherId && myWallets.size > 0) {
-      const walletArr = Array.from(myWallets);
-      const { data: walletDupes } = await admin
-        .from("profiles")
-        .select("id,wallet_address,linked_wallets")
-        .neq("id", me)
-        .or(
-          `wallet_address.in.(${walletArr.map((w) => `"${w}"`).join(",")}),linked_wallets.ov.{${walletArr.join(",")}}`,
-        )
-        .limit(1);
-      if (walletDupes && walletDupes.length > 0) {
-        otherId = walletDupes[0].id as string;
-        reason = "wallet";
-      }
-    }
+    const detected = await detectCollision(me);
+    const otherId = detected?.otherId ?? null;
+    const reason = detected?.reason ?? null;
 
     if (!otherId || !reason) return null;
 
@@ -151,6 +181,10 @@ export const recordKeepSeparate = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const me = context.userId;
+    const detected = await detectCollision(me);
+    if (!detected || detected.otherId !== data.otherUserId) {
+      throw new Error("No matching account collision for this pair");
+    }
     const { a, b } = pairKey(me, data.otherUserId);
     const admin = await getAdmin();
     const { data: existing } = await admin
@@ -206,6 +240,13 @@ export const mergeAccounts = createServerFn({ method: "POST" })
     if (data.survivorUserId !== me && data.survivorUserId !== other) {
       throw new Error("Survivor must be one of the two accounts");
     }
+    // SECURITY: previously ANY signed-in user could pass ANY otherUserId and
+    // absorb that account (roles included — e.g. super_admin) and delete it.
+    // The pair must be a real, server-detected collision.
+    const detected = await detectCollision(me);
+    if (!detected || detected.otherId !== other) {
+      throw new Error("No matching account collision for this pair");
+    }
     const admin = await getAdmin();
 
     // Re-check no prior decision (race safety).
@@ -245,10 +286,14 @@ export const mergeAccounts = createServerFn({ method: "POST" })
       { table: "lobby_message_reactions", column: "user_id" },
       { table: "messages", column: "sender_id" },
       { table: "lifer_messages", column: "user_id" },
-      { table: "karaoke_recordings", column: "performer_user_id" },
+      { table: "karaoke_recordings", column: "performer_id" },
       { table: "ape_rides", column: "host_id" },
       { table: "ape_ride_requests", column: "user_id" },
       { table: "room_bookings", column: "user_id" },
+      { table: "karaoke_reservations", column: "booked_by" },
+      { table: "karaoke_reservations", column: "singer_user_id" },
+      { table: "karaoke_backing_tracks", column: "owner_id" },
+      { table: "linked_wallets", column: "user_id" },
       { table: "notifications", column: "user_id" },
     ];
     for (const { table, column } of reassignTables) {

@@ -1,21 +1,33 @@
 /**
- * VIP Entrance modal.
+ * VIP Entrance modal — "sign in your way".
  *
- * Clicking "VIP" in the header opens this branded modal (styled like the main
- * entrance — gold radial wash + glass card). Confirming hands off to Glyph's
- * own connect popup (the Glyph Global Wallet, via wagmi). After the wallet
- * connects, <GlyphBridge> (mounted at the root) signs the user into Supabase
- * by verifying on-chain BAYC/MAYC ownership via a single SIWE signature.
+ *   ① Glyph  — email, social login or an existing Glyph wallet, through
+ *              Glyph's own sign-in popup (Glyph Global Wallet connector).
+ *   ② Wallet — any installed browser wallet (MetaMask, Rabby, Coinbase,
+ *              Brave… discovered via EIP-6963), or WalletConnect for mobile
+ *              wallets. On phones without an injected wallet we offer
+ *              "open in wallet app" deep links.
  *
- * Kept as a named export `EntranceDialog` so AppHeader's existing import keeps
- * working. The `open` prop drives visibility; `onOpenChange(false)` closes it.
+ * Either path then asks for ONE gasless SIWE signature ("Sign to enter"),
+ * which the server verifies against a single-use nonce and checks BAYC/MAYC
+ * ownership (direct, delegate.cash, or wallets you've linked).
+ *
+ * Previously the header VIP button fired Glyph's connect() immediately (no
+ * choice), connect() rejections were unhandled, and external wallets were
+ * impossible because the connector list contained only Glyph.
  */
-import { useEffect, useState } from "react";
-import { Loader2, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "@tanstack/react-router";
+import { Loader2, Mail, Wallet as WalletIcon, X, Smartphone } from "lucide-react";
 import { toast } from "sonner";
-import { useGlyphReady } from "@/components/GlyphAppProvider";
+import { useAccount, useConnect, useDisconnect, type Connector } from "wagmi";
+import {
+  GLYPH_CONNECTOR_ID,
+  WALLETCONNECT_CONNECTOR_ID,
+  useGlyphReady,
+  useWalletStack,
+} from "@/components/GlyphAppProvider";
 import { EmbroideredImage } from "@/components/EmbroideredImage";
-import { importWithRetry } from "@/lib/import-with-retry";
 import { useAuth } from "@/lib/auth/useAuth";
 import { useGlyphAuthState } from "@/lib/auth/useGlyphBridge";
 
@@ -24,168 +36,34 @@ interface EntranceDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-type GlyphConnection = { connect: () => void; disconnect: () => void };
-type UseNativeGlyphConnection = () => GlyphConnection;
-type AccountValue = { isConnected: boolean };
-type UseAccount = () => AccountValue;
-type EntranceHooks = {
-  useNativeGlyphConnection: UseNativeGlyphConnection;
-  useAccount: UseAccount;
-};
-
-function isFrameAncestorBlocked(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error ?? "");
-  return message.toLowerCase().includes("frame ancestor");
+function sliceAddress(a: string) {
+  return a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a;
+}
+function isMobile() {
+  return typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+function friendlyConnectError(e: unknown): string {
+  const msg = e instanceof Error ? e.message : String(e ?? "");
+  if (/rejected|denied|closed/i.test(msg)) return "Connection cancelled.";
+  if (/frame ancestor|popup/i.test(msg)) {
+    return "The sign-in popup was blocked. Allow popups, or open the site in its own tab (not an embedded preview).";
+  }
+  if (/already pending/i.test(msg))
+    return "Check your wallet — a connection request is already open.";
+  return msg || "Couldn't connect.";
 }
 
 export function EntranceDialog({ open, onOpenChange }: EntranceDialogProps) {
-  const glyphReady = useGlyphReady();
-  const [hooks, setHooks] = useState<EntranceHooks | null>(null);
-
+  const ready = useGlyphReady();
   useEffect(() => {
-    if (open) console.log("[ENTRANCE MODAL OPEN]");
-  }, [open]);
-
-  // Lazy-load the Glyph + wagmi hooks (SSR-unsafe SDK). Only after the
-  // GlyphWalletProvider has mounted — calling these outside it throws.
-  useEffect(() => {
-    if (!glyphReady) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const [glyphMod, wagmiMod] = await Promise.all([
-          importWithRetry(() => import("@use-glyph/sdk-react"), {
-            label: "glyph-sdk-react-entrance",
-          }),
-          importWithRetry(() => import("wagmi"), { label: "wagmi-entrance" }),
-        ]);
-        if (cancelled) return;
-        setHooks(() => ({
-          useNativeGlyphConnection:
-            glyphMod.useNativeGlyphConnection as unknown as UseNativeGlyphConnection,
-          useAccount: wagmiMod.useAccount as unknown as UseAccount,
-        }));
-      } catch {
-        /* provider boundary already renders children without Glyph */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [glyphReady]);
-
-  if (!open) return null;
-  return <EntranceModal onOpenChange={onOpenChange} hooks={hooks} ready={glyphReady} />;
-}
-
-function EntranceModal({
-  onOpenChange,
-  hooks,
-  ready,
-}: {
-  onOpenChange: (open: boolean) => void;
-  hooks: EntranceHooks | null;
-  ready: boolean;
-}) {
-  // Hooks must be called unconditionally and only when present — render a
-  // hookless variant until the SDK loads so ordering stays stable.
-  if (!hooks) {
-    return (
-      <EntranceModalShell
-        onOpenChange={onOpenChange}
-        ready={ready}
-        connect={null}
-        isConnected={false}
-      />
-    );
-  }
-  return <EntranceModalWithHooks onOpenChange={onOpenChange} hooks={hooks} />;
-}
-
-function EntranceModalWithHooks({
-  onOpenChange,
-  hooks,
-}: {
-  onOpenChange: (open: boolean) => void;
-  hooks: EntranceHooks;
-}) {
-  const { connect } = hooks.useNativeGlyphConnection();
-  const { isConnected } = hooks.useAccount();
-  const { isAuthenticated } = useAuth();
-  const { verifying } = useGlyphAuthState();
-
-  // Close once the Supabase session exists (sign-in complete). We intentionally
-  // keep the modal open after the wallet merely connects so the user can tap
-  // "Sign to enter" — the wallet signing popup can only open from that tap.
-  useEffect(() => {
-    if (isAuthenticated) onOpenChange(false);
-  }, [isAuthenticated, onOpenChange]);
-
-  return (
-    <EntranceModalShell
-      onOpenChange={onOpenChange}
-      ready
-      connect={connect}
-      isConnected={isConnected}
-      verifying={verifying}
-    />
-  );
-}
-
-function EntranceModalShell({
-  onOpenChange,
-  ready,
-  connect,
-  isConnected,
-  verifying = false,
-}: {
-  onOpenChange: (open: boolean) => void;
-  ready: boolean;
-  connect: (() => void) | null;
-  isConnected: boolean;
-  verifying?: boolean;
-}) {
-  const [connecting, setConnecting] = useState(false);
-  const canConnect = ready && !!connect && !isConnected;
-  // Two phases: connect the wallet, then sign one message to enter. Once the
-  // wallet is connected the modal switches to the sign step.
-  const phase: "connect" | "sign" = isConnected ? "sign" : "connect";
-
-  // Fire the SIWE signature inside this click. dispatchEvent runs the bridge's
-  // listener synchronously, so signMessage is reached within the user gesture
-  // and the wallet's signing popup is allowed to open.
-  function handleSign() {
-    window.dispatchEvent(new Event("baycmc:wallet-verify"));
-  }
-
-  // Escape closes the modal.
-  useEffect(() => {
+    if (!open) return;
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onOpenChange(false);
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onOpenChange]);
-
-  function handleConnect() {
-    if (!connect) return;
-    setConnecting(true);
-    try {
-      connect();
-    } catch (e) {
-      console.warn("[EntranceDialog] Glyph connect() threw:", e);
-      if (isFrameAncestorBlocked(e)) {
-        toast.error("Wallet sign-in is blocked inside this embedded preview.", {
-          description: "Open the preview in a new tab or use the published app to continue.",
-          duration: 7000,
-        });
-      } else {
-        toast.error("Couldn't open the wallet sign-in popup.");
-      }
-      setConnecting(false);
-    }
-  }
-
+  }, [open, onOpenChange]);
+  if (!open) return null;
   return (
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center px-4"
@@ -193,22 +71,18 @@ function EntranceModalShell({
       aria-modal="true"
       aria-label="VIP entrance"
     >
-      {/* Backdrop */}
       <button
         type="button"
         aria-label="Close"
         onClick={() => onOpenChange(false)}
         className="absolute inset-0 cursor-default bg-black/70 backdrop-blur-sm"
       />
-
-      {/* Card — mirrors the landing hero: gold radial wash + glass. */}
       <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-gold/30 bg-card/90 p-6 shadow-card backdrop-blur sm:p-8">
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 -z-10 opacity-70"
           style={{ background: "var(--gradient-radial-gold)" }}
         />
-
         <button
           type="button"
           aria-label="Close"
@@ -217,12 +91,10 @@ function EntranceModalShell({
         >
           <X className="h-4 w-4" />
         </button>
-
         <div className="inline-flex items-center gap-2 rounded-full border border-gold/30 bg-gold/5 px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-gold sm:text-xs">
-          <span className="inline-block h-1.5 w-1.5 rounded-full bg-gold animate-pulse-glow" />
+          <span className="inline-block h-1.5 w-1.5 animate-pulse-glow rounded-full bg-gold" />
           Members only · BAYC/MAYC
         </div>
-
         <div className="mt-4">
           <EmbroideredImage
             variant="baycmc"
@@ -231,56 +103,242 @@ function EntranceModalShell({
             clamp="clamp(1.6rem, 8vw, 2.75rem)"
           />
         </div>
-
         <h2 className="mt-3 font-display text-2xl font-bold text-gradient-gold sm:text-3xl">
           VIP Entrance
         </h2>
-        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          {phase === "sign"
-            ? "Wallet connected. Tap “Sign to enter” and approve the one-tap message to verify holdings — no gas, no transaction."
-            : "Connect your Glyph wallet to verify holdings for access into gated areas of the BAYCmc. No gas, no transaction."}
-        </p>
-
-        {phase === "sign" ? (
-          <button
-            type="button"
-            disabled={verifying}
-            onClick={handleSign}
-            className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-md bg-gradient-gold px-4 py-2.5 text-sm font-semibold text-gold-foreground shadow-gold transition hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
-          >
-            {verifying ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" /> Signing…
-              </>
-            ) : (
-              "Sign to enter"
-            )}
-          </button>
+        {ready ? (
+          <EntranceBody onOpenChange={onOpenChange} />
         ) : (
+          <div className="mt-6 flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading sign-in…
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function EntranceBody({ onOpenChange }: { onOpenChange: (open: boolean) => void }) {
+  const { isAuthenticated, user } = useAuth();
+  const { glyphLoaded, glyphError } = useWalletStack();
+  const { connectors, connectAsync, isPending } = useConnect();
+  const { disconnect } = useDisconnect();
+  const { isConnected, address, connector: active } = useAccount();
+  const { verifying } = useGlyphAuthState();
+  const [mode, setMode] = useState<"choose" | "wallets">("choose");
+  const [pendingId, setPendingId] = useState<string | null>(null);
+
+  const isWalletSession = !!user?.email?.endsWith("@wallet.baycmc.local");
+
+  // Close once a WALLET session exists. (An email session that merely opened
+  // this dialog to add a wallet stays open — that flow lives on Profile.)
+  useEffect(() => {
+    if (isAuthenticated && isWalletSession) onOpenChange(false);
+  }, [isAuthenticated, isWalletSession, onOpenChange]);
+
+  const glyph = connectors.find((c) => c.id === GLYPH_CONNECTOR_ID);
+  const wc = connectors.find((c) => c.id === WALLETCONNECT_CONNECTOR_ID);
+  const browserWallets = useMemo(() => {
+    const list = connectors.filter((c) => c.type === "injected" && c.id !== GLYPH_CONNECTOR_ID);
+    // Prefer EIP-6963 named wallets; keep the generic "Injected" only if alone.
+    const named = list.filter((c) => c.id !== "injected");
+    return named.length > 0 ? named : list;
+  }, [connectors]);
+  const hasInjected =
+    typeof window !== "undefined" && !!(window as unknown as { ethereum?: unknown }).ethereum;
+
+  async function connectWith(c: Connector) {
+    setPendingId(c.uid);
+    try {
+      // Called directly from the click so popups (Glyph) / extensions open.
+      await connectAsync({ connector: c });
+    } catch (e) {
+      toast.error(friendlyConnectError(e), { duration: 7000 });
+    } finally {
+      setPendingId(null);
+    }
+  }
+
+  // Signed in with email/password already → link instead of switching accounts.
+  if (isAuthenticated && !isWalletSession) {
+    return (
+      <div className="mt-4 space-y-3 text-sm text-muted-foreground">
+        <p>
+          You're signed in with email. To unlock BAYC / MAYC rooms, link the wallet that holds your
+          ape to this account — you'll sign one message from that wallet, no gas.
+        </p>
+        <Link
+          to="/profile"
+          onClick={() => onOpenChange(false)}
+          className="inline-flex w-full items-center justify-center rounded-md bg-gradient-gold px-4 py-2.5 text-sm font-semibold text-gold-foreground shadow-gold"
+        >
+          Link a wallet on my profile
+        </Link>
+      </div>
+    );
+  }
+
+  // Step 2 — wallet connected, one signature to enter.
+  if (isConnected && address) {
+    return (
+      <div className="mt-2 space-y-3">
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          Connected {active?.name ? `with ${active.name}` : ""} as{" "}
+          <span className="font-mono text-foreground">{sliceAddress(address)}</span>. Tap “Sign to
+          enter” and approve the message — no gas, no transaction.
+        </p>
+        <button
+          type="button"
+          disabled={verifying}
+          onClick={() => window.dispatchEvent(new Event("baycmc:wallet-verify"))}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-gradient-gold px-4 py-2.5 text-sm font-semibold text-gold-foreground shadow-gold transition hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
+        >
+          {verifying ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" /> Waiting for signature…
+            </>
+          ) : (
+            "Sign to enter"
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={() => disconnect()}
+          className="w-full text-center text-xs text-muted-foreground hover:text-foreground"
+        >
+          Use a different wallet or Glyph account
+        </button>
+      </div>
+    );
+  }
+
+  const optionBtn =
+    "flex w-full items-center gap-3 rounded-lg border border-gold/30 bg-secondary/30 px-4 py-3 text-left transition hover:border-gold/60 hover:bg-gold/10 disabled:cursor-wait disabled:opacity-60";
+
+  if (mode === "wallets") {
+    const here = encodeURIComponent(window.location.host + window.location.pathname);
+    const fullUrl = encodeURIComponent(window.location.href);
+    return (
+      <div className="mt-3 space-y-2">
+        {browserWallets.length > 0 && hasInjected ? (
+          browserWallets.map((c) => (
+            <button
+              key={c.uid}
+              type="button"
+              disabled={isPending}
+              onClick={() => void connectWith(c)}
+              className={optionBtn}
+            >
+              {c.icon ? (
+                <img src={c.icon} alt="" className="h-6 w-6 rounded" />
+              ) : (
+                <WalletIcon className="h-6 w-6 text-gold" />
+              )}
+              <span className="flex-1 text-sm font-semibold">{c.name}</span>
+              {pendingId === c.uid && <Loader2 className="h-4 w-4 animate-spin" />}
+            </button>
+          ))
+        ) : (
+          <p className="rounded-md border border-border/60 bg-black/30 p-3 text-xs text-muted-foreground">
+            No browser wallet detected
+            {isMobile()
+              ? " — open this page inside your wallet app, or use WalletConnect."
+              : ". Install MetaMask / Rabby, or use WalletConnect."}
+          </p>
+        )}
+        {wc && (
           <button
             type="button"
-            disabled={!canConnect || connecting}
-            onClick={handleConnect}
-            className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-md bg-gradient-gold px-4 py-2.5 text-sm font-semibold text-gold-foreground shadow-gold transition hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
+            disabled={isPending}
+            onClick={() => void connectWith(wc)}
+            className={optionBtn}
           >
-            {!ready ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" /> Loading wallet…
-              </>
-            ) : connecting ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" /> Look for the popup…
-              </>
-            ) : (
-              "Connect wallet"
-            )}
+            <Smartphone className="h-6 w-6 text-gold" />
+            <span className="flex-1">
+              <span className="block text-sm font-semibold">WalletConnect</span>
+              <span className="block text-[11px] text-muted-foreground">
+                Ledger Live, Trust, Rainbow, Uniswap & 400+ wallets
+              </span>
+            </span>
+            {pendingId === wc.uid && <Loader2 className="h-4 w-4 animate-spin" />}
           </button>
         )}
-
-        <p className="mt-3 text-center text-[11px] text-muted-foreground">
-          Powered by Glyph · ApeChain
-        </p>
+        {isMobile() && !hasInjected && (
+          <div className="grid grid-cols-2 gap-2 pt-1 text-xs">
+            <a
+              href={`https://metamask.app.link/dapp/${here}`}
+              className="rounded-md border border-border px-3 py-2 text-center hover:border-gold/60"
+            >
+              Open in MetaMask
+            </a>
+            <a
+              href={`https://go.cb-w.com/dapp?cb_url=${fullUrl}`}
+              className="rounded-md border border-border px-3 py-2 text-center hover:border-gold/60"
+            >
+              Open in Coinbase Wallet
+            </a>
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => setMode("choose")}
+          className="w-full pt-1 text-center text-xs text-muted-foreground hover:text-foreground"
+        >
+          ← Back
+        </button>
       </div>
+    );
+  }
+
+  return (
+    <div className="mt-2 space-y-2">
+      <p className="text-sm leading-relaxed text-muted-foreground">
+        Sign in your way. Holders unlock the BAYC / MAYC rooms; everyone gets the lobby, chat and
+        karaoke.
+      </p>
+      <button
+        type="button"
+        disabled={!glyph || isPending}
+        onClick={() => glyph && void connectWith(glyph)}
+        className={optionBtn}
+      >
+        <Mail className="h-6 w-6 text-gold" />
+        <span className="flex-1">
+          <span className="block text-sm font-semibold">Continue with Glyph</span>
+          <span className="block text-[11px] text-muted-foreground">
+            Email, social login or your Glyph wallet
+          </span>
+        </span>
+        {(glyph && pendingId === glyph.uid) || (!glyphLoaded && !glyphError) ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : null}
+      </button>
+      {glyphError && (
+        <p className="text-[11px] text-amber-300">{glyphError} Use a wallet instead.</p>
+      )}
+      <button type="button" onClick={() => setMode("wallets")} className={optionBtn}>
+        <WalletIcon className="h-6 w-6 text-gold" />
+        <span className="flex-1">
+          <span className="block text-sm font-semibold">Connect a wallet</span>
+          <span className="block text-[11px] text-muted-foreground">
+            MetaMask, Rabby, Coinbase, WalletConnect…
+          </span>
+        </span>
+      </button>
+      <p className="pt-1 text-center text-[11px] text-muted-foreground">
+        Prefer a password?{" "}
+        <Link
+          to="/login"
+          onClick={() => onOpenChange(false)}
+          className="font-semibold text-gold hover:underline"
+        >
+          Email & password
+        </Link>
+      </p>
+      <p className="text-center text-[10px] text-muted-foreground/70">
+        Your ape lives in a cold wallet? Sign in with any wallet, then link the vault on your
+        profile or delegate via delegate.xyz.
+      </p>
     </div>
   );
 }

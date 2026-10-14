@@ -67,8 +67,9 @@ function LoginPage() {
       <div className="glass rounded-2xl border border-gold/20 p-6 shadow-card sm:p-8">
         <h1 className="font-display text-2xl font-bold sm:text-3xl">Main Entrance</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Sign in with email and password to enter the lobby. Verified holders should use the{" "}
-          <span className="font-semibold text-gold">VIP</span> entrance in the top-right instead.
+          Sign in with email and password to enter the lobby — or use Glyph (email / social) or your
+          wallet below. Holders unlock the BAYC / MAYC rooms by signing in with (or linking) the
+          wallet that holds their ape.
         </p>
 
         <form onSubmit={onSubmit} className="mt-6 space-y-4">
@@ -107,6 +108,17 @@ function LoginPage() {
             {busy ? "Please wait…" : mode === "signup" ? "Create account" : "Sign in"}
           </button>
         </form>
+
+        <div className="my-5 flex items-center gap-3 text-[10px] uppercase tracking-widest text-muted-foreground">
+          <span className="h-px flex-1 bg-border" /> or <span className="h-px flex-1 bg-border" />
+        </div>
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new Event("baycmc:vip-click"))}
+          className="w-full rounded-md border border-gold/50 bg-gold/10 px-4 py-2.5 text-sm font-semibold text-gold transition hover:bg-gold/20"
+        >
+          Continue with Glyph or a wallet
+        </button>
 
         <div className="mt-4 text-center text-xs text-muted-foreground">
           {mode === "signin" ? (
