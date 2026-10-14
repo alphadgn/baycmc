@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
+import { useChatScroll } from "@/hooks/use-chat-scroll";
 import { toast } from "sonner";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { GifPicker } from "@/components/GifPicker";
@@ -93,15 +94,17 @@ export function MessageThread({
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const { scrollRef, contentRef, handleScroll } = useChatScroll(channelName, !loading && !denied, messages);
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
+    setDenied(false);
     void (async () => {
       const { data, error } = await supabase
         .from(table)
         .select("id,user_id,body,image_url,gif_url,created_at")
-        .order("created_at", { ascending: true })
+        .order("created_at", { ascending: false })
         .limit(200);
       if (cancelled) return;
       if (error) {
@@ -109,7 +112,7 @@ export function MessageThread({
         setLoading(false);
         return;
       }
-      setMessages((data ?? []) as Message[]);
+      setMessages(((data ?? []) as Message[]).reverse());
       setLoading(false);
       await hydrateProfiles((data ?? []) as Message[]);
     })();
@@ -143,20 +146,6 @@ export function MessageThread({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelName, table]);
 
-  // Entering a thread jumps straight to the newest messages; later
-  // messages scroll smoothly.
-  const initialScrollDoneRef = useRef(false);
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    if (!initialScrollDoneRef.current && messages.length > 0) {
-      initialScrollDoneRef.current = true;
-      el.scrollTop = el.scrollHeight;
-      requestAnimationFrame(() => (el.scrollTop = el.scrollHeight));
-      return;
-    }
-    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-  }, [messages.length]);
 
   useEffect(() => {
     if (!pendingImage) {
@@ -370,8 +359,11 @@ export function MessageThread({
       </div>
       <div
         ref={scrollRef}
-        className="relative flex-1 space-y-3 overflow-x-hidden overflow-y-auto p-4 sm:p-6"
+        onScroll={handleScroll}
+        aria-label="Chat messages"
+        className="relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6"
       >
+        <div ref={contentRef} className="space-y-3">
         {loading ? (
           <div className="space-y-2">
             {[1, 2, 3].map((i) => (
@@ -478,6 +470,7 @@ export function MessageThread({
         )}
       </div>
 
+        </div>
       {editingId && (
         <div className="relative flex flex-col gap-2 border-t border-gold/30 bg-gold/5 px-3 py-2 text-xs">
           <div className="flex items-center justify-between gap-2">

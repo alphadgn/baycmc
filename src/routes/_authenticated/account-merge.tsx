@@ -11,6 +11,7 @@ import {
   type CollisionInfo,
 } from "@/server/account-merge.functions";
 import { signOut } from "@/lib/auth/useAuth";
+import { avatarShapeClass } from "@/lib/profile-avatar";
 
 export const Route = createFileRoute("/_authenticated/account-merge")({
   component: AccountMergePage,

@@ -21,6 +21,8 @@ import {
 import { toast } from "sonner";
 import { supabase as typedSupabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
+import { avatarShapeClass } from "@/lib/profile-avatar";
+import { useChatScroll } from "@/hooks/use-chat-scroll";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { GifPicker } from "@/components/GifPicker";
@@ -128,10 +130,9 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
   // Long-press / right-click on a message opens this bottom action sheet.
   // Stored as the full message object so the sheet can render context.
   const [actionTarget, setActionTarget] = useState<LobbyMessage | null>(null);
-  const [showJumpToBottom, setShowJumpToBottom] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
-  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const { scrollRef, contentRef, handleScroll, scrollToBottom, showJumpToBottom: jumpVisible } = useChatScroll(channelName, !loading, messages);
 
   const hydrateProfiles = useCallback(
     async (msgs: LobbyMessage[]) => {
@@ -158,7 +159,7 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
       const { data, error } = await supabase
         .from("lobby_messages")
         .select("id,user_id,body,image_url,gif_url,reply_to_id,created_at")
-        .order("created_at", { ascending: true })
+        .order("created_at", { ascending: false })
         .limit(300);
       if (cancelled) return;
       if (error) {
@@ -166,7 +167,7 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
         setLoading(false);
         return;
       }
-      const msgs = (data ?? []) as LobbyMessage[];
+      const msgs = ((data ?? []) as LobbyMessage[]).reverse();
       setMessages(msgs);
       setLoading(false);
       void hydrateProfiles(msgs);
@@ -254,38 +255,6 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
     };
   }, [hydrateProfiles]);
 
-  // Auto-scroll on new messages only when the user is near the bottom.
-  // Entering the room always lands on the most recent messages.
-  const nearBottomRef = useRef(true);
-  const initialScrollDoneRef = useRef(false);
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    if (!initialScrollDoneRef.current && messages.length > 0) {
-      initialScrollDoneRef.current = true;
-      el.scrollTop = el.scrollHeight;
-      requestAnimationFrame(() => (el.scrollTop = el.scrollHeight));
-      return;
-    }
-    if (nearBottomRef.current) {
-      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-    }
-  }, [messages.length]);
-
-  const handleScroll = useCallback(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
-    const near = distance < 80;
-    nearBottomRef.current = near;
-    setShowJumpToBottom(!near && el.scrollHeight > el.clientHeight + 40);
-  }, []);
-
-  const scrollToBottom = useCallback(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-  }, []);
 
   const messageById = useMemo(() => {
     const m = new Map<string, LobbyMessage>();
@@ -488,7 +457,7 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
                       key={p.id}
                       className="flex items-center gap-3 rounded-lg p-2 transition hover:bg-secondary/60"
                     >
-                      <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full border border-border bg-gradient-gold">
+                      <div className={`h-9 w-9 shrink-0 overflow-hidden border border-border bg-gradient-gold ${avatarShapeClass(p.avatar_url)}`}>
                         {p.avatar_url ? (
                           <img
                             src={p.avatar_url}
@@ -516,8 +485,10 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
         <div
           ref={scrollRef}
           onScroll={handleScroll}
-          className="flex-1 space-y-2 overflow-x-hidden overflow-y-auto p-2 sm:p-4"
+          aria-label="Lobby messages"
+          className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-2 sm:p-4"
         >
+          <div ref={contentRef} className="space-y-2">
           {loading ? (
             <div className="space-y-2">
               {[1, 2, 3, 4, 5].map((i) => (
@@ -560,7 +531,8 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
             ))
           )}
         </div>
-        {showJumpToBottom && (
+          </div>
+        {jumpVisible && (
           <button
             type="button"
             onClick={scrollToBottom}
@@ -1027,7 +999,7 @@ function MessageRow({
       onContextMenu={onContextMenu}
     >
       <div className="group flex max-w-full items-start gap-2.5 rounded-lg px-2 py-1.5 transition hover:bg-secondary/30 sm:gap-3">
-        <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full border border-border bg-gradient-gold">
+        <div className={`h-9 w-9 shrink-0 overflow-hidden border border-border bg-gradient-gold ${avatarShapeClass(author?.avatar_url)}`}>
           {author?.avatar_url ? (
             <img src={author.avatar_url} alt={name} className="h-full w-full object-cover" />
           ) : (

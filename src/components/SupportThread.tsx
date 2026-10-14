@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { Check, Pencil, ShieldCheck, Trash2, X } from "lucide-react";
 import { supabase as typedSupabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
+import { useChatScroll } from "@/hooks/use-chat-scroll";
 import { toast } from "sonner";
 
 // support_messages is too new to be in the generated Database type — cast
@@ -55,7 +56,7 @@ export function SupportThread({
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const { scrollRef, contentRef, handleScroll } = useChatScroll(threadUserId, !loading, messages);
 
   // Initial load — scoped to this thread.
   useEffect(() => {
@@ -66,7 +67,7 @@ export function SupportThread({
         .from("support_messages")
         .select("id,thread_user_id,sender_id,is_admin,body,created_at")
         .eq("thread_user_id", threadUserId)
-        .order("created_at", { ascending: true })
+        .order("created_at", { ascending: false })
         .limit(500);
       if (cancelled) return;
       if (error) {
@@ -74,7 +75,7 @@ export function SupportThread({
         setLoading(false);
         return;
       }
-      const rows = (data ?? []) as SupportMessage[];
+      const rows = ((data ?? []) as SupportMessage[]).reverse();
       setMessages(rows);
       setLoading(false);
       await hydrateProfiles(rows);
@@ -137,20 +138,6 @@ export function SupportThread({
     };
   }, [threadUserId]);
 
-  // Entering a thread jumps straight to the newest messages; later
-  // messages scroll smoothly.
-  const initialScrollDoneRef = useRef(false);
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    if (!initialScrollDoneRef.current && messages.length > 0) {
-      initialScrollDoneRef.current = true;
-      el.scrollTop = el.scrollHeight;
-      requestAnimationFrame(() => (el.scrollTop = el.scrollHeight));
-      return;
-    }
-    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-  }, [messages.length]);
 
   async function hydrateProfiles(msgs: SupportMessage[]) {
     const missing = Array.from(
@@ -244,8 +231,11 @@ export function SupportThread({
 
       <div
         ref={scrollRef}
-        className="flex-1 space-y-3 overflow-x-hidden overflow-y-auto p-4 sm:p-6"
+        onScroll={handleScroll}
+        aria-label="Support messages"
+        className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6"
       >
+        <div ref={contentRef} className="space-y-3">
         {loading ? (
           <div className="space-y-2">
             {[1, 2, 3].map((i) => (
@@ -329,6 +319,7 @@ export function SupportThread({
         )}
       </div>
 
+        </div>
       {editingId && (
         <div className="flex items-center justify-between gap-2 border-t border-gold/30 bg-gold/5 px-3 py-2 text-xs">
           <span className="flex items-center gap-1.5 text-gold">
