@@ -64,6 +64,17 @@ export const requestLinkedWalletNonce = createServerFn({ method: "POST" })
     const { userId } = context;
     const address = getAddress(data.address);
 
+    const { data: me } = await context.supabase
+      .from("profiles")
+      .select("wallet_address")
+      .eq("id", userId)
+      .maybeSingle();
+    if (me?.wallet_address && me.wallet_address.toLowerCase() === address.toLowerCase()) {
+      throw new Error(
+        "That's the wallet you signed in with — pick a different account in your wallet to link.",
+      );
+    }
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const nonce = crypto.randomUUID();
     const expiresAt = new Date(Date.now() + LINK_NONCE_TTL_MS).toISOString();
