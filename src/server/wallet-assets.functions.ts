@@ -94,7 +94,11 @@ export const listWalletNfts = createServerFn({ method: "POST" })
         items: [],
       };
     }
-    const url = `${base}/getNFTsForOwner?owner=${owner}&withMetadata=true&pageSize=100`;
+    // Only collections whitelisted by this app (single source of truth).
+    const { REQUIRED_COLLECTIONS } = await import("@/lib/web3/constants");
+    const allowed = new Set(REQUIRED_COLLECTIONS.map((c) => c.toLowerCase()));
+    const filter = REQUIRED_COLLECTIONS.map((c) => `&contractAddresses[]=${c}`).join("");
+    const url = `${base}/getNFTsForOwner?owner=${owner}&withMetadata=true&pageSize=100${filter}`;
     try {
       const resp = await fetchJson<AlchemyNftResponse>(url);
       const items: NftItem[] = (resp.ownedNfts ?? []).map((n) => {
@@ -111,7 +115,9 @@ export const listWalletNfts = createServerFn({ method: "POST" })
           openseaUrl: `https://opensea.io/assets/ethereum/${contract}/${tokenId}`,
         };
       });
-      items.sort((a, b) => (a.collection ?? "").localeCompare(b.collection ?? ""));
+      const kept = items.filter((i) => allowed.has(i.contract));
+      kept.sort((a, b) => (a.collection ?? "").localeCompare(b.collection ?? ""));
+      return { ok: true as const, items: kept };
       return { ok: true as const, items };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
