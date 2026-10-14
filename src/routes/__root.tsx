@@ -9,6 +9,7 @@ import { AuthRedirectWatcher } from "@/components/AuthRedirectWatcher";
 import { AccountMergeWatcher } from "@/components/AccountMergeWatcher";
 import { Toaster } from "@/components/ui/sonner";
 import { AiAssistant } from "@/components/AiAssistant";
+import { VerificationStatusProvider } from "@/lib/baycmc/useVerificationStatus";
 import { installDiagnostics } from "@/lib/diagnostics";
 import { useNotificationPrefs } from "@/lib/baycmc/useNotificationPrefs";
 
@@ -124,6 +125,7 @@ function RootComponent() {
   }, []);
   return (
     <GlyphAppProvider>
+      <VerificationStatusProvider>
       <GlyphBridgeMount />
       <div className="min-h-screen grain">
         <AppHeader />
@@ -134,6 +136,7 @@ function RootComponent() {
         <AccountMergeWatcher />
         <AiAssistant />
       </div>
+      </VerificationStatusProvider>
     </GlyphAppProvider>
   );
 }

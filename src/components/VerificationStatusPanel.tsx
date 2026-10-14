@@ -1,15 +1,10 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { CheckCircle2, XCircle, Loader2, ShieldCheck } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
 import { verifyLuminaOwnership } from "@/server/lumina.functions";
 import { toast } from "sonner";
-
-interface VerifRow {
-  bayc_verified: boolean;
-  lumina_verified: boolean;
-}
+import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 
 /**
  * User-facing verification status: shows BAYC ownership and Lumina
@@ -17,33 +12,13 @@ interface VerifRow {
  * product decision (no automatic call after on-chain check).
  */
 export function VerificationStatusPanel() {
-  const { user, loading: authLoading } = useAuth();
-  const [row, setRow] = useState<VerifRow | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
+  const verification = useVerificationStatus();
+  const { loading, error } = verification;
   const [luminaBusy, setLuminaBusy] = useState(false);
   const [luminaError, setLuminaError] = useState<string | null>(null);
   const verifyLumina = useServerFn(verifyLuminaOwnership);
 
-  async function load() {
-    if (!user) return;
-    setLoading(true);
-    setError(null);
-    const { data, error: e } = await supabase
-      .from("user_verifications")
-      .select("bayc_verified, lumina_verified")
-      .eq("user_id", user.id)
-      .maybeSingle();
-    if (e) setError(e.message);
-    setRow(data ?? { bayc_verified: false, lumina_verified: false });
-    setLoading(false);
-  }
-
-  useEffect(() => {
-    if (authLoading || !user) return;
-    void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, authLoading]);
 
   async function handleLuminaCheck() {
     setLuminaBusy(true);
@@ -54,7 +29,7 @@ export function VerificationStatusPanel() {
         toast.success(
           res.verified ? "Lumina ownership verified" : "Lumina did not detect ownership",
         );
-        await load();
+        await verification.refresh();
       } else {
         setLuminaError(res.error ?? "Lumina check failed");
       }
@@ -85,11 +60,11 @@ export function VerificationStatusPanel() {
 
       <div className="mt-4 space-y-3">
         <StatusRow
-          label="BAYC verified"
+          label="BAYC/MAYC verified"
           loading={loading}
-          ok={!!row?.bayc_verified}
+          ok={verification.isVerifiedHolder}
           hint={
-            row?.bayc_verified
+            verification.isVerifiedHolder
               ? "On-chain BAYC/MAYC ownership confirmed."
               : "Not yet verified. Sign in and approve a wallet signature to verify ownership."
           }
@@ -97,9 +72,9 @@ export function VerificationStatusPanel() {
         <StatusRow
           label="Lumina verified"
           loading={loading}
-          ok={!!row?.lumina_verified}
+          ok={verification.lumina}
           hint={
-            row?.lumina_verified
+            verification.lumina
               ? "Lumina confirmed ownership for your wallet."
               : "Run a Lumina check against your verified wallet."
           }
@@ -109,7 +84,7 @@ export function VerificationStatusPanel() {
               disabled={luminaBusy}
               className="rounded-md border border-gold/40 bg-gold/10 px-3 py-1 text-[11px] font-semibold text-gold hover:bg-gold/20 disabled:opacity-50"
             >
-              {luminaBusy ? "Checking…" : row?.lumina_verified ? "Re-check" : "Check now"}
+              {luminaBusy ? "Checking…" : verification.lumina ? "Re-check" : "Check now"}
             </button>
           }
           error={luminaError}
