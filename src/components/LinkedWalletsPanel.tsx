@@ -3,8 +3,6 @@ import { useServerFn } from "@tanstack/react-start";
 import { Loader2, Trash2, CheckCircle2, Wallet } from "lucide-react";
 import {
   listLinkedWallets,
-  requestLinkedWalletNonce,
-  verifyAndLinkWallet,
   removeLinkedWallet,
 } from "@/lib/linked-wallets.functions";
 import { toast } from "sonner";
@@ -36,12 +34,10 @@ export function LinkedWalletsPanel() {
 function LinkedWalletsPanelInner() {
   const [rows, setRows] = useState<LinkedWalletRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
+  const busy = false;
   const [err, setErr] = useState<string | null>(null);
 
   const list = useServerFn(listLinkedWallets);
-  const requestNonce = useServerFn(requestLinkedWalletNonce);
-  const verify = useServerFn(verifyAndLinkWallet);
   const remove = useServerFn(removeLinkedWallet);
 
   async function reload() {
