@@ -90,7 +90,7 @@ export const listWalletNfts = createServerFn({ method: "POST" })
     if (!base) {
       return {
         ok: false as const,
-        reason: "NFT lookup requires an Alchemy ETH_RPC_URL.",
+        reason: "NFT lookup requires an Alchemy API key.",
         items: [],
       };
     }
@@ -169,7 +169,7 @@ export const listWalletActivity = createServerFn({ method: "POST" })
     if (!base) {
       return {
         ok: false as const,
-        reason: "Activity lookup requires an Alchemy ETH_RPC_URL.",
+        reason: "Activity lookup requires an Alchemy API key.",
         items: [],
       };
     }
