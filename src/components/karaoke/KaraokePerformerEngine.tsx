@@ -96,6 +96,9 @@ export function KaraokePerformerEngine({ roomId }: { roomId: string }) {
     const { userId } = getKaraokeStage();
     if (!result || !userId || !meta || result.blob.size < 8_000 || result.durationMs < 5_000)
       return;
+    const hasInstrumental = !!meta.backingTrackId || bus.hasMusicStream();
+    // Never auto-save: ask the singer at the end of every performance.
+    const upload = async () => {
     try {
       const baseMime = result.mime.split(";")[0] || "audio/webm";
       const ext = baseMime.includes("mp4") ? "m4a" : "webm";
@@ -116,7 +119,7 @@ export function KaraokePerformerEngine({ roomId }: { roomId: string }) {
           sessionGeneration: meta.generation,
           durationMs: result.durationMs,
           mimeType: baseMime,
-          hasInstrumental: !!meta.backingTrackId || bus.hasMusicStream(),
+          hasInstrumental,
         },
       });
       window.dispatchEvent(new Event("karaoke:recordings-changed"));
@@ -127,6 +130,13 @@ export function KaraokePerformerEngine({ roomId }: { roomId: string }) {
         description: e instanceof Error ? e.message : undefined,
       });
     }
+    };
+    toast("Save this performance?", {
+      description: `${meta.title ?? "Your take"} · ${Math.round(result.durationMs / 1000)}s`,
+      duration: Infinity,
+      action: { label: "Save", onClick: () => void upload() },
+      cancel: { label: "Discard", onClick: () => undefined },
+    });
   }, [roomId, saveFn]);
 
   // ── Teardown ─────────────────────────────────────────────────────────────

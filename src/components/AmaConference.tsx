@@ -12,6 +12,7 @@ import { Crown, Mic, MicOff } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchVipUserIds } from "@/lib/karaoke/vip.functions";
+import { useKaraokeStage } from "@/lib/karaoke/stageStore";
 
 interface ProfileMini {
   id: string;
@@ -65,9 +66,13 @@ export function AmaConference({
 
   const profiles = useParticipantProfiles(participants);
 
+  // Karaoke: whoever holds the stage (server session) is the only tile at
+  // the top; everyone else sits lower as the audience.
+  const performerId = useKaraokeStage().session?.performer_user_id ?? null;
+  const stageUserId = karaoke ? performerId : hostUserId;
   const hostParticipant = useMemo(
-    () => (hostUserId ? (participants.find((p) => p.identity === hostUserId) ?? null) : null),
-    [participants, hostUserId],
+    () => (stageUserId ? (participants.find((p) => p.identity === stageUserId) ?? null) : null),
+    [participants, stageUserId],
   );
 
   const audienceParticipants = useMemo(() => {
@@ -197,7 +202,7 @@ function AmaGridLayout({
         </div>
       )}
 
-      <div className="flex flex-col gap-2">
+      <div className={`flex flex-col gap-2 ${karaoke && showHostTile ? "mt-24 sm:mt-32" : ""}`}>
         {visibleCount === 0 ? (
           // Hide the "no one else here yet" copy when the host is alone —
           // their big solo card already speaks for itself.
