@@ -8,6 +8,23 @@ import {
   removeLinkedWallet,
 } from "@/lib/linked-wallets.functions";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
+/** Older in-app wallet browsers expose only window.ethereum (no EIP-6963). */
+function injectedFallback() {
+  if (typeof window === "undefined") return [];
+  const eth = (window as unknown as { ethereum?: { request?: unknown; isMetaMask?: boolean } })
+    .ethereum;
+  if (!eth || typeof eth.request !== "function") return [];
+  return [
+    {
+      uuid: "injected",
+      name: eth.isMetaMask ? "MetaMask (this browser)" : "This browser's wallet",
+      icon: "",
+      provider: eth as unknown as { request: (a: { method: string; params?: unknown[] }) => Promise<unknown> },
+    },
+  ];
+}
 
 interface LinkedWalletRow {
   id: string;
@@ -94,7 +111,53 @@ function LinkedWalletsPanelInner() {
     await reload();
   }
 
-  async function handleAddWalletClick() {
+  const [chooserOpen, setChooserOpen] = useState(false);
+  const [wallets6963, setWallets6963] = useState<
+    { uuid: string; name: string; icon: string; provider: MetaMaskProvider }[]
+  >([]);
+
+  // EIP-6963: every wallet installed in this browser announces itself.
+  useEffect(() => {
+    const onAnnounce = (ev: Event) => {
+      const d = (ev as CustomEvent).detail as {
+        info: { uuid: string; name: string; icon: string };
+        provider: MetaMaskProvider;
+      };
+      if (!d?.info || !d.provider) return;
+      setWallets6963((prev) =>
+        prev.some((w) => w.uuid === d.info.uuid)
+          ? prev
+          : [...prev, { ...d.info, provider: d.provider }],
+      );
+    };
+    window.addEventListener("eip6963:announceProvider", onAnnounce);
+    window.dispatchEvent(new Event("eip6963:requestProvider"));
+    return () => window.removeEventListener("eip6963:announceProvider", onAnnounce);
+  }, []);
+
+  function handleAddWalletClick() {
+    setErr(null);
+    window.dispatchEvent(new Event("eip6963:requestProvider"));
+    setChooserOpen(true);
+  }
+
+  async function linkWithInjected(provider: MetaMaskProvider, name: string) {
+    setChooserOpen(false);
+    setErr(null);
+    setBusy(true);
+    try {
+      await connectWithProvider(provider, name);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to link wallet";
+      setErr(msg);
+      toast.error(msg);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function linkWithMetaMaskSdk() {
+    setChooserOpen(false);
     setErr(null);
     setBusy(true);
     let sdk: {
@@ -103,14 +166,6 @@ function LinkedWalletsPanelInner() {
       terminate?: () => Promise<void>;
     } | null = null;
     try {
-      // 1) If an injected EIP-1193 provider exists (desktop MetaMask, in-app
-      //    browsers like MetaMask Mobile / Rainbow / Trust), use it directly.
-      const injected = (window as unknown as { ethereum?: MetaMaskProvider }).ethereum;
-      if (injected && typeof injected.request === "function") {
-        await connectWithProvider(injected, "Injected wallet");
-        return;
-      }
-
       // 2) Otherwise open the MetaMask SDK modal, which renders a
       //    WalletConnect-style QR + "Open MetaMask" + install options.
       // Compile-time constant — keeps the MetaMask SDK out of the server bundle.
@@ -226,6 +281,45 @@ function LinkedWalletsPanelInner() {
           )}
         </button>
       </div>
+      <Dialog open={chooserOpen} onOpenChange={setChooserOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Select a wallet to link</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground">
+            Choose the wallet that holds (or is delegated) your NFTs. If it's in the same wallet
+            app, pick a different account when the wallet asks.
+          </p>
+          <div className="space-y-2">
+            {(wallets6963.length > 0
+              ? wallets6963
+              : injectedFallback()
+            ).map((w) => (
+              <button
+                key={w.uuid}
+                type="button"
+                onClick={() => void linkWithInjected(w.provider, w.name)}
+                className="flex w-full items-center gap-3 rounded-lg border border-border bg-secondary/30 px-4 py-3 text-left text-sm font-medium hover:border-gold/50"
+              >
+                {w.icon ? (
+                  <img src={w.icon} alt="" className="h-6 w-6 rounded" />
+                ) : (
+                  <Wallet className="h-5 w-5 text-gold" />
+                )}
+                {w.name}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => void linkWithMetaMaskSdk()}
+              className="flex w-full items-center gap-3 rounded-lg border border-border bg-secondary/30 px-4 py-3 text-left text-sm font-medium hover:border-gold/50"
+            >
+              <Wallet className="h-5 w-5 text-gold" />
+              MetaMask on another device / app (QR)
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <p className="mt-1 text-sm text-muted-foreground">
         Attach additional wallets to your account. Each is checked on-chain for BAYC / MAYC (and
         incoming delegate.cash delegations) on every sign-in.

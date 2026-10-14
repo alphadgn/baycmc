@@ -254,13 +254,19 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
     };
   }, [hydrateProfiles]);
 
-  // Auto-scroll only when the user is already near the bottom, so users
-  // landing in the lobby stay at the top of the thread and can scroll
-  // down on their own. Track scroll position to toggle the jump button.
-  const nearBottomRef = useRef(false);
+  // Auto-scroll on new messages only when the user is near the bottom.
+  // Entering the room always lands on the most recent messages.
+  const nearBottomRef = useRef(true);
+  const initialScrollDoneRef = useRef(false);
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
+    if (!initialScrollDoneRef.current && messages.length > 0) {
+      initialScrollDoneRef.current = true;
+      el.scrollTop = el.scrollHeight;
+      requestAnimationFrame(() => (el.scrollTop = el.scrollHeight));
+      return;
+    }
     if (nearBottomRef.current) {
       el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
     }
