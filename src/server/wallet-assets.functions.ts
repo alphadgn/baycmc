@@ -118,7 +118,6 @@ export const listWalletNfts = createServerFn({ method: "POST" })
       const kept = items.filter((i) => allowed.has(i.contract));
       kept.sort((a, b) => (a.collection ?? "").localeCompare(b.collection ?? ""));
       return { ok: true as const, items: kept };
-      return { ok: true as const, items };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error("listWalletNfts failed", msg);
