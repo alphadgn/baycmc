@@ -8,6 +8,8 @@ import { VerificationStatusPanel } from "@/components/VerificationStatusPanel";
 import { NftGallery } from "@/components/NftGallery";
 import { LinkedWalletsPanel } from "@/components/LinkedWalletsPanel";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
+import { AvatarPicker, isDeviceAvatar } from "@/components/AvatarPicker";
+import type { NftItem } from "@/server/wallet-assets.functions";
 
 export const Route = createFileRoute("/_authenticated/profile")({
   head: () => ({
@@ -52,6 +54,7 @@ function ProfilePage() {
   const [loadState, setLoadState] = useState<LoadState>("idle");
   const [loadError, setLoadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   // Lazy-load all server data after mount. We never block render on this —
   // the component shows a skeleton fallback while loadState !== "ready".
@@ -171,6 +174,30 @@ function ProfilePage() {
     }
   }
 
+  async function handlePickNft(nft: NftItem) {
+    if (!user || !nft.image) return;
+    setPickerOpen(false);
+    setUploadingAvatar(true);
+    const { data: rows, error } = await supabase
+      .from("profiles")
+      .upsert(
+        {
+          id: user.id,
+          avatar_url: nft.image,
+          ...(profile?.wallet_address ? { wallet_address: profile.wallet_address } : {}),
+        },
+        { onConflict: "id" },
+      )
+      .select("id");
+    setUploadingAvatar(false);
+    if (error || !rows?.length) {
+      toast.error(error?.message ?? "Couldn't save your avatar. Please try again.");
+      return;
+    }
+    setAvatarUrl(nft.image);
+    toast.success("Avatar updated");
+  }
+
   // Verification is handled at Entrance via Privy + on-chain check; profile
   // only shows the public-facing BAYC/MAYC status. Lifer access is checked
   // silently in the background — the Lifer rooms appear in the navigation
@@ -207,9 +234,11 @@ function ProfilePage() {
             <div className="flex items-end gap-4">
               <button
                 type="button"
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => setPickerOpen(true)}
                 disabled={uploadingAvatar}
-                className="group relative h-24 w-24 cursor-pointer overflow-hidden rounded-2xl border-4 border-background bg-gradient-gold shadow-gold transition hover:opacity-90 disabled:cursor-wait"
+                className={`group relative h-24 w-24 cursor-pointer overflow-hidden ${
+                  avatarUrl && !isDeviceAvatar(avatarUrl) ? "rounded-md" : "rounded-full"
+                } border-4 border-background bg-gradient-gold shadow-gold transition hover:opacity-90 disabled:cursor-wait`}
                 aria-label="Change avatar"
               >
                 {avatarUrl ? (
@@ -228,6 +257,16 @@ function ProfilePage() {
                   </span>
                 )}
               </button>
+              <AvatarPicker
+                open={pickerOpen}
+                onOpenChange={setPickerOpen}
+                primaryWallet={profile?.wallet_address ?? ""}
+                onPickDevice={() => {
+                  setPickerOpen(false);
+                  fileInputRef.current?.click();
+                }}
+                onPickNft={(n) => void handlePickNft(n)}
+              />
               <input
                 ref={fileInputRef}
                 type="file"
