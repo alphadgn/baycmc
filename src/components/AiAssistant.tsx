@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { useChatScroll } from "@/hooks/use-chat-scroll";
 import { cn } from "@/lib/utils";
 
 type Mode = "assistant" | "contract";
@@ -36,6 +36,7 @@ export function AiAssistant() {
   });
 
   const isLoading = status === "submitted" || status === "streaming";
+  const { scrollRef, contentRef, handleScroll } = useChatScroll(`assistant-${mode}`, open, messages);
 
   async function handleSend() {
     const text = input.trim();
@@ -80,7 +81,8 @@ export function AiAssistant() {
           </TabsList>
         </Tabs>
 
-        <ScrollArea className="flex-1 rounded-md border p-3">
+        <div ref={scrollRef} onScroll={handleScroll} aria-label="Assistant messages" className="min-h-0 flex-1 overflow-y-auto rounded-md border p-3">
+          <div ref={contentRef}>
           {messages.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               {mode === "contract"
@@ -115,7 +117,8 @@ export function AiAssistant() {
               )}
             </div>
           )}
-        </ScrollArea>
+          </div>
+        </div>
 
         <div className="flex items-end gap-2">
           <Textarea

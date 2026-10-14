@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { useChatScroll } from "@/hooks/use-chat-scroll";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -51,14 +51,14 @@ function ContractAuditorPage() {
       const { data, error } = await supabase
         .from("contract_audit_messages")
         .select("id, role, parts, created_at")
-        .order("created_at", { ascending: true })
+        .order("created_at", { ascending: false })
         .limit(200);
       if (cancelled) return;
       if (error) {
         console.error("[contract-auditor] history load failed", error);
       } else if (data) {
         setMessages(
-          (data as AuditRow[]).map((row) => ({
+          (data as AuditRow[]).reverse().map((row) => ({
             id: row.id,
             role: row.role,
             parts: row.parts as UIMessage["parts"],
@@ -80,6 +80,7 @@ function ContractAuditorPage() {
   }, [historyLoaded, status]);
 
   const isLoading = status === "submitted" || status === "streaming";
+  const { scrollRef, contentRef, handleScroll } = useChatScroll(`audit-${user?.id ?? ""}`, historyLoaded && !authLoading, messages);
 
   async function handleSend() {
     const text = input.trim();
@@ -123,7 +124,8 @@ function ContractAuditorPage() {
         )}
       </div>
 
-      <ScrollArea className="flex-1 rounded-md border p-3">
+      <div ref={scrollRef} onScroll={handleScroll} aria-label="Audit messages" className="min-h-0 flex-1 overflow-y-auto rounded-md border p-3">
+        <div ref={contentRef}>
         {!historyLoaded || authLoading ? (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Loader2 className="h-3 w-3 animate-spin" /> Loading your audit history…
@@ -161,7 +163,8 @@ function ContractAuditorPage() {
             )}
           </div>
         )}
-      </ScrollArea>
+        </div>
+      </div>
 
       <div className="mt-3 flex items-end gap-2">
         <Textarea
