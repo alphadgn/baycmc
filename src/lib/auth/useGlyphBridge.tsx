@@ -22,7 +22,7 @@ import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { SiweMessage } from "siwe";
 import { toast } from "sonner";
-import { useAccount, useDisconnect, useSignMessage } from "wagmi";
+import { useAccount, useConfig, useDisconnect, useSignMessage } from "wagmi";
 import { supabase } from "@/integrations/supabase/client";
 import { getSiweNonce, verifyOwnership } from "@/server/wallet.functions";
 import { useGlyphReady } from "@/components/GlyphAppProvider";
@@ -98,7 +98,14 @@ export function clearWalletAuthLocalState() {
           k.startsWith("glyph:") ||
           k.startsWith("privy:") ||
           k.startsWith("__glyph-widget-") ||
-          k.startsWith("wagmi.")
+          k.startsWith("wagmi.") ||
+          k.startsWith("wc@2") ||
+          k.startsWith("@w3m") ||
+          k.startsWith("@appkit") ||
+          k.startsWith("W3M") ||
+          k.startsWith("WCM") ||
+          k.startsWith("-walletlink") ||
+          k.startsWith("walletconnect")
         ) {
           store.removeItem(k);
         }
@@ -106,6 +113,23 @@ export function clearWalletAuthLocalState() {
     }
   } catch {
     /* private mode — ignore */
+  }
+  // WalletConnect v2 keeps pairings/sessions in IndexedDB.
+  try {
+    window.indexedDB?.deleteDatabase("WALLET_CONNECT_V2_INDEXED_DB");
+  } catch {
+    /* ignore */
+  }
+  // Privy (Glyph) session cookies on this site.
+  try {
+    for (const c of document.cookie.split(";")) {
+      const name = c.split("=")[0]?.trim();
+      if (name && /^privy-/i.test(name)) {
+        document.cookie = `${name}=; Max-Age=0; path=/`;
+      }
+    }
+  } catch {
+    /* ignore */
   }
 }
 
@@ -139,6 +163,9 @@ function WalletBridge() {
   const { address: wagmiAddress, isConnected, connector } = useAccount();
   const { signMessageAsync } = useSignMessage();
   const { disconnectAsync } = useDisconnect();
+  const config = useConfig();
+  const configRef = useRef(config);
+  configRef.current = config;
   const verifyFn = useServerFn(verifyOwnership);
   const nonceFn = useServerFn(getSiweNonce);
 
@@ -292,7 +319,18 @@ function WalletBridge() {
     const onLogout = () => {
       prefetched.current = null;
       inFlightRef.current = null;
-      void disconnectRef.current().catch(() => undefined);
+      // End EVERY wallet session — Glyph (Privy), browser wallets and
+      // WalletConnect — not just the active one, then wipe persisted state.
+      void (async () => {
+        const cfg = configRef.current;
+        const connectors = new Set(cfg.connectors);
+        for (const conn of cfg.state.connections.values()) connectors.add(conn.connector);
+        await Promise.allSettled(
+          [...connectors].map((c) => disconnectRef.current({ connector: c })),
+        );
+        await Promise.allSettled([...connectors].map((c) => c.disconnect()));
+        clearWalletAuthLocalState();
+      })();
       clearWalletAuthLocalState();
       patchGlyphSnapshot({
         authenticated: false,

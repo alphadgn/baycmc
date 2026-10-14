@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { ExternalLink, ImageOff, Loader2 } from "lucide-react";
 import { listWalletNfts, type NftItem } from "@/server/wallet-assets.functions";
 import { listLinkedWallets } from "@/lib/linked-wallets.functions";
+import { getOwnershipGraph } from "@/server/verification.functions";
 import { useAuth } from "@/lib/auth/useAuth";
 import { mergeWalletNfts } from "@/lib/wallet-nfts";
 
@@ -17,6 +18,7 @@ export function NftGallery({
   const userId = user?.id;
   const listFn = useServerFn(listWalletNfts);
   const listLinked = useServerFn(listLinkedWallets);
+  const ownershipGraph = useServerFn(getOwnershipGraph);
   const [items, setItems] = useState<NftItem[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +48,16 @@ export function NftGallery({
             }
           } catch {
             failures.push("Couldn't load linked wallets.");
+          }
+          // Vault wallets that delegated to any of the user's wallets
+          // (delegate.cash / delegate.xyz) — their NFTs show here too.
+          try {
+            const graph = await ownershipGraph();
+            for (const e of graph.edges) {
+              if (e.via === "delegate-in") addresses.add(e.from.toLowerCase());
+            }
+          } catch {
+            failures.push("Couldn't load delegated wallets.");
           }
         }
         const results = await Promise.allSettled(
@@ -79,7 +91,7 @@ export function NftGallery({
     return () => {
       cancelled = true;
     };
-  }, [address, includeLinkedWallets, userId, listFn, listLinked, refreshVersion]);
+  }, [address, includeLinkedWallets, userId, listFn, listLinked, ownershipGraph, refreshVersion]);
 
   if (loading) {
     return (
@@ -104,7 +116,7 @@ export function NftGallery({
           <ImageOff className="mb-2 h-6 w-6 text-muted-foreground" />
           {error
             ? `Couldn't load NFTs — ${error}`
-            : "No NFTs from allowed collections found in your connected wallets."}
+            : "No NFTs from allowed collections found in your connected, linked or delegated wallets."}
         </div>
       </div>
     );

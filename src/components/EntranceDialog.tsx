@@ -20,7 +20,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Loader2, Mail, Wallet as WalletIcon, X, Smartphone } from "lucide-react";
 import { toast } from "sonner";
-import { useAccount, useConnect, useDisconnect, type Connector } from "wagmi";
+import { useAccount, useConnect, useDisconnect, useSignMessage, type Connector } from "wagmi";
+import { useServerFn } from "@tanstack/react-start";
+import { requestLinkedWalletNonce, verifyAndLinkWallet } from "@/lib/linked-wallets.functions";
 import {
   GLYPH_CONNECTOR_ID,
   WALLETCONNECT_CONNECTOR_ID,
@@ -34,6 +36,8 @@ import { useGlyphAuthState } from "@/lib/auth/useGlyphBridge";
 interface EntranceDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** "link" reuses the exact sign-in wallet list to attach another wallet. */
+  mode?: "signin" | "link";
 }
 
 function sliceAddress(a: string) {
@@ -53,7 +57,7 @@ function friendlyConnectError(e: unknown): string {
   return msg || "Couldn't connect.";
 }
 
-export function EntranceDialog({ open, onOpenChange }: EntranceDialogProps) {
+export function EntranceDialog({ open, onOpenChange, mode = "signin" }: EntranceDialogProps) {
   const ready = useGlyphReady();
   useEffect(() => {
     if (!open) return;
@@ -69,7 +73,7 @@ export function EntranceDialog({ open, onOpenChange }: EntranceDialogProps) {
       className="fixed inset-0 z-[60] flex items-center justify-center px-4"
       role="dialog"
       aria-modal="true"
-      aria-label="VIP entrance"
+      aria-label={mode === "link" ? "Add a wallet" : "VIP entrance"}
     >
       <button
         type="button"
@@ -104,10 +108,10 @@ export function EntranceDialog({ open, onOpenChange }: EntranceDialogProps) {
           />
         </div>
         <h2 className="mt-3 font-display text-2xl font-bold text-gradient-gold sm:text-3xl">
-          VIP Entrance
+          {mode === "link" ? "Add a wallet" : "VIP Entrance"}
         </h2>
         {ready ? (
-          <EntranceBody onOpenChange={onOpenChange} />
+          <EntranceBody onOpenChange={onOpenChange} linking={mode === "link"} />
         ) : (
           <div className="mt-6 flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" /> Loading sign-in…
@@ -118,11 +122,20 @@ export function EntranceDialog({ open, onOpenChange }: EntranceDialogProps) {
   );
 }
 
-function EntranceBody({ onOpenChange }: { onOpenChange: (open: boolean) => void }) {
+function EntranceBody({
+  onOpenChange,
+  linking,
+}: {
+  onOpenChange: (open: boolean) => void;
+  linking: boolean;
+}) {
   const { isAuthenticated, user } = useAuth();
   const { glyphLoaded, glyphError } = useWalletStack();
   const { connectors, connectAsync, isPending } = useConnect();
-  const { disconnect } = useDisconnect();
+  const { disconnect, disconnectAsync } = useDisconnect();
+  const { signMessageAsync } = useSignMessage();
+  const requestNonce = useServerFn(requestLinkedWalletNonce);
+  const verifyLink = useServerFn(verifyAndLinkWallet);
   const { isConnected, address, connector: active } = useAccount();
   const { verifying } = useGlyphAuthState();
   const [mode, setMode] = useState<"choose" | "wallets">("choose");
@@ -133,8 +146,8 @@ function EntranceBody({ onOpenChange }: { onOpenChange: (open: boolean) => void 
   // Close once a WALLET session exists. (An email session that merely opened
   // this dialog to add a wallet stays open — that flow lives on Profile.)
   useEffect(() => {
-    if (isAuthenticated && isWalletSession) onOpenChange(false);
-  }, [isAuthenticated, isWalletSession, onOpenChange]);
+    if (!linking && isAuthenticated && isWalletSession) onOpenChange(false);
+  }, [linking, isAuthenticated, isWalletSession, onOpenChange]);
 
   const glyph = connectors.find((c) => c.id === GLYPH_CONNECTOR_ID);
   const wc = connectors.find((c) => c.id === WALLETCONNECT_CONNECTOR_ID);
@@ -147,7 +160,39 @@ function EntranceBody({ onOpenChange }: { onOpenChange: (open: boolean) => void 
   const hasInjected =
     typeof window !== "undefined" && !!(window as unknown as { ethereum?: unknown }).ethereum;
 
+  // Link flow: same wallet list as sign-in, always starting fresh. The chosen
+  // wallet signs a single-use server nonce, then its session is closed again.
+  async function linkWith(c: Connector) {
+    setPendingId(c.uid);
+    try {
+      if (active && c.uid === active.uid) {
+        // Already connected with this wallet → end that session so its own
+        // modal opens from the beginning and another account can be chosen.
+        await disconnectAsync({ connector: c }).catch(() => undefined);
+      }
+      const res = await connectAsync({ connector: c });
+      const target = res.accounts[0];
+      if (!target) throw new Error("No account returned from wallet");
+      const { message, nonce } = await requestNonce({ data: { address: target } });
+      const signature = await signMessageAsync({ message, account: target, connector: c });
+      const out = await verifyLink({
+        data: { address: target, nonce, signature, label: c.name },
+      });
+      if (!out.ok) throw new Error("Verification failed");
+      toast.success("Wallet linked. Refreshing ownership…");
+      window.dispatchEvent(new Event("baycmc:linked-wallets-changed"));
+      window.dispatchEvent(new Event("baycmc:verification-refresh"));
+      onOpenChange(false);
+    } catch (e) {
+      toast.error(friendlyConnectError(e), { duration: 7000 });
+    } finally {
+      await disconnectAsync({ connector: c }).catch(() => undefined);
+      setPendingId(null);
+    }
+  }
+
   async function connectWith(c: Connector) {
+    if (linking) return linkWith(c);
     setPendingId(c.uid);
     try {
       // Called directly from the click so popups (Glyph) / extensions open.
@@ -160,7 +205,7 @@ function EntranceBody({ onOpenChange }: { onOpenChange: (open: boolean) => void 
   }
 
   // Signed in with email/password already → link instead of switching accounts.
-  if (isAuthenticated && !isWalletSession) {
+  if (!linking && isAuthenticated && !isWalletSession) {
     return (
       <div className="mt-4 space-y-3 text-sm text-muted-foreground">
         <p>
@@ -179,7 +224,7 @@ function EntranceBody({ onOpenChange }: { onOpenChange: (open: boolean) => void 
   }
 
   // Step 2 — wallet connected, one signature to enter.
-  if (isConnected && address) {
+  if (!linking && isConnected && address) {
     return (
       <div className="mt-2 space-y-3">
         <p className="text-sm leading-relaxed text-muted-foreground">
@@ -293,6 +338,11 @@ function EntranceBody({ onOpenChange }: { onOpenChange: (open: boolean) => void 
   return (
     <div className="mt-2 space-y-2">
       <p className="text-sm leading-relaxed text-muted-foreground">
+        {linking
+          ? "Pick the wallet that holds (or is delegated) your NFTs. You'll sign one message — no gas."
+          : null}
+      </p>
+      <p className={linking ? "hidden" : "text-sm leading-relaxed text-muted-foreground"}>
         Sign in your way. Holders unlock the BAYC / MAYC rooms; everyone gets the lobby, chat and
         karaoke.
       </p>
@@ -325,7 +375,7 @@ function EntranceBody({ onOpenChange }: { onOpenChange: (open: boolean) => void 
           </span>
         </span>
       </button>
-      <p className="pt-1 text-center text-[11px] text-muted-foreground">
+      <p className={linking ? "hidden" : "pt-1 text-center text-[11px] text-muted-foreground"}>
         Prefer a password?{" "}
         <Link
           to="/login"
