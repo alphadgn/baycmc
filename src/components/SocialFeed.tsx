@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
+import { avatarShapeClass } from "@/lib/profile-avatar";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 
@@ -179,7 +180,9 @@ export function SocialFeed({ liferOnly = false }: SocialFeedProps) {
           return (
             <article key={p.id} className="glass rounded-2xl p-5 shadow-card">
               <header className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-full bg-gradient-gold" />
+                <div className={`h-9 w-9 shrink-0 overflow-hidden bg-gradient-gold ${avatarShapeClass(profile?.avatar_url)}`}>
+                  {profile?.avatar_url && <img src={profile.avatar_url} alt={name} className="h-full w-full object-cover" />}
+                </div>
                 <div>
                   <div className="text-sm font-semibold font-sans-display">{name}</div>
                   <div className="text-[11px] text-muted-foreground">

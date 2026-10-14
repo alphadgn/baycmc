@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { LifeBuoy } from "lucide-react";
 import { supabase as typedSupabase } from "@/integrations/supabase/client";
 import { SupportThread } from "@/components/SupportThread";
+import { avatarShapeClass } from "@/lib/profile-avatar";
 
 // support_messages isn't in the generated Database type yet — cast through
 // an untyped client (same pattern as LobbyChat / SupportThread).
@@ -148,7 +149,7 @@ function AdminSupport() {
                         active ? "bg-gold/10 ring-1 ring-gold/30" : "hover:bg-secondary/40"
                       }`}
                     >
-                      <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 overflow-hidden rounded-full border border-border bg-gradient-gold">
+                      <span className={`mt-0.5 inline-flex h-8 w-8 shrink-0 overflow-hidden border border-border bg-gradient-gold ${avatarShapeClass(t.profile?.avatar_url)}`}>
                         {t.profile?.avatar_url ? (
                           <img
                             src={t.profile.avatar_url}
