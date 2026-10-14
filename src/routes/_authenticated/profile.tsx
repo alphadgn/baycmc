@@ -7,10 +7,24 @@ import { toast } from "sonner";
 import { VerificationStatusPanel } from "@/components/VerificationStatusPanel";
 import { NftGallery } from "@/components/NftGallery";
 import { LinkedWalletsPanel } from "@/components/LinkedWalletsPanel";
+import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 
 export const Route = createFileRoute("/_authenticated/profile")({
   head: () => ({
-    meta: [{ title: "Your Profile — BAYCMC" }],
+    meta: [
+      { title: "Your Profile — BAYCMC" },
+      {
+        name: "description",
+        content: "Manage your BAYCMC profile, linked wallets and live holder verification.",
+      },
+      { property: "og:title", content: "Your Profile — BAYCMC" },
+      {
+        property: "og:description",
+        content: "Manage your BAYCMC profile, linked wallets and live holder verification.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
   }),
   component: ProfilePage,
 });
@@ -22,23 +36,14 @@ interface ProfileRow {
   bio: string | null;
   avatar_url: string | null;
 }
-interface VerifRow {
-  bayc_verified: boolean;
-  lumina_verified: boolean;
-  delegation_verified: boolean;
-  bayc_token_ids: number[];
-}
-interface RoleRow {
-  role: string;
-}
 
 type LoadState = "idle" | "loading" | "ready" | "error";
 
 function ProfilePage() {
   const { user, loading: authLoading } = useAuth();
+  const verification = useVerificationStatus();
+  const roles = verification.roles;
   const [profile, setProfile] = useState<ProfileRow | null>(null);
-  const [verif, setVerif] = useState<VerifRow | null>(null);
-  const [roles, setRoles] = useState<string[]>([]);
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -58,14 +63,14 @@ function ProfilePage() {
 
     void (async () => {
       try {
-        const [profileRes, verifRes, rolesRes] = await Promise.all([
-          supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
-          supabase.from("user_verifications").select("*").eq("user_id", user.id).maybeSingle(),
-          supabase.from("user_roles").select("role").eq("user_id", user.id),
-        ]);
+        const profileRes = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .maybeSingle();
         if (cancelled) return;
 
-        const firstError = profileRes.error ?? verifRes.error ?? rolesRes.error ?? null;
+        const firstError = profileRes.error;
         if (firstError) {
           setLoadError(firstError.message);
           setLoadState("error");
@@ -79,8 +84,6 @@ function ProfilePage() {
           setBio(p.bio ?? "");
           setAvatarUrl(p.avatar_url ?? null);
         }
-        if (verifRes.data) setVerif(verifRes.data as VerifRow);
-        if (rolesRes.data) setRoles((rolesRes.data as RoleRow[]).map((x) => x.role));
         setLoadState("ready");
       } catch (e) {
         if (cancelled) return;
@@ -252,9 +255,20 @@ function ProfilePage() {
                   {r.replace("_", " ")}
                 </span>
               ))}
-              {roles.length === 0 && (
+              {verification.isVerifiedHolder && (
+                <span className="rounded-full border border-success/30 bg-success/10 px-3 py-1 text-xs font-semibold text-success">
+                  {verification.collection
+                    ? `${verification.collection} verified`
+                    : "BAYC/MAYC verified"}
+                </span>
+              )}
+              {!verification.isVerifiedHolder && (
                 <span className="rounded-full border border-border bg-muted/30 px-3 py-1 text-xs text-muted-foreground">
-                  unverified
+                  {verification.loading
+                    ? "Checking…"
+                    : verification.error
+                      ? "Status unavailable"
+                      : "Not verified"}
                 </span>
               )}
             </div>
@@ -310,17 +324,31 @@ function ProfilePage() {
           <ul className="mt-5 space-y-3">
             <VerifyRow
               label="BAYC/MAYC ownership"
-              ok={!!verif?.bayc_verified}
+              ok={verification.isVerifiedHolder}
               action={
                 <span className="text-xs text-muted-foreground">
-                  {verif?.bayc_verified ? "Verified" : "Not verified"}
+                  {verification.loading
+                    ? "Checking…"
+                    : verification.isVerifiedHolder
+                      ? "Verified"
+                      : verification.error
+                        ? "Status unavailable"
+                        : "Not verified"}
                 </span>
               }
             />
             <VerifyRow
               label="delegate.cash vault"
-              ok={!!verif?.delegation_verified}
-              action={<span className="text-xs text-muted-foreground">Coming soon</span>}
+              ok={verification.delegationVerified}
+              action={
+                <span className="text-xs text-muted-foreground">
+                  {verification.loading
+                    ? "Checking…"
+                    : verification.delegationVerified
+                      ? "Verified"
+                      : "Not verified"}
+                </span>
+              }
             />
           </ul>
           <div className="mt-6">
@@ -338,7 +366,6 @@ function ProfilePage() {
         </div>
         <LinkedWalletsPanel />
       </section>
-
 
       {wallet && (
         <section className="mt-10">

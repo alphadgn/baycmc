@@ -49,10 +49,10 @@ export function AiAssistant() {
       <SheetTrigger asChild>
         <Button
           size="icon"
-          className="fixed bottom-4 right-4 z-40 h-12 w-12 rounded-full shadow-lg"
+          className="fixed bottom-[calc(env(safe-area-inset-bottom)+7rem)] left-3 z-40 h-9 w-9 rounded-full shadow-lg"
           aria-label="Open AI assistant"
         >
-          <Sparkles className="h-5 w-5" />
+          <Sparkles className="h-4 w-4" />
         </Button>
       </SheetTrigger>
       <SheetContent side="right" className="flex w-full flex-col gap-3 sm:max-w-md">
@@ -60,9 +60,7 @@ export function AiAssistant() {
           <SheetTitle className="flex items-center gap-2">
             <Sparkles className="h-4 w-4" /> BAYCMC Assistant
           </SheetTitle>
-          <SheetDescription>
-            In-app AI for logic help and smart-contract review.
-          </SheetDescription>
+          <SheetDescription>In-app AI for logic help and smart-contract review.</SheetDescription>
         </SheetHeader>
 
         <Tabs
@@ -92,9 +90,7 @@ export function AiAssistant() {
           ) : (
             <div className="space-y-3">
               {messages.map((m) => {
-                const text = m.parts
-                  .map((p) => (p.type === "text" ? p.text : ""))
-                  .join("");
+                const text = m.parts.map((p) => (p.type === "text" ? p.text : "")).join("");
                 return (
                   <div
                     key={m.id}
@@ -126,9 +122,7 @@ export function AiAssistant() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={
-              mode === "contract"
-                ? "Paste contract code or ask a question…"
-                : "Ask a question…"
+              mode === "contract" ? "Paste contract code or ask a question…" : "Ask a question…"
             }
             rows={2}
             className="resize-none"
