@@ -1,5 +1,10 @@
 # Karaoke overhaul roadmap
 
+## Global pictures and chat opening
+- [ ] Apply NFT versus device photo shapes to every profile picture display
+- [ ] Open every chat thread at the newest messages, including delayed media
+- [ ] Verify picture rendering and chat opening regressions
+
 ## Screenshot fixes
 - [x] Alchemy NFT lookup — ALCHEMY_API_KEY secret saved, wallet-assets functions wired to it, live lookup verified (key valid; Glyph wallet holds 0 NFTs, BAYC #2931 owner returns 1)
 - [x] Synchronize profile badges and global verification displays (shared snapshot; regression test passes)

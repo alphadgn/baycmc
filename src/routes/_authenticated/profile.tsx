@@ -8,7 +8,8 @@ import { VerificationStatusPanel } from "@/components/VerificationStatusPanel";
 import { NftGallery } from "@/components/NftGallery";
 import { LinkedWalletsPanel } from "@/components/LinkedWalletsPanel";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
-import { AvatarPicker, isDeviceAvatar } from "@/components/AvatarPicker";
+import { AvatarPicker } from "@/components/AvatarPicker";
+import { avatarShapeClass } from "@/lib/profile-avatar";
 import type { NftItem } from "@/server/wallet-assets.functions";
 
 export const Route = createFileRoute("/_authenticated/profile")({
@@ -237,7 +238,7 @@ function ProfilePage() {
                 onClick={() => setPickerOpen(true)}
                 disabled={uploadingAvatar}
                 className={`group relative h-24 w-24 cursor-pointer overflow-hidden ${
-                  avatarUrl && !isDeviceAvatar(avatarUrl) ? "rounded-md" : "rounded-full"
+                  avatarShapeClass(avatarUrl)
                 } border-4 border-background bg-gradient-gold shadow-gold transition hover:opacity-90 disabled:cursor-wait`}
                 aria-label="Change avatar"
               >

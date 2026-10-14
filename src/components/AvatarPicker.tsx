@@ -5,11 +5,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { listWalletNfts, type NftItem } from "@/server/wallet-assets.functions";
 import { listLinkedWallets } from "@/lib/linked-wallets.functions";
 
-/** Avatars uploaded from a device live in the "avatars" storage bucket. */
-export function isDeviceAvatar(url: string | null | undefined): boolean {
-  return !!url && url.includes("/storage/v1/object/public/avatars/");
-}
-
 export function AvatarPicker({
   open,
   onOpenChange,

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
+import { avatarShapeClass } from "@/lib/profile-avatar";
 
 interface OnlineMember {
   user_id: string;
@@ -125,7 +126,7 @@ export function LobbyOnlineAvatars({ max = 12 }: LobbyOnlineAvatarsProps) {
             <li
               key={m.user_id}
               title={name}
-              className="inline-flex h-7 w-7 items-center justify-center overflow-hidden rounded-full border border-background bg-gradient-gold ring-1 ring-gold/40"
+              className={`inline-flex h-7 w-7 items-center justify-center overflow-hidden border border-background bg-gradient-gold ring-1 ring-gold/40 ${avatarShapeClass(m.avatar_url)}`}
             >
               {m.avatar_url ? (
                 <img src={m.avatar_url} alt={name} className="h-full w-full object-cover" />

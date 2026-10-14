@@ -3,3 +3,5 @@
 - The singer's audio is mixed on their device (src/components/karaoke/KaraokePerformerEngine.tsx + src/lib/karaoke/audioMixBus.ts) and published as ONE LiveKit track named "karaoke-mix". Never publish the raw mic for the current performer; route performer mic toggles through stageStore.micWanted.
 - Wallet auth: wagmi config + connectors live in src/components/GlyphAppProvider.tsx (Glyph, EIP-6963 browser wallets, WalletConnect). SIWE nonces are server-issued (getSiweNonce) and single-use. Never trust wallet lists sent from the browser.
 - Verification UI reads the root VerificationStatusProvider snapshot; one user-scoped query and live subscription keep badges and navigation consistent without competing ownership requests.
+- Profile picture frames use avatarShapeClass from src/lib/profile-avatar.ts, keeping NFT and device-photo shapes consistent without importing the wallet picker.
+- Chat lists use useChatScroll with a bounded viewport and observed content wrapper; fetch newest limited history descending and reverse for display so entry never stops at an older message window.

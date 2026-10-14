@@ -283,7 +283,7 @@ function AccountCard({
           <img
             src={profile.avatar_url}
             alt=""
-            className="h-10 w-10 rounded-full border border-gold/30 object-cover"
+            className={`h-10 w-10 border border-gold/30 object-cover ${avatarShapeClass(profile.avatar_url)}`}
           />
         ) : (
           <div className="h-10 w-10 rounded-full border border-gold/30 bg-secondary" />

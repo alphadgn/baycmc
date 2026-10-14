@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
+import { avatarShapeClass } from "@/lib/profile-avatar";
 import karaokeLobbyBg from "@/assets/karaoke-lobby-bg.png.asset.json";
 
 interface OnlineMember {
@@ -176,7 +177,7 @@ function Avatar({
   return (
     <div
       style={{ width: size, height: size }}
-      className={`inline-flex items-center justify-center overflow-hidden rounded-full border bg-gradient-gold ${
+      className={`inline-flex items-center justify-center overflow-hidden border bg-gradient-gold ${avatarShapeClass(member.avatar_url)} ${
         highlight
           ? "border-gold ring-2 ring-gold/60 shadow-gold"
           : "border-background ring-1 ring-gold/30"
