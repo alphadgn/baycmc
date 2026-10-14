@@ -19,7 +19,6 @@ export function VerificationStatusPanel() {
   const [luminaError, setLuminaError] = useState<string | null>(null);
   const verifyLumina = useServerFn(verifyLuminaOwnership);
 
-
   async function handleLuminaCheck() {
     setLuminaBusy(true);
     setLuminaError(null);

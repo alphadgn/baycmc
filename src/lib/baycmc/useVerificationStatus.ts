@@ -42,9 +42,13 @@ export function VerificationStatusProvider({ children }: { children: ReactNode }
     queryFn: async () => {
       if (!userId) throw new Error("Sign in to load verification");
       const [ver, roles] = await Promise.all([
-        supabase.from("user_verifications")
-          .select("bayc_verified, bayc_collection, otherpage_verified, lumina_verified, delegation_verified")
-          .eq("user_id", userId).maybeSingle(),
+        supabase
+          .from("user_verifications")
+          .select(
+            "bayc_verified, bayc_collection, otherpage_verified, lumina_verified, delegation_verified",
+          )
+          .eq("user_id", userId)
+          .maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", userId),
       ]);
       if (ver.error) throw new Error(ver.error.message);
@@ -81,7 +85,10 @@ export function VerificationStatusProvider({ children }: { children: ReactNode }
     isVerifiedHolder,
     isLobby: isAuthenticated && !isVerifiedHolder,
     tokenProof: isVerifiedHolder,
-    collection: ver?.bayc_collection === "BAYC" || ver?.bayc_collection === "MAYC" ? ver.bayc_collection : null,
+    collection:
+      ver?.bayc_collection === "BAYC" || ver?.bayc_collection === "MAYC"
+        ? ver.bayc_collection
+        : null,
     otherpage: !!ver?.otherpage_verified,
     lumina: !!ver?.lumina_verified,
     delegationVerified: !!ver?.delegation_verified,

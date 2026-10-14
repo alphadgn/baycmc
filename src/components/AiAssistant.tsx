@@ -60,9 +60,7 @@ export function AiAssistant() {
           <SheetTitle className="flex items-center gap-2">
             <Sparkles className="h-4 w-4" /> BAYCMC Assistant
           </SheetTitle>
-          <SheetDescription>
-            In-app AI for logic help and smart-contract review.
-          </SheetDescription>
+          <SheetDescription>In-app AI for logic help and smart-contract review.</SheetDescription>
         </SheetHeader>
 
         <Tabs
@@ -92,9 +90,7 @@ export function AiAssistant() {
           ) : (
             <div className="space-y-3">
               {messages.map((m) => {
-                const text = m.parts
-                  .map((p) => (p.type === "text" ? p.text : ""))
-                  .join("");
+                const text = m.parts.map((p) => (p.type === "text" ? p.text : "")).join("");
                 return (
                   <div
                     key={m.id}
@@ -126,9 +122,7 @@ export function AiAssistant() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={
-              mode === "contract"
-                ? "Paste contract code or ask a question…"
-                : "Ask a question…"
+              mode === "contract" ? "Paste contract code or ask a question…" : "Ask a question…"
             }
             rows={2}
             className="resize-none"

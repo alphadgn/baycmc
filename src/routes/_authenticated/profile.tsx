@@ -13,9 +13,15 @@ export const Route = createFileRoute("/_authenticated/profile")({
   head: () => ({
     meta: [
       { title: "Your Profile — BAYCMC" },
-      { name: "description", content: "Manage your BAYCMC profile, linked wallets and live holder verification." },
+      {
+        name: "description",
+        content: "Manage your BAYCMC profile, linked wallets and live holder verification.",
+      },
       { property: "og:title", content: "Your Profile — BAYCMC" },
-      { property: "og:description", content: "Manage your BAYCMC profile, linked wallets and live holder verification." },
+      {
+        property: "og:description",
+        content: "Manage your BAYCMC profile, linked wallets and live holder verification.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -57,7 +63,11 @@ function ProfilePage() {
 
     void (async () => {
       try {
-        const profileRes = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
+        const profileRes = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .maybeSingle();
         if (cancelled) return;
 
         const firstError = profileRes.error;
@@ -247,12 +257,18 @@ function ProfilePage() {
               ))}
               {verification.isVerifiedHolder && (
                 <span className="rounded-full border border-success/30 bg-success/10 px-3 py-1 text-xs font-semibold text-success">
-                  {verification.collection ? `${verification.collection} verified` : "BAYC/MAYC verified"}
+                  {verification.collection
+                    ? `${verification.collection} verified`
+                    : "BAYC/MAYC verified"}
                 </span>
               )}
               {!verification.isVerifiedHolder && (
                 <span className="rounded-full border border-border bg-muted/30 px-3 py-1 text-xs text-muted-foreground">
-                  {verification.loading ? "Checking…" : verification.error ? "Status unavailable" : "Not verified"}
+                  {verification.loading
+                    ? "Checking…"
+                    : verification.error
+                      ? "Status unavailable"
+                      : "Not verified"}
                 </span>
               )}
             </div>
@@ -311,14 +327,28 @@ function ProfilePage() {
               ok={verification.isVerifiedHolder}
               action={
                 <span className="text-xs text-muted-foreground">
-                  {verification.loading ? "Checking…" : verification.isVerifiedHolder ? "Verified" : verification.error ? "Status unavailable" : "Not verified"}
+                  {verification.loading
+                    ? "Checking…"
+                    : verification.isVerifiedHolder
+                      ? "Verified"
+                      : verification.error
+                        ? "Status unavailable"
+                        : "Not verified"}
                 </span>
               }
             />
             <VerifyRow
               label="delegate.cash vault"
               ok={verification.delegationVerified}
-              action={<span className="text-xs text-muted-foreground">{verification.loading ? "Checking…" : verification.delegationVerified ? "Verified" : "Not verified"}</span>}
+              action={
+                <span className="text-xs text-muted-foreground">
+                  {verification.loading
+                    ? "Checking…"
+                    : verification.delegationVerified
+                      ? "Verified"
+                      : "Not verified"}
+                </span>
+              }
             />
           </ul>
           <div className="mt-6">
@@ -336,7 +366,6 @@ function ProfilePage() {
         </div>
         <LinkedWalletsPanel />
       </section>
-
 
       {wallet && (
         <section className="mt-10">

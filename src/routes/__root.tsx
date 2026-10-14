@@ -126,16 +126,16 @@ function RootComponent() {
   return (
     <GlyphAppProvider>
       <VerificationStatusProvider>
-      <GlyphBridgeMount />
-      <div className="min-h-screen grain">
-        <AppHeader />
-        <Outlet />
-        <GatedToaster />
-        <InactivityWatcher />
-        <AuthRedirectWatcher />
-        <AccountMergeWatcher />
-        <AiAssistant />
-      </div>
+        <GlyphBridgeMount />
+        <div className="min-h-screen grain">
+          <AppHeader />
+          <Outlet />
+          <GatedToaster />
+          <InactivityWatcher />
+          <AuthRedirectWatcher />
+          <AccountMergeWatcher />
+          <AiAssistant />
+        </div>
       </VerificationStatusProvider>
     </GlyphAppProvider>
   );
