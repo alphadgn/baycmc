@@ -11,36 +11,33 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
  * strip the v2/ prefix and substitute the right path.
  */
 
-function parseAlchemyRpc(): { protocol: string; host: string; key: string } | null {
+/**
+ * Resolve the Alchemy API key. Prefers the dedicated ALCHEMY_API_KEY secret;
+ * falls back to parsing the key out of an Alchemy ETH_RPC_URL.
+ */
+function alchemyKey(): string | null {
+  const direct = process.env.ALCHEMY_API_KEY?.trim();
+  if (direct) return direct;
   const rpc = process.env.ETH_RPC_URL?.trim();
   if (!rpc) return null;
   try {
     const u = new URL(rpc);
     if (!u.hostname.endsWith("alchemy.com")) return null;
     const parts = u.pathname.split("/").filter(Boolean);
-    const key = parts[parts.length - 1];
-    if (!key) return null;
-    return { protocol: u.protocol, host: u.host, key };
+    return parts[parts.length - 1] || null;
   } catch {
     return null;
   }
 }
 
 function alchemyNftBaseUrl(): string | null {
-  const p = parseAlchemyRpc();
-  return p ? `${p.protocol}//${p.host}/nft/v3/${p.key}` : null;
+  const key = alchemyKey();
+  return key ? `https://eth-mainnet.g.alchemy.com/nft/v3/${key}` : null;
 }
 
 function alchemyCoreBaseUrl(): string | null {
-  const rpc = process.env.ETH_RPC_URL?.trim();
-  if (!rpc) return null;
-  try {
-    const u = new URL(rpc);
-    if (!u.hostname.endsWith("alchemy.com")) return null;
-    return rpc;
-  } catch {
-    return null;
-  }
+  const key = alchemyKey();
+  return key ? `https://eth-mainnet.g.alchemy.com/v2/${key}` : null;
 }
 
 const fetchTimeoutMs = 12_000;
@@ -93,7 +90,7 @@ export const listWalletNfts = createServerFn({ method: "POST" })
     if (!base) {
       return {
         ok: false as const,
-        reason: "NFT lookup requires an Alchemy ETH_RPC_URL.",
+        reason: "NFT lookup requires an Alchemy API key.",
         items: [],
       };
     }
@@ -172,7 +169,7 @@ export const listWalletActivity = createServerFn({ method: "POST" })
     if (!base) {
       return {
         ok: false as const,
-        reason: "Activity lookup requires an Alchemy ETH_RPC_URL.",
+        reason: "Activity lookup requires an Alchemy API key.",
         items: [],
       };
     }

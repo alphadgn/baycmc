@@ -1,7 +1,7 @@
 # Karaoke overhaul roadmap
 
 ## Screenshot fixes
-- [ ] Verify Alchemy NFT lookup — credentials saved, but live lookup still reports the Alchemy connection unavailable; needs a valid Ethereum Mainnet HTTPS URL or runtime configuration correction
+- [x] Alchemy NFT lookup — ALCHEMY_API_KEY secret saved, wallet-assets functions wired to it, live lookup verified (key valid; Glyph wallet holds 0 NFTs, BAYC #2931 owner returns 1)
 - [x] Synchronize profile badges and global verification displays (shared snapshot; regression test passes)
 - [x] Shrink floating help button and move left above room controls (phone viewport and opening checked)
 
