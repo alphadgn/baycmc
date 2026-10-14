@@ -451,7 +451,7 @@ function ParticipantVideoTile({
 
   return (
     <div
-      className={`relative shrink-0 overflow-hidden rounded-2xl border-2 bg-card/40 ${sizeClasses} ${ringClasses}`}
+      className={`relative shrink-0 overflow-hidden border-2 bg-card/40 ${!camOn && profile?.avatar_url ? avatarShapeClass(profile.avatar_url) : "rounded-2xl"} ${sizeClasses} ${ringClasses}`}
     >
       {camOn && camTrack && isTrackReference(camTrack) ? (
         <VideoTrack trackRef={camTrack} className="absolute inset-0 h-full w-full object-cover" />
