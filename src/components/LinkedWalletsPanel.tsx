@@ -65,6 +65,17 @@ function LinkedWalletsPanelInner() {
   }, []);
 
   async function connectWithProvider(provider: MetaMaskProvider, sourceLabel: string) {
+    // Start fresh: force the wallet's account picker instead of silently
+    // reusing the already-connected account, so a new wallet can be chosen.
+    try {
+      await provider.request({
+        method: "wallet_requestPermissions",
+        params: [{ eth_accounts: {} }],
+      });
+    } catch (e) {
+      const code = (e as { code?: number })?.code;
+      if (code === 4001) throw new Error("Wallet connection cancelled");
+    }
     const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
     const target = accounts?.[0];
     if (!target) throw new Error("No account returned from wallet");
