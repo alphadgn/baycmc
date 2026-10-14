@@ -12,14 +12,22 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/contract-auditor")({
-  head: () => ({ meta: [
-    { title: "Contract Auditor — BAYCMC" },
-    { name: "description", content: "Review smart contracts with Claude in your private BAYCMC audit conversation." },
-    { property: "og:title", content: "Contract Auditor — BAYCMC" },
-    { property: "og:description", content: "Review smart contracts with Claude in your private BAYCMC audit conversation." },
-    { property: "og:type", content: "website" },
-    { name: "twitter:card", content: "summary" },
-  ] }),
+  head: () => ({
+    meta: [
+      { title: "Contract Auditor — BAYCMC" },
+      {
+        name: "description",
+        content: "Review smart contracts with Claude in your private BAYCMC audit conversation.",
+      },
+      { property: "og:title", content: "Contract Auditor — BAYCMC" },
+      {
+        property: "og:description",
+        content: "Review smart contracts with Claude in your private BAYCMC audit conversation.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
   component: ContractAuditorPage,
 });
 

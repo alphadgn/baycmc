@@ -9,7 +9,11 @@ export const Route = createFileRoute("/")({
     meta: [
       { title: "BAYCMC — the BAYC/MAYC mobile clubhouse" },
       { property: "og:title", content: "BAYCMC — the BAYC/MAYC mobile clubhouse" },
-      { property: "og:description", content: "The BAYCMC wallet-connected clubhouse for live rooms, member conversations and on-chain holder verification." },
+      {
+        property: "og:description",
+        content:
+          "The BAYCMC wallet-connected clubhouse for live rooms, member conversations and on-chain holder verification.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       {
@@ -84,7 +88,6 @@ function Index() {
               >
                 How verification works
               </Link>
-
             </div>
           </div>
 
