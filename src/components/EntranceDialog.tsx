@@ -242,8 +242,8 @@ function EntranceBody({ onOpenChange }: { onOpenChange: (open: boolean) => void 
           <p className="rounded-md border border-border/60 bg-black/30 p-3 text-xs text-muted-foreground">
             No browser wallet detected
             {isMobile()
-              ? " — open this page inside your wallet app, or use WalletConnect."
-              : ". Install MetaMask / Rabby, or use WalletConnect."}
+              ? ` — open this page inside your wallet app${wc ? ", or use WalletConnect" : " (buttons below)"}.`
+              : `. Install MetaMask / Rabby${wc ? ", or use WalletConnect" : ""}.`}
           </p>
         )}
         {wc && (

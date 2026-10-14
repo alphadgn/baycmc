@@ -260,11 +260,9 @@ function WalletBridge() {
           duration: 3000,
         });
       } else {
-        toast.message("You're in the lobby", {
-          id: toastId,
-          description: result.reason ?? "No BAYC/MAYC found — gated rooms stay locked.",
-          duration: 6000,
-        });
+        // No "You're in the lobby / No BAYC/MAYC found" notification — removed
+        // app-wide by request. Just clear the "Checking ownership…" spinner.
+        toast.dismiss(toastId);
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
