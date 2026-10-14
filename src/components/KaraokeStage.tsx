@@ -538,7 +538,8 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
   useEffect(() => {
     if (!isPlaying) setForceWaitlistVisible(false);
   }, [isPlaying]);
-  const waitlistHidden = isPlaying && !forceWaitlistVisible;
+  // Auto-hide only applies to the current singer; everyone else always sees it.
+  const waitlistHidden = isMyTurn && isPlaying && !forceWaitlistVisible;
 
   const resetAllPanels = useCallback(() => {
     setPos({ dx: 0, dy: 0 });

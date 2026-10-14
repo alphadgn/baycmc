@@ -12,6 +12,7 @@ import { Crown, Mic, MicOff } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchVipUserIds } from "@/lib/karaoke/vip.functions";
+import { useKaraokeStage } from "@/lib/karaoke/stageStore";
 
 interface ProfileMini {
   id: string;
