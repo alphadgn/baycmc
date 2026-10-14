@@ -143,8 +143,19 @@ export function MessageThread({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelName, table]);
 
+  // Entering a thread jumps straight to the newest messages; later
+  // messages scroll smoothly.
+  const initialScrollDoneRef = useRef(false);
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    const el = scrollRef.current;
+    if (!el) return;
+    if (!initialScrollDoneRef.current && messages.length > 0) {
+      initialScrollDoneRef.current = true;
+      el.scrollTop = el.scrollHeight;
+      requestAnimationFrame(() => (el.scrollTop = el.scrollHeight));
+      return;
+    }
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, [messages.length]);
 
   useEffect(() => {
