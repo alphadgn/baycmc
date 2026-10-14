@@ -8,23 +8,6 @@ import {
   removeLinkedWallet,
 } from "@/lib/linked-wallets.functions";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-
-/** Older in-app wallet browsers expose only window.ethereum (no EIP-6963). */
-function injectedFallback() {
-  if (typeof window === "undefined") return [];
-  const eth = (window as unknown as { ethereum?: { request?: unknown; isMetaMask?: boolean } })
-    .ethereum;
-  if (!eth || typeof eth.request !== "function") return [];
-  return [
-    {
-      uuid: "injected",
-      name: eth.isMetaMask ? "MetaMask (this browser)" : "This browser's wallet",
-      icon: "",
-      provider: eth as unknown as { request: (a: { method: string; params?: unknown[] }) => Promise<unknown> },
-    },
-  ];
-}
 
 interface LinkedWalletRow {
   id: string;
@@ -49,9 +32,6 @@ export function LinkedWalletsPanel() {
   );
 }
 
-type MetaMaskProvider = {
-  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
-};
 
 function LinkedWalletsPanelInner() {
   const [rows, setRows] = useState<LinkedWalletRow[]>([]);
@@ -81,161 +61,18 @@ function LinkedWalletsPanelInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function connectWithProvider(provider: MetaMaskProvider, sourceLabel: string) {
-    // Start fresh: force the wallet's account picker instead of silently
-    // reusing the already-connected account, so a new wallet can be chosen.
-    try {
-      await provider.request({
-        method: "wallet_requestPermissions",
-        params: [{ eth_accounts: {} }],
-      });
-    } catch (e) {
-      const code = (e as { code?: number })?.code;
-      if (code === 4001) throw new Error("Wallet connection cancelled");
-    }
-    const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
-    const target = accounts?.[0];
-    if (!target) throw new Error("No account returned from wallet");
-    const { message, nonce } = await requestNonce({ data: { address: target } });
-    const signature = await provider.request({
-      method: "personal_sign",
-      params: [message, target],
-    });
-    if (typeof signature !== "string") throw new Error("No signature returned");
-    const res = await verify({
-      data: { address: target, nonce, signature, label: sourceLabel },
-    });
-    if (!res.ok) throw new Error("Verification failed");
-    toast.success("Wallet linked. Refreshing ownership…");
-    window.dispatchEvent(new Event("baycmc:verification-refresh"));
-    await reload();
-  }
-
-  const [chooserOpen, setChooserOpen] = useState(false);
-  const [wallets6963, setWallets6963] = useState<
-    { uuid: string; name: string; icon: string; provider: MetaMaskProvider }[]
-  >([]);
-
-  // EIP-6963: every wallet installed in this browser announces itself.
   useEffect(() => {
-    const onAnnounce = (ev: Event) => {
-      const d = (ev as CustomEvent).detail as {
-        info: { uuid: string; name: string; icon: string };
-        provider: MetaMaskProvider;
-      };
-      if (!d?.info || !d.provider) return;
-      setWallets6963((prev) =>
-        prev.some((w) => w.uuid === d.info.uuid)
-          ? prev
-          : [...prev, { ...d.info, provider: d.provider }],
-      );
-    };
-    window.addEventListener("eip6963:announceProvider", onAnnounce);
-    window.dispatchEvent(new Event("eip6963:requestProvider"));
-    return () => window.removeEventListener("eip6963:announceProvider", onAnnounce);
+    const onChanged = () => void reload();
+    window.addEventListener("baycmc:linked-wallets-changed", onChanged);
+    return () => window.removeEventListener("baycmc:linked-wallets-changed", onChanged);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Opens the same wallet window used at sign-in (Glyph, browser wallets,
+  // WalletConnect), starting fresh so any wallet can be picked.
   function handleAddWalletClick() {
     setErr(null);
-    window.dispatchEvent(new Event("eip6963:requestProvider"));
-    setChooserOpen(true);
-  }
-
-  async function linkWithInjected(provider: MetaMaskProvider, name: string) {
-    setChooserOpen(false);
-    setErr(null);
-    setBusy(true);
-    try {
-      await connectWithProvider(provider, name);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Failed to link wallet";
-      setErr(msg);
-      toast.error(msg);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function linkWithMetaMaskSdk() {
-    setChooserOpen(false);
-    setErr(null);
-    setBusy(true);
-    let sdk: {
-      connect: () => Promise<string[]>;
-      getProvider: () => MetaMaskProvider | undefined;
-      terminate?: () => Promise<void>;
-    } | null = null;
-    try {
-      // 2) Otherwise open the MetaMask SDK modal, which renders a
-      //    WalletConnect-style QR + "Open MetaMask" + install options.
-      // Compile-time constant — keeps the MetaMask SDK out of the server bundle.
-      if (import.meta.env.SSR) throw new Error("Wallet linking is browser-only");
-      await import("@/lib/polyfill-shim").then((m) => m.installBrowserPolyfills());
-      const { MetaMaskSDK } = await import("@metamask/sdk");
-      sdk = new MetaMaskSDK({
-        dappMetadata: { name: "BAYCmc", url: window.location.origin },
-        useDeeplink: false,
-        preferDesktop: false,
-        checkInstallationImmediately: false,
-        enableAnalytics: false,
-        extensionOnly: false,
-        openDeeplink: (link: string) => {
-          // Fallback: if the SDK modal never mounts (some mobile Safari
-          // configs), navigate the user into MetaMask's in-app browser at
-          // this dapp so window.ethereum becomes available there.
-          window.open(link, "_blank", "noopener");
-        },
-      } as unknown as ConstructorParameters<typeof MetaMaskSDK>[0]);
-      if (typeof (sdk as unknown as { init?: () => Promise<void> }).init === "function") {
-        await (sdk as unknown as { init: () => Promise<void> }).init();
-      }
-      // Race the SDK connect against a timeout so we can surface a clear
-      // error + fallback link instead of hanging forever.
-      const connectPromise = sdk.connect();
-      const timeout = new Promise<never>((_, rej) =>
-        setTimeout(() => rej(new Error("timeout")), 45_000),
-      );
-      let accounts: string[];
-      try {
-        accounts = (await Promise.race([connectPromise, timeout])) as string[];
-      } catch (raceErr) {
-        // Offer an escape hatch: open the dapp in MetaMask's in-app browser.
-        const host = window.location.host + window.location.pathname;
-        const universal = `https://metamask.app.link/dapp/${host}`;
-        window.open(universal, "_blank", "noopener");
-        throw raceErr instanceof Error && raceErr.message === "timeout"
-          ? new Error("Wallet modal didn't respond — opening MetaMask in-app browser instead")
-          : raceErr;
-      }
-      const target = accounts?.[0];
-      if (!target) throw new Error("No account returned from wallet");
-      const provider = sdk.getProvider();
-      if (!provider) throw new Error("Wallet provider unavailable");
-      const { message, nonce } = await requestNonce({ data: { address: target } });
-      const signature = await provider.request({
-        method: "personal_sign",
-        params: [message, target],
-      });
-      if (typeof signature !== "string") throw new Error("No signature returned");
-      const res = await verify({
-        data: { address: target, nonce, signature, label: "WalletConnect" },
-      });
-      if (!res.ok) throw new Error("Verification failed");
-      toast.success("Wallet linked. Refreshing ownership…");
-      window.dispatchEvent(new Event("baycmc:verification-refresh"));
-      await reload();
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Failed to link wallet";
-      setErr(msg);
-      toast.error(msg);
-    } finally {
-      try {
-        await sdk?.terminate?.();
-      } catch {
-        /* non-fatal */
-      }
-      setBusy(false);
-    }
+    window.dispatchEvent(new Event("baycmc:link-wallet-open"));
   }
 
   async function handleRemove(address: string) {
@@ -262,7 +99,7 @@ function LinkedWalletsPanelInner() {
           type="button"
           onClick={handleAddWalletClick}
           disabled={busy}
-          aria-label="Add wallet with MetaMask"
+          aria-label="Add wallet"
           className="inline-flex h-8 w-auto select-none items-center justify-center rounded-full border border-gold/70 px-3.5 text-xs font-medium leading-none text-gold-foreground transition hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:translate-y-px active:brightness-95 disabled:pointer-events-none disabled:opacity-70"
           style={{
             background: "var(--gradient-gold)",
@@ -281,45 +118,6 @@ function LinkedWalletsPanelInner() {
           )}
         </button>
       </div>
-      <Dialog open={chooserOpen} onOpenChange={setChooserOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Select a wallet to link</DialogTitle>
-          </DialogHeader>
-          <p className="text-xs text-muted-foreground">
-            Choose the wallet that holds (or is delegated) your NFTs. If it's in the same wallet
-            app, pick a different account when the wallet asks.
-          </p>
-          <div className="space-y-2">
-            {(wallets6963.length > 0
-              ? wallets6963
-              : injectedFallback()
-            ).map((w) => (
-              <button
-                key={w.uuid}
-                type="button"
-                onClick={() => void linkWithInjected(w.provider, w.name)}
-                className="flex w-full items-center gap-3 rounded-lg border border-border bg-secondary/30 px-4 py-3 text-left text-sm font-medium hover:border-gold/50"
-              >
-                {w.icon ? (
-                  <img src={w.icon} alt="" className="h-6 w-6 rounded" />
-                ) : (
-                  <Wallet className="h-5 w-5 text-gold" />
-                )}
-                {w.name}
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={() => void linkWithMetaMaskSdk()}
-              className="flex w-full items-center gap-3 rounded-lg border border-border bg-secondary/30 px-4 py-3 text-left text-sm font-medium hover:border-gold/50"
-            >
-              <Wallet className="h-5 w-5 text-gold" />
-              MetaMask on another device / app (QR)
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
       <p className="mt-1 text-sm text-muted-foreground">
         Attach additional wallets to your account. Each is checked on-chain for BAYC / MAYC (and
         incoming delegate.cash delegations) on every sign-in.

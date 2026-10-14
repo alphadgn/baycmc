@@ -65,6 +65,12 @@ export function AppHeader() {
   const isVerifiedHolder = gate.ownsRequiredAsset;
   const isLifer = gate.showLifers;
   const [entranceOpen, setEntranceOpen] = useState(false);
+  const [linkOpen, setLinkOpen] = useState(false);
+  useEffect(() => {
+    const open = () => setLinkOpen(true);
+    window.addEventListener("baycmc:link-wallet-open", open);
+    return () => window.removeEventListener("baycmc:link-wallet-open", open);
+  }, []);
   const [navOpen, setNavOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
@@ -267,6 +273,7 @@ export function AppHeader() {
       </header>
 
       <EntranceDialog open={entranceOpen} onOpenChange={setEntranceOpen} />
+      <EntranceDialog open={linkOpen} onOpenChange={setLinkOpen} mode="link" />
     </>
   );
 }
