@@ -1,5 +1,5 @@
 import { type PublicClient, parseAbi, getAddress } from "viem";
-import { DELEGATE_REGISTRY_V2, BAYC_CONTRACT, MAYC_CONTRACT } from "@/lib/web3/constants";
+import { DELEGATE_REGISTRY_V2, isAllowedCollection } from "@/lib/web3/constants";
 
 const NO_RIGHTS = "0x0000000000000000000000000000000000000000000000000000000000000000";
 
@@ -21,10 +21,7 @@ function relevant(d: RawDelegation): boolean {
   // type_: 1 = ALL, 2 = CONTRACT, 3 = ERC721
   if (d.rights !== NO_RIGHTS) return false;
   if (d.type_ === 1) return true;
-  if (d.type_ === 2 || d.type_ === 3) {
-    const c = d.contract_.toLowerCase();
-    return c === BAYC_CONTRACT.toLowerCase() || c === MAYC_CONTRACT.toLowerCase();
-  }
+  if (d.type_ === 2 || d.type_ === 3) return isAllowedCollection(d.contract_);
   return false;
 }
 
