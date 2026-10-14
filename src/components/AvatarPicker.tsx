@@ -28,7 +28,9 @@ export function AvatarPicker({
     let cancelled = false;
     void (async () => {
       try {
-        const linked = await listLinked().catch(() => ({ wallets: [] as { address: string; verified_at: string | null }[] }));
+        const linked = await listLinked().catch(() => ({
+          wallets: [] as { address: string; verified_at: string | null }[],
+        }));
         const addrs = new Set<string>();
         if (primaryWallet) addrs.add(primaryWallet.toLowerCase());
         for (const w of linked.wallets as { address: string; verified_at: string | null }[]) {
@@ -95,7 +97,11 @@ export function AvatarPicker({
                 className="aspect-square overflow-hidden rounded-md border-2 border-border hover:border-gold"
                 title={n.name ?? `#${n.tokenId}`}
               >
-                <img src={n.image!} alt={n.name ?? n.tokenId} className="h-full w-full object-cover" />
+                <img
+                  src={n.image!}
+                  alt={n.name ?? n.tokenId}
+                  className="h-full w-full object-cover"
+                />
               </button>
             ))}
           </div>

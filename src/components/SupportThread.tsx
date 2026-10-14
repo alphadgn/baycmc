@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { Check, Pencil, ShieldCheck, Trash2, X } from "lucide-react";
 import { supabase as typedSupabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
+import { useChatScroll } from "@/hooks/use-chat-scroll";
 import { toast } from "sonner";
 
 // support_messages is too new to be in the generated Database type — cast
@@ -55,7 +56,7 @@ export function SupportThread({
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const { scrollRef, contentRef, handleScroll } = useChatScroll(threadUserId, !loading, messages);
 
   // Initial load — scoped to this thread.
   useEffect(() => {
@@ -66,7 +67,7 @@ export function SupportThread({
         .from("support_messages")
         .select("id,thread_user_id,sender_id,is_admin,body,created_at")
         .eq("thread_user_id", threadUserId)
-        .order("created_at", { ascending: true })
+        .order("created_at", { ascending: false })
         .limit(500);
       if (cancelled) return;
       if (error) {
@@ -74,7 +75,7 @@ export function SupportThread({
         setLoading(false);
         return;
       }
-      const rows = (data ?? []) as SupportMessage[];
+      const rows = ((data ?? []) as SupportMessage[]).reverse();
       setMessages(rows);
       setLoading(false);
       await hydrateProfiles(rows);
@@ -136,21 +137,6 @@ export function SupportThread({
       void supabase.removeChannel(channel);
     };
   }, [threadUserId]);
-
-  // Entering a thread jumps straight to the newest messages; later
-  // messages scroll smoothly.
-  const initialScrollDoneRef = useRef(false);
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    if (!initialScrollDoneRef.current && messages.length > 0) {
-      initialScrollDoneRef.current = true;
-      el.scrollTop = el.scrollHeight;
-      requestAnimationFrame(() => (el.scrollTop = el.scrollHeight));
-      return;
-    }
-    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-  }, [messages.length]);
 
   async function hydrateProfiles(msgs: SupportMessage[]) {
     const missing = Array.from(
@@ -244,91 +230,94 @@ export function SupportThread({
 
       <div
         ref={scrollRef}
-        className="flex-1 space-y-3 overflow-x-hidden overflow-y-auto p-4 sm:p-6"
+        onScroll={handleScroll}
+        aria-label="Support messages"
+        className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6"
       >
-        {loading ? (
-          <div className="space-y-2">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-12 animate-pulse rounded-lg bg-muted/20" />
-            ))}
-          </div>
-        ) : messages.length === 0 ? (
-          <p className="py-12 text-center text-sm text-muted-foreground">
-            {viewerIsAdmin
-              ? "No messages in this thread yet."
-              : "No messages yet — say hi to the admins."}
-          </p>
-        ) : (
-          messages.map((m) => {
-            const senderProfile = profiles[m.sender_id];
-            const mine = m.sender_id === user?.id;
-            const name =
-              senderProfile?.username ??
-              (senderProfile?.wallet_address
-                ? `${senderProfile.wallet_address.slice(0, 6)}…${senderProfile.wallet_address.slice(-4)}`
-                : m.is_admin
-                  ? "Admin"
-                  : "anon");
-            return (
-              <div
-                key={m.id}
-                className={`group flex max-w-full flex-col ${mine ? "items-end" : "items-start"}`}
-              >
-                <div className="mb-0.5 flex max-w-full flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
-                  <span className={mine ? "text-gold" : ""}>{name}</span>
-                  {m.is_admin && !mine && (
-                    <span className="inline-flex items-center gap-0.5 rounded-full border border-gold/40 bg-gold/10 px-1.5 text-[9px] font-semibold uppercase tracking-wider text-gold">
-                      <ShieldCheck className="h-2.5 w-2.5" /> Admin
-                    </span>
-                  )}
-                  <span>
-                    {new Date(m.created_at).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </span>
-                </div>
+        <div ref={contentRef} className="space-y-3">
+          {loading ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-12 animate-pulse rounded-lg bg-muted/20" />
+              ))}
+            </div>
+          ) : messages.length === 0 ? (
+            <p className="py-12 text-center text-sm text-muted-foreground">
+              {viewerIsAdmin
+                ? "No messages in this thread yet."
+                : "No messages yet — say hi to the admins."}
+            </p>
+          ) : (
+            messages.map((m) => {
+              const senderProfile = profiles[m.sender_id];
+              const mine = m.sender_id === user?.id;
+              const name =
+                senderProfile?.username ??
+                (senderProfile?.wallet_address
+                  ? `${senderProfile.wallet_address.slice(0, 6)}…${senderProfile.wallet_address.slice(-4)}`
+                  : m.is_admin
+                    ? "Admin"
+                    : "anon");
+              return (
                 <div
-                  className={`flex max-w-full items-center gap-1.5 ${mine ? "flex-row-reverse" : ""}`}
+                  key={m.id}
+                  className={`group flex max-w-full flex-col ${mine ? "items-end" : "items-start"}`}
                 >
-                  <div
-                    className={`max-w-[80%] whitespace-pre-wrap break-words rounded-2xl px-3 py-2 text-sm [overflow-wrap:anywhere] ${
-                      mine
-                        ? "bg-gradient-gold text-gold-foreground shadow-gold"
-                        : m.is_admin
-                          ? "border border-gold/30 bg-gold/5"
-                          : "border border-border bg-background/40"
-                    }`}
-                  >
-                    {m.body}
+                  <div className="mb-0.5 flex max-w-full flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
+                    <span className={mine ? "text-gold" : ""}>{name}</span>
+                    {m.is_admin && !mine && (
+                      <span className="inline-flex items-center gap-0.5 rounded-full border border-gold/40 bg-gold/10 px-1.5 text-[9px] font-semibold uppercase tracking-wider text-gold">
+                        <ShieldCheck className="h-2.5 w-2.5" /> Admin
+                      </span>
+                    )}
+                    <span>
+                      {new Date(m.created_at).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
                   </div>
-                  {mine && (
-                    <div className="flex shrink-0 items-center gap-1 opacity-0 transition group-hover:opacity-100">
-                      <button
-                        type="button"
-                        onClick={() => beginEdit(m)}
-                        aria-label="Edit message"
-                        className="rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void deleteMessage(m)}
-                        aria-label="Delete message"
-                        className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                  <div
+                    className={`flex max-w-full items-center gap-1.5 ${mine ? "flex-row-reverse" : ""}`}
+                  >
+                    <div
+                      className={`max-w-[80%] whitespace-pre-wrap break-words rounded-2xl px-3 py-2 text-sm [overflow-wrap:anywhere] ${
+                        mine
+                          ? "bg-gradient-gold text-gold-foreground shadow-gold"
+                          : m.is_admin
+                            ? "border border-gold/30 bg-gold/5"
+                            : "border border-border bg-background/40"
+                      }`}
+                    >
+                      {m.body}
                     </div>
-                  )}
+                    {mine && (
+                      <div className="flex shrink-0 items-center gap-1 opacity-0 transition group-hover:opacity-100">
+                        <button
+                          type="button"
+                          onClick={() => beginEdit(m)}
+                          aria-label="Edit message"
+                          className="rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void deleteMessage(m)}
+                          aria-label="Delete message"
+                          className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })
-        )}
+              );
+            })
+          )}
+        </div>
       </div>
-
       {editingId && (
         <div className="flex items-center justify-between gap-2 border-t border-gold/30 bg-gold/5 px-3 py-2 text-xs">
           <span className="flex items-center gap-1.5 text-gold">

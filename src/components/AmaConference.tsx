@@ -13,6 +13,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchVipUserIds } from "@/lib/karaoke/vip.functions";
 import { useKaraokeStage } from "@/lib/karaoke/stageStore";
+import { avatarShapeClass } from "@/lib/profile-avatar";
 
 interface ProfileMini {
   id: string;
@@ -450,7 +451,7 @@ function ParticipantVideoTile({
 
   return (
     <div
-      className={`relative shrink-0 overflow-hidden rounded-2xl border-2 bg-card/40 ${sizeClasses} ${ringClasses}`}
+      className={`relative shrink-0 overflow-hidden border-2 bg-card/40 ${!camOn && profile?.avatar_url ? avatarShapeClass(profile.avatar_url) : "rounded-2xl"} ${sizeClasses} ${ringClasses}`}
     >
       {camOn && camTrack && isTrackReference(camTrack) ? (
         <VideoTrack trackRef={camTrack} className="absolute inset-0 h-full w-full object-cover" />
@@ -506,11 +507,11 @@ function NoCamPlaceholder({
   // bottom gradient keeps the name pill and mic badge legible over it.
   if (profile?.avatar_url) {
     return (
-      <div className="absolute inset-0">
+      <div className="absolute inset-0 flex items-center justify-center">
         <img
           src={profile.avatar_url}
           alt={displayName}
-          className="absolute inset-0 h-full w-full object-cover"
+          className={`aspect-square max-h-full max-w-full border border-border object-cover ${avatarShapeClass(profile.avatar_url)}`}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-background/60 via-transparent to-transparent" />
       </div>
@@ -577,7 +578,7 @@ function OverflowStrip({
                 <img
                   src={prof.avatar_url}
                   alt={name}
-                  className="h-20 w-20 rounded-full border border-gold/40 object-cover"
+                  className={`h-20 w-20 border border-gold/40 object-cover ${avatarShapeClass(prof.avatar_url)}`}
                 />
               ) : (
                 <span className="inline-flex h-20 w-20 items-center justify-center rounded-full bg-gradient-gold text-sm font-bold text-gold-foreground">

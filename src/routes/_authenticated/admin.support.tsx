@@ -33,7 +33,19 @@ interface ThreadSummary {
 }
 
 export const Route = createFileRoute("/_authenticated/admin/support")({
-  head: () => ({ meta: [{ title: "Support inbox — BAYCMC admin" }] }),
+  head: () => ({
+    meta: [
+      { title: "Support inbox — BAYCMC admin" },
+      { name: "description", content: "Member support conversations for BAYCMC administrators." },
+      { property: "og:title", content: "Support inbox — BAYCMC admin" },
+      {
+        property: "og:description",
+        content: "Member support conversations for BAYCMC administrators.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
   component: AdminSupport,
 });
 
@@ -149,7 +161,9 @@ function AdminSupport() {
                         active ? "bg-gold/10 ring-1 ring-gold/30" : "hover:bg-secondary/40"
                       }`}
                     >
-                      <span className={`mt-0.5 inline-flex h-8 w-8 shrink-0 overflow-hidden border border-border bg-gradient-gold ${avatarShapeClass(t.profile?.avatar_url)}`}>
+                      <span
+                        className={`mt-0.5 inline-flex h-8 w-8 shrink-0 overflow-hidden border border-border bg-gradient-gold ${avatarShapeClass(t.profile?.avatar_url)}`}
+                      >
                         {t.profile?.avatar_url ? (
                           <img
                             src={t.profile.avatar_url}

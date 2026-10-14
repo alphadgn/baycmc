@@ -237,9 +237,9 @@ function ProfilePage() {
                 type="button"
                 onClick={() => setPickerOpen(true)}
                 disabled={uploadingAvatar}
-                className={`group relative h-24 w-24 cursor-pointer overflow-hidden ${
-                  avatarShapeClass(avatarUrl)
-                } border-4 border-background bg-gradient-gold shadow-gold transition hover:opacity-90 disabled:cursor-wait`}
+                className={`group relative h-24 w-24 cursor-pointer overflow-hidden ${avatarShapeClass(
+                  avatarUrl,
+                )} border-4 border-background bg-gradient-gold shadow-gold transition hover:opacity-90 disabled:cursor-wait`}
                 aria-label="Change avatar"
               >
                 {avatarUrl ? (
@@ -407,15 +407,15 @@ function ProfilePage() {
         <LinkedWalletsPanel />
       </section>
 
-      {wallet && (
+      {user && (
         <section className="mt-10">
           <div className="mb-4 flex items-baseline justify-between">
             <h2 className="font-display text-2xl font-bold">Your collection</h2>
             <p className="text-xs text-muted-foreground">
-              NFTs in <span className="font-mono">{short}</span> · live from Alchemy
+              Connected wallets · allowed collections · live from Alchemy
             </p>
           </div>
-          <NftGallery address={wallet} />
+          <NftGallery address={wallet} includeLinkedWallets />
         </section>
       )}
     </main>

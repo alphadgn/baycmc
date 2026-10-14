@@ -7,12 +7,27 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { useChatScroll } from "@/hooks/use-chat-scroll";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/contract-auditor")({
-  head: () => ({ meta: [{ title: "Contract Auditor — BAYCMC" }] }),
+  head: () => ({
+    meta: [
+      { title: "Contract Auditor — BAYCMC" },
+      {
+        name: "description",
+        content: "Review smart contracts with Claude in your private BAYCMC audit conversation.",
+      },
+      { property: "og:title", content: "Contract Auditor — BAYCMC" },
+      {
+        property: "og:description",
+        content: "Review smart contracts with Claude in your private BAYCMC audit conversation.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
   component: ContractAuditorPage,
 });
 
@@ -51,14 +66,14 @@ function ContractAuditorPage() {
       const { data, error } = await supabase
         .from("contract_audit_messages")
         .select("id, role, parts, created_at")
-        .order("created_at", { ascending: true })
+        .order("created_at", { ascending: false })
         .limit(200);
       if (cancelled) return;
       if (error) {
         console.error("[contract-auditor] history load failed", error);
       } else if (data) {
         setMessages(
-          (data as AuditRow[]).map((row) => ({
+          (data as AuditRow[]).reverse().map((row) => ({
             id: row.id,
             role: row.role,
             parts: row.parts as UIMessage["parts"],
@@ -80,6 +95,11 @@ function ContractAuditorPage() {
   }, [historyLoaded, status]);
 
   const isLoading = status === "submitted" || status === "streaming";
+  const { scrollRef, contentRef, handleScroll } = useChatScroll(
+    `audit-${user?.id ?? ""}`,
+    historyLoaded && !authLoading,
+    messages,
+  );
 
   async function handleSend() {
     const text = input.trim();
@@ -123,45 +143,54 @@ function ContractAuditorPage() {
         )}
       </div>
 
-      <ScrollArea className="flex-1 rounded-md border p-3">
-        {!historyLoaded || authLoading ? (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Loader2 className="h-3 w-3 animate-spin" /> Loading your audit history…
-          </div>
-        ) : !user ? (
-          <p className="text-sm text-muted-foreground">Sign in to use the contract auditor.</p>
-        ) : messages.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No audits yet. Paste a contract below to start — findings come back grouped by
-            Critical / High / Medium / Low / Informational.
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {messages.map((m) => {
-              const text = m.parts.map((p) => (p.type === "text" ? p.text : "")).join("");
-              return (
-                <div
-                  key={m.id}
-                  className={cn(
-                    "rounded-md px-3 py-2 text-sm whitespace-pre-wrap",
-                    m.role === "user" ? "bg-primary/10 text-foreground" : "bg-muted text-foreground",
-                  )}
-                >
-                  <div className="mb-1 text-xs font-medium opacity-70">
-                    {m.role === "user" ? "You" : "Auditor"}
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        aria-label="Audit messages"
+        className="min-h-0 flex-1 overflow-y-auto rounded-md border p-3"
+      >
+        <div ref={contentRef}>
+          {!historyLoaded || authLoading ? (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" /> Loading your audit history…
+            </div>
+          ) : !user ? (
+            <p className="text-sm text-muted-foreground">Sign in to use the contract auditor.</p>
+          ) : messages.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No audits yet. Paste a contract below to start — findings come back grouped by
+              Critical / High / Medium / Low / Informational.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {messages.map((m) => {
+                const text = m.parts.map((p) => (p.type === "text" ? p.text : "")).join("");
+                return (
+                  <div
+                    key={m.id}
+                    className={cn(
+                      "rounded-md px-3 py-2 text-sm whitespace-pre-wrap",
+                      m.role === "user"
+                        ? "bg-primary/10 text-foreground"
+                        : "bg-muted text-foreground",
+                    )}
+                  >
+                    <div className="mb-1 text-xs font-medium opacity-70">
+                      {m.role === "user" ? "You" : "Auditor"}
+                    </div>
+                    {text}
                   </div>
-                  {text}
+                );
+              })}
+              {isLoading && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" /> Auditing…
                 </div>
-              );
-            })}
-            {isLoading && (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Loader2 className="h-3 w-3 animate-spin" /> Auditing…
-              </div>
-            )}
-          </div>
-        )}
-      </ScrollArea>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
 
       <div className="mt-3 flex items-end gap-2">
         <Textarea

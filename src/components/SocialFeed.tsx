@@ -180,8 +180,16 @@ export function SocialFeed({ liferOnly = false }: SocialFeedProps) {
           return (
             <article key={p.id} className="glass rounded-2xl p-5 shadow-card">
               <header className="flex items-center gap-3">
-                <div className={`h-9 w-9 shrink-0 overflow-hidden bg-gradient-gold ${avatarShapeClass(profile?.avatar_url)}`}>
-                  {profile?.avatar_url && <img src={profile.avatar_url} alt={name} className="h-full w-full object-cover" />}
+                <div
+                  className={`h-9 w-9 shrink-0 overflow-hidden bg-gradient-gold ${avatarShapeClass(profile?.avatar_url)}`}
+                >
+                  {profile?.avatar_url && (
+                    <img
+                      src={profile.avatar_url}
+                      alt={name}
+                      className="h-full w-full object-cover"
+                    />
+                  )}
                 </div>
                 <div>
                   <div className="text-sm font-semibold font-sans-display">{name}</div>

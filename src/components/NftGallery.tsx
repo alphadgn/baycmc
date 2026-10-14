@@ -2,28 +2,72 @@ import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { ExternalLink, ImageOff, Loader2 } from "lucide-react";
 import { listWalletNfts, type NftItem } from "@/server/wallet-assets.functions";
+import { listLinkedWallets } from "@/lib/linked-wallets.functions";
+import { useAuth } from "@/lib/auth/useAuth";
+import { mergeWalletNfts } from "@/lib/wallet-nfts";
 
-export function NftGallery({ address }: { address: string }) {
+export function NftGallery({
+  address,
+  includeLinkedWallets = false,
+}: {
+  address: string;
+  includeLinkedWallets?: boolean;
+}) {
+  const { user } = useAuth();
+  const userId = user?.id;
   const listFn = useServerFn(listWalletNfts);
+  const listLinked = useServerFn(listLinkedWallets);
   const [items, setItems] = useState<NftItem[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshVersion, setRefreshVersion] = useState(0);
 
   useEffect(() => {
-    if (!address) return;
+    const refresh = () => setRefreshVersion((v) => v + 1);
+    window.addEventListener("baycmc:verification-refresh", refresh);
+    return () => window.removeEventListener("baycmc:verification-refresh", refresh);
+  }, []);
+
+  useEffect(() => {
+    if (!userId) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
     (async () => {
       try {
-        const res = await listFn({ data: { address } });
-        if (cancelled) return;
-        if (!res.ok) {
-          setError(res.reason ?? "Couldn't load NFTs");
-          setItems([]);
-        } else {
-          setItems(res.items);
+        const addresses = new Set<string>();
+        if (address) addresses.add(address.toLowerCase());
+        const failures: string[] = [];
+        if (includeLinkedWallets) {
+          try {
+            const linked = await listLinked();
+            for (const w of linked.wallets) {
+              if (w.verified_at) addresses.add(w.address.toLowerCase());
+            }
+          } catch {
+            failures.push("Couldn't load linked wallets.");
+          }
         }
+        const results = await Promise.allSettled(
+          [...addresses].map((wallet) => listFn({ data: { address: wallet } })),
+        );
+        if (cancelled) return;
+        const holdings: NftItem[][] = [];
+        for (const result of results) {
+          if (result.status === "fulfilled" && result.value.ok) holdings.push(result.value.items);
+          else
+            failures.push(
+              result.status === "fulfilled"
+                ? (result.value.reason ?? "Couldn't load wallet NFTs.")
+                : "Couldn't load wallet NFTs.",
+            );
+        }
+        setItems(mergeWalletNfts(holdings));
+        setError(
+          failures.length
+            ? `${failures.length} wallet lookup${failures.length === 1 ? "" : "s"} unavailable. ${failures[0]}`
+            : null,
+        );
       } catch (e) {
         if (cancelled) return;
         setError(e instanceof Error ? e.message : "Couldn't load NFTs");
@@ -35,7 +79,7 @@ export function NftGallery({ address }: { address: string }) {
     return () => {
       cancelled = true;
     };
-  }, [address, listFn]);
+  }, [address, includeLinkedWallets, userId, listFn, listLinked, refreshVersion]);
 
   if (loading) {
     return (
@@ -53,12 +97,14 @@ export function NftGallery({ address }: { address: string }) {
     );
   }
 
-  if (error || !items || items.length === 0) {
+  if (!items || items.length === 0) {
     return (
       <div className="glass rounded-2xl p-6 shadow-card">
         <div className="flex flex-col items-center justify-center py-10 text-center text-sm text-muted-foreground">
           <ImageOff className="mb-2 h-6 w-6 text-muted-foreground" />
-          {error ? `Couldn't load NFTs — ${error}` : "No NFTs found in this wallet yet."}
+          {error
+            ? `Couldn't load NFTs — ${error}`
+            : "No NFTs from allowed collections found in your connected wallets."}
         </div>
       </div>
     );
@@ -76,6 +122,11 @@ export function NftGallery({ address }: { address: string }) {
 
   return (
     <div className="space-y-6">
+      {error && (
+        <p role="status" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
       {collections.map((col) => (
         <section key={col} className="glass rounded-2xl p-6 shadow-card">
           <div className="flex items-center justify-between">
