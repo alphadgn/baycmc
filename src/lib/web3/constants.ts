@@ -10,10 +10,13 @@ export const REQUIRED_COLLECTIONS = [BAYC_CONTRACT, MAYC_CONTRACT] as const;
 // delegate.cash v2 registry (mainnet)
 export const DELEGATE_REGISTRY_V2 = "0x00000000000000447e69651d841bD8D104Bed493" as const;
 
-// Reown AppKit project ID — replace with your own from https://cloud.reown.com
-// (a free public ID is fine for dev; a real one is required for production)
-export const REOWN_PROJECT_ID =
-  import.meta.env.VITE_REOWN_PROJECT_ID || "b56e18d47c72ab683b10814fe9495694";
+// WalletConnect (Reown) project ID. Must be YOUR project, created at
+// https://dashboard.reown.com, with every domain the app runs on allow-listed
+// (baycmc.app, your *.lovable.app preview). The old hard-coded fallback ID
+// belonged to someone else and isn't allowed on this domain, so WalletConnect
+// opened and showed "Invalid App Configuration". With no ID set, the
+// WalletConnect option is simply hidden instead of failing.
+export const REOWN_PROJECT_ID: string = (import.meta.env.VITE_REOWN_PROJECT_ID ?? "").trim();
 
 // Resolution order:
 //   1. process.env.ETH_RPC_URL          — runtime Cloudflare Worker secret

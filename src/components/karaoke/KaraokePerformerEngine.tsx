@@ -40,6 +40,7 @@ import {
   getBackingElement,
 } from "@/lib/karaoke/audioMixBus";
 import { saveKaraokeRecording } from "@/lib/karaoke/recordings.functions";
+import { useRoomPreferences } from "@/lib/baycmc/useRoomPreferences";
 import {
   getKaraokeStage,
   livePositionMs,
@@ -52,6 +53,11 @@ const MIX_TRACK_NAME = "karaoke-mix";
 export function KaraokePerformerEngine({ roomId }: { roomId: string }) {
   const room = useRoomContext();
   const stage = useKaraokeStage();
+  // ONE mic switch for the whole room: the bottom-bar Mic, the preferences
+  // panel and the karaoke machine all read/write prefs.micEnabled. For the
+  // singer it means "my voice is in the mix".
+  const { prefs, setPrefs } = useRoomPreferences();
+  const micWanted = prefs.micEnabled;
   const saveFn = useServerFn(saveKaraokeRecording);
 
   const busRef = useRef<KaraokeMixBus | null>(null);
@@ -170,7 +176,7 @@ export function KaraokePerformerEngine({ roomId }: { roomId: string }) {
   useEffect(() => {
     const bus = busRef.current;
     if (!active || !bus) return;
-    if (!stage.micWanted) {
+    if (!micWanted) {
       if (micAttachedRef.current) {
         bus.detachMic();
         micAttachedRef.current = null;
@@ -181,12 +187,12 @@ export function KaraokePerformerEngine({ roomId }: { roomId: string }) {
     micAttachedRef.current = { headphones: stage.headphones };
     void bus.attachMic(undefined, { headphones: stage.headphones }).catch((e) => {
       micAttachedRef.current = null;
-      patchKaraokeStage({ micWanted: false });
+      setPrefs({ micEnabled: false });
       toast.error("Microphone unavailable", {
         description: e instanceof Error ? e.message : "Allow microphone access and try again.",
       });
     });
-  }, [active, stage.micWanted, stage.headphones]);
+  }, [active, micWanted, stage.headphones]);
 
   // 3. Volumes.
   useEffect(() => {
@@ -197,7 +203,7 @@ export function KaraokePerformerEngine({ roomId }: { roomId: string }) {
   }, [stage.micVolume, active]);
 
   // 4. Publish the mixed track while there is something to hear.
-  const shouldPublish = active && (stage.micWanted || backingPlaying || stage.musicInMyMix);
+  const shouldPublish = active && (micWanted || backingPlaying || stage.musicInMyMix);
   useEffect(() => {
     const bus = busRef.current;
     if (!room || !bus) return;
@@ -206,7 +212,17 @@ export function KaraokePerformerEngine({ roomId }: { roomId: string }) {
       void (async () => {
         try {
           // The raw mic would double the voice — the mix replaces it.
-          await room.localParticipant.setMicrophoneEnabled(false).catch(() => undefined);
+          // Unpublish (not just mute) so the singer has exactly one
+          // Microphone-source track and listeners see the right on-air state.
+          for (const pub of room.localParticipant.audioTrackPublications.values()) {
+            if (
+              pub.source === Track.Source.Microphone &&
+              pub.trackName !== MIX_TRACK_NAME &&
+              pub.track
+            ) {
+              await room.localParticipant.unpublishTrack(pub.track, true).catch(() => undefined);
+            }
+          }
           const mixed = bus.broadcastTrack();
           if (!mixed) throw new Error("Mix bus produced no audio track");
           const lk = new LocalAudioTrack(mixed, undefined, false);
@@ -226,7 +242,7 @@ export function KaraokePerformerEngine({ roomId }: { roomId: string }) {
           toast.error("Couldn't put you on air", {
             description: e instanceof Error ? e.message : "Check microphone permission.",
           });
-          patchKaraokeStage({ micWanted: false });
+          setPrefs({ micEnabled: false });
         } finally {
           publishingRef.current = false;
         }
@@ -240,10 +256,10 @@ export function KaraokePerformerEngine({ roomId }: { roomId: string }) {
   }, [shouldPublish, room]);
 
   useEffect(() => {
-    const live = active && stage.micWanted && published;
+    const live = active && micWanted && published;
     patchKaraokeStage({ engineLive: live });
     window.dispatchEvent(new CustomEvent("karaoke:mic-state", { detail: { enabled: live } }));
-  }, [active, stage.micWanted, published]);
+  }, [active, micWanted, published]);
 
   // 5. Uploaded backing track: follow the server's play / pause / seek.
   const backingUrl = active ? (stage.backingTrack?.url ?? null) : null;

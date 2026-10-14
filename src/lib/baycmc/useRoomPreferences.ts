@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 import { useAuth } from "@/lib/auth/useAuth";
 
 export interface RoomPreferences {
@@ -54,30 +54,65 @@ function writePrefs(userId: string | null | undefined, prefs: RoomPreferences) {
 }
 
 /**
- * Per-user persisted mic/camera defaults for conference rooms.
+ * Per-user persisted mic/camera preferences — ONE shared copy per user.
  *
- * Reads from localStorage on mount and on user change so a returning user
- * lands in the same audio/video state they left in. Toggling within a room
- * writes back immediately so the next room (or next session) inherits it.
+ * Previously every component that called this hook kept its own private
+ * copy in useState. The room's bottom bar, the preferences panel (mounted
+ * twice on mobile) and the karaoke machine therefore disagreed about
+ * whether the mic was on, and each one's "enforce my preference" effect
+ * kept flipping the LiveKit mic back — the mic buttons didn't control each
+ * other, and on iPhone every flip interrupted media playback (the karaoke
+ * music started, then stopped). Now all callers read and write the same
+ * store, so every mic control in the app shows and drives the same state.
  */
+let cache: { key: string; prefs: RoomPreferences } | null = null;
+const listeners = new Set<() => void>();
+
+function current(userId: string | null | undefined): RoomPreferences {
+  const key = storageKey(userId);
+  if (!cache || cache.key !== key) cache = { key, prefs: readPrefs(userId) };
+  return cache.prefs;
+}
+
+function subscribe(cb: () => void) {
+  listeners.add(cb);
+  const onStorage = (e: StorageEvent) => {
+    if (cache && e.key === cache.key) {
+      cache = null;
+      cb();
+    }
+  };
+  if (typeof window !== "undefined") window.addEventListener("storage", onStorage);
+  return () => {
+    listeners.delete(cb);
+    if (typeof window !== "undefined") window.removeEventListener("storage", onStorage);
+  };
+}
+
+/** Imperative setter for code outside React (same store as the hook). */
+export function setRoomPreferences(
+  userId: string | null | undefined,
+  patch: Partial<RoomPreferences>,
+) {
+  const prev = current(userId);
+  const next = { ...prev, ...patch };
+  if ((Object.keys(next) as (keyof RoomPreferences)[]).every((k) => next[k] === prev[k])) return;
+  cache = { key: storageKey(userId), prefs: next };
+  writePrefs(userId, next);
+  for (const l of listeners) l();
+}
+
 export function useRoomPreferences() {
   const { user } = useAuth();
-  const [prefs, setPrefsState] = useState<RoomPreferences>(() => readPrefs(user?.id ?? null));
-
-  useEffect(() => {
-    setPrefsState(readPrefs(user?.id ?? null));
-  }, [user?.id]);
-
-  const setPrefs = useCallback(
-    (patch: Partial<RoomPreferences>) => {
-      setPrefsState((prev) => {
-        const next = { ...prev, ...patch };
-        writePrefs(user?.id ?? null, next);
-        return next;
-      });
-    },
-    [user?.id],
+  const userId = user?.id ?? null;
+  const prefs = useSyncExternalStore(
+    subscribe,
+    () => current(userId),
+    () => DEFAULT_PREFS,
   );
-
+  const setPrefs = useCallback(
+    (patch: Partial<RoomPreferences>) => setRoomPreferences(userId, patch),
+    [userId],
+  );
   return { prefs, setPrefs };
 }

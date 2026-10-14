@@ -335,9 +335,6 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
       backingTrack,
     });
   }, [roomId, user?.id, isMyTurn, session, settings, backingTrack]);
-  useEffect(() => {
-    if (!isMyTurn) patchKaraokeStage({ micWanted: false });
-  }, [isMyTurn]);
   useEffect(() => () => resetKaraokeStage(), [roomId]);
 
   // ---- Performer actions ----

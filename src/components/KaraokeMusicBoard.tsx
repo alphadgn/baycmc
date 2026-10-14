@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
   GripVertical,
@@ -28,6 +28,7 @@ import {
   type KaraokeSessionRow,
 } from "@/lib/karaoke/stageStore";
 import { KaraokeTrackLibrary } from "@/components/karaoke/KaraokeTrackLibrary";
+import { useRoomPreferences } from "@/lib/baycmc/useRoomPreferences";
 
 // Average karaoke song length, used to estimate ETA from a queue position.
 const AVG_SONG_SECONDS = 240;
@@ -172,24 +173,41 @@ export function KaraokeMusicBoard({
     if (!win) return;
     win.postMessage(JSON.stringify({ event: "command", func, args }), "https://www.youtube.com");
   }
-  // Start offset is computed once per song so the iframe doesn't reload.
+  // Start offset is fixed ONCE per song and baked into the iframe URL.
+  // It used to be stored with setState in an effect, which changed the URL
+  // a moment after the video started → the iframe reloaded, and on iPhone a
+  // reloaded YouTube embed cannot autoplay without a new tap: the music
+  // started, then immediately stopped.
   const songKey = videoId ? `${videoId}:${session.generation}` : null;
-  const [startSec, setStartSec] = useState(0);
-  useEffect(() => {
-    if (!videoId) return;
-    setStartSec(Math.floor(livePositionMs(session) / 1000));
-    ytTimeRef.current = null;
+  const startSec = useMemo(() => {
+    if (!videoId) return 0;
+    const s = Math.floor(livePositionMs(session) / 1000);
+    return s < 3 ? 0 : s; // a fresh song starts at 0:00
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [songKey]);
+  const ytStateRef = useRef<number | null>(null); // YT: -1 unstarted, 0 ended, 1 playing, 2 paused, 3 buffering, 5 cued
+  const [needsTap, setNeedsTap] = useState(false);
+  useEffect(() => {
+    ytTimeRef.current = null;
+    ytStateRef.current = null;
+    setNeedsTap(false);
   }, [songKey]);
 
   useEffect(() => {
     function onMsg(e: MessageEvent) {
       if (e.origin !== "https://www.youtube.com" || typeof e.data !== "string") return;
       try {
-        const d = JSON.parse(e.data) as { event?: string; info?: { currentTime?: number } };
-        if (d.event === "infoDelivery" && typeof d.info?.currentTime === "number") {
-          ytTimeRef.current = d.info.currentTime;
+        const d = JSON.parse(e.data) as {
+          event?: string;
+          info?: { currentTime?: number; playerState?: number } | number;
+        };
+        if (d.event === "infoDelivery" && d.info && typeof d.info === "object") {
+          if (typeof d.info.currentTime === "number") ytTimeRef.current = d.info.currentTime;
+          if (typeof d.info.playerState === "number") ytStateRef.current = d.info.playerState;
+        } else if (d.event === "onStateChange" && typeof d.info === "number") {
+          ytStateRef.current = d.info;
         }
+        if (ytStateRef.current === 1) setNeedsTap(false);
       } catch {
         /* not ours */
       }
@@ -198,27 +216,41 @@ export function KaraokeMusicBoard({
     return () => window.removeEventListener("message", onMsg);
   }, []);
 
-  // Follow server play/pause, and correct drift > 2s every few seconds.
+  // Follow the server's play / pause (only when it actually changes).
   useEffect(() => {
     if (!videoId) return;
     postToPlayer(paused ? "pauseVideo" : "playVideo");
-    if (!paused) {
-      const target = livePositionMs(session) / 1000;
-      if (ytTimeRef.current !== null && Math.abs(ytTimeRef.current - target) > 2) {
-        postToPlayer("seekTo", [target, true]);
-      }
-    }
-  }, [paused, videoId, session]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paused, videoId]);
+
+  // Watchdog: the server says "playing" but the player sits paused/unstarted
+  // (iOS interrupted it, autoplay blocked) → nudge it, then ask for one tap.
+  // Listeners also correct drift > 4 s. The singer's own player is the
+  // reference, so it is never seeked.
   useEffect(() => {
     if (!videoId || paused) return;
+    let nudges = 0;
     const t = window.setInterval(() => {
-      const target = livePositionMs(session) / 1000;
-      if (ytTimeRef.current !== null && Math.abs(ytTimeRef.current - target) > 2.5) {
-        postToPlayer("seekTo", [target, true]);
+      const st = ytStateRef.current;
+      if (st === 2 || st === -1 || st === 5 || st === null) {
+        if (nudges < 2) {
+          nudges++;
+          postToPlayer("playVideo");
+        } else {
+          setNeedsTap(true);
+        }
+      } else {
+        nudges = 0;
       }
-    }, 4000);
+      if (!isMyTurn && st === 1) {
+        const target = livePositionMs(session) / 1000;
+        if (ytTimeRef.current !== null && Math.abs(ytTimeRef.current - target) > 4) {
+          postToPlayer("seekTo", [target, true]);
+        }
+      }
+    }, 2500);
     return () => window.clearInterval(t);
-  }, [videoId, paused, session]);
+  }, [videoId, paused, session, isMyTurn]);
 
   // Listeners mute their local YouTube copy whenever the singer's mix already
   // contains the music — they hear it once, in sync with the voice.
@@ -238,23 +270,16 @@ export function KaraokeMusicBoard({
   }, [hasSong, paused]);
   const positionMs = isMyTurn && hasBacking ? stage.backingPositionMs : livePositionMs(session);
 
-  // ── Mic (audience → normal LiveKit mic; singer → mix bus) ──────────────
-  const [audienceMicOn, setAudienceMicOn] = useState(false);
-  useEffect(() => {
-    function onState(e: Event) {
-      if (!isMyTurn) setAudienceMicOn(!!(e as CustomEvent<{ enabled: boolean }>).detail?.enabled);
-    }
-    window.addEventListener("karaoke:mic-state", onState as EventListener);
-    return () => window.removeEventListener("karaoke:mic-state", onState as EventListener);
-  }, [isMyTurn]);
-  const micOn = isMyTurn ? stage.micWanted : audienceMicOn;
+  // ── Mic: the SAME switch as the room's bottom-bar Mic button ───────────
+  // prefs.micEnabled is shared by every mic control. Audience → the room bar
+  // applies it to their LiveKit mic; singer → the mix engine puts the voice
+  // on air. Previously this button kept its own state and drifted out of
+  // sync with the bottom bar.
+  const { prefs: roomPrefs, setPrefs: setRoomPrefs } = useRoomPreferences();
+  const micOn = roomPrefs.micEnabled;
   function toggleMic() {
-    if (isMyTurn) {
-      unlockKaraokeAudio(); // resume AudioContext inside the tap (iOS)
-      patchKaraokeStage({ micWanted: !stage.micWanted });
-      return;
-    }
-    window.dispatchEvent(new CustomEvent("karaoke:toggle-mic", { detail: { enabled: !micOn } }));
+    if (isMyTurn) unlockKaraokeAudio(); // resume AudioContext inside the tap (iOS)
+    setRoomPrefs({ micEnabled: !micOn });
   }
   function shareTabAudio() {
     // dispatchEvent is synchronous → getDisplayMedia runs inside this click.
@@ -474,8 +499,19 @@ export function KaraokeMusicBoard({
               allowFullScreen
               onLoad={() => {
                 // Ask the player to stream currentTime back (drift correction).
-                iframeRef.current?.contentWindow?.postMessage(
-                  JSON.stringify({ event: "listening", id: "kara" }),
+                const w = iframeRef.current?.contentWindow;
+                w?.postMessage(
+                  JSON.stringify({ event: "listening", id: "kara", channel: "widget" }),
+                  "https://www.youtube.com",
+                );
+                w?.postMessage(
+                  JSON.stringify({
+                    event: "command",
+                    func: "addEventListener",
+                    args: ["onStateChange"],
+                    id: "kara",
+                    channel: "widget",
+                  }),
                   "https://www.youtube.com",
                 );
                 if (muteLocal) postToPlayer("mute");
@@ -520,6 +556,11 @@ export function KaraokeMusicBoard({
             </div>
           )}
         </div>
+        {videoId && !paused && needsTap && (
+          <p className="mt-1 rounded-sm border border-gold/40 bg-gold/10 px-2 py-1 text-[9px] font-semibold text-gold">
+            Your browser paused the music — tap ▶ on the video once to resume.
+          </p>
+        )}
         {!isMyTurn && videoId && !muteLocal && (
           <p className="mt-1 text-[8px] leading-snug text-amber-200/70">
             Music is playing from your own device — the singer hasn't shared their track, so it may

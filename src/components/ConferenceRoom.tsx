@@ -10,7 +10,7 @@ import {
 } from "@/server/livekit.functions";
 import { MicGainProcessor } from "@/lib/karaoke/micGainProcessor";
 import { KaraokePerformerEngine } from "@/components/karaoke/KaraokePerformerEngine";
-import { getKaraokeStage, patchKaraokeStage } from "@/lib/karaoke/stageStore";
+import { getKaraokeStage, useKaraokeStage } from "@/lib/karaoke/stageStore";
 import {
   LiveKitRoom,
   RoomAudioRenderer,
@@ -80,6 +80,11 @@ export function ConferenceRoom({
   const revalidateAccess = useServerFn(revalidateLivekitRoomAccess);
   const navigate = useNavigate();
   const { prefs } = useRoomPreferences();
+  // LiveKitRoom's audio/video props are applied on EVERY change, not just at
+  // connect. Mic/cam toggles are handled by the controls below (and, for the
+  // karaoke singer, by the mix engine), so only the state at join time is
+  // passed here — otherwise a toggle would also flip the singer's mixed track.
+  const [joinAv] = useState(() => ({ audio: prefs.micEnabled, video: prefs.cameraEnabled }));
 
   const progressTimer = useRef<number | null>(null);
 
@@ -203,8 +208,8 @@ export function ConferenceRoom({
         // Auto-publish mic/cam tracks based on saved prefs the moment we
         // connect — otherwise users had to toggle each control off-then-on
         // before LiveKit would acquire the device.
-        audio={prefs.micEnabled}
-        video={prefs.cameraEnabled}
+        audio={joinAv.audio}
+        video={joinAv.video}
         // Keep browser echo cancellation on for everyone. Disabling it
         // globally made listeners on speakers re-broadcast the room audio.
         // Audience mics in karaoke rooms still follow saved preferences.
@@ -720,10 +725,13 @@ function LiveBottomBar({
   // when the user previously turned it OFF. Reconcile on every change of
   // the participant's actual track state — granting permission is NOT the
   // same as the user wanting the device live.
+  // The karaoke singer's "mic" is the mixed karaoke-mix track owned by
+  // KaraokePerformerEngine — never toggle the raw mic for them here.
+  const { isMyTurn: karaokeSinger } = useKaraokeStage();
   useEffect(() => {
     const p = local.localParticipant;
     if (!p) return;
-    if (!micLocked && p.isMicrophoneEnabled !== prefs.micEnabled) {
+    if (!micLocked && !karaokeSinger && p.isMicrophoneEnabled !== prefs.micEnabled) {
       void p.setMicrophoneEnabled(prefs.micEnabled).catch(() => {});
     }
     if (p.isCameraEnabled !== prefs.cameraEnabled) {
@@ -736,6 +744,7 @@ function LiveBottomBar({
     prefs.micEnabled,
     prefs.cameraEnabled,
     micLocked,
+    karaokeSinger,
   ]);
 
   async function toggleMic() {
@@ -745,6 +754,7 @@ function LiveBottomBar({
       return;
     }
     setPrefs({ micEnabled: v });
+    if (karaokeSinger) return; // the mix engine follows prefs.micEnabled
     try {
       await local.localParticipant.setMicrophoneEnabled(v);
     } catch (e) {
@@ -992,11 +1002,8 @@ function LivePreferencesPanel({ isHost }: { isHost: boolean }) {
     // The karaoke performer's voice goes out through the mix bus (voice +
     // backing track in one track). Publishing the raw mic as well would
     // double the vocal, so route the toggle to the engine instead.
-    if (getKaraokeStage().isMyTurn) {
-      patchKaraokeStage({ micWanted: v });
-      return;
-    }
     setPrefs({ micEnabled: v });
+    if (getKaraokeStage().isMyTurn) return;
     try {
       await local.localParticipant.setMicrophoneEnabled(v);
       window.dispatchEvent(new CustomEvent("karaoke:mic-state", { detail: { enabled: v } }));
