@@ -288,6 +288,74 @@ export type Database = {
         }
         Relationships: []
       }
+      karaoke_backing_tracks: {
+        Row: {
+          artist: string | null
+          created_at: string
+          duration_ms: number | null
+          id: string
+          is_public: boolean
+          lyrics: string | null
+          mime_type: string
+          owner_id: string
+          size_bytes: number
+          storage_path: string
+          title: string
+        }
+        Insert: {
+          artist?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          id?: string
+          is_public?: boolean
+          lyrics?: string | null
+          mime_type: string
+          owner_id: string
+          size_bytes: number
+          storage_path: string
+          title: string
+        }
+        Update: {
+          artist?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          id?: string
+          is_public?: boolean
+          lyrics?: string | null
+          mime_type?: string
+          owner_id?: string
+          size_bytes?: number
+          storage_path?: string
+          title?: string
+        }
+        Relationships: []
+      }
+      karaoke_presence: {
+        Row: {
+          last_seen_at: string
+          room_id: string
+          user_id: string
+        }
+        Insert: {
+          last_seen_at?: string
+          room_id: string
+          user_id: string
+        }
+        Update: {
+          last_seen_at?: string
+          room_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "karaoke_presence_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       karaoke_queue: {
         Row: {
           id: string
@@ -380,66 +448,6 @@ export type Database = {
         }
         Relationships: []
       }
-      karaoke_backing_tracks: {
-        Row: {
-          artist: string | null
-          created_at: string
-          duration_ms: number | null
-          id: string
-          is_public: boolean
-          lyrics: string | null
-          mime_type: string
-          owner_id: string
-          size_bytes: number
-          storage_path: string
-          title: string
-        }
-        Insert: {
-          artist?: string | null
-          created_at?: string
-          duration_ms?: number | null
-          id?: string
-          is_public?: boolean
-          lyrics?: string | null
-          mime_type: string
-          owner_id: string
-          size_bytes: number
-          storage_path: string
-          title: string
-        }
-        Update: {
-          artist?: string | null
-          created_at?: string
-          duration_ms?: number | null
-          id?: string
-          is_public?: boolean
-          lyrics?: string | null
-          mime_type?: string
-          owner_id?: string
-          size_bytes?: number
-          storage_path?: string
-          title?: string
-        }
-        Relationships: []
-      }
-      karaoke_presence: {
-        Row: {
-          last_seen_at: string
-          room_id: string
-          user_id: string
-        }
-        Insert: {
-          last_seen_at?: string
-          room_id: string
-          user_id: string
-        }
-        Update: {
-          last_seen_at?: string
-          room_id?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       karaoke_reservations: {
         Row: {
           backing_track_id: string | null
@@ -486,7 +494,22 @@ export type Database = {
           status?: string
           video_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "karaoke_reservations_backing_track_id_fkey"
+            columns: ["backing_track_id"]
+            isOneToOne: false
+            referencedRelation: "karaoke_backing_tracks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "karaoke_reservations_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       karaoke_room_sanctions: {
         Row: {
@@ -525,7 +548,15 @@ export type Database = {
           room_id?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "karaoke_room_sanctions_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       karaoke_room_settings: {
         Row: {
@@ -573,7 +604,15 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "karaoke_room_settings_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: true
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       karaoke_search_cache: {
         Row: {
@@ -1271,6 +1310,7 @@ export type Database = {
         Returns: string
       }
       karaoke_admin_delete_room: { Args: { _room: string }; Returns: string }
+      karaoke_assert_room: { Args: { _room: string }; Returns: undefined }
       karaoke_book_slot: {
         Args: {
           _backing_track_id?: string
@@ -1298,44 +1338,15 @@ export type Database = {
           status: string
           video_id: string | null
         }
-      }
-      karaoke_cancel_reservation: { Args: { _id: string }; Returns: undefined }
-      karaoke_is_admin: { Args: { _uid: string }; Returns: boolean }
-      karaoke_is_sanctioned: {
-        Args: { _kind: string; _room: string; _uid: string }
-        Returns: boolean
-      }
-      karaoke_set_sanction: {
-        Args: {
-          _active: boolean
-          _kind: string
-          _minutes?: number
-          _reason?: string
-          _room: string
-          _user: string
-        }
-        Returns: undefined
-      }
-      karaoke_update_settings: {
-        Args: { _patch: Json; _room: string }
-        Returns: {
-          allow_uploads: boolean
-          allow_youtube: boolean
-          booking_window_days: number
-          holders_priority: boolean
-          max_future_bookings: number
-          max_slot_minutes: number
-          max_song_seconds: number
-          recording_enabled: boolean
-          require_booking: boolean
-          room_id: string
-          rules: string
-          updated_at: string
-          updated_by: string | null
+        SetofOptions: {
+          from: "*"
+          to: "karaoke_reservations"
+          isOneToOne: true
+          isSetofReturn: false
         }
       }
-      karaoke_server_time: { Args: never; Returns: string }
       karaoke_booking_host: { Args: { _room: string }; Returns: string }
+      karaoke_cancel_reservation: { Args: { _id: string }; Returns: undefined }
       karaoke_claim_stage: {
         Args: { _room: string }
         Returns: {
@@ -1427,6 +1438,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      karaoke_entitled_performer: {
+        Args: { _room: string }
+        Returns: Record<string, unknown>
+      }
       karaoke_heartbeat: {
         Args: { _room: string }
         Returns: {
@@ -1454,8 +1469,13 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      karaoke_is_admin: { Args: { _uid: string }; Returns: boolean }
       karaoke_is_moderator: {
         Args: { _room: string; _uid: string }
+        Returns: boolean
+      }
+      karaoke_is_sanctioned: {
+        Args: { _kind: string; _room: string; _uid: string }
         Returns: boolean
       }
       karaoke_join_queue: { Args: { _room: string }; Returns: undefined }
@@ -1488,10 +1508,71 @@ export type Database = {
         }
       }
       karaoke_promote_next: { Args: { _room: string }; Returns: string }
+      karaoke_server_time: { Args: never; Returns: string }
+      karaoke_set_sanction: {
+        Args: {
+          _active: boolean
+          _kind: string
+          _minutes?: number
+          _reason?: string
+          _room: string
+          _user: string
+        }
+        Returns: undefined
+      }
+      karaoke_settings: {
+        Args: { _room: string }
+        Returns: {
+          allow_uploads: boolean
+          allow_youtube: boolean
+          booking_window_days: number
+          holders_priority: boolean
+          max_future_bookings: number
+          max_slot_minutes: number
+          max_song_seconds: number
+          recording_enabled: boolean
+          require_booking: boolean
+          room_id: string
+          rules: string
+          updated_at: string
+          updated_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "karaoke_room_settings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      karaoke_update_settings: {
+        Args: { _patch: Json; _room: string }
+        Returns: {
+          allow_uploads: boolean
+          allow_youtube: boolean
+          booking_window_days: number
+          holders_priority: boolean
+          max_future_bookings: number
+          max_slot_minutes: number
+          max_song_seconds: number
+          recording_enabled: boolean
+          require_booking: boolean
+          room_id: string
+          rules: string
+          updated_at: string
+          updated_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "karaoke_room_settings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       log_audit_event: {
         Args: { _event_type: string; _metadata?: Json; _target_id?: string }
         Returns: string
       }
+      purge_expired_auth_nonces: { Args: never; Returns: number }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
     }
