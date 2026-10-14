@@ -33,7 +33,14 @@ interface ThreadSummary {
 }
 
 export const Route = createFileRoute("/_authenticated/admin/support")({
-  head: () => ({ meta: [{ title: "Support inbox — BAYCMC admin" }] }),
+  head: () => ({ meta: [
+    { title: "Support inbox — BAYCMC admin" },
+    { name: "description", content: "Member support conversations for BAYCMC administrators." },
+    { property: "og:title", content: "Support inbox — BAYCMC admin" },
+    { property: "og:description", content: "Member support conversations for BAYCMC administrators." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   component: AdminSupport,
 });
 

@@ -14,6 +14,14 @@ import { signOut } from "@/lib/auth/useAuth";
 import { avatarShapeClass } from "@/lib/profile-avatar";
 
 export const Route = createFileRoute("/_authenticated/account-merge")({
+  head: () => ({ meta: [
+    { title: "Account linking — BAYCMC" },
+    { name: "description", content: "Manage your connected BAYCMC account identities." },
+    { property: "og:title", content: "Account linking — BAYCMC" },
+    { property: "og:description", content: "Manage your connected BAYCMC account identities." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   component: AccountMergePage,
 });
 

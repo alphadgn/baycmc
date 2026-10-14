@@ -1,10 +1,10 @@
 # Karaoke overhaul roadmap
 
 ## Global pictures and chat opening
-- [ ] Apply NFT versus device photo shapes to every profile picture display
-- [ ] Open every chat thread at the newest messages, including delayed media
-- [ ] Verify picture rendering and chat opening regressions
-- [ ] Display whitelisted NFTs from every verified connected wallet on the profile
+- [x] Apply NFT versus device photo shapes to every profile picture display
+- [x] Open every chat thread at the newest messages, including delayed media
+- [x] Verify picture rendering and chat opening regressions (49 tests pass; signed-in lobby opens at bottom; live circular and square pictures render)
+- [x] Display whitelisted NFTs from every verified connected wallet on the profile (aggregation/filter regression passes; signed-in account returns a real empty collection; populated multi-wallet UI not verified)
 
 ## Screenshot fixes
 - [x] Alchemy NFT lookup — ALCHEMY_API_KEY secret saved, wallet-assets functions wired to it, live lookup verified (key valid; Glyph wallet holds 0 NFTs, BAYC #2931 owner returns 1)

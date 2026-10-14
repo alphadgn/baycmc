@@ -14,6 +14,7 @@ export function NftGallery({
   includeLinkedWallets?: boolean;
 }) {
   const { user } = useAuth();
+  const userId = user?.id;
   const listFn = useServerFn(listWalletNfts);
   const listLinked = useServerFn(listLinkedWallets);
   const [items, setItems] = useState<NftItem[] | null>(null);
@@ -28,7 +29,7 @@ export function NftGallery({
   }, []);
 
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -78,7 +79,7 @@ export function NftGallery({
     return () => {
       cancelled = true;
     };
-  }, [address, includeLinkedWallets, user?.id, listFn, listLinked, refreshVersion]);
+  }, [address, includeLinkedWallets, userId, listFn, listLinked, refreshVersion]);
 
   if (loading) {
     return (
