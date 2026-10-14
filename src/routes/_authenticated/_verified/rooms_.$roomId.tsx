@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ConferenceRoom } from "@/components/ConferenceRoom";
+import { KaraokeErrorBoundary } from "@/components/karaoke/KaraokeErrorBoundary";
 import { KaraokeStage } from "@/components/KaraokeStage";
 import { getRoomThemeImage, getRoomThemeAmbience } from "@/lib/baycmc/roomThemes";
 
@@ -85,7 +86,11 @@ function RoomDetail() {
         kind={meta.kind === "game" ? "game" : meta.kind === "karaoke" ? "karaoke" : "conference"}
         hostUserId={hostUserId}
       />
-      {isKaraoke && <KaraokeStage roomId={roomId} bookingHostUserId={hostUserId} />}
+      {isKaraoke && (
+        <KaraokeErrorBoundary name="stage">
+          <KaraokeStage roomId={roomId} bookingHostUserId={hostUserId} />
+        </KaraokeErrorBoundary>
+      )}
     </>
   );
 }

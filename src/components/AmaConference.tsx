@@ -647,6 +647,9 @@ function useParticipantProfiles(participants: Participant[]): Map<string, Profil
     })();
     return () => {
       cancelled = true;
+      // Allow a retry — otherwise a participant list change mid-fetch left
+      // these members nameless forever.
+      for (const id of toFetch) fetchedRef.current.delete(id);
     };
   }, [participants]);
 
@@ -687,6 +690,7 @@ function useVipUserIds(participants: Participant[], enabled: boolean): Set<strin
     })();
     return () => {
       cancelled = true;
+      for (const id of toCheck) fetchedRef.current.delete(id);
     };
   }, [participants, enabled, fetchFn]);
 
