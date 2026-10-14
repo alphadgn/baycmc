@@ -277,18 +277,111 @@ export const inspectWalletHoldings = createServerFn({ method: "POST" })
     };
   });
 
+const nonceBuckets = new Map<string, Bucket>();
+const SIWE_NONCE_TTL_MS = 10 * 60 * 1000;
+
+/**
+ * Issue a single-use SIWE nonce bound to a wallet address. The client fetches
+ * this as soon as the wallet connects (BEFORE the "Sign to enter" tap) so the
+ * signing popup still opens synchronously inside the user's gesture.
+ *
+ * Previously the nonce was generated in the browser and never checked, so a
+ * captured signature could be replayed for 10 minutes.
+ */
+export const getSiweNonce = createServerFn({ method: "POST" })
+  .inputValidator((input: { address: string }) =>
+    z.object({ address: z.string().regex(/^0x[a-fA-F0-9]{40}$/) }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const address = getAddress(data.address);
+    const rl = rateLimit(nonceBuckets, address.toLowerCase(), 12);
+    if (!rl.ok) {
+      throw new Error(
+        `Too many sign-in attempts. Try again in ${Math.ceil(rl.retryAfterMs / 1000)}s.`,
+      );
+    }
+    const nonce = crypto.randomUUID().replace(/-/g, "");
+    const expiresAt = new Date(Date.now() + SIWE_NONCE_TTL_MS).toISOString();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("auth_nonces").insert({
+      wallet_address: address.toLowerCase(),
+      nonce,
+      expires_at: expiresAt,
+      consumed: false,
+    });
+    if (error) throw new Error("Could not start sign-in. Please try again.");
+    return { nonce, expiresAt };
+  });
+
+/**
+ * Ask Glyph's API (server-to-server) which wallets are linked to the signer's
+ * Glyph account. The client only forwards its Glyph widget token; Glyph — not
+ * the browser — vouches for the list, and the token is bound to the signer's
+ * address via the x-evm-address header.
+ */
+async function fetchGlyphLinkedWalletsServer(
+  signer: string,
+  glyph: { token: string; nonce: string } | undefined,
+): Promise<`0x${string}`[]> {
+  if (!glyph) return [];
+  try {
+    const res = await withTimeout(
+      fetch("https://useglyph.io/api/widget/user", {
+        headers: {
+          Authorization: `Bearer ${glyph.token}`,
+          "x-evm-address": signer,
+          "x-glyph-nonce": glyph.nonce,
+          "Content-Type": "application/json",
+        },
+      }),
+      5_000,
+      "glyph user lookup",
+    );
+    if (!res.ok) return [];
+    const json = (await res.json()) as {
+      evmWallet?: string;
+      smartWallet?: string;
+      linkedWallets?: Array<{ address?: string }>;
+    } | null;
+    // The Glyph account must actually belong to the signer.
+    const owners = [json?.evmWallet, json?.smartWallet]
+      .filter((a): a is string => !!a && isAddress(a))
+      .map((a) => a.toLowerCase());
+    if (!owners.includes(signer.toLowerCase())) return [];
+    const out: `0x${string}`[] = [];
+    for (const a of [
+      json?.evmWallet,
+      json?.smartWallet,
+      ...(json?.linkedWallets ?? []).map((w) => w?.address),
+    ]) {
+      if (a && isAddress(a)) out.push(getAddress(a) as `0x${string}`);
+    }
+    return out;
+  } catch (e) {
+    console.warn("[verifyOwnership] Glyph linked-wallet lookup failed", e);
+    return [];
+  }
+}
+
 export const verifyOwnership = createServerFn({ method: "POST" })
-  .inputValidator((input: { message: string; signature: string; linkedWallets?: string[] }) =>
-    z
-      .object({
-        message: z.string().min(20).max(4000),
-        signature: z.string().min(20).max(400),
-        linkedWallets: z
-          .array(z.string().regex(/^0x[a-fA-F0-9]{40}$/))
-          .max(20)
-          .optional(),
-      })
-      .parse(input),
+  .inputValidator(
+    (input: {
+      message: string;
+      signature: string;
+      glyphSession?: { token: string; nonce: string };
+      /** @deprecated Ignored — client-supplied wallet lists are never trusted. */
+      linkedWallets?: string[];
+    }) =>
+      z
+        .object({
+          message: z.string().min(20).max(4000),
+          signature: z.string().min(20).max(400),
+          glyphSession: z
+            .object({ token: z.string().min(10).max(4096), nonce: z.string().min(4).max(256) })
+            .optional(),
+          linkedWallets: z.array(z.string()).max(20).optional(),
+        })
+        .parse(input),
   )
 
   .handler(async ({ data }) => {
@@ -356,6 +449,21 @@ export const verifyOwnership = createServerFn({ method: "POST" })
         throw new Error("Signature verification failed");
       }
       address = result.data.address;
+
+      // Single-use, server-issued nonce bound to this wallet. Atomic consume
+      // (UPDATE … WHERE consumed = false) so two parallel replays can't both win.
+      const { supabaseAdmin: nonceDb } = await import("@/integrations/supabase/client.server");
+      const { data: consumed } = await nonceDb
+        .from("auth_nonces")
+        .update({ consumed: true })
+        .eq("nonce", siwe.nonce)
+        .eq("consumed", false)
+        .eq("wallet_address", address.toLowerCase())
+        .gt("expires_at", new Date().toISOString())
+        .select("id");
+      if (!consumed || consumed.length !== 1) {
+        throw new Error("Signature has expired. Please sign again.");
+      }
     } catch (e) {
       console.error("SIWE verify failed", e);
       const msg = e instanceof Error ? e.message : "";
@@ -415,14 +523,39 @@ export const verifyOwnership = createServerFn({ method: "POST" })
     // delegated to the signer, plus any Glyph "linked wallets" the user has
     // attached to their account (signed in via the Glyph modal). For linked
     // wallets we also walk their own incoming delegations.
+    //
+    // SECURITY: the old code trusted a `linkedWallets` array sent by the
+    // browser, so anyone could sign with an empty wallet, list a whale's
+    // address, and be marked BAYC-verified. Linked wallets now come ONLY from
+    // (a) Glyph's API, queried server-side with the signer-bound Glyph token,
+    // and (b) wallets this account already proved with a signature
+    // (`linked_wallets.verified_at`, see linked-wallets.functions.ts).
     const lowerSigner = wallet.toLowerCase();
     const linkedAddrs: `0x${string}`[] = [];
-    for (const raw of data.linkedWallets ?? []) {
-      if (!isAddress(raw)) continue;
+    const pushLinked = (raw: string | null | undefined) => {
+      if (!raw || !isAddress(raw)) return;
       const addr = getAddress(raw) as `0x${string}`;
-      if (addr.toLowerCase() === lowerSigner) continue;
-      if (linkedAddrs.some((a) => a.toLowerCase() === addr.toLowerCase())) continue;
+      if (addr.toLowerCase() === lowerSigner) return;
+      if (linkedAddrs.some((a) => a.toLowerCase() === addr.toLowerCase())) return;
       linkedAddrs.push(addr);
+    };
+    for (const a of await fetchGlyphLinkedWalletsServer(wallet, data.glyphSession)) pushLinked(a);
+    {
+      const { supabaseAdmin: lwDb } = await import("@/integrations/supabase/client.server");
+      const { data: owner } = await lwDb
+        .from("profiles")
+        .select("id")
+        .eq("wallet_address", lowerSigner)
+        .maybeSingle();
+      if (owner?.id) {
+        const { data: proven } = await lwDb
+          .from("linked_wallets")
+          .select("address")
+          .eq("user_id", owner.id)
+          .not("verified_at", "is", null)
+          .limit(20);
+        for (const r of proven ?? []) pushLinked(r.address as string);
+      }
     }
 
     if (totalBayc === 0n && totalMayc === 0n && vaults.length > 0) {
@@ -513,12 +646,24 @@ export const verifyOwnership = createServerFn({ method: "POST" })
       const alreadyExists = createErr?.message?.toLowerCase().includes("already");
       if (!alreadyExists) throw createErr ?? new Error("Could not create wallet session");
 
-      const { data: existing } = await supabaseAdmin.auth.admin.listUsers({
-        page: 1,
-        perPage: 1000,
-      });
-      const found = existing?.users.find((u) => u.email === email);
-      userId = found?.id;
+      // Look the account up by its wallet (indexed) instead of scanning the
+      // first 1,000 auth users — that scan stopped finding returning members
+      // once the club grew past 1,000 accounts.
+      const { data: prof } = await supabaseAdmin
+        .from("profiles")
+        .select("id")
+        .eq("wallet_address", lower)
+        .maybeSingle();
+      userId = (prof?.id as string | undefined) ?? undefined;
+      for (let page = 1; !userId && page <= 50; page++) {
+        const { data: existing } = await supabaseAdmin.auth.admin.listUsers({
+          page,
+          perPage: 1000,
+        });
+        const found = existing?.users.find((u) => u.email === email);
+        userId = found?.id;
+        if (!existing || existing.users.length < 1000) break;
+      }
       if (!userId) throw new Error("Could not find wallet session");
       const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(userId, {
         password,

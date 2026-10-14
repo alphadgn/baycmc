@@ -7,11 +7,15 @@
  *   Microphone ─► micGain ─► micCompressor ─┐
  *                                            ├─► mixGain ─┬─► broadcastDest (MediaStream → LiveKit)
  *   Music <audio> ─► musicGain ──────────────┘            ├─► recordDest    (MediaStream → MediaRecorder)
- *                                                          └─► monitorGain  (→ destination, singer's headphones)
+ *   YouTube tab audio ─► musicGain               │            └─► monitorGain  (→ destination, optional)
+ *                            └─► musicMonitor ──► destination (singer ALWAYS hears the track)
  *
- * Aggressive browser DSP (echoCancellation, noiseSuppression, autoGainControl)
- * is intentionally DISABLED on the mic capture so the singer's voice isn't
- * suppressed when music is playing simultaneously.
+ * Mic DSP depends on the singer's setup (real karaoke apps ask the same
+ * question):
+ *   - headphones: echoCancellation / noiseSuppression / AGC OFF — studio
+ *     quality, nothing fights the voice.
+ *   - speaker:    echoCancellation + noiseSuppression ON so the backing track
+ *     coming out of the phone speaker isn't re-captured (doubled + delayed).
  *
  * This module is environment-safe: it never touches `window` / `navigator` at
  * module scope, only inside methods that callers invoke from the browser.
@@ -36,6 +40,51 @@ export interface MixBusConfig {
 }
 
 let _ctx: AudioContext | null = null;
+const elementSources = new WeakMap<HTMLMediaElement, MediaElementAudioSourceNode>();
+
+let _backingEl: HTMLAudioElement | null = null;
+// 0.1s of silence — used to "unlock" the element inside a user gesture so
+// iOS/Safari let later programmatic play() calls through.
+const SILENT_WAV =
+  "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
+
+/** The single <audio> element used for uploaded backing tracks. */
+export function getBackingElement(): HTMLAudioElement {
+  if (typeof window === "undefined") throw new Error("browser only");
+  if (!_backingEl) {
+    _backingEl = new Audio();
+    _backingEl.crossOrigin = "anonymous"; // signed Supabase URLs are CORS-enabled
+    _backingEl.preload = "auto";
+    (_backingEl as HTMLAudioElement & { playsInline?: boolean }).playsInline = true;
+  }
+  return _backingEl;
+}
+
+/**
+ * Call synchronously from a click/tap handler before anything async. Resumes
+ * the AudioContext and plays/pauses the backing element once so the browser
+ * treats both as user-activated for the rest of the session.
+ */
+export function unlockKaraokeAudio(): void {
+  if (typeof window === "undefined") return;
+  try {
+    void getAudioContext().resume();
+  } catch {
+    /* noop */
+  }
+  try {
+    const el = getBackingElement();
+    if (!el.src) el.src = SILENT_WAV;
+    const p = el.play();
+    if (p) {
+      p.then(() => {
+        if (el.src === SILENT_WAV) el.pause();
+      }).catch(() => undefined);
+    }
+  } catch {
+    /* noop */
+  }
+}
 
 /** Singleton AudioContext getter. Resumes if suspended (autoplay policy). */
 export function getAudioContext(): AudioContext {
@@ -89,6 +138,13 @@ export class KaraokeMixBus {
   private musicSource: MediaElementAudioSourceNode | null = null;
   private musicElement: HTMLMediaElement | null = null;
   readonly musicGain: GainNode;
+  /** Music → singer's own output. Without this, createMediaElementSource
+   *  re-routes the <audio> element into the graph only and the singer hears
+   *  nothing (the old bus left monitor at 0, so phones played silence). */
+  readonly musicMonitor: GainNode;
+  private readonly tabMusicGain: GainNode;
+  private musicStreamSource: MediaStreamAudioSourceNode | null = null;
+  private musicStream: MediaStream | null = null;
 
   // Mix bus
   readonly mixGain: GainNode;
@@ -125,6 +181,10 @@ export class KaraokeMixBus {
 
     this.musicGain = this.ctx.createGain();
     this.musicGain.gain.value = config.musicGainValue ?? 0.55;
+    this.musicMonitor = this.ctx.createGain();
+    this.musicMonitor.gain.value = 1.0;
+    this.tabMusicGain = this.ctx.createGain();
+    this.tabMusicGain.gain.value = config.musicGainValue ?? 0.55;
 
     this.mixGain = this.ctx.createGain();
     this.mixGain.gain.value = 1.0;
@@ -139,8 +199,11 @@ export class KaraokeMixBus {
     this.micGain.connect(this.micCompressor);
     this.micCompressor.connect(this.mixGain);
 
-    // Wire music chain
+    // Wire music chain (to the mix AND straight to the singer's ears)
     this.musicGain.connect(this.mixGain);
+    this.musicGain.connect(this.musicMonitor);
+    this.musicMonitor.connect(this.ctx.destination);
+    this.tabMusicGain.connect(this.mixGain);
 
     // Mix → broadcast + record + (optional) monitor
     this.mixGain.connect(this.broadcastDest);
@@ -151,8 +214,9 @@ export class KaraokeMixBus {
     this.state = "ready";
   }
 
-  /** Acquire the microphone with DSP off (karaoke mode). */
-  async attachMic(deviceId?: string): Promise<void> {
+  /** Acquire the microphone. `headphones: false` keeps echo cancellation on. */
+  async attachMic(deviceId?: string, opts: { headphones?: boolean } = {}): Promise<void> {
+    const headphones = opts.headphones ?? true;
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
       throw new Error("Microphone API unavailable in this browser");
     }
@@ -161,8 +225,8 @@ export class KaraokeMixBus {
     const constraints: MediaStreamConstraints = {
       audio: {
         deviceId: deviceId ? { exact: deviceId } : undefined,
-        echoCancellation: false,
-        noiseSuppression: false,
+        echoCancellation: !headphones,
+        noiseSuppression: !headphones,
         autoGainControl: false,
         // Hint browser to preserve full vocal frequency range.
         sampleRate: 48000,
@@ -216,26 +280,46 @@ export class KaraokeMixBus {
    */
   attachMusicElement(el: HTMLMediaElement): void {
     if (this.musicElement === el && this.musicSource) return;
-    if (this.musicElement && this.musicElement !== el) {
-      try {
-        this.musicSource?.disconnect();
-      } catch {
-        /* noop */
-      }
-      this.musicSource = null;
+    try {
+      this.musicSource?.disconnect();
+    } catch {
+      /* noop */
     }
     this.musicElement = el;
-    try {
-      this.musicSource = this.ctx.createMediaElementSource(el);
-      this.musicSource.connect(this.musicGain);
-      // Mute the element's direct output so the audience doesn't get
-      // it twice (once via element default route, once via mix bus).
-      // The mix is routed back through monitor for local audibility.
-    } catch (e) {
-      // Already wired (some browsers throw if createMediaElementSource was
-      // called previously on this element). Ignore.
-      console.warn("[mix-bus] attachMusicElement", e);
+    // An element can only ever get ONE MediaElementSource per AudioContext.
+    // Cache it module-wide so a new bus (next turn) can re-use the element.
+    let src = elementSources.get(el);
+    if (!src) {
+      src = this.ctx.createMediaElementSource(el);
+      elementSources.set(el, src);
     }
+    this.musicSource = src;
+    this.musicSource.connect(this.musicGain);
+  }
+
+  /**
+   * Mix an external MediaStream (YouTube tab audio from getDisplayMedia) into
+   * the music bus. The singer already hears the tab directly, so it is NOT
+   * routed to musicMonitor (that would double it locally).
+   */
+  attachMusicStream(stream: MediaStream): void {
+    this.detachMusicStream();
+    this.musicStream = stream;
+    this.musicStreamSource = this.ctx.createMediaStreamSource(stream);
+    this.musicStreamSource.connect(this.tabMusicGain);
+  }
+  detachMusicStream(): void {
+    try {
+      this.musicStreamSource?.disconnect();
+    } catch {
+      /* noop */
+    }
+    this.musicStreamSource = null;
+    this.musicStream?.getTracks().forEach((t) => t.stop());
+    this.musicStream = null;
+  }
+  hasMusicStream(): boolean {
+    return !!this.musicStreamSource;
   }
 
   /** Set mic gain (0..2 typical). */
@@ -244,6 +328,7 @@ export class KaraokeMixBus {
   }
   setMusicGain(v: number): void {
     this.musicGain.gain.setTargetAtTime(v, this.ctx.currentTime, 0.02);
+    this.tabMusicGain.gain.setTargetAtTime(v, this.ctx.currentTime, 0.02);
   }
   setMonitor(on: boolean): void {
     this.monitorGain.gain.setTargetAtTime(on ? 0.4 : 0, this.ctx.currentTime, 0.05);
@@ -274,22 +359,32 @@ export class KaraokeMixBus {
   }
 
   startRecording(): void {
-    if (this.recorder && this.recorder.state === "recording") return;
-    this.recordedChunks = [];
+    if (this.recorder && this.recorder.state !== "inactive") return;
+    // Each take owns its chunk array so a late `dataavailable` from the
+    // previous take can never leak into the next one.
+    const chunks: Blob[] = [];
+    this.recordedChunks = chunks;
     this.recorderMime = this.pickRecorderMime();
     this.recorder = new MediaRecorder(this.recordDest.stream, {
       mimeType: this.recorderMime,
       audioBitsPerSecond: 128_000,
     });
     this.recorder.ondataavailable = (e) => {
-      if (e.data && e.data.size > 0) this.recordedChunks.push(e.data);
+      if (e.data && e.data.size > 0) chunks.push(e.data);
     };
     this.recorder.start(1000); // 1s chunks → smooth uploads, low memory
     this.recordStartedAt = Date.now();
   }
 
+  pauseRecording(): void {
+    if (this.recorder?.state === "recording") this.recorder.pause();
+  }
+  resumeRecording(): void {
+    if (this.recorder?.state === "paused") this.recorder.resume();
+  }
+
   isRecording(): boolean {
-    return this.recorder?.state === "recording";
+    return this.recorder?.state === "recording" || this.recorder?.state === "paused";
   }
 
   recordingDurationMs(): number {
@@ -305,12 +400,14 @@ export class KaraokeMixBus {
     if (!rec || rec.state === "inactive") return null;
     const durationMs = this.recordingDurationMs();
     const mime = this.recorderMime;
-    const blob = await new Promise<Blob>((resolve) => {
-      rec.onstop = () => resolve(new Blob(this.recordedChunks, { type: mime }));
-      rec.stop();
-    });
+    const chunks = this.recordedChunks;
+    // Detach synchronously so a new take can start immediately.
     this.recorder = null;
     this.recordStartedAt = null;
+    const blob = await new Promise<Blob>((resolve) => {
+      rec.onstop = () => resolve(new Blob(chunks, { type: mime }));
+      rec.stop();
+    });
     return { blob, durationMs, mime };
   }
 
@@ -339,6 +436,7 @@ export class KaraokeMixBus {
       }
     }
     this.detachMic();
+    this.detachMusicStream();
     try {
       this.musicSource?.disconnect();
     } catch {
@@ -352,6 +450,8 @@ export class KaraokeMixBus {
       this.mixGain.disconnect();
       this.micGain.disconnect();
       this.musicGain.disconnect();
+      this.musicMonitor.disconnect();
+      this.tabMusicGain.disconnect();
       this.monitorGain.disconnect();
       this.micCompressor.disconnect();
     } catch {

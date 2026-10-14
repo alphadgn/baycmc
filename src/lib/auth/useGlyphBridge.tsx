@@ -1,80 +1,54 @@
 /**
- * Glyph → Supabase bridge (replaces the old Privy bridge).
+ * Wallet → Supabase bridge (Glyph, browser wallets, WalletConnect).
  *
- * AUTHENTICATION (who you are): Supabase Auth.
+ * AUTHENTICATION (who you are): one SIWE signature → Supabase session.
  * AUTHORIZATION (what you can do): on-chain BAYC/MAYC ownership.
  *
- * This hook is the single place that ties Glyph's connected EVM wallet to a
- * Supabase session. It is mounted ONCE (via <GlyphBridgeMount>) and triggers
- * exactly once per wallet address, so the historic "infinite wallet creation
- * loop" cannot reappear here.
+ * Lifecycle:
+ *   1. A wallet connects through any wagmi connector (Glyph's modal for
+ *      email/social/Glyph-wallet users, or an external wallet).
+ *   2. If a Supabase session already exists for that address → done.
+ *   3. Otherwise we immediately PREFETCH a single-use server nonce
+ *      (getSiweNonce) so the user's "Sign to enter" tap can open the signing
+ *      popup synchronously — the Glyph popup is blocked outside a gesture.
+ *   4. Tap → SIWE sign (wagmi signMessage, works for every connector) →
+ *      verifyOwnership → supabase.auth.setSession.
  *
- * Lifecycle (deterministic, no polling):
- *   1. Wallet connects through Glyph → wagmi's useAccount() reports the
- *      address (the automatic path, runVerify(false)).
- *   2. If a Supabase session already exists for this address → done, no popup.
- *   3. Otherwise the user must TAP "Sign to enter" (runVerify(true)). The
- *      wallet's signing popup can only open from inside a user gesture, so we
- *      never auto-pop it from an effect — that popup is silently blocked. The
- *      tap dispatches "baycmc:wallet-verify"; dispatchEvent runs the listener
- *      synchronously, so signMessage fires inside the same gesture. We build a
- *      SIWE message, sign it, and POST { message, signature } to the
- *      `verifyOwnership` server fn → it verifies the signature, runs on-chain
- *      balanceOf against BAYC + MAYC + delegate.cash, and mints a Supabase
- *      session (lobby for everyone, bayc_verified flipped for holders).
- *   4. supabase.auth.setSession(...) → onAuthStateChange fires → RLS-protected
- *      reads work app-wide.
- *
- * NOTE: unlike the old Privy flow there is no separate "lobby session without
- * a signature" path — the new server fn mints a session from the SIWE
- * signature directly, so every entrance requires exactly one signature.
+ * SECURITY: we no longer send a client-built "linkedWallets" list (the server
+ * used to trust it). If Glyph left a widget token in storage we forward it
+ * and the SERVER asks Glyph which wallets are linked.
  */
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { SiweMessage } from "siwe";
 import { toast } from "sonner";
+import { useAccount, useDisconnect, useSignMessage } from "wagmi";
 import { supabase } from "@/integrations/supabase/client";
-import { verifyOwnership } from "@/server/wallet.functions";
+import { getSiweNonce, verifyOwnership } from "@/server/wallet.functions";
 import { useGlyphReady } from "@/components/GlyphAppProvider";
 import { logEvent } from "@/lib/diagnostics";
-import { importWithRetry } from "@/lib/import-with-retry";
 
-/**
- * Lightweight, app-wide view of Glyph state. Lets the header render the
- * connected-wallet pill (and a re-verify affordance) without being wrapped
- * by the bridge component itself.
- *
- * Implemented as a module-level store + useSyncExternalStore so any
- * component (e.g. AppHeader) can read the bridge's view of Glyph.
- */
 export interface GlyphAuthSnapshot {
   ready: boolean;
-  authenticated: boolean;
+  authenticated: boolean; // a wallet is connected
   address: string | null;
-  /** A SIWE + ownership verification is currently running. */
+  connectorId: string | null;
   verifying: boolean;
 }
 let glyphSnapshot: GlyphAuthSnapshot = {
   ready: false,
   authenticated: false,
   address: null,
+  connectorId: null,
   verifying: false,
 };
 const glyphListeners = new Set<() => void>();
-function setGlyphSnapshot(next: GlyphAuthSnapshot) {
-  if (
-    glyphSnapshot.ready === next.ready &&
-    glyphSnapshot.authenticated === next.authenticated &&
-    glyphSnapshot.address === next.address &&
-    glyphSnapshot.verifying === next.verifying
-  ) {
+function patchGlyphSnapshot(patch: Partial<GlyphAuthSnapshot>) {
+  const next = { ...glyphSnapshot, ...patch };
+  if ((Object.keys(next) as (keyof GlyphAuthSnapshot)[]).every((k) => next[k] === glyphSnapshot[k]))
     return;
-  }
   glyphSnapshot = next;
   for (const l of glyphListeners) l();
-}
-function patchGlyphSnapshot(patch: Partial<GlyphAuthSnapshot>) {
-  setGlyphSnapshot({ ...glyphSnapshot, ...patch });
 }
 export function useGlyphAuthState(): GlyphAuthSnapshot {
   return useSyncExternalStore(
@@ -91,54 +65,47 @@ const VERIFIED_TTL_MS = 24 * 60 * 60 * 1000;
 function verifiedKey(addr: string) {
   return `baycmc:verified:${addr.toLowerCase()}`;
 }
-function isVerifiedFresh(addr: string): boolean {
-  try {
-    const raw = window.localStorage.getItem(verifiedKey(addr));
-    if (!raw) return false;
-    const ts = Number.parseInt(raw, 10);
-    if (!Number.isFinite(ts)) return false;
-    return Date.now() - ts < VERIFIED_TTL_MS;
-  } catch {
-    return false;
-  }
-}
 function markVerified(addr: string) {
   try {
     window.localStorage.setItem(verifiedKey(addr), String(Date.now()));
   } catch {
-    /* ignore quota / private mode */
+    /* ignore */
+  }
+}
+export function isVerifiedFresh(addr: string): boolean {
+  try {
+    const ts = Number.parseInt(window.localStorage.getItem(verifiedKey(addr)) ?? "", 10);
+    return Number.isFinite(ts) && Date.now() - ts < VERIFIED_TTL_MS;
+  } catch {
+    return false;
   }
 }
 
 /**
- * Hard-reset every shred of cached wallet state. Used by the inactivity
- * timer (and any other forced sign-out path) so the next visit must go
- * through Glyph's modal from scratch. Without this, Glyph's underlying
- * Privy session persists in localStorage and the bridge can short-circuit
- * the user back in without a fresh signature.
+ * Hard-reset every shred of cached wallet state (inactivity timeout, forced
+ * sign-out). Clears our markers, Glyph/Privy persisted sessions and wagmi's
+ * remembered connector so the next visit starts from the entrance modal.
  */
 export function clearWalletAuthLocalState() {
   if (typeof window === "undefined") return;
   try {
-    const ls = window.localStorage;
-    for (let i = ls.length - 1; i >= 0; i--) {
-      const k = ls.key(i);
-      if (!k) continue;
-      // Our 24h verify-fresh markers.
-      if (k.startsWith("baycmc:verified:")) ls.removeItem(k);
-      // Glyph persists session/wallet metadata under "glyph:*", and its
-      // underlying Privy cross-app wallet under "privy:*". Clear both so the
-      // next visit forces a full re-login.
-      if (k.startsWith("glyph:") || k.startsWith("privy:")) ls.removeItem(k);
-    }
-    const ss = window.sessionStorage;
-    for (let i = ss.length - 1; i >= 0; i--) {
-      const k = ss.key(i);
-      if (!k) continue;
-      if (k.startsWith("glyph:") || k.startsWith("privy:")) ss.removeItem(k);
+    for (const store of [window.localStorage, window.sessionStorage]) {
+      for (let i = store.length - 1; i >= 0; i--) {
+        const k = store.key(i);
+        if (!k) continue;
+        if (
+          k.startsWith("baycmc:verified:") ||
+          k.startsWith("glyph:") ||
+          k.startsWith("privy:") ||
+          k.startsWith("__glyph-widget-") ||
+          k.startsWith("wagmi.")
+        ) {
+          store.removeItem(k);
+        }
+      }
     }
   } catch {
-    /* private mode / quota — ignore */
+    /* private mode — ignore */
   }
 }
 
@@ -146,313 +113,134 @@ function withTimeout<T>(p: Promise<T>, ms: number, message: string): Promise<T> 
   return new Promise<T>((resolve, reject) => {
     const t = window.setTimeout(() => reject(new Error(message)), ms);
     p.then(
-      (value) => {
+      (v) => {
         window.clearTimeout(t);
-        resolve(value);
+        resolve(v);
       },
-      (error) => {
+      (e) => {
         window.clearTimeout(t);
-        reject(error);
+        reject(e);
       },
     );
   });
 }
 
-/**
- * The wallet SDK occasionally fails to load one of its lazy chunks on the
- * first request. The chunk is cached after that first miss so a single retry
- * succeeds. Detect the error shape and let the caller retry once.
- */
-function isChunkLoadError(error: unknown): boolean {
-  const msg = (error instanceof Error ? error.message : String(error ?? "")).toLowerCase();
-  return (
-    msg.includes("loading chunk") ||
-    msg.includes("loading css chunk") ||
-    msg.includes("failed to fetch dynamically imported module") ||
-    msg.includes("importing a module script failed")
-  );
-}
-
-/**
- * The bridge consumes two hooks (both valid inside <GlyphWalletProvider>,
- * which sets up WagmiProvider + the Glyph context):
- *
- *  - wagmi's `useAccount()` for the connected wallet address + connection
- *    state. In Glyph's EIP1193 "Global Wallet" strategy the address comes from
- *    wagmi — `useGlyph().user` is only populated after the optional Glyph
- *    *widget* login, which we don't use (we do our own SIWE for Supabase).
- *  - `useGlyph()` for `signMessage` (works as soon as the wallet is connected)
- *    and `logout`.
- */
-type GlyphLinkedWallet = { address: string; walletClientType?: string };
-type GlyphUser = {
-  evmWallet?: string;
-  smartWallet?: string;
-  linkedWallets?: GlyphLinkedWallet[];
-} | null;
-type GlyphHookValue = {
-  logout: () => void;
-  signMessage: (params: { message: string }) => Promise<string>;
-  user?: GlyphUser;
-  refreshUser?: (force?: boolean) => Promise<void>;
-};
-type UseGlyph = () => GlyphHookValue;
-type AccountValue = { address?: string | null; isConnected: boolean };
-type UseAccount = () => AccountValue;
-
-const GLYPH_API_BASE = "https://useglyph.io";
-const GLYPH_TOKEN_KEY = "__glyph-widget-token__";
-const GLYPH_NONCE_KEY = "__glyph-widget-nonce__";
-
-function dedupePush(out: string[], a?: string | null) {
-  if (!a || !/^0x[a-fA-F0-9]{40}$/.test(a)) return;
-  if (out.some((x) => x.toLowerCase() === a.toLowerCase())) return;
-  out.push(a);
-}
-
-/**
- * Pull the current Glyph "widget user" directly from Glyph's REST API. We do
- * this in addition to reading `useGlyph().user` because that React state may
- * not be hydrated yet when the user taps "Sign to enter" — Glyph runs its own
- * SIWE to mint a session token, then asynchronously fetches /api/widget/user.
- * Hitting the endpoint ourselves with the stored token guarantees we have the
- * freshest linked-wallets list before we call verifyOwnership.
- */
-async function fetchGlyphLinkedWallets(address: string): Promise<string[]> {
-  if (typeof window === "undefined") return [];
-  let token: string | null = null;
-  let nonce: string | null = null;
+function glyphSessionFromStorage(): { token: string; nonce: string } | undefined {
   try {
-    token = window.localStorage.getItem(GLYPH_TOKEN_KEY);
-    nonce = window.localStorage.getItem(GLYPH_NONCE_KEY);
+    const token = window.localStorage.getItem("__glyph-widget-token__");
+    const nonce = window.localStorage.getItem("__glyph-widget-nonce__");
+    return token && nonce ? { token, nonce } : undefined;
   } catch {
-    return [];
-  }
-  if (!token || !nonce) return [];
-  try {
-    const res = await fetch(`${GLYPH_API_BASE}/api/widget/user`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "x-evm-address": address,
-        "x-glyph-nonce": nonce,
-        "Content-Type": "application/json",
-      },
-    });
-    if (!res.ok) {
-      logEvent("auth", "warn", "glyph /widget/user fetch failed", { status: res.status });
-      return [];
-    }
-    const json = (await res.json()) as GlyphUser;
-    const out: string[] = [];
-    dedupePush(out, json?.evmWallet);
-    dedupePush(out, json?.smartWallet);
-    for (const w of json?.linkedWallets ?? []) dedupePush(out, w?.address);
-    return out;
-  } catch (e) {
-    logEvent("auth", "warn", "glyph /widget/user fetch threw", {
-      message: e instanceof Error ? e.message : String(e),
-    });
-    return [];
+    return undefined;
   }
 }
 
-export function GlyphBridge({
-  useGlyph,
-  useAccount,
-}: {
-  useGlyph: UseGlyph;
-  useAccount: UseAccount;
-}) {
-  const { logout, signMessage, user, refreshUser } = useGlyph();
-  const { address: wagmiAddress, isConnected } = useAccount();
+function WalletBridge() {
+  const { address: wagmiAddress, isConnected, connector } = useAccount();
+  const { signMessageAsync } = useSignMessage();
+  const { disconnectAsync } = useDisconnect();
   const verifyFn = useServerFn(verifyOwnership);
+  const nonceFn = useServerFn(getSiweNonce);
 
   const address = isConnected ? (wagmiAddress ?? null) : null;
-
-  // Cached snapshot from useGlyph().user — used as a fallback if the live
-  // REST fetch in runVerify() comes back empty (e.g. token expired).
-  const linkedWalletsFromState = (() => {
-    const out: string[] = [];
-    dedupePush(out, user?.evmWallet);
-    dedupePush(out, user?.smartWallet);
-    for (const w of user?.linkedWallets ?? []) dedupePush(out, w?.address);
-    return out;
-  })();
-  const linkedWalletsRef = useRef(linkedWalletsFromState);
-  linkedWalletsRef.current = linkedWalletsFromState;
-  const refreshUserRef = useRef(refreshUser);
-  refreshUserRef.current = refreshUser;
-
-  // Latest connected address, read inside the stable runVerify callback so we
-  // don't have to thread it through deps.
   const addressRef = useRef(address);
   addressRef.current = address;
+  const signRef = useRef(signMessageAsync);
+  signRef.current = signMessageAsync;
+  const verifyRef = useRef(verifyFn);
+  verifyRef.current = verifyFn;
+  const nonceRef = useRef(nonceFn);
+  nonceRef.current = nonceFn;
+  const disconnectRef = useRef(disconnectAsync);
+  disconnectRef.current = disconnectAsync;
 
-  // signMessage/verifyFn/logout are new refs every render — store them in
-  // refs so we call the latest version inside the effect without putting them
-  // in the dep array (which would re-fire the effect on every render and
-  // silently cancel in-flight verifies via the closure cleanup).
-  const signMessageRef = useRef(signMessage);
-  signMessageRef.current = signMessage;
-  const verifyFnRef = useRef(verifyFn);
-  verifyFnRef.current = verifyFn;
-  const logoutRef = useRef(logout);
-  logoutRef.current = logout;
-
-  // One-shot guard per wallet address. NEVER cleared while the address is
-  // unchanged — this is what kills the historic verify loop.
   const inFlightRef = useRef<string | null>(null);
-  const completedRef = useRef<Set<string>>(new Set());
-  const unmountedRef = useRef(false);
-  useEffect(() => {
-    unmountedRef.current = false;
-    return () => {
-      unmountedRef.current = true;
-    };
+  const prefetched = useRef<{ address: string; nonce: string; expiresAt: number } | null>(null);
+
+  const prefetchNonce = useCallback(async (addr: string) => {
+    try {
+      const res = await nonceRef.current({ data: { address: addr } });
+      prefetched.current = {
+        address: addr.toLowerCase(),
+        nonce: res.nonce,
+        expiresAt: new Date(res.expiresAt).getTime(),
+      };
+    } catch (e) {
+      logEvent("auth", "warn", "nonce prefetch failed", {
+        message: e instanceof Error ? e.message : String(e),
+      });
+    }
   }, []);
 
-  // The SIWE sign + on-chain verify + Supabase session mint.
-  //
-  // `explicit` means a real user gesture (a tap) is driving this. The wallet's
-  // signing popup can ONLY be opened from inside a user gesture — a popup
-  // requested from a bare effect (e.g. right after the wallet connects) is
-  // blocked by the browser and silently never appears. So the automatic path
-  // (`explicit === false`) NEVER opens the signing popup: it only reuses an
-  // existing Supabase session for a returning wallet. A brand-new connection
-  // signs only once the user taps "Sign to enter", which calls this with
-  // `explicit === true` synchronously inside the tap.
-  const runVerify = useCallback(async (explicit: boolean) => {
-    const addr = addressRef.current;
-    if (!addr) {
-      logEvent("auth", "debug", "verify skipped: no connected wallet");
+  // On connect: reuse an existing session for this wallet, else prefetch a nonce.
+  useEffect(() => {
+    if (!address) {
+      prefetched.current = null;
       return;
     }
-
-    if (!explicit) {
-      if (completedRef.current.has(addr.toLowerCase())) return;
-      const { data: sess } = await supabase.auth.getSession();
-      const existingEmail = sess.session?.user.email ?? "";
-      if (existingEmail === `${addr.toLowerCase()}@wallet.baycmc.local`) {
-        logEvent(
-          "auth",
-          "info",
-          "verify: existing Supabase session matches wallet — short-circuit",
-        );
-        completedRef.current.add(addr.toLowerCase());
-        if (!isVerifiedFresh(addr)) markVerified(addr);
-      } else {
-        logEvent(
-          "auth",
-          "info",
-          "verify: wallet connected — awaiting user tap (popup needs a gesture)",
-        );
-      }
-      return;
-    }
-
-    // Explicit path — single-flight so a double-tap can't fire two popups.
-    if (inFlightRef.current === addr) {
-      logEvent("auth", "debug", "verify skipped: signature already in-flight");
-      return;
-    }
-    inFlightRef.current = addr;
-    const toastId = `glyph-bridge-${addr.toLowerCase()}`;
-    logEvent("auth", "info", "verify: entering signature path", {
-      address: addr.slice(0, 6) + "…" + addr.slice(-4),
-    });
-
-    try {
-      patchGlyphSnapshot({ verifying: true });
-      logEvent("auth", "info", "verify: building SIWE + calling signMessage");
-
-      const domain = window.location.host;
-      const origin = window.location.origin;
-      const nonce = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
-      const siwe = new SiweMessage({
-        domain,
-        address: addr,
-        uri: origin,
-        version: "1",
-        chainId: 1,
-        nonce,
-        issuedAt: new Date().toISOString(),
-        expirationTime: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-      });
-      const message = siwe.prepareMessage();
-
-      // signMessage is invoked synchronously here (inside the user's tap) so
-      // the wallet's signing popup is allowed to open.
-      let signature: string;
-      try {
-        signature = await withTimeout(
-          signMessageRef.current({ message }),
-          45_000,
-          "Signature request timed out. Please try signing in again.",
-        );
-      } catch (e) {
-        if (!isChunkLoadError(e)) throw e;
-        logEvent("auth", "warn", "verify: signMessage chunk-load failed — retrying", {
-          message: e instanceof Error ? e.message : String(e),
-        });
-        toast.loading("Reloading wallet sign-in…", { id: toastId, position: "top-center" });
-        await new Promise((r) => window.setTimeout(r, 600));
-        toast.dismiss(toastId);
-        signature = await withTimeout(
-          signMessageRef.current({ message }),
-          45_000,
-          "Signature request timed out. Please try signing in again.",
-        );
-      }
-      if (unmountedRef.current) {
-        logEvent("auth", "warn", "verify: aborted after signMessage — component unmounted");
+    let cancelled = false;
+    void (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (cancelled) return;
+      if (data.session?.user.email === `${address.toLowerCase()}@wallet.baycmc.local`) {
+        markVerified(address);
         return;
       }
-      logEvent("auth", "info", "verify: signature obtained — calling verifyFn");
+      await prefetchNonce(address);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [address, prefetchNonce]);
 
-      // Pull the freshest linked-wallets list from Glyph before verifying. Try
-      // a refreshUser() so React state catches up, then hit Glyph's REST API
-      // directly using the stored widget token — the REST result is the
-      // source of truth and is independent of React render timing. Fall back
-      // to whatever we already had on state if the REST call returns empty.
-      try {
-        await refreshUserRef.current?.(true);
-      } catch (e) {
-        logEvent("auth", "debug", "verify: refreshUser threw (non-fatal)", {
-          message: e instanceof Error ? e.message : String(e),
-        });
+  const runVerify = useCallback(async () => {
+    const addr = addressRef.current;
+    if (!addr) {
+      toast.error("Connect a wallet first.");
+      return;
+    }
+    if (inFlightRef.current === addr) return;
+    inFlightRef.current = addr;
+    const toastId = `wallet-verify-${addr.toLowerCase()}`;
+    patchGlyphSnapshot({ verifying: true });
+    try {
+      let pre = prefetched.current;
+      if (!pre || pre.address !== addr.toLowerCase() || pre.expiresAt - Date.now() < 30_000) {
+        // Only hit when the prefetch is missing/expired. Browser wallets sign
+        // fine after an await; Glyph's popup may need one more tap.
+        await prefetchNonce(addr);
+        pre = prefetched.current;
       }
-      const liveLinked = await fetchGlyphLinkedWallets(addr);
-      const merged: string[] = [];
-      dedupePush(merged, addr);
-      for (const w of liveLinked) dedupePush(merged, w);
-      for (const w of linkedWalletsRef.current) dedupePush(merged, w);
-      logEvent("auth", "info", "verify: linked wallets resolved", {
-        count: merged.length,
-        liveCount: liveLinked.length,
-      });
+      if (!pre) throw new Error("Couldn't start sign-in. Please try again.");
+      prefetched.current = null; // single use
+
+      const message = new SiweMessage({
+        domain: window.location.host,
+        address: addr,
+        statement: "Sign in to BAYCmc. This does not cost gas or move funds.",
+        uri: window.location.origin,
+        version: "1",
+        chainId: 1,
+        nonce: pre.nonce,
+        issuedAt: new Date().toISOString(),
+        expirationTime: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+      }).prepareMessage();
+
+      const signature = await withTimeout(
+        signRef.current({ message, account: addr as `0x${string}` }),
+        90_000,
+        "Signature request timed out. Please try again.",
+      );
 
       toast.loading("Checking BAYC / MAYC ownership…", { id: toastId, position: "top-center" });
       const result = await withTimeout(
-        verifyFnRef.current({
-          data: { message, signature, linkedWallets: merged },
+        verifyRef.current({
+          data: { message, signature, glyphSession: glyphSessionFromStorage() },
         }),
-
-        20_000,
+        25_000,
         "The verification check is taking longer than expected. Please try again.",
       );
-      if (unmountedRef.current) {
-        logEvent("auth", "warn", "verify: aborted after verifyFn — component unmounted");
-        return;
-      }
-      logEvent("auth", "info", "verify: verifyFn returned", {
-        verified: result.verified,
-        hasSession: !!result.session,
-        collection: result.collection,
-        reason: result.reason ?? null,
-      });
-
       if (!result.session) {
-        logEvent("auth", "error", "verify: server returned no session", { reason: result.reason });
         toast.error(result.reason ?? "Sign-in failed.", { id: toastId });
         return;
       }
@@ -461,140 +249,78 @@ export function GlyphBridge({
         refresh_token: result.session.refresh_token,
       });
       if (error) {
-        logEvent("auth", "error", "verify: setSession failed", { message: error.message });
         toast.error(error.message, { id: toastId });
         return;
       }
-      logEvent("auth", "info", "verify: Supabase session set — redirect should follow");
-
-      completedRef.current.add(addr.toLowerCase());
       markVerified(addr);
-
-      // Tell useVerificationStatus consumers to reload their row — the server
-      // fn just rewrote user_verifications.
       window.dispatchEvent(new Event("baycmc:verification-refresh"));
-
       if (result.verified) {
-        toast.success("Verified", { id: toastId, duration: 2500 });
+        toast.success(`Welcome aboard — ${result.collection} verified`, {
+          id: toastId,
+          duration: 3000,
+        });
       } else {
-        toast.error("Not verified", { id: toastId, duration: 2500 });
+        toast.message("You're in the lobby", {
+          id: toastId,
+          description: result.reason ?? "No BAYC/MAYC found — gated rooms stay locked.",
+          duration: 6000,
+        });
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      if (
-        !msg.toLowerCase().includes("user rejected") &&
-        !msg.toLowerCase().includes("user denied")
-      ) {
-        logEvent("auth", "error", "verify: threw", { message: msg });
-        toast.error(msg || "Sign-in failed. Please try again.", { id: toastId });
-      } else {
-        logEvent("auth", "info", "verify: user rejected signature");
+      if (/user rejected|user denied|rejected the request/i.test(msg)) {
         toast.dismiss(toastId);
+      } else {
+        logEvent("auth", "error", "verify threw", { message: msg });
+        toast.error(msg || "Sign-in failed. Please try again.", { id: toastId });
       }
+      // Fresh nonce for the retry.
+      if (addressRef.current) void prefetchNonce(addressRef.current);
     } finally {
-      if (inFlightRef.current === addr) inFlightRef.current = null;
+      inFlightRef.current = null;
       patchGlyphSnapshot({ verifying: false });
     }
-  }, []);
+  }, [prefetchNonce]);
 
-  // Explicit sign trigger. dispatchEvent runs listeners synchronously, so a
-  // tap that dispatches "baycmc:wallet-verify" reaches signMessage inside the
-  // same gesture and the wallet popup is allowed to open. Clearing the
-  // completed guard lets a lobby user re-sign to re-check holdings.
+  // "Sign to enter" taps dispatch this; dispatchEvent is synchronous, so
+  // signMessage starts inside the user gesture.
   useEffect(() => {
-    const onVerify = () => {
-      completedRef.current.clear();
-      void runVerify(true);
-    };
+    const onVerify = () => void runVerify();
     window.addEventListener("baycmc:wallet-verify", onVerify);
     return () => window.removeEventListener("baycmc:wallet-verify", onVerify);
   }, [runVerify]);
 
-  // Hard sign-out from Glyph on demand. The inactivity timer can't call Glyph
-  // hooks itself (it lives outside this React tree), so it dispatches a window
-  // event we handle here from inside the hook context.
   useEffect(() => {
     const onLogout = () => {
-      logEvent("auth", "info", "forced Glyph logout");
-      completedRef.current.clear();
+      prefetched.current = null;
       inFlightRef.current = null;
+      void disconnectRef.current().catch(() => undefined);
+      clearWalletAuthLocalState();
       patchGlyphSnapshot({
-        ready: false,
         authenticated: false,
         address: null,
+        connectorId: null,
         verifying: false,
       });
-      try {
-        logoutRef.current();
-      } catch (e) {
-        console.warn("[GlyphBridge] logout threw", e);
-      }
-      clearWalletAuthLocalState();
     };
     window.addEventListener("baycmc:wallet-logout", onLogout);
     return () => window.removeEventListener("baycmc:wallet-logout", onLogout);
   }, []);
 
-  // Automatic path on connect: reuse an existing Supabase session if there is
-  // one for this wallet (a returning user — no popup needed). A brand-new
-  // connection does NOT sign here; it waits for the user's "Sign to enter"
-  // tap, because the wallet signing popup can't open outside a user gesture.
-  useEffect(() => {
-    void runVerify(false);
-  }, [address, runVerify]);
-
-  // Publish the latest snapshot to the module-level store. `verifying` is
-  // owned by the verify effect — patch the other fields only. The provider is
-  // mounted by the time this component renders, so `ready` is always true here;
-  // `authenticated` tracks wallet connection.
   useEffect(() => {
     patchGlyphSnapshot({
       ready: true,
-      authenticated: isConnected,
+      authenticated: isConnected && !!address,
       address,
+      connectorId: connector?.id ?? null,
     });
-  }, [isConnected, address]);
+  }, [isConnected, address, connector?.id]);
 
   return null;
 }
 
-/**
- * Lazy loader: dynamic-imports @use-glyph/sdk-react + wagmi (both SSR-unsafe to
- * import eagerly) and mounts <GlyphBridge> once the Glyph provider is ready and
- * the hooks are available. wagmi's useAccount reads the WagmiProvider that
- * <GlyphWalletProvider> sets up, so both hooks resolve the same wallet.
- */
+/** Mounted once at the root; renders the bridge as soon as wagmi is ready. */
 export function GlyphBridgeMount() {
-  const glyphReady = useGlyphReady();
-  const [hooks, setHooks] = useState<{ useGlyph: UseGlyph; useAccount: UseAccount } | null>(null);
-
-  useEffect(() => {
-    if (!glyphReady) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const [glyphMod, wagmiMod] = await Promise.all([
-          importWithRetry(() => import("@use-glyph/sdk-react"), {
-            label: "glyph-sdk-react-bridge",
-          }),
-          importWithRetry(() => import("wagmi"), { label: "wagmi-bridge" }),
-        ]);
-        if (cancelled) return;
-        // Store the hook functions; wrap in a fn so React's setState doesn't
-        // invoke them as updaters.
-        setHooks(() => ({
-          useGlyph: glyphMod.useGlyph as unknown as UseGlyph,
-          useAccount: wagmiMod.useAccount as unknown as UseAccount,
-        }));
-      } catch (e) {
-        console.warn("[GlyphBridgeMount] failed to load wallet hooks:", e);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [glyphReady]);
-
-  if (!glyphReady || !hooks) return null;
-  return <GlyphBridge useGlyph={hooks.useGlyph} useAccount={hooks.useAccount} />;
+  const ready = useGlyphReady();
+  return ready ? <WalletBridge /> : null;
 }
