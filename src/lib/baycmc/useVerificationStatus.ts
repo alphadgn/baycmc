@@ -6,7 +6,7 @@ import { useAuth } from "@/lib/auth/useAuth";
 import { useVerificationRevalidation } from "@/hooks/useVerificationRevalidation";
 import { revalidateOwnership } from "@/server/verification.functions";
 
-export type BaycCollection = "BAYC" | "MAYC" | null;
+export type BaycCollection = string | null;
 export interface VerificationStatus {
   loading: boolean;
   error: string | null;
@@ -86,9 +86,7 @@ export function VerificationStatusProvider({ children }: { children: ReactNode }
     isLobby: isAuthenticated && !isVerifiedHolder,
     tokenProof: isVerifiedHolder,
     collection:
-      ver?.bayc_collection === "BAYC" || ver?.bayc_collection === "MAYC"
-        ? ver.bayc_collection
-        : null,
+ver?.bayc_collection ?? null,
     otherpage: !!ver?.otherpage_verified,
     lumina: !!ver?.lumina_verified,
     delegationVerified: !!ver?.delegation_verified,

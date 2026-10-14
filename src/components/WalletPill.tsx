@@ -7,7 +7,7 @@ import { toast } from "sonner";
 
 interface WalletPillProps {
   address: string;
-  collection: "BAYC" | "MAYC" | null;
+  collection: string | null;
   /** Lobby users (Tier 1) get a "Verify holder access" dropdown item that
    *  triggers a fresh Glyph signature + on-chain ownership check. */
   isVerifiedHolder?: boolean;
