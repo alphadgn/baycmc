@@ -14,7 +14,7 @@ import { collectionLabel } from "@/server/ownership/collections";
 export interface OwnershipSnapshot {
   wallet: string | null;
   tokenProof: boolean;
-  collection: "BAYC" | "MAYC" | null;
+  collection: string | null;
   delegationVerified: boolean;
   delegationVault: string | null;
   linkedHolder: string | null;

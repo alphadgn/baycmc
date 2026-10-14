@@ -618,8 +618,8 @@ export const verifyOwnership = createServerFn({ method: "POST" })
         ? "linked"
         : "direct";
 
-    const holdsApe = totalBayc > 0n || totalMayc > 0n;
-    const collection: "BAYC" | "MAYC" | null = holdsApe ? (totalBayc > 0n ? "BAYC" : "MAYC") : null;
+    let holdsApe = totalBayc > 0n || totalMayc > 0n;
+    let collection: string | null = holdsApe ? (totalBayc > 0n ? "BAYC" : "MAYC") : null;
     const delegationDetailsUrl = delegatedFrom
       ? `https://delegate.cash/registry?delegate=${linkedHolder ?? wallet}&vault=${delegatedFrom}`
       : null;
@@ -708,6 +708,22 @@ export const verifyOwnership = createServerFn({ method: "POST" })
       },
       { onConflict: "user_id" },
     );
+
+    // Fast path above only checks BAYC/MAYC. If it found nothing, run the
+    // central ownership engine, which covers every whitelisted collection
+    // (CryptoPunks, Pudgy Penguins, …) across linked + delegated wallets.
+    if (!holdsApe) {
+      try {
+        const { recomputeOwnership } = await import("@/server/ownership.server");
+        const snap = await recomputeOwnership(userId);
+        if (snap.tokenProof) {
+          holdsApe = true;
+          collection = snap.collection;
+        }
+      } catch (e) {
+        console.error("recomputeOwnership during sign-in failed", e);
+      }
+    }
 
     if (holdsApe) {
       const apeHolder = delegatedFrom ?? linkedHolder ?? wallet;

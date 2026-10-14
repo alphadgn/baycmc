@@ -6,7 +6,7 @@ import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import { LinkedWalletsPanel } from "@/components/LinkedWalletsPanel";
 import { VerificationStatusPanel } from "@/components/VerificationStatusPanel";
 import { getOwnershipGraph } from "@/server/verification.functions";
-import { BAYC_CONTRACT } from "@/lib/web3/constants";
+import { ALLOWED_COLLECTIONS } from "@/lib/web3/constants";
 
 type Graph = Awaited<ReturnType<typeof getOwnershipGraph>>;
 
@@ -14,8 +14,9 @@ function shortAddr(a: string) {
   return `${a.slice(0, 6)}…${a.slice(-4)}`;
 }
 
-function labelFor(contract: string): "BAYC" | "MAYC" {
-  return contract.toLowerCase() === BAYC_CONTRACT.toLowerCase() ? "BAYC" : "MAYC";
+function labelFor(contract: string): string {
+  const c = contract.toLowerCase();
+  return ALLOWED_COLLECTIONS.find((a) => a.contract.toLowerCase() === c)?.name ?? "NFT";
 }
 
 export const Route = createFileRoute("/verify")({
