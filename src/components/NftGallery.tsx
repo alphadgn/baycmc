@@ -6,7 +6,13 @@ import { listLinkedWallets } from "@/lib/linked-wallets.functions";
 import { useAuth } from "@/lib/auth/useAuth";
 import { mergeWalletNfts } from "@/lib/wallet-nfts";
 
-export function NftGallery({ address, includeLinkedWallets = false }: { address: string; includeLinkedWallets?: boolean }) {
+export function NftGallery({
+  address,
+  includeLinkedWallets = false,
+}: {
+  address: string;
+  includeLinkedWallets?: boolean;
+}) {
   const { user } = useAuth();
   const listFn = useServerFn(listWalletNfts);
   const listLinked = useServerFn(listLinkedWallets);
@@ -41,15 +47,26 @@ export function NftGallery({ address, includeLinkedWallets = false }: { address:
             failures.push("Couldn't load linked wallets.");
           }
         }
-        const results = await Promise.allSettled([...addresses].map((wallet) => listFn({ data: { address: wallet } })));
+        const results = await Promise.allSettled(
+          [...addresses].map((wallet) => listFn({ data: { address: wallet } })),
+        );
         if (cancelled) return;
         const holdings: NftItem[][] = [];
         for (const result of results) {
           if (result.status === "fulfilled" && result.value.ok) holdings.push(result.value.items);
-          else failures.push(result.status === "fulfilled" ? result.value.reason ?? "Couldn't load wallet NFTs." : "Couldn't load wallet NFTs.");
+          else
+            failures.push(
+              result.status === "fulfilled"
+                ? (result.value.reason ?? "Couldn't load wallet NFTs.")
+                : "Couldn't load wallet NFTs.",
+            );
         }
         setItems(mergeWalletNfts(holdings));
-        setError(failures.length ? `${failures.length} wallet lookup${failures.length === 1 ? "" : "s"} unavailable. ${failures[0]}` : null);
+        setError(
+          failures.length
+            ? `${failures.length} wallet lookup${failures.length === 1 ? "" : "s"} unavailable. ${failures[0]}`
+            : null,
+        );
       } catch (e) {
         if (cancelled) return;
         setError(e instanceof Error ? e.message : "Couldn't load NFTs");
@@ -84,7 +101,9 @@ export function NftGallery({ address, includeLinkedWallets = false }: { address:
       <div className="glass rounded-2xl p-6 shadow-card">
         <div className="flex flex-col items-center justify-center py-10 text-center text-sm text-muted-foreground">
           <ImageOff className="mb-2 h-6 w-6 text-muted-foreground" />
-          {error ? `Couldn't load NFTs — ${error}` : "No NFTs from allowed collections found in your connected wallets."}
+          {error
+            ? `Couldn't load NFTs — ${error}`
+            : "No NFTs from allowed collections found in your connected wallets."}
         </div>
       </div>
     );
@@ -102,7 +121,11 @@ export function NftGallery({ address, includeLinkedWallets = false }: { address:
 
   return (
     <div className="space-y-6">
-      {error && <p role="status" className="text-sm text-destructive">{error}</p>}
+      {error && (
+        <p role="status" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
       {collections.map((col) => (
         <section key={col} className="glass rounded-2xl p-6 shadow-card">
           <div className="flex items-center justify-between">

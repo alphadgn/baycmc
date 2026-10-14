@@ -132,7 +132,13 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
   const [actionTarget, setActionTarget] = useState<LobbyMessage | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
-  const { scrollRef, contentRef, handleScroll, scrollToBottom, showJumpToBottom: jumpVisible } = useChatScroll(channelName, !loading, messages);
+  const {
+    scrollRef,
+    contentRef,
+    handleScroll,
+    scrollToBottom,
+    showJumpToBottom: jumpVisible,
+  } = useChatScroll(channelName, !loading, messages);
 
   const hydrateProfiles = useCallback(
     async (msgs: LobbyMessage[]) => {
@@ -254,7 +260,6 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
       void supabase.removeChannel(ch);
     };
   }, [hydrateProfiles]);
-
 
   const messageById = useMemo(() => {
     const m = new Map<string, LobbyMessage>();
@@ -457,7 +462,9 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
                       key={p.id}
                       className="flex items-center gap-3 rounded-lg p-2 transition hover:bg-secondary/60"
                     >
-                      <div className={`h-9 w-9 shrink-0 overflow-hidden border border-border bg-gradient-gold ${avatarShapeClass(p.avatar_url)}`}>
+                      <div
+                        className={`h-9 w-9 shrink-0 overflow-hidden border border-border bg-gradient-gold ${avatarShapeClass(p.avatar_url)}`}
+                      >
                         {p.avatar_url ? (
                           <img
                             src={p.avatar_url}
@@ -489,49 +496,51 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
           className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-2 sm:p-4"
         >
           <div ref={contentRef} className="space-y-2">
-          {loading ? (
-            <div className="space-y-2">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="h-14 animate-pulse rounded-lg bg-muted/20" />
-              ))}
-            </div>
-          ) : messages.length === 0 ? (
-            <p className="py-12 text-center text-sm text-muted-foreground">
-              Welcome to the lobby. Say hi 👋
-            </p>
-          ) : (
-            enriched.map(({ msg, showDate, date }) => (
-              <div key={msg.id}>
-                {showDate && (
-                  <div className="my-3 flex items-center gap-3 px-2 text-[10px] uppercase tracking-wider text-muted-foreground">
-                    <span className="h-px flex-1 bg-border/60" />
-                    <span>{format(date, "EEE, MMM d, yyyy")}</span>
-                    <span className="h-px flex-1 bg-border/60" />
-                  </div>
-                )}
-                <MessageRow
-                  message={msg}
-                  author={profiles[msg.user_id]}
-                  replyTarget={msg.reply_to_id ? (messageById.get(msg.reply_to_id) ?? null) : null}
-                  replyTargetAuthor={
-                    msg.reply_to_id
-                      ? (profiles[messageById.get(msg.reply_to_id)?.user_id ?? ""] ?? null)
-                      : null
-                  }
-                  reactions={reactions[msg.id] ?? []}
-                  currentUserId={user?.id ?? null}
-                  onReply={() => {
-                    setReplyTo(msg);
-                    setEditing(null);
-                  }}
-                  onReact={(emoji) => toggleReaction(msg.id, emoji)}
-                  onLongPress={() => setActionTarget(msg)}
-                />
+            {loading ? (
+              <div className="space-y-2">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="h-14 animate-pulse rounded-lg bg-muted/20" />
+                ))}
               </div>
-            ))
-          )}
-        </div>
+            ) : messages.length === 0 ? (
+              <p className="py-12 text-center text-sm text-muted-foreground">
+                Welcome to the lobby. Say hi 👋
+              </p>
+            ) : (
+              enriched.map(({ msg, showDate, date }) => (
+                <div key={msg.id}>
+                  {showDate && (
+                    <div className="my-3 flex items-center gap-3 px-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+                      <span className="h-px flex-1 bg-border/60" />
+                      <span>{format(date, "EEE, MMM d, yyyy")}</span>
+                      <span className="h-px flex-1 bg-border/60" />
+                    </div>
+                  )}
+                  <MessageRow
+                    message={msg}
+                    author={profiles[msg.user_id]}
+                    replyTarget={
+                      msg.reply_to_id ? (messageById.get(msg.reply_to_id) ?? null) : null
+                    }
+                    replyTargetAuthor={
+                      msg.reply_to_id
+                        ? (profiles[messageById.get(msg.reply_to_id)?.user_id ?? ""] ?? null)
+                        : null
+                    }
+                    reactions={reactions[msg.id] ?? []}
+                    currentUserId={user?.id ?? null}
+                    onReply={() => {
+                      setReplyTo(msg);
+                      setEditing(null);
+                    }}
+                    onReact={(emoji) => toggleReaction(msg.id, emoji)}
+                    onLongPress={() => setActionTarget(msg)}
+                  />
+                </div>
+              ))
+            )}
           </div>
+        </div>
         {jumpVisible && (
           <button
             type="button"
@@ -999,7 +1008,9 @@ function MessageRow({
       onContextMenu={onContextMenu}
     >
       <div className="group flex max-w-full items-start gap-2.5 rounded-lg px-2 py-1.5 transition hover:bg-secondary/30 sm:gap-3">
-        <div className={`h-9 w-9 shrink-0 overflow-hidden border border-border bg-gradient-gold ${avatarShapeClass(author?.avatar_url)}`}>
+        <div
+          className={`h-9 w-9 shrink-0 overflow-hidden border border-border bg-gradient-gold ${avatarShapeClass(author?.avatar_url)}`}
+        >
           {author?.avatar_url ? (
             <img src={author.avatar_url} alt={name} className="h-full w-full object-cover" />
           ) : (

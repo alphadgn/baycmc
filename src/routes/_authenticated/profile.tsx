@@ -237,9 +237,9 @@ function ProfilePage() {
                 type="button"
                 onClick={() => setPickerOpen(true)}
                 disabled={uploadingAvatar}
-                className={`group relative h-24 w-24 cursor-pointer overflow-hidden ${
-                  avatarShapeClass(avatarUrl)
-                } border-4 border-background bg-gradient-gold shadow-gold transition hover:opacity-90 disabled:cursor-wait`}
+                className={`group relative h-24 w-24 cursor-pointer overflow-hidden ${avatarShapeClass(
+                  avatarUrl,
+                )} border-4 border-background bg-gradient-gold shadow-gold transition hover:opacity-90 disabled:cursor-wait`}
                 aria-label="Change avatar"
               >
                 {avatarUrl ? (

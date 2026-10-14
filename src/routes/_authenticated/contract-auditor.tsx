@@ -80,7 +80,11 @@ function ContractAuditorPage() {
   }, [historyLoaded, status]);
 
   const isLoading = status === "submitted" || status === "streaming";
-  const { scrollRef, contentRef, handleScroll } = useChatScroll(`audit-${user?.id ?? ""}`, historyLoaded && !authLoading, messages);
+  const { scrollRef, contentRef, handleScroll } = useChatScroll(
+    `audit-${user?.id ?? ""}`,
+    historyLoaded && !authLoading,
+    messages,
+  );
 
   async function handleSend() {
     const text = input.trim();
@@ -124,45 +128,52 @@ function ContractAuditorPage() {
         )}
       </div>
 
-      <div ref={scrollRef} onScroll={handleScroll} aria-label="Audit messages" className="min-h-0 flex-1 overflow-y-auto rounded-md border p-3">
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        aria-label="Audit messages"
+        className="min-h-0 flex-1 overflow-y-auto rounded-md border p-3"
+      >
         <div ref={contentRef}>
-        {!historyLoaded || authLoading ? (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Loader2 className="h-3 w-3 animate-spin" /> Loading your audit history…
-          </div>
-        ) : !user ? (
-          <p className="text-sm text-muted-foreground">Sign in to use the contract auditor.</p>
-        ) : messages.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No audits yet. Paste a contract below to start — findings come back grouped by
-            Critical / High / Medium / Low / Informational.
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {messages.map((m) => {
-              const text = m.parts.map((p) => (p.type === "text" ? p.text : "")).join("");
-              return (
-                <div
-                  key={m.id}
-                  className={cn(
-                    "rounded-md px-3 py-2 text-sm whitespace-pre-wrap",
-                    m.role === "user" ? "bg-primary/10 text-foreground" : "bg-muted text-foreground",
-                  )}
-                >
-                  <div className="mb-1 text-xs font-medium opacity-70">
-                    {m.role === "user" ? "You" : "Auditor"}
+          {!historyLoaded || authLoading ? (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" /> Loading your audit history…
+            </div>
+          ) : !user ? (
+            <p className="text-sm text-muted-foreground">Sign in to use the contract auditor.</p>
+          ) : messages.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No audits yet. Paste a contract below to start — findings come back grouped by
+              Critical / High / Medium / Low / Informational.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {messages.map((m) => {
+                const text = m.parts.map((p) => (p.type === "text" ? p.text : "")).join("");
+                return (
+                  <div
+                    key={m.id}
+                    className={cn(
+                      "rounded-md px-3 py-2 text-sm whitespace-pre-wrap",
+                      m.role === "user"
+                        ? "bg-primary/10 text-foreground"
+                        : "bg-muted text-foreground",
+                    )}
+                  >
+                    <div className="mb-1 text-xs font-medium opacity-70">
+                      {m.role === "user" ? "You" : "Auditor"}
+                    </div>
+                    {text}
                   </div>
-                  {text}
+                );
+              })}
+              {isLoading && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" /> Auditing…
                 </div>
-              );
-            })}
-            {isLoading && (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Loader2 className="h-3 w-3 animate-spin" /> Auditing…
-              </div>
-            )}
-          </div>
-        )}
+              )}
+            </div>
+          )}
         </div>
       </div>
 

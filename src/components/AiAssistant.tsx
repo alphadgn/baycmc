@@ -36,7 +36,11 @@ export function AiAssistant() {
   });
 
   const isLoading = status === "submitted" || status === "streaming";
-  const { scrollRef, contentRef, handleScroll } = useChatScroll(`assistant-${mode}`, open, messages);
+  const { scrollRef, contentRef, handleScroll } = useChatScroll(
+    `assistant-${mode}`,
+    open,
+    messages,
+  );
 
   async function handleSend() {
     const text = input.trim();
@@ -81,42 +85,47 @@ export function AiAssistant() {
           </TabsList>
         </Tabs>
 
-        <div ref={scrollRef} onScroll={handleScroll} aria-label="Assistant messages" className="min-h-0 flex-1 overflow-y-auto rounded-md border p-3">
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          aria-label="Assistant messages"
+          className="min-h-0 flex-1 overflow-y-auto rounded-md border p-3"
+        >
           <div ref={contentRef}>
-          {messages.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              {mode === "contract"
-                ? "Paste Solidity code or ask about a contract. You'll get a severity-graded audit."
-                : "Ask about rooms, karaoke, Ape Rides, verification, or anything about the app."}
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {messages.map((m) => {
-                const text = m.parts.map((p) => (p.type === "text" ? p.text : "")).join("");
-                return (
-                  <div
-                    key={m.id}
-                    className={cn(
-                      "rounded-md px-3 py-2 text-sm whitespace-pre-wrap",
-                      m.role === "user"
-                        ? "bg-primary/10 text-foreground"
-                        : "bg-muted text-foreground",
-                    )}
-                  >
-                    <div className="mb-1 text-xs font-medium opacity-70">
-                      {m.role === "user" ? "You" : "Assistant"}
+            {messages.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                {mode === "contract"
+                  ? "Paste Solidity code or ask about a contract. You'll get a severity-graded audit."
+                  : "Ask about rooms, karaoke, Ape Rides, verification, or anything about the app."}
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {messages.map((m) => {
+                  const text = m.parts.map((p) => (p.type === "text" ? p.text : "")).join("");
+                  return (
+                    <div
+                      key={m.id}
+                      className={cn(
+                        "rounded-md px-3 py-2 text-sm whitespace-pre-wrap",
+                        m.role === "user"
+                          ? "bg-primary/10 text-foreground"
+                          : "bg-muted text-foreground",
+                      )}
+                    >
+                      <div className="mb-1 text-xs font-medium opacity-70">
+                        {m.role === "user" ? "You" : "Assistant"}
+                      </div>
+                      {text}
                     </div>
-                    {text}
+                  );
+                })}
+                {isLoading && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" /> Thinking…
                   </div>
-                );
-              })}
-              {isLoading && (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Loader2 className="h-3 w-3 animate-spin" /> Thinking…
-                </div>
-              )}
-            </div>
-          )}
+                )}
+              </div>
+            )}
           </div>
         </div>
 

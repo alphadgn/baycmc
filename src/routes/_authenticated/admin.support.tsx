@@ -149,7 +149,9 @@ function AdminSupport() {
                         active ? "bg-gold/10 ring-1 ring-gold/30" : "hover:bg-secondary/40"
                       }`}
                     >
-                      <span className={`mt-0.5 inline-flex h-8 w-8 shrink-0 overflow-hidden border border-border bg-gradient-gold ${avatarShapeClass(t.profile?.avatar_url)}`}>
+                      <span
+                        className={`mt-0.5 inline-flex h-8 w-8 shrink-0 overflow-hidden border border-border bg-gradient-gold ${avatarShapeClass(t.profile?.avatar_url)}`}
+                      >
                         {t.profile?.avatar_url ? (
                           <img
                             src={t.profile.avatar_url}
