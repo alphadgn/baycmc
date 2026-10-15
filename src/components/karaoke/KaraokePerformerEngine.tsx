@@ -41,6 +41,7 @@ import {
 } from "@/lib/karaoke/audioMixBus";
 import { saveKaraokeRecording } from "@/lib/karaoke/recordings.functions";
 import { addPendingTake } from "@/lib/karaoke/pendingTakes";
+import { shouldKeepRecording } from "@/lib/karaoke/takeLifecycle";
 import { useRoomPreferences } from "@/lib/baycmc/useRoomPreferences";
 import {
   getKaraokeStage,
@@ -385,10 +386,22 @@ export function KaraokePerformerEngine({ roomId }: { roomId: string }) {
   }, [room, active, stage.musicInMyMix]);
 
   // 7. Record each performance (one take per song).
+  //
+  // A take lives exactly as long as the PERFORMANCE: from the song starting
+  // until Stop (song cleared), a new song, the turn ending or leaving the
+  // room. Mute and Pause never end it — the recorder has its own feed from
+  // the mix bus, so it doesn't depend on being on air. (It used to require
+  // `published`; muting the mic during a YouTube song took the mix off air,
+  // which ended the take and popped "Save this performance?" mid-song.)
   useEffect(() => {
     const bus = busRef.current;
     const wantRecord =
-      !!bus && active && stage.settings.recording_enabled && !!songKey && published;
+      !!bus &&
+      shouldKeepRecording({
+        active,
+        recordingEnabled: stage.settings.recording_enabled,
+        songKey,
+      });
     if (!wantRecord) {
       if (recKeyRef.current) void finishRecording();
       return;
@@ -427,7 +440,6 @@ export function KaraokePerformerEngine({ roomId }: { roomId: string }) {
     session,
     stage.settings.recording_enabled,
     stage.backingTrack,
-    published,
     finishRecording,
   ]);
 
