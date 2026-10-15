@@ -20,6 +20,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Loader2, Mail, Wallet as WalletIcon, X, Smartphone } from "lucide-react";
 import { toast } from "sonner";
+import { apeChain } from "viem/chains";
 import { useAccount, useConnect, useDisconnect, useSignMessage, type Connector } from "wagmi";
 import { useServerFn } from "@tanstack/react-start";
 import { requestLinkedWalletNonce, verifyAndLinkWallet } from "@/lib/linked-wallets.functions";
@@ -212,7 +213,9 @@ function EntranceBody({
       if (c.type === "injected" && c.id !== GLYPH_CONNECTOR_ID) {
         await requestAccountPicker(c);
       }
-      const res = await connectAsync({ connector: c });
+      const res = await connectAsync(
+        c.id === GLYPH_CONNECTOR_ID ? { connector: c, chainId: apeChain.id } : { connector: c },
+      );
       const target = res.accounts[0];
       if (!target) throw new Error("No account returned from wallet");
       const { message, nonce } = await requestNonce({ data: { address: target } });
@@ -238,7 +241,10 @@ function EntranceBody({
     setPendingId(c.uid);
     try {
       // Called directly from the click so popups (Glyph) / extensions open.
-      await connectAsync({ connector: c });
+      // Glyph always connects on ApeChain — its home chain.
+      await connectAsync(
+        c.id === GLYPH_CONNECTOR_ID ? { connector: c, chainId: apeChain.id } : { connector: c },
+      );
     } catch (e) {
       toast.error(friendlyConnectError(e), { duration: 7000 });
     } finally {
