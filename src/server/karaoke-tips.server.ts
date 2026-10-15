@@ -133,7 +133,8 @@ export async function verifyAndRecordTip(input: {
     tx_hash: input.txHash.toLowerCase(),
     from_address: getAddress(tx.from),
     to_address: to,
-    amount_wei: tx.value.toString(),
+    // numeric column: send as string to keep full wei precision.
+    amount_wei: tx.value.toString() as unknown as number,
     session_generation: input.generation,
   });
   if (error && !/duplicate key|karaoke_tips_tx_unique/i.test(error.message)) {

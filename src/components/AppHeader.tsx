@@ -42,7 +42,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/rooms", label: "Conference Rooms", tier: "verified" },
   { to: "/ape-rides", label: "Ape Rides", tier: "verified" },
   { to: "/lifers/messages", label: "Lifer Chat", tier: "lifer" },
-  { to: "/karaoke", label: "Karaoke Room", tier: "lobby_only" },
+  { to: "/karaoke", label: "Karaoke Room", tier: "all" },
   { to: "/profile", label: "Profile", tier: "all" },
   { to: "/support", label: "Support", tier: "all" },
   { to: "/admin", label: "Administrator", tier: "admin" },
