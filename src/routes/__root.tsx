@@ -9,6 +9,7 @@ import { AuthRedirectWatcher } from "@/components/AuthRedirectWatcher";
 import { AccountMergeWatcher } from "@/components/AccountMergeWatcher";
 import { Toaster } from "@/components/ui/sonner";
 import { AiAssistant } from "@/components/AiAssistant";
+import { KaraokeSaveTakeDialog } from "@/components/karaoke/KaraokeSaveTakeDialog";
 import { VerificationStatusProvider } from "@/lib/baycmc/useVerificationStatus";
 import { installDiagnostics } from "@/lib/diagnostics";
 import { useNotificationPrefs } from "@/lib/baycmc/useNotificationPrefs";
@@ -131,6 +132,7 @@ function RootComponent() {
           <AppHeader />
           <Outlet />
           <GatedToaster />
+          <KaraokeSaveTakeDialog />
           <InactivityWatcher />
           <AuthRedirectWatcher />
           <AccountMergeWatcher />

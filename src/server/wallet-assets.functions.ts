@@ -30,11 +30,6 @@ function alchemyKey(): string | null {
   }
 }
 
-function alchemyNftBaseUrl(): string | null {
-  const key = alchemyKey();
-  return key ? `https://eth-mainnet.g.alchemy.com/nft/v3/${key}` : null;
-}
-
 function alchemyCoreBaseUrl(): string | null {
   const key = alchemyKey();
   return key ? `https://eth-mainnet.g.alchemy.com/v2/${key}` : null;
@@ -54,23 +49,7 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   }
 }
 
-export interface NftItem {
-  contract: string;
-  tokenId: string;
-  name: string | null;
-  collection: string | null;
-  image: string | null;
-  openseaUrl: string;
-}
-
-interface AlchemyNftResponse {
-  ownedNfts?: Array<{
-    contract?: { address?: string; name?: string; openSeaMetadata?: { collectionName?: string } };
-    tokenId?: string;
-    name?: string;
-    image?: { cachedUrl?: string; thumbnailUrl?: string; originalUrl?: string };
-  }>;
-}
+export type { NftItem } from "@/server/nft-holdings.server";
 
 /**
  * List the NFTs owned by a wallet address. Caller must be authenticated.
@@ -85,39 +64,13 @@ export const listWalletNfts = createServerFn({ method: "POST" })
     if (!isAddress(data.address)) {
       return { ok: false as const, reason: "invalid-address" as const, items: [] };
     }
-    const owner = getAddress(data.address);
-    const base = alchemyNftBaseUrl();
-    if (!base) {
-      return {
-        ok: false as const,
-        reason: "NFT lookup requires an Alchemy API key.",
-        items: [],
-      };
-    }
-    // Only collections whitelisted by this app (single source of truth).
-    const { REQUIRED_COLLECTIONS } = await import("@/lib/web3/constants");
-    const allowed = new Set(REQUIRED_COLLECTIONS.map((c) => c.toLowerCase()));
-    const filter = REQUIRED_COLLECTIONS.map((c) => `&contractAddresses[]=${c}`).join("");
-    const url = `${base}/getNFTsForOwner?owner=${owner}&withMetadata=true&pageSize=100${filter}`;
+    const owner = getAddress(data.address) as `0x${string}`;
+    // Only collections whitelisted by this app, each read on its own chain
+    // (Ethereum, ApeChain, Robinhood Chain).
     try {
-      const resp = await fetchJson<AlchemyNftResponse>(url);
-      const items: NftItem[] = (resp.ownedNfts ?? []).map((n) => {
-        const contract = (n.contract?.address ?? "").toLowerCase();
-        const tokenId = n.tokenId ?? "";
-        const collection = n.contract?.openSeaMetadata?.collectionName ?? n.contract?.name ?? null;
-        const image = n.image?.cachedUrl ?? n.image?.thumbnailUrl ?? n.image?.originalUrl ?? null;
-        return {
-          contract,
-          tokenId,
-          name: n.name ?? null,
-          collection,
-          image,
-          openseaUrl: `https://opensea.io/assets/ethereum/${contract}/${tokenId}`,
-        };
-      });
-      const kept = items.filter((i) => allowed.has(i.contract));
-      kept.sort((a, b) => (a.collection ?? "").localeCompare(b.collection ?? ""));
-      return { ok: true as const, items: kept };
+      const { listAllowedNfts } = await import("@/server/nft-holdings.server");
+      const items = await listAllowedNfts(owner, alchemyKey());
+      return { ok: true as const, items };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error("listWalletNfts failed", msg);

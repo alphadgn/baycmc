@@ -40,6 +40,7 @@ import {
   getBackingElement,
 } from "@/lib/karaoke/audioMixBus";
 import { saveKaraokeRecording } from "@/lib/karaoke/recordings.functions";
+import { addPendingTake } from "@/lib/karaoke/pendingTakes";
 import { useRoomPreferences } from "@/lib/baycmc/useRoomPreferences";
 import {
   getKaraokeStage,
@@ -97,9 +98,8 @@ export function KaraokePerformerEngine({ roomId }: { roomId: string }) {
     if (!result || !userId || !meta || result.blob.size < 8_000 || result.durationMs < 5_000)
       return;
     const hasInstrumental = !!meta.backingTrackId || bus.hasMusicStream();
-    // Never auto-save: ask the singer at the end of every performance.
-    const upload = async () => {
-    try {
+    // Never auto-save: park the take and ask the singer (KaraokeSaveTakeDialog).
+    const save = async () => {
       const baseMime = result.mime.split(";")[0] || "audio/webm";
       const ext = baseMime.includes("mp4") ? "m4a" : "webm";
       const storagePath = `${userId}/${roomId}/take-${Date.now()}.${ext}`;
@@ -124,18 +124,15 @@ export function KaraokePerformerEngine({ roomId }: { roomId: string }) {
       });
       window.dispatchEvent(new Event("karaoke:recordings-changed"));
       toast.success("Performance saved", { description: "Replay it any time under Takes." });
-    } catch (e) {
-      console.warn("[karaoke-engine] recording upload failed", e);
-      toast.error("Couldn't save your take", {
-        description: e instanceof Error ? e.message : undefined,
-      });
-    }
     };
-    toast("Save this performance?", {
-      description: `${meta.title ?? "Your take"} · ${Math.round(result.durationMs / 1000)}s`,
-      duration: Infinity,
-      action: { label: "Save", onClick: () => void upload() },
-      cancel: { label: "Discard", onClick: () => undefined },
+    addPendingTake({
+      id: `${roomId}:${meta.generation}:${Date.now()}`,
+      blob: result.blob,
+      mime: result.mime,
+      durationMs: result.durationMs,
+      title: meta.title,
+      artist: meta.artist,
+      save,
     });
   }, [roomId, saveFn]);
 
