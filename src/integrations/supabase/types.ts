@@ -700,56 +700,6 @@ export type Database = {
           },
         ]
       }
-      karaoke_tips: {
-        Row: {
-          amount_wei: number
-          chain_id: number
-          created_at: string
-          from_address: string
-          id: string
-          recipient_id: string
-          room_id: string
-          session_generation: number | null
-          tipper_id: string
-          to_address: string
-          tx_hash: string
-        }
-        Insert: {
-          amount_wei: number | string
-          chain_id?: number
-          created_at?: string
-          from_address: string
-          id?: string
-          recipient_id: string
-          room_id: string
-          session_generation?: number | null
-          tipper_id: string
-          to_address: string
-          tx_hash: string
-        }
-        Update: {
-          amount_wei?: number | string
-          chain_id?: number
-          created_at?: string
-          from_address?: string
-          id?: string
-          recipient_id?: string
-          room_id?: string
-          session_generation?: number | null
-          tipper_id?: string
-          to_address?: string
-          tx_hash?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "karaoke_tips_room_id_fkey"
-            columns: ["room_id"]
-            isOneToOne: false
-            referencedRelation: "rooms"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       karaoke_songs: {
         Row: {
           artist: string | null
@@ -788,6 +738,56 @@ export type Database = {
           youtube_id?: string | null
         }
         Relationships: []
+      }
+      karaoke_tips: {
+        Row: {
+          amount_wei: number
+          chain_id: number
+          created_at: string
+          from_address: string
+          id: string
+          recipient_id: string
+          room_id: string
+          session_generation: number | null
+          tipper_id: string
+          to_address: string
+          tx_hash: string
+        }
+        Insert: {
+          amount_wei: number
+          chain_id?: number
+          created_at?: string
+          from_address: string
+          id?: string
+          recipient_id: string
+          room_id: string
+          session_generation?: number | null
+          tipper_id: string
+          to_address: string
+          tx_hash: string
+        }
+        Update: {
+          amount_wei?: number
+          chain_id?: number
+          created_at?: string
+          from_address?: string
+          id?: string
+          recipient_id?: string
+          room_id?: string
+          session_generation?: number | null
+          tipper_id?: string
+          to_address?: string
+          tx_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "karaoke_tips_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       lifer_messages: {
         Row: {
