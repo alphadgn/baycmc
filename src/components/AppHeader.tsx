@@ -338,7 +338,7 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
         <WalletPill
           address={walletAddress}
           collection={isVerifiedHolder ? (collection ?? null) : null}
-          collections={isVerifiedHolder ? collections : []}
+          collections={collections}
           isVerifiedHolder={isVerifiedHolder}
           onVerify={() => window.dispatchEvent(new Event("baycmc:wallet-verify"))}
           verifying={glyph.verifying || verifLoading}

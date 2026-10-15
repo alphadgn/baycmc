@@ -50,7 +50,7 @@ const TRANSFER_EVENT = parseAbiItem(
 );
 
 const FETCH_TIMEOUT_MS = 12_000;
-const CHAIN_BUDGET_MS = 22_000;
+const CHAIN_BUDGET_MS = 28_000;
 const MAX_PAGES = 10; // Alchemy: 100 per page → up to 1,000 per wallet
 const MAX_IDS = 1_000;
 const SERVER_METADATA = 12; // the rest load their metadata in the browser
@@ -173,6 +173,47 @@ async function idsViaEnumerable(
   }
 }
 
+
+const LOGS_BUDGET_MS = 15_000;
+const MAX_LOG_SPLITS = 64;
+
+type TransferLog = Awaited<ReturnType<Client["getLogs"]>>[number] & {
+  args: { from?: `0x${string}`; to?: `0x${string}`; tokenId?: bigint };
+};
+
+/**
+ * eth_getLogs over [from, to]; public nodes often reject a whole-history
+ * range ("block range too large" / "too many results"), so on error the range
+ * is split in half and retried, within a time budget. Throws if it can't
+ * finish — the caller then shows a "Collection × N" card instead.
+ */
+async function logsAdaptive(
+  client: Client,
+  address: `0x${string}`,
+  args: { from?: `0x${string}`; to?: `0x${string}` },
+  from: bigint,
+  to: bigint,
+  deadline: number,
+  budget = { splits: 0 },
+): Promise<TransferLog[]> {
+  if (Date.now() > deadline) throw new Error("log scan out of time");
+  try {
+    return (await client.getLogs({
+      address,
+      event: TRANSFER_EVENT,
+      args,
+      fromBlock: from,
+      toBlock: to,
+    })) as TransferLog[];
+  } catch (e) {
+    if (to - from < 1_000n || ++budget.splits > MAX_LOG_SPLITS) throw e;
+    const mid = from + (to - from) / 2n;
+    const left = await logsAdaptive(client, address, args, from, mid, deadline, budget);
+    const right = await logsAdaptive(client, address, args, mid + 1n, to, deadline, budget);
+    return [...left, ...right];
+  }
+}
+
 /** Replay ordered transfer events → token ids currently held. */
 export function holdingsFromTransfers(events: { id: bigint; in: boolean }[]): Set<bigint> {
   const held = new Set<bigint>();
@@ -192,22 +233,12 @@ async function idsViaTransferLogs(
   address: `0x${string}`,
   owner: `0x${string}`,
 ): Promise<string[] | null> {
+  const deadline = Date.now() + LOGS_BUDGET_MS;
   try {
+    const latest = await client.getBlockNumber();
     const [incoming, outgoing] = await Promise.all([
-      client.getLogs({
-        address,
-        event: TRANSFER_EVENT,
-        args: { to: owner },
-        fromBlock: 0n,
-        toBlock: "latest",
-      }),
-      client.getLogs({
-        address,
-        event: TRANSFER_EVENT,
-        args: { from: owner },
-        fromBlock: 0n,
-        toBlock: "latest",
-      }),
+      logsAdaptive(client, address, { to: owner }, 0n, latest, deadline),
+      logsAdaptive(client, address, { from: owner }, 0n, latest, deadline),
     ]);
     const pos = (l: { blockNumber: bigint | null; logIndex: number | null }) =>
       (l.blockNumber ?? 0n) * 100_000n + BigInt(l.logIndex ?? 0);

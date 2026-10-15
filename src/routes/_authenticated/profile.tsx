@@ -292,18 +292,23 @@ function ProfilePage() {
                   {r.replace("_", " ")}
                 </span>
               ))}
-              {verification.isVerifiedHolder &&
-                (verification.collections.length > 0 ? verification.collections : [null]).map(
-                  (label) => (
-                    <span
-                      key={label ?? "holder"}
-                      className="rounded-full border border-success/30 bg-success/10 px-3 py-1 text-xs font-semibold text-success"
-                    >
-                      {label ? `${collectionNameForLabel(label)} verified` : "Holder verified"}
-                    </span>
-                  ),
-                )}
-              {!verification.isVerifiedHolder && (
+              {/* Every collection verified this session — full-access AND
+                  partner collections (Temp Agency / Orca / Ugly Duck), which
+                  don't grant the holder clubhouse but are still verified. */}
+              {verification.collections.map((label) => (
+                <span
+                  key={label}
+                  className="rounded-full border border-success/30 bg-success/10 px-3 py-1 text-xs font-semibold text-success"
+                >
+                  {collectionNameForLabel(label)} verified
+                </span>
+              ))}
+              {verification.isVerifiedHolder && verification.collections.length === 0 && (
+                <span className="rounded-full border border-success/30 bg-success/10 px-3 py-1 text-xs font-semibold text-success">
+                  Holder verified
+                </span>
+              )}
+              {!verification.isVerifiedHolder && verification.collections.length === 0 && (
                 <span className="rounded-full border border-border bg-muted/30 px-3 py-1 text-xs text-muted-foreground">
                   {verification.loading
                     ? "Checking…"
@@ -364,7 +369,22 @@ function ProfilePage() {
           </p>
           <ul className="mt-5 space-y-3">
             <VerifyRow
-              label="BAYC/MAYC ownership"
+              label="Collections (this sign-in)"
+              ok={verification.collections.length > 0}
+              action={
+                <span className="text-right text-xs text-muted-foreground">
+                  {verification.loading
+                    ? "Checking…"
+                    : verification.collections.length > 0
+                      ? verification.collections.map((l) => collectionNameForLabel(l)).join(", ")
+                      : verification.error
+                        ? "Status unavailable"
+                        : "None found"}
+                </span>
+              }
+            />
+            <VerifyRow
+              label="Holder clubhouse (BAYC / MAYC / CryptoPunks)"
               ok={verification.isVerifiedHolder}
               action={
                 <span className="text-xs text-muted-foreground">
