@@ -22,13 +22,13 @@ function labelFor(contract: string): string {
 export const Route = createFileRoute("/verify")({
   head: () => ({
     meta: [
-      { title: "Verify BAYC / MAYC ownership — BAYCMC" },
+      { title: "Verify BAYC / MAYC ownership — BAYCmc" },
       {
         name: "description",
         content:
-          "End-to-end walkthrough for verifying Bored Ape or Mutant Ape ownership and linking additional wallets to unlock the BAYCMC clubhouse.",
+          "End-to-end walkthrough for verifying Bored Ape or Mutant Ape ownership and linking additional wallets to unlock the BAYCmc clubhouse.",
       },
-      { property: "og:title", content: "Verify BAYC / MAYC ownership — BAYCMC" },
+      { property: "og:title", content: "Verify BAYC / MAYC ownership — BAYCmc" },
       {
         property: "og:description",
         content:
@@ -53,7 +53,7 @@ const STEPS: Step[] = [
     title: "Sign in with your wallet",
     body: (
       <>
-        From the BAYCMC home page tap <span className="font-semibold">VIP</span> and connect with
+        From the BAYCmc home page tap <span className="font-semibold">VIP</span> and connect with
         Glyph. Glyph supports any EVM wallet — MetaMask, Rainbow, Coinbase Wallet, Ledger via
         WalletConnect — and embedded email wallets. Your signing wallet address is stored on your
         profile and used as the primary check.
@@ -66,7 +66,7 @@ const STEPS: Step[] = [
     title: "Sign the ownership challenge",
     body: (
       <>
-        Right after sign-in BAYCMC checks your wallet for{" "}
+        Right after sign-in BAYCmc checks your wallet for{" "}
         <a
           href="https://etherscan.io/address/0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D"
           target="_blank"
@@ -95,7 +95,7 @@ const STEPS: Step[] = [
     title: "Delegate.cash vaults are auto-walked",
     body: (
       <>
-        If your signer wallet doesn't hold an ape, BAYCMC asks the{" "}
+        If your signer wallet doesn't hold an ape, BAYCmc asks the{" "}
         <a
           href="https://etherscan.io/address/0x00000000000000447e69651d841bD8D104Bed493"
           target="_blank"
@@ -116,7 +116,7 @@ const STEPS: Step[] = [
     body: (
       <>
         Hold your ape on a wallet you don't sign in with — and don't use delegate.cash? Add it
-        below. Each linked wallet must sign a one-time challenge to prove control, then BAYCMC
+        below. Each linked wallet must sign a one-time challenge to prove control, then BAYCmc
         walks it on-chain alongside the signer wallet and every incoming delegation.
       </>
     ),

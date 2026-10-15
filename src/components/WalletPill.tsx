@@ -4,10 +4,13 @@ import { Activity, ChevronDown, Copy, Loader2, Lock, LogOut, User as UserIcon } 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { signOut } from "@/lib/auth/useAuth";
 import { toast } from "sonner";
+import { collectionNameForLabel } from "@/lib/web3/constants";
 
 interface WalletPillProps {
   address: string;
   collection: string | null;
+  /** Every verified collection (labels) — shown as one chip each. */
+  collections?: string[];
   /** Lobby users (Tier 1) get a "Verify holder access" dropdown item that
    *  triggers a fresh Glyph signature + on-chain ownership check. */
   isVerifiedHolder?: boolean;
@@ -51,6 +54,7 @@ function AddressAvatar({ address, size = 20 }: { address: string; size?: number 
 export function WalletPill({
   address,
   collection,
+  collections,
   isVerifiedHolder = collection !== null,
   onVerify,
   verifying = false,
@@ -112,17 +116,22 @@ export function WalletPill({
             </div>
             <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
               <span className="h-1.5 w-1.5 rounded-full bg-success" />
-              Ethereum Mainnet
+              Ethereum · ApeChain · Robinhood Chain
             </div>
           </div>
         </div>
 
-        {collection && (
-          <div className="px-4 py-3">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-gold/40 bg-gold/10 px-2.5 py-1 text-[11px] font-semibold text-gold">
-              <span className="h-1.5 w-1.5 rounded-full bg-gold" />
-              {collection} verified
-            </span>
+        {(collections?.length ? collections : collection ? [collection] : []).length > 0 && (
+          <div className="flex flex-wrap gap-1.5 px-4 py-3">
+            {(collections?.length ? collections : [collection as string]).map((label) => (
+              <span
+                key={label}
+                className="inline-flex items-center gap-1.5 rounded-full border border-gold/40 bg-gold/10 px-2.5 py-1 text-[11px] font-semibold text-gold"
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-gold" />
+                {collectionNameForLabel(label)} verified
+              </span>
+            ))}
           </div>
         )}
 
@@ -145,7 +154,7 @@ export function WalletPill({
               {verifying ? "Verifying…" : "Verify holder access"}
             </button>
             <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
-              Re-checks BAYC/MAYC ownership on-chain (direct or via delegate.cash). You'll be asked
+              Re-checks every approved collection on-chain (direct or via delegate.cash). You'll be asked
               to sign a message.
             </p>
           </div>

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { Sparkles, Send, Loader2, ShieldCheck } from "lucide-react";
+import { Sparkles, Send, Loader2 } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -11,33 +11,28 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useChatScroll } from "@/hooks/use-chat-scroll";
 import { cn } from "@/lib/utils";
 
-type Mode = "assistant" | "contract";
-
 /**
- * Floating AI Assistant. Two modes over the same /api/chat endpoint:
- *  - assistant: GPT-5.5 for general app logic help
- *  - contract:  GPT-5.5 in smart-contract auditor mode (Solidity, security)
+ * Floating BAYCmc Assistant — customer-facing help for BAYCmc and
+ * Bored Ape Yacht Club / Yuga Labs questions, answered from official
+ * sources (see /api/chat).
  */
 export function AiAssistant() {
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<Mode>("assistant");
   const [input, setInput] = useState("");
 
   const { messages, sendMessage, status, setMessages } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/chat",
-      body: () => ({ mode }),
     }),
   });
 
   const isLoading = status === "submitted" || status === "streaming";
   const { scrollRef, contentRef, handleScroll } = useChatScroll(
-    `assistant-${mode}`,
+    "assistant",
     open,
     messages,
   );
@@ -61,29 +56,17 @@ export function AiAssistant() {
         </Button>
       </SheetTrigger>
       <SheetContent side="right" className="flex w-full flex-col gap-3 sm:max-w-md">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4" /> BAYCMC Assistant
+        <SheetHeader className="items-center text-center sm:text-center">
+          <SheetTitle className="flex items-center justify-center gap-2">
+            <Sparkles className="h-4 w-4" /> BAYCmc Assistant
           </SheetTitle>
-          <SheetDescription>In-app AI for logic help and smart-contract review.</SheetDescription>
+          <SheetDescription className="sr-only">
+            Help with BAYCmc and Bored Ape Yacht Club questions.
+          </SheetDescription>
+          <span className="mx-auto inline-flex items-center gap-1 rounded-md bg-muted px-4 py-1.5 text-sm font-medium text-foreground">
+            <Sparkles className="h-3.5 w-3.5" /> Assistant
+          </span>
         </SheetHeader>
-
-        <Tabs
-          value={mode}
-          onValueChange={(v) => {
-            setMode(v as Mode);
-            setMessages([]);
-          }}
-        >
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="assistant">
-              <Sparkles className="mr-1 h-3.5 w-3.5" /> Assistant
-            </TabsTrigger>
-            <TabsTrigger value="contract">
-              <ShieldCheck className="mr-1 h-3.5 w-3.5" /> Contracts
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
 
         <div
           ref={scrollRef}
@@ -93,10 +76,9 @@ export function AiAssistant() {
         >
           <div ref={contentRef}>
             {messages.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                {mode === "contract"
-                  ? "Paste Solidity code or ask about a contract. You'll get a severity-graded audit."
-                  : "Ask about rooms, karaoke, Ape Rides, verification, or anything about the app."}
+              <p className="text-center text-sm text-muted-foreground">
+                Ask about BAYCmc (sign-in, rooms, karaoke, verification) or about Bored Ape Yacht
+                Club and Yuga Labs.
               </p>
             ) : (
               <div className="space-y-3">
@@ -133,9 +115,7 @@ export function AiAssistant() {
           <Textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={
-              mode === "contract" ? "Paste contract code or ask a question…" : "Ask a question…"
-            }
+            placeholder="Ask about BAYCmc or BAYC…"
             rows={2}
             className="resize-none"
             onKeyDown={(e) => {

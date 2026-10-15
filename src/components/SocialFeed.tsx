@@ -4,6 +4,7 @@ import { useAuth } from "@/lib/auth/useAuth";
 import { avatarShapeClass } from "@/lib/profile-avatar";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
+import { shortAddress } from "@/lib/short-address";
 
 interface Post {
   id: string;
@@ -175,7 +176,7 @@ export function SocialFeed({ liferOnly = false }: SocialFeedProps) {
           const name =
             profile?.username ??
             (profile?.wallet_address
-              ? `${profile.wallet_address.slice(0, 6)}…${profile.wallet_address.slice(-4)}`
+              ? `${shortAddress(profile.wallet_address)}`
               : "anon");
           return (
             <article key={p.id} className="glass rounded-2xl p-5 shadow-card">

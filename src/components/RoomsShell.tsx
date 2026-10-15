@@ -4,8 +4,10 @@ import { toast } from "sonner";
 import {
   Bell,
   Calendar as CalendarIcon,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Home,
   HelpCircle,
   LifeBuoy,
@@ -197,23 +199,33 @@ export function RoomsShell({
               main grid. Starts hidden so the video / hero isn't obscured;
               the chevron tab toggles it. */}
           {rightRail && (
-            <div className="xl:hidden border-t border-border/60 bg-card/40">
+            <div
+              className={`xl:hidden flex flex-col border-t border-border/60 bg-card/40 ${
+                railOpen ? "max-h-[60dvh]" : ""
+              }`}
+            >
+              {/* The toggle stays pinned on top of the open panel so it can
+                  always be closed again: ⌃ reveals, ⌄ hides. */}
               <button
                 type="button"
                 onClick={() => setRailOpen((v) => !v)}
                 aria-expanded={railOpen}
                 aria-controls="rooms-shell-mobile-rail"
-                className="flex w-full items-center justify-between gap-2 px-4 py-2 text-[11px] uppercase tracking-widest text-muted-foreground transition hover:bg-secondary/40 sm:px-6"
+                aria-label={railOpen ? "Hide room panels" : "Show room panels"}
+                className="flex w-full shrink-0 items-center justify-between gap-2 px-4 py-2 text-[11px] uppercase tracking-widest text-muted-foreground transition hover:bg-secondary/40 sm:px-6"
               >
                 <span>Room panels</span>
                 {railOpen ? (
-                  <ChevronLeft className="h-3.5 w-3.5 rotate-90" />
+                  <ChevronDown className="h-3.5 w-3.5" />
                 ) : (
-                  <ChevronRight className="h-3.5 w-3.5 rotate-90" />
+                  <ChevronUp className="h-3.5 w-3.5" />
                 )}
               </button>
               {railOpen && (
-                <div id="rooms-shell-mobile-rail" className="px-4 pb-4 sm:px-6">
+                <div
+                  id="rooms-shell-mobile-rail"
+                  className="scrollbar-modern min-h-0 flex-1 overflow-y-auto px-4 pb-4 sm:px-6"
+                >
                   {rightRail}
                 </div>
               )}

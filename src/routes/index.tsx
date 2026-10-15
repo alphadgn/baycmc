@@ -7,12 +7,12 @@ import { EmbroideredImage } from "@/components/EmbroideredImage";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "BAYCMC — the BAYC/MAYC mobile clubhouse" },
-      { property: "og:title", content: "BAYCMC — the BAYC/MAYC mobile clubhouse" },
+      { title: "BAYCmc — the BAYC/MAYC mobile clubhouse" },
+      { property: "og:title", content: "BAYCmc — the BAYC/MAYC mobile clubhouse" },
       {
         property: "og:description",
         content:
-          "The BAYCMC wallet-connected clubhouse for live rooms, member conversations and on-chain holder verification.",
+          "The BAYCmc wallet-connected clubhouse for live rooms, member conversations and on-chain holder verification.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -72,7 +72,7 @@ function Index() {
                   to="/profile"
                   className="rounded-md bg-gradient-gold px-3 py-1.5 text-sm font-semibold text-gold-foreground shadow-gold transition hover:opacity-90"
                 >
-                  Enter BAYCMC →
+                  Enter BAYCmc →
                 </Link>
               ) : (
                 <Link
@@ -191,7 +191,7 @@ function Index() {
 
       <footer className="border-t border-border/50">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-4 py-10 text-sm text-muted-foreground sm:flex-row sm:px-6">
-          <p>© BAYCMC. Not affiliated with Yuga Labs.</p>
+          <p>© BAYCmc. Not affiliated with Yuga Labs.</p>
           <p className="font-mono text-xs">v0.1 · foundation</p>
         </div>
       </footer>

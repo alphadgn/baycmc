@@ -5,6 +5,7 @@ import { supabase as typedSupabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
 import { useChatScroll } from "@/hooks/use-chat-scroll";
 import { toast } from "sonner";
+import { shortAddress } from "@/lib/short-address";
 
 // support_messages is too new to be in the generated Database type — cast
 // through an untyped client so this file compiles before regen.
@@ -254,7 +255,7 @@ export function SupportThread({
               const name =
                 senderProfile?.username ??
                 (senderProfile?.wallet_address
-                  ? `${senderProfile.wallet_address.slice(0, 6)}…${senderProfile.wallet_address.slice(-4)}`
+                  ? `${shortAddress(senderProfile.wallet_address)}`
                   : m.is_admin
                     ? "Admin"
                     : "anon");

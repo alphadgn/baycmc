@@ -634,12 +634,37 @@ export const verifyOwnership = createServerFn({ method: "POST" })
     const password = await deriveWalletPassword(lower);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { wallet: lower, via: "glyph" },
-    });
+    // A wallet that is nobody's PRIMARY wallet but is a signature-verified
+    // linked wallet of exactly one account (e.g. the other half of a merged
+    // account) signs into THAT account — with its roles — instead of minting
+    // a fresh, privilege-less account for the wallet.
+    let linkedOwnerId: string | null = null;
+    {
+      const { data: primaryOwner } = await supabaseAdmin
+        .from("profiles")
+        .select("id")
+        .eq("wallet_address", lower)
+        .maybeSingle();
+      if (!primaryOwner) {
+        const { data: rows } = await supabaseAdmin
+          .from("linked_wallets")
+          .select("user_id")
+          .ilike("address", lower)
+          .not("verified_at", "is", null)
+          .limit(5);
+        const owners = new Set((rows ?? []).map((r) => r.user_id as string));
+        if (owners.size === 1) linkedOwnerId = [...owners][0] ?? null;
+      }
+    }
+
+    const { data: created, error: createErr } = linkedOwnerId
+      ? { data: { user: { id: linkedOwnerId } }, error: null }
+      : await supabaseAdmin.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+          user_metadata: { wallet: lower, via: "glyph" },
+        });
     let userId = created.user?.id;
 
     if (!userId) {
@@ -689,11 +714,10 @@ export const verifyOwnership = createServerFn({ method: "POST" })
       if (w) allLinked.add(w.toLowerCase());
     }
     await supabaseAdmin.from("profiles").upsert(
-      {
-        id: userId,
-        wallet_address: lower,
-        linked_wallets: Array.from(allLinked),
-      },
+      linkedOwnerId
+        ? // Keep the owner's primary wallet; this wallet stays a linked one.
+          { id: userId, linked_wallets: Array.from(allLinked) }
+        : { id: userId, wallet_address: lower, linked_wallets: Array.from(allLinked) },
       { onConflict: "id" },
     );
 
@@ -712,11 +736,12 @@ export const verifyOwnership = createServerFn({ method: "POST" })
     // Fast path above only checks BAYC/MAYC. If it found nothing, run the
     // central ownership engine, which covers every whitelisted collection
     // (CryptoPunks, Pudgy Penguins, …) across linked + delegated wallets.
-    if (!holdsApe) {
+    // Always run it: it records EVERY collection the account holds.
+    {
       try {
         const { recomputeOwnership } = await import("@/server/ownership.server");
         const snap = await recomputeOwnership(userId);
-        if (snap.tokenProof) {
+        if (snap.tokenProof && !holdsApe) {
           holdsApe = true;
           collection = snap.collection;
         }
@@ -742,10 +767,9 @@ export const verifyOwnership = createServerFn({ method: "POST" })
       ]);
     }
 
-    const { data: signIn, error: signInErr } = await supabaseAdmin.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { data: signIn, error: signInErr } = linkedOwnerId
+      ? await sessionForUser(supabaseAdmin, linkedOwnerId)
+      : await supabaseAdmin.auth.signInWithPassword({ email, password });
     if (signInErr || !signIn.session) {
       throw signInErr ?? new Error("Could not mint session");
     }
@@ -778,3 +802,30 @@ export const verifyOwnership = createServerFn({ method: "POST" })
       },
     };
   });
+
+
+/**
+ * Session for an existing account the caller has just proven control of
+ * (a verified linked wallet). Uses a one-time magic-link token server-side;
+ * nothing is emailed and the token never leaves the server.
+ */
+async function sessionForUser(
+  admin: (typeof import("@/integrations/supabase/client.server"))["supabaseAdmin"],
+  userId: string,
+) {
+  const { data: u, error: uErr } = await admin.auth.admin.getUserById(userId);
+  const ownerEmail = u?.user?.email;
+  if (uErr || !ownerEmail) {
+    return { data: { session: null }, error: uErr ?? new Error("Account has no login email") };
+  }
+  const { data: link, error: linkErr } = await admin.auth.admin.generateLink({
+    type: "magiclink",
+    email: ownerEmail,
+  });
+  const tokenHash = link?.properties?.hashed_token;
+  if (linkErr || !tokenHash) {
+    return { data: { session: null }, error: linkErr ?? new Error("Could not mint session") };
+  }
+  const { data, error } = await admin.auth.verifyOtp({ token_hash: tokenHash, type: "magiclink" });
+  return { data: { session: data?.session ?? null }, error };
+}

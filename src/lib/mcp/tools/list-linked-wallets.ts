@@ -4,7 +4,7 @@ import { dbError, jsonResult, supabaseForUser, unauthenticated } from "../supaba
 export default defineTool({
   name: "list_linked_wallets",
   title: "List my linked wallets",
-  description: "List wallets the signed-in user has linked to their BAYCMC account, with verification and last-checked timestamps.",
+  description: "List wallets the signed-in user has linked to their BAYCmc account, with verification and last-checked timestamps.",
   inputSchema: {},
   annotations: { readOnlyHint: true, openWorldHint: false },
   handler: async (_input, ctx) => {

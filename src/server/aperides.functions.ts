@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isInsideWynwood } from "@/lib/baycmc/wynwood";
+import { shortAddress } from "@/lib/short-address";
 
 /**
  * Host starts a new Ape Ride. Server re-validates the GPS coordinate is
@@ -248,7 +249,7 @@ export const getApeRideToken = createServerFn({ method: "POST" })
     const name =
       profile?.username ||
       (profile?.wallet_address
-        ? `${profile.wallet_address.slice(0, 6)}…${profile.wallet_address.slice(-4)}`
+        ? `${shortAddress(profile.wallet_address)}`
         : "Member");
 
     const { AccessToken } = await import("livekit-server-sdk");

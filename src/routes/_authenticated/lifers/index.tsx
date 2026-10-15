@@ -3,7 +3,7 @@ import { BrandLogo } from "@/components/BrandLogo";
 
 export const Route = createFileRoute("/_authenticated/lifers/")({
   head: () => ({
-    meta: [{ title: "Lifers — BAYCMC" }],
+    meta: [{ title: "Lifers — BAYCmc" }],
   }),
   component: LifersHome,
 });
@@ -19,7 +19,7 @@ function LifersHome() {
           </p>
           <h1 className="mt-4 font-display text-3xl font-bold sm:text-4xl">Welcome, Lifer.</h1>
           <p className="mt-3 max-w-2xl text-sm text-muted-foreground sm:text-base">
-            This wing of BAYCMC is invisible to anyone outside the Lifer circle. The conference room
+            This wing of BAYCmc is invisible to anyone outside the Lifer circle. The conference room
             and the Lifer thread are yours.
           </p>
         </div>

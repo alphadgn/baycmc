@@ -16,10 +16,10 @@ import { avatarShapeClass } from "@/lib/profile-avatar";
 export const Route = createFileRoute("/_authenticated/account-merge")({
   head: () => ({
     meta: [
-      { title: "Account linking — BAYCMC" },
-      { name: "description", content: "Manage your connected BAYCMC account identities." },
-      { property: "og:title", content: "Account linking — BAYCMC" },
-      { property: "og:description", content: "Manage your connected BAYCMC account identities." },
+      { title: "Account linking — BAYCmc" },
+      { name: "description", content: "Manage your connected BAYCmc account identities." },
+      { property: "og:title", content: "Account linking — BAYCmc" },
+      { property: "og:description", content: "Manage your connected BAYCmc account identities." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],

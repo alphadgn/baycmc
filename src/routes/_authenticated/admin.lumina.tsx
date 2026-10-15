@@ -15,7 +15,7 @@ export const Route = createFileRoute("/_authenticated/admin/lumina")({
     if (!ok) throw redirect({ to: "/" });
   },
   head: () => ({
-    meta: [{ title: "Admin · Lumina — BAYCMC" }],
+    meta: [{ title: "Admin · Lumina — BAYCmc" }],
   }),
   component: AdminLuminaPage,
 });

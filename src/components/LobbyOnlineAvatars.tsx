@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
 import { avatarShapeClass } from "@/lib/profile-avatar";
+import { shortAddress } from "@/lib/short-address";
 
 interface OnlineMember {
   user_id: string;
@@ -119,7 +120,7 @@ export function LobbyOnlineAvatars({ max = 12 }: LobbyOnlineAvatarsProps) {
           const name =
             m.username ??
             (m.wallet_address
-              ? `${m.wallet_address.slice(0, 6)}…${m.wallet_address.slice(-4)}`
+              ? `${shortAddress(m.wallet_address)}`
               : "anon");
           const initials = (name ?? "??").slice(0, 2).toUpperCase();
           return (

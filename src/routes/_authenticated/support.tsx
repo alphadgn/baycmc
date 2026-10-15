@@ -9,7 +9,7 @@ import { SupportThread } from "@/components/SupportThread";
  * sure they only ever see their own messages plus any admin replies.
  */
 export const Route = createFileRoute("/_authenticated/support")({
-  head: () => ({ meta: [{ title: "Support — BAYCMC" }] }),
+  head: () => ({ meta: [{ title: "Support — BAYCmc" }] }),
   component: SupportPage,
 });
 
@@ -26,7 +26,7 @@ function SupportPage() {
           <p className="text-[10px] uppercase tracking-[0.4em] text-gold">Concierge</p>
           <h1 className="font-display text-3xl font-bold">Support</h1>
           <p className="mt-1 text-xs text-muted-foreground">
-            Direct line to the BAYCMC admins. Send a message and someone will respond as soon as
+            Direct line to the BAYCmc admins. Send a message and someone will respond as soon as
             they're online.
           </p>
         </div>

@@ -26,6 +26,7 @@ import { Route as AuthenticatedKaraokeRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedLifersRouteImport } from './routes/_authenticated/lifers'
 import { Route as AuthenticatedLobbyRouteImport } from './routes/_authenticated/lobby'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
+import { Route as AuthenticatedPunksBrunchRouteImport } from './routes/_authenticated/punks-brunch'
 import { Route as AuthenticatedSuperAdminRouteImport } from './routes/_authenticated/super-admin'
 import { Route as AuthenticatedSupportRouteImport } from './routes/_authenticated/support'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
@@ -138,6 +139,12 @@ const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
   path: '/profile',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedPunksBrunchRoute =
+  AuthenticatedPunksBrunchRouteImport.update({
+    id: '/punks-brunch',
+    path: '/punks-brunch',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedSuperAdminRoute = AuthenticatedSuperAdminRouteImport.update({
   id: '/super-admin',
   path: '/super-admin',
@@ -289,6 +296,7 @@ export interface FileRoutesByFullPath {
   '/lifers': typeof AuthenticatedLifersRouteWithChildren
   '/lobby': typeof AuthenticatedLobbyRoute
   '/profile': typeof AuthenticatedProfileRoute
+  '/punks-brunch': typeof AuthenticatedPunksBrunchRoute
   '/super-admin': typeof AuthenticatedSuperAdminRoute
   '/support': typeof AuthenticatedSupportRoute
   '/api/chat': typeof ApiChatRoute
@@ -328,6 +336,7 @@ export interface FileRoutesByTo {
   '/karaoke': typeof AuthenticatedKaraokeRouteWithChildren
   '/lobby': typeof AuthenticatedLobbyRoute
   '/profile': typeof AuthenticatedProfileRoute
+  '/punks-brunch': typeof AuthenticatedPunksBrunchRoute
   '/super-admin': typeof AuthenticatedSuperAdminRoute
   '/support': typeof AuthenticatedSupportRoute
   '/api/chat': typeof ApiChatRoute
@@ -372,6 +381,7 @@ export interface FileRoutesById {
   '/_authenticated/lifers': typeof AuthenticatedLifersRouteWithChildren
   '/_authenticated/lobby': typeof AuthenticatedLobbyRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
+  '/_authenticated/punks-brunch': typeof AuthenticatedPunksBrunchRoute
   '/_authenticated/super-admin': typeof AuthenticatedSuperAdminRoute
   '/_authenticated/support': typeof AuthenticatedSupportRoute
   '/api/chat': typeof ApiChatRoute
@@ -415,6 +425,7 @@ export interface FileRouteTypes {
     | '/lifers'
     | '/lobby'
     | '/profile'
+    | '/punks-brunch'
     | '/super-admin'
     | '/support'
     | '/api/chat'
@@ -454,6 +465,7 @@ export interface FileRouteTypes {
     | '/karaoke'
     | '/lobby'
     | '/profile'
+    | '/punks-brunch'
     | '/super-admin'
     | '/support'
     | '/api/chat'
@@ -497,6 +509,7 @@ export interface FileRouteTypes {
     | '/_authenticated/lifers'
     | '/_authenticated/lobby'
     | '/_authenticated/profile'
+    | '/_authenticated/punks-brunch'
     | '/_authenticated/super-admin'
     | '/_authenticated/support'
     | '/api/chat'
@@ -659,6 +672,13 @@ declare module '@tanstack/react-router' {
       path: '/profile'
       fullPath: '/profile'
       preLoaderRoute: typeof AuthenticatedProfileRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/punks-brunch': {
+      id: '/_authenticated/punks-brunch'
+      path: '/punks-brunch'
+      fullPath: '/punks-brunch'
+      preLoaderRoute: typeof AuthenticatedPunksBrunchRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/super-admin': {
@@ -926,6 +946,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedLifersRoute: typeof AuthenticatedLifersRouteWithChildren
   AuthenticatedLobbyRoute: typeof AuthenticatedLobbyRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
+  AuthenticatedPunksBrunchRoute: typeof AuthenticatedPunksBrunchRoute
   AuthenticatedSuperAdminRoute: typeof AuthenticatedSuperAdminRoute
   AuthenticatedSupportRoute: typeof AuthenticatedSupportRoute
 }
@@ -940,6 +961,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedLifersRoute: AuthenticatedLifersRouteWithChildren,
   AuthenticatedLobbyRoute: AuthenticatedLobbyRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
+  AuthenticatedPunksBrunchRoute: AuthenticatedPunksBrunchRoute,
   AuthenticatedSuperAdminRoute: AuthenticatedSuperAdminRoute,
   AuthenticatedSupportRoute: AuthenticatedSupportRoute,
 }

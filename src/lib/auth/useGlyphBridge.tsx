@@ -24,6 +24,7 @@ import { SiweMessage } from "siwe";
 import { toast } from "sonner";
 import { useAccount, useConfig, useDisconnect, useSignMessage } from "wagmi";
 import { supabase } from "@/integrations/supabase/client";
+import { collectionNameForLabel } from "@/lib/web3/constants";
 import { getSiweNonce, verifyOwnership } from "@/server/wallet.functions";
 import { useGlyphReady } from "@/components/GlyphAppProvider";
 import { logEvent } from "@/lib/diagnostics";
@@ -282,7 +283,7 @@ function WalletBridge() {
       markVerified(addr);
       window.dispatchEvent(new Event("baycmc:verification-refresh"));
       if (result.verified) {
-        toast.success(`Welcome aboard — ${result.collection} verified`, {
+        toast.success(`Welcome aboard — ${collectionNameForLabel(result.collection) ?? "holder"} verified`, {
           id: toastId,
           duration: 3000,
         });

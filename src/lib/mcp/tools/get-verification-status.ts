@@ -5,7 +5,7 @@ export default defineTool({
   name: "get_my_verification_status",
   title: "Get my verification status",
   description:
-    "Return the signed-in user's BAYCMC verification state (BAYC / OtherPage / delegation / Lumina) and role summary.",
+    "Return the signed-in user's BAYCmc verification state (BAYC / OtherPage / delegation / Lumina) and role summary.",
   inputSchema: {},
   annotations: { readOnlyHint: true, openWorldHint: false },
   handler: async (_input, ctx) => {

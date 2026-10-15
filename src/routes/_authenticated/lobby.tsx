@@ -23,11 +23,11 @@ const LOBBY_IMAGE: string | null = Object.values(LOBBY_IMAGE_MODULES)[0]?.defaul
 export const Route = createFileRoute("/_authenticated/lobby")({
   head: () => ({
     meta: [
-      { title: "Lobby — BAYCMC" },
+      { title: "Lobby — BAYCmc" },
       {
         name: "description",
         content:
-          "The BAYCMC lobby — open chat for every member. Verify your BAYC or MAYC to unlock conference rooms and the rest of the clubhouse.",
+          "The BAYCmc lobby — open chat for every member. Verify your BAYC or MAYC to unlock conference rooms and the rest of the clubhouse.",
       },
     ],
   }),

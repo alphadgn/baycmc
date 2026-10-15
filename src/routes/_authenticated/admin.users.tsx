@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { listUsers, overrideVerification, getMyAdminContext } from "@/server/admin.functions";
+import { shortAddress } from "@/lib/short-address";
 
 interface UserRow {
   id: string;
@@ -28,7 +29,7 @@ export const Route = createFileRoute("/_authenticated/admin/users")({
     const ok = roles?.some((r) => r.role === "admin" || r.role === "super_admin");
     if (!ok) throw redirect({ to: "/" });
   },
-  head: () => ({ meta: [{ title: "Admin · Users — BAYCMC" }] }),
+  head: () => ({ meta: [{ title: "Admin · Users — BAYCmc" }] }),
   component: AdminUsersPage,
 });
 
@@ -150,7 +151,7 @@ function AdminUsersPage() {
                 <tr key={u.id} className="border-b border-border/30">
                   <td className="px-4 py-2">{u.username ?? "—"}</td>
                   <td className="px-4 py-2 font-mono text-[10px]">
-                    {u.wallet_address.slice(0, 6)}…{u.wallet_address.slice(-4)}
+                    {shortAddress(u.wallet_address)}
                   </td>
                   <td className="px-4 py-2">
                     {u.roles.length ? (

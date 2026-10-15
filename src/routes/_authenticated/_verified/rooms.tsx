@@ -38,7 +38,7 @@ interface Booking {
 export const Route = createFileRoute("/_authenticated/_verified/rooms")({
   head: () => ({
     meta: [
-      { title: "Conference Rooms — BAYCMC" },
+      { title: "Conference Rooms — BAYCmc" },
       {
         name: "description",
         content:

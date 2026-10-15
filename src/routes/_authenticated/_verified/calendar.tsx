@@ -29,7 +29,7 @@ interface Booking {
 export const Route = createFileRoute("/_authenticated/_verified/calendar")({
   head: () => ({
     meta: [
-      { title: "Calendar — BAYCMC" },
+      { title: "Calendar — BAYCmc" },
       {
         name: "description",
         content: "Upcoming bookings across every conference room — verified holders only.",

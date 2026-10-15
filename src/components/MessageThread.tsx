@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { GifPicker } from "@/components/GifPicker";
 import type { GifResult } from "@/server/giphy.functions";
+import { shortAddress } from "@/lib/short-address";
 
 /** Tokenize a message body, marking @mentions and #tags as clickable. */
 function renderTokens(body: string, onToken: (token: string) => void) {
@@ -384,7 +385,7 @@ export function MessageThread({
               const name =
                 profile?.username ??
                 (profile?.wallet_address
-                  ? `${profile.wallet_address.slice(0, 6)}…${profile.wallet_address.slice(-4)}`
+                  ? `${shortAddress(profile.wallet_address)}`
                   : "anon");
               const hasAnyContent = !!m.body || !!m.image_url || !!m.gif_url;
               return (

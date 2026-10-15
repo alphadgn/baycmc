@@ -880,6 +880,7 @@ export type Database = {
       }
       lobby_messages: {
         Row: {
+          channel: string
           body: string | null
           created_at: string
           gif_url: string | null
@@ -890,6 +891,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          channel?: string
           body?: string | null
           created_at?: string
           gif_url?: string | null
@@ -900,6 +902,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          channel?: string
           body?: string | null
           created_at?: string
           gif_url?: string | null
@@ -1266,6 +1269,7 @@ export type Database = {
       }
       user_verifications: {
         Row: {
+          verified_collections: string[]
           bayc_collection: string | null
           bayc_token_ids: number[]
           bayc_verified: boolean
@@ -1280,6 +1284,7 @@ export type Database = {
           verified_at: string | null
         }
         Insert: {
+          verified_collections?: string[]
           bayc_collection?: string | null
           bayc_token_ids?: number[]
           bayc_verified?: boolean
@@ -1294,6 +1299,7 @@ export type Database = {
           verified_at?: string | null
         }
         Update: {
+          verified_collections?: string[]
           bayc_collection?: string | null
           bayc_token_ids?: number[]
           bayc_verified?: boolean

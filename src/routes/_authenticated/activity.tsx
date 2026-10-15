@@ -20,7 +20,7 @@ import { listWalletActivity, type ActivityItem } from "@/server/wallet-assets.fu
 export const Route = createFileRoute("/_authenticated/activity")({
   head: () => ({
     meta: [
-      { title: "My Activity — BAYCMC" },
+      { title: "My Activity — BAYCmc" },
       {
         name: "description",
         content:

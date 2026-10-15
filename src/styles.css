@@ -47,7 +47,7 @@
 :root {
   --radius: 0.5rem;
 
-  /* BAYCMC — dark luxury palette (BAYC-inspired) */
+  /* BAYCmc — dark luxury palette (BAYC-inspired) */
   --background: oklch(0.14 0.01 80);
   --foreground: oklch(0.96 0.02 85);
 
@@ -343,7 +343,7 @@
  * Custom scrollbars
  *
  * Windows browsers (Edge especially) ship with a chunky white scrollbar that
- * looks out of place on the dark BAYCMC theme. The default rules below
+ * looks out of place on the dark BAYCmc theme. The default rules below
  * override it app-wide (slim, gold-tinted on hover). Use the explicit
  * utilities to opt OUT or override per-element:
  *   .scrollbar-modern  → restate the default (rare; useful inside iframes)

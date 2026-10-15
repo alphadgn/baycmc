@@ -10,6 +10,7 @@ import {
   listChapterSubmissions,
   reviewChapterSubmission,
 } from "@/server/admin.functions";
+import { shortAddress } from "@/lib/short-address";
 
 interface UserRow {
   id: string;
@@ -52,7 +53,7 @@ export const Route = createFileRoute("/_authenticated/super-admin")({
     const ok = roles?.some((r) => r.role === "super_admin");
     if (!ok) throw redirect({ to: "/" });
   },
-  head: () => ({ meta: [{ title: "Super Admin — BAYCMC" }] }),
+  head: () => ({ meta: [{ title: "Super Admin — BAYCmc" }] }),
   component: SuperAdminPage,
 });
 
@@ -229,7 +230,7 @@ function UsersTab() {
                   <tr key={u.id} className="border-b border-border/30">
                     <td className="px-4 py-2">{u.username ?? "—"}</td>
                     <td className="px-4 py-2 font-mono text-[10px]">
-                      {u.wallet_address.slice(0, 6)}…{u.wallet_address.slice(-4)}
+                      {shortAddress(u.wallet_address)}
                     </td>
                     <td className="px-4 py-2">
                       {u.roles.length ? (
@@ -374,7 +375,7 @@ function ChaptersTab() {
                   <h3 className="font-display text-lg text-gold">{r.chapter_name}</h3>
                   <p className="text-[11px] text-muted-foreground font-mono">
                     {[r.city, r.region].filter(Boolean).join(", ") || "—"} ·{" "}
-                    {r.applicant?.username ?? r.applicant?.wallet_address.slice(0, 10) ?? "—"} ·{" "}
+                    {r.applicant?.username ?? r.applicant?.wallet_address?.slice(0, 10) ?? "—"} ·{" "}
                     {new Date(r.created_at).toLocaleString()}
                   </p>
                 </div>

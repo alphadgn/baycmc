@@ -49,8 +49,9 @@ export const listUsers = createServerFn({ method: "POST" })
       .limit(data.limit ?? 200);
 
     if (data.search && data.search.trim()) {
-      const s = data.search.trim();
-      q = q.or(`wallet_address.ilike.%${s}%,username.ilike.%${s}%`);
+      // Strip PostgREST filter syntax so a search can't inject extra filters.
+      const s = data.search.trim().replace(/[,()*%\\:"']/g, " ").trim();
+      if (s) q = q.or(`wallet_address.ilike.%${s}%,username.ilike.%${s}%`);
     }
 
     const { data: profiles, error } = await q;

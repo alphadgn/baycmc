@@ -5,3 +5,7 @@
 - Verification UI reads the root VerificationStatusProvider snapshot; one user-scoped query and live subscription keep badges and navigation consistent without competing ownership requests.
 - Profile picture frames use avatarShapeClass from src/lib/profile-avatar.ts, keeping NFT and device-photo shapes consistent without importing the wallet picker.
 - Chat lists use useChatScroll with a bounded viewport and observed content wrapper; fetch newest limited history descending and reverse for display so entry never stops at an older message window.
+- Wallet columns (profiles.wallet_address / linked_wallets, linked_wallets.*) are server-written only (service role after a signature check); members may edit only username/bio/avatar and delete their own linked wallets.
+- Collections live in COLLECTION_REGISTRY (src/lib/web3/constants.ts) with chainId + active; only active ones (ALLOWED_COLLECTIONS) grant access, display or tips. user_verifications.verified_collections stores every held label.
+- Chat channels share lobby_messages via `channel`; access is decided by can_access_chat_channel() in RLS (punks-brunch = holds_collection(uid,'PUNKS')).
+- Display wallet addresses with shortAddress() (src/lib/short-address.ts) — email accounts have no wallet.

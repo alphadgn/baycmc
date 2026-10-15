@@ -25,6 +25,7 @@ interface NavItem {
     | "/lifers"
     | "/lifers/messages"
     | "/support"
+    | "/punks-brunch"
     | "/admin"
     | "/super-admin";
   label: string;
@@ -33,12 +34,13 @@ interface NavItem {
   // Rooms hall (it lives there as a karaoke-kind tile), so a duplicate
   // top-level entry would be redundant for them. Lobby visitors still
   // need a direct way in since Conference Rooms is gated.
-  tier: "all" | "lobby_only" | "verified" | "lifer" | "admin" | "super_admin";
+  tier: "all" | "lobby_only" | "verified" | "punks" | "lifer" | "admin" | "super_admin";
 }
 
 const NAV_ITEMS: NavItem[] = [
   { to: "/lobby", label: "Public Lobby", tier: "all" },
   { to: "/feed", label: "Holders Chat", tier: "verified" },
+  { to: "/punks-brunch", label: "Punks Brunch", tier: "punks" },
   { to: "/rooms", label: "Conference Rooms", tier: "verified" },
   { to: "/ape-rides", label: "Ape Rides", tier: "verified" },
   { to: "/lifers/messages", label: "Lifer Chat", tier: "lifer" },
@@ -64,6 +66,7 @@ export function AppHeader() {
   const gate = useAuthGate();
   const isVerifiedHolder = gate.ownsRequiredAsset;
   const isLifer = gate.showLifers;
+  const { collections } = useVerificationStatus();
   const [entranceOpen, setEntranceOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   useEffect(() => {
@@ -184,7 +187,7 @@ export function AppHeader() {
             )}
             <Link
               to={isAuthenticated ? "/lobby" : "/"}
-              aria-label="BAYCMC"
+              aria-label="BAYCmc"
               className="inline-flex min-w-0 shrink cursor-pointer items-center"
             >
               <EmbroideredImage
@@ -222,6 +225,7 @@ export function AppHeader() {
                     {NAV_ITEMS.filter((item) => {
                       // Hide gated items entirely from users without access.
                       if (item.tier === "verified") return isVerifiedHolder;
+                      if (item.tier === "punks") return isAdmin || collections.includes("PUNKS");
                       if (item.tier === "lifer") return isLifer;
                       if (item.tier === "super_admin") return isSuperAdmin;
                       if (item.tier === "admin") return isAdmin;
@@ -289,7 +293,12 @@ function sliceAddress(addr: string) {
 // promise rejection was unhandled.)
 function EntranceControls({ onOpen }: { onOpen: () => void }) {
   const { isAuthenticated, user } = useAuth();
-  const { isVerifiedHolder, collection, loading: verifLoading } = useVerificationStatus();
+  const {
+    isVerifiedHolder,
+    collection,
+    collections,
+    loading: verifLoading,
+  } = useVerificationStatus();
   const glyph = useGlyphAuthState();
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
 
@@ -323,6 +332,7 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
         <WalletPill
           address={walletAddress}
           collection={isVerifiedHolder ? (collection ?? null) : null}
+          collections={isVerifiedHolder ? collections : []}
           isVerifiedHolder={isVerifiedHolder}
           onVerify={() => window.dispatchEvent(new Event("baycmc:wallet-verify"))}
           verifying={glyph.verifying || verifLoading}

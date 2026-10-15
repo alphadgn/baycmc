@@ -6,7 +6,7 @@ export default defineTool({
   name: "book_room",
   title: "Book a clubhouse room",
   description:
-    "Reserve a BAYCMC clubhouse room (conference/karaoke) for a time window. The booking is created as the signed-in user; RLS and the overlap trigger reject conflicts.",
+    "Reserve a BAYCmc clubhouse room (conference/karaoke) for a time window. The booking is created as the signed-in user; RLS and the overlap trigger reject conflicts.",
   inputSchema: {
     room_id: z.string().uuid().describe("The room to book."),
     starts_at: z.string().describe("Booking start (ISO 8601 timestamp)."),
