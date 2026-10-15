@@ -736,11 +736,16 @@ export const verifyOwnership = createServerFn({ method: "POST" })
     // Fast path above only checks BAYC/MAYC. If it found nothing, run the
     // central ownership engine, which covers every whitelisted collection
     // (CryptoPunks, Pudgy Penguins, …) across linked + delegated wallets.
-    // Always run it: it records EVERY collection the account holds.
+    // Always run it, FRESH: every sign-in re-checks the wallets on-chain and
+    // grants access only from what they hold right now — nothing verified in
+    // a previous session carries over, and a failed check grants nothing.
     {
       try {
         const { recomputeOwnership } = await import("@/server/ownership.server");
-        const snap = await recomputeOwnership(userId);
+        const snap = await recomputeOwnership(userId, {
+          fresh: true,
+          confirmedLabels: holdsApe && collection ? [collection] : [],
+        });
         if (snap.tokenProof && !holdsApe) {
           holdsApe = true;
           collection = snap.collection;

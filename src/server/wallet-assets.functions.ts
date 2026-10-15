@@ -69,8 +69,8 @@ export const listWalletNfts = createServerFn({ method: "POST" })
     // (Ethereum, ApeChain, Robinhood Chain).
     try {
       const { listAllowedNfts } = await import("@/server/nft-holdings.server");
-      const items = await listAllowedNfts(owner, alchemyKey());
-      return { ok: true as const, items };
+      const { items, errors } = await listAllowedNfts(owner, alchemyKey());
+      return { ok: true as const, items, warnings: errors };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error("listWalletNfts failed", msg);

@@ -11,3 +11,5 @@
 - Display wallet addresses with shortAddress() (src/lib/short-address.ts) — email accounts have no wallet.
 - Access tiers: collections have `access` "full" (BAYC/MAYC/CryptoPunks → bayc_verified, holder clubhouse) or "partner" (Temp Agency/Orca Business/Ugly Duck Labs → regular menu + Ape Rides via can_use_ape_rides()). Rooms can require one collection via rooms.required_collection (enforced in the LiveKit token gate).
 - Ownership scans batch JSON-RPC calls and retry; a failed check is "unknown" (ScanResult.failed) and must never be stored as "not held".
+- Verification is per sign-in session: wallet sign-in (verifyOwnership) and email sign-in (startVerificationSession) recompute with `fresh: true` (no carry-over, failed checks grant nothing); sign-out (signOut / InactivityWatcher) calls endVerificationSession to wipe it. Mid-session recomputes may keep labels whose check errored (they were verified this session).
+- NFT display (listAllowedNfts) is live per wallet and per chain with its own time budget; partial results + `warnings`, never all-or-nothing.

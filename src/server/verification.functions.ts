@@ -19,6 +19,41 @@ export const revalidateOwnership = createServerFn({ method: "POST" })
   });
 
 /**
+ * Start of a sign-in session (email/password sign-in; wallet sign-in does the
+ * same inside verifyOwnership): wipe the previous session's verification and
+ * re-check every wallet on-chain from scratch.
+ */
+export const startVerificationSession = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { recomputeOwnership } = await import("@/server/ownership.server");
+    return recomputeOwnership(context.userId, { fresh: true });
+  });
+
+/**
+ * Sign-out: verification never outlives the session. The next sign-in must
+ * prove ownership again from the wallet's current contents.
+ */
+export const endVerificationSession = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin
+      .from("user_verifications")
+      .update({
+        bayc_verified: false,
+        bayc_collection: null,
+        verified_collections: [],
+        verified_at: null,
+        delegation_verified: false,
+        delegation_vault: null,
+        otherpage_verified: false,
+      })
+      .eq("user_id", context.userId);
+    return { ok: true as const };
+  });
+
+/**
  * Returns the full wallet graph that drove the latest ownership decision —
  * connected wallet, verified linked wallets, delegate.cash edges, every
  * address scanned, and which (wallet, contract) pairs returned a positive
