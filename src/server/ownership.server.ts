@@ -24,7 +24,21 @@ export interface OwnershipSnapshot {
   reason: string | null;
 }
 
-export async function recomputeOwnership(userId: string): Promise<OwnershipSnapshot> {
+export interface RecomputeOptions {
+  /**
+   * Start of a sign-in session: decide access from THIS check only. Nothing
+   * verified in an earlier session is carried over, and a check that errors
+   * grants nothing (fail closed).
+   */
+  fresh?: boolean;
+  /** Labels positively confirmed on-chain moments ago in the same request. */
+  confirmedLabels?: string[];
+}
+
+export async function recomputeOwnership(
+  userId: string,
+  opts: RecomputeOptions = {},
+): Promise<OwnershipSnapshot> {
   const result = await resolveOwnership(userId);
 
   // Find the "winning" row — direct holder on the connected wallet wins;
@@ -50,7 +64,7 @@ export async function recomputeOwnership(userId: string): Promise<OwnershipSnaps
   // EVERY whitelisted collection held anywhere in the walked graph, in
   // allowlist order (previously only the first hit was stored, so a wallet
   // holding several collections showed just one).
-  const heldLabels = new Set(
+  const heldLabels = new Set<string>(
     result.ownership
       .map((o) => collectionLabel(o.contract))
       .filter((l): l is NonNullable<typeof l> => !!l),
@@ -58,8 +72,12 @@ export async function recomputeOwnership(userId: string): Promise<OwnershipSnaps
   // A check that ERRORED (RPC outage / rate limit) is "unknown", not "0":
   // keep whatever was verified for that collection before, so a flaky node
   // can't silently strip a collection the member really holds.
+  for (const l of opts.confirmedLabels ?? []) heldLabels.add(l);
   const failed = new Set(result.failedContracts.map((c) => c.toLowerCase()));
-  if (failed.size > 0) {
+  // Within a session only: the stored labels were verified earlier in THIS
+  // session (they are wiped at every sign-in and sign-out), so a transient
+  // RPC error mid-session doesn't kick a member out of a room.
+  if (failed.size > 0 && !opts.fresh) {
     const { data: prev } = await supabaseAdmin
       .from("user_verifications")
       .select("verified_collections")
@@ -92,12 +110,12 @@ export async function recomputeOwnership(userId: string): Promise<OwnershipSnaps
     delegation_verified: !!delegationVault,
     delegation_vault: delegationVault,
   };
-  if (result.scanned.length > 0) updates.verified_collections = collections;
+  if (result.scanned.length > 0 || opts.fresh) updates.verified_collections = collections;
   if (tokenProof) {
     updates.bayc_verified = true;
     updates.bayc_collection = collection;
     updates.verified_at = new Date().toISOString();
-  } else if (result.scanned.length > 0 && failed.size === 0) {
+  } else if (opts.fresh || (result.scanned.length > 0 && failed.size === 0)) {
     // Only flip to false on a clean scan — never on RPC errors/outages.
     updates.bayc_verified = false;
     updates.bayc_collection = collection; // partner label (or null)

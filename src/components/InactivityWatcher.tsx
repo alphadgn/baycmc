@@ -43,6 +43,16 @@ export function InactivityWatcher() {
       } catch {
         /* noop */
       }
+      // Same rule as a manual sign-out: verification ends with the session.
+      try {
+        const { endVerificationSession } = await import("@/server/verification.functions");
+        await Promise.race([
+          endVerificationSession(),
+          new Promise((resolve) => setTimeout(resolve, 4_000)),
+        ]);
+      } catch (e) {
+        console.warn("[InactivityWatcher] clearing verification failed", e);
+      }
       try {
         await supabase.auth.signOut();
       } catch (e) {

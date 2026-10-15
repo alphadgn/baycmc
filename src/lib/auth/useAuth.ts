@@ -59,6 +59,18 @@ export async function signOut() {
   } catch {
     /* noop */
   }
+  // Verification never outlives the session: clear it server-side BEFORE the
+  // session ends (needs the auth token). The next sign-in re-checks the
+  // wallet's contents from scratch. Best-effort, bounded.
+  try {
+    const { endVerificationSession } = await import("@/server/verification.functions");
+    await Promise.race([
+      endVerificationSession(),
+      new Promise((resolve) => setTimeout(resolve, 4_000)),
+    ]);
+  } catch (e) {
+    console.warn("[signOut] clearing verification failed", e);
+  }
   try {
     await supabase.auth.signOut();
   } catch (e) {

@@ -51,6 +51,15 @@ function LoginPage() {
           password,
         });
         if (error) throw error;
+        // New session → re-check every linked wallet on-chain from scratch;
+        // nothing from a previous session is trusted.
+        try {
+          const { startVerificationSession } = await import("@/server/verification.functions");
+          await startVerificationSession();
+          window.dispatchEvent(new Event("baycmc:verification-refresh"));
+        } catch (e) {
+          console.warn("[login] fresh verification failed", e);
+        }
         toast.success("Welcome back.");
         void navigate({ to: "/lobby", replace: true });
       }

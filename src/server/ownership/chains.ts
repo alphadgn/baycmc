@@ -64,7 +64,13 @@ export function publicClientFor(chainId: CollectionChainId): PublicClient {
     chain: cfg.chain,
     transport: fallback(
       urls.map((u) =>
-        http(u, { timeout: 10_000, retryCount: 2, batch: { batchSize: 50, wait: 16 } }),
+        http(u, {
+          timeout: 10_000,
+          retryCount: 2,
+          // Robinhood's public node isn't known to accept JSON-RPC batches;
+          // its calls are few (balanceOf, Transfer logs), so send them plain.
+          batch: chainId === CHAIN_ROBINHOOD ? false : { batchSize: 50, wait: 16 },
+        }),
       ),
       { rank: false, retryCount: 1 },
     ),

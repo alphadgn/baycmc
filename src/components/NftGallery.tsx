@@ -66,8 +66,11 @@ export function NftGallery({
         if (cancelled) return;
         const holdings: NftItem[][] = [];
         for (const result of results) {
-          if (result.status === "fulfilled" && result.value.ok) holdings.push(result.value.items);
-          else
+          if (result.status === "fulfilled" && result.value.ok) {
+            holdings.push(result.value.items);
+            const w = (result.value as { warnings?: string[] }).warnings ?? [];
+            for (const msg of w) if (!failures.includes(msg)) failures.push(msg);
+          } else
             failures.push(
               result.status === "fulfilled"
                 ? (result.value.reason ?? "Couldn't load wallet NFTs.")
@@ -75,11 +78,7 @@ export function NftGallery({
             );
         }
         setItems(mergeWalletNfts(holdings));
-        setError(
-          failures.length
-            ? `${failures.length} wallet lookup${failures.length === 1 ? "" : "s"} unavailable. ${failures[0]}`
-            : null,
-        );
+        setError(failures.length ? failures.join(" ") : null);
       } catch (e) {
         if (cancelled) return;
         setError(e instanceof Error ? e.message : "Couldn't load NFTs");
