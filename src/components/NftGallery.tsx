@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { ExternalLink, ImageOff, Loader2 } from "lucide-react";
 import { listWalletNfts, type NftItem } from "@/server/wallet-assets.functions";
@@ -158,20 +158,53 @@ export function NftGallery({
   );
 }
 
+function resolveIpfs(u: string | null | undefined): string | null {
+  if (!u) return null;
+  if (u.startsWith("ipfs://")) return `https://ipfs.io/ipfs/${u.slice(7).replace(/^ipfs\//, "")}`;
+  if (u.startsWith("ar://")) return `https://arweave.net/${u.slice(5)}`;
+  return u;
+}
+
 function NftCard({ nft }: { nft: NftItem }) {
   const [imgError, setImgError] = useState(false);
-  const title = nft.name ?? `#${nft.tokenId}`;
+  // Large holdings: the server sends metadata for the first few only; the
+  // rest load their image here, lazily, straight from the token's metadata.
+  const [lazy, setLazy] = useState<{ image: string | null; name: string | null } | null>(null);
+  const cardRef = useRef<HTMLAnchorElement | null>(null);
+  useEffect(() => {
+    if (nft.image || !nft.metadataUrl || !cardRef.current) return;
+    let cancelled = false;
+    const el = cardRef.current;
+    const io = new IntersectionObserver((entries) => {
+      if (!entries.some((e) => e.isIntersecting)) return;
+      io.disconnect();
+      fetch(nft.metadataUrl as string)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((m: { image?: string; name?: string } | null) => {
+          if (!cancelled && m) setLazy({ image: resolveIpfs(m.image), name: m.name ?? null });
+        })
+        .catch(() => undefined);
+    });
+    io.observe(el);
+    return () => {
+      cancelled = true;
+      io.disconnect();
+    };
+  }, [nft.image, nft.metadataUrl]);
+  const image = nft.image ?? lazy?.image ?? null;
+  const title = lazy?.name ?? nft.name ?? `#${nft.tokenId}`;
   return (
     <a
+      ref={cardRef}
       href={nft.openseaUrl}
       target="_blank"
       rel="noreferrer"
       className="group relative overflow-hidden rounded-xl border border-border/60 bg-card/30 transition hover:border-gold/40"
     >
       <div className="aspect-square bg-muted/20">
-        {nft.image && !imgError ? (
+        {image && !imgError ? (
           <img
-            src={nft.image}
+            src={image}
             alt={title}
             loading="lazy"
             onError={() => setImgError(true)}

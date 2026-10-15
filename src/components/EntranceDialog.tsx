@@ -46,29 +46,6 @@ function sliceAddress(a: string) {
 function isMobile() {
   return typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 }
-function isIOS() {
-  return typeof navigator !== "undefined" && /iPhone|iPad|iPod/i.test(navigator.userAgent);
-}
-/**
- * A wallet app's built-in browser (phone + injected provider). Glyph's
- * sign-in opens privy.useglyph.io in a NEW TAB here, which can't report back
- * to this page — the user approves, then Glyph shows "Something went wrong.
- * Close this tab and try connecting again." So we steer these users to the
- * wallet they're already in, or to the system browser for Glyph.
- */
-function isInAppWalletBrowser() {
-  return (
-    typeof window !== "undefined" &&
-    isMobile() &&
-    !!(window as unknown as { ethereum?: unknown }).ethereum
-  );
-}
-function systemBrowserUrl() {
-  const here = window.location.href;
-  if (isIOS()) return `x-safari-${here}`; // opens Safari (iOS 17+)
-  const u = new URL(here);
-  return `intent://${u.host}${u.pathname}${u.search}#Intent;scheme=https;end`;
-}
 function friendlyConnectError(e: unknown): string {
   const msg = e instanceof Error ? e.message : String(e ?? "");
   if (/rejected|denied|closed/i.test(msg)) return "Connection cancelled.";
@@ -219,7 +196,6 @@ function EntranceBody({
   }, [connectors]);
   const hasInjected =
     typeof window !== "undefined" && !!(window as unknown as { ethereum?: unknown }).ethereum;
-  const inAppWallet = isInAppWalletBrowser();
 
   // Link flow: same wallet list as sign-in, always starting fresh. The chosen
   // wallet signs a single-use server nonce, then its session is closed again.
@@ -412,31 +388,6 @@ function EntranceBody({
         Sign in your way. Holders unlock the BAYC / MAYC rooms; everyone gets the lobby, chat and
         karaoke.
       </p>
-      {inAppWallet && (
-        <div className="space-y-2 rounded-lg border border-amber-400/40 bg-amber-400/10 p-3 text-[11px] leading-snug text-amber-100">
-          <p>
-            You're inside a wallet app's browser. Glyph sign-in can't finish here — use this
-            app's wallet below, or open BAYCmc in{" "}
-            {isIOS() ? "Safari" : "your browser"} to use Glyph.
-          </p>
-          {browserWallets[0] && (
-            <button
-              type="button"
-              disabled={isPending}
-              onClick={() => void connectWith(browserWallets[0] as Connector)}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-gradient-gold px-3 py-2 text-xs font-semibold text-gold-foreground"
-            >
-              <WalletIcon className="h-4 w-4" /> Use {browserWallets[0].name}
-            </button>
-          )}
-          <a
-            href={systemBrowserUrl()}
-            className="block w-full rounded-md border border-amber-300/50 px-3 py-1.5 text-center font-semibold"
-          >
-            Open in {isIOS() ? "Safari" : "browser"} for Glyph
-          </a>
-        </div>
-      )}
       <button
         type="button"
         disabled={!glyph || isPending}

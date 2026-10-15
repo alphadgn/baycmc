@@ -24,6 +24,7 @@ interface Room {
   display_order: number | null;
   is_locked: boolean;
   kind: "conference" | "game" | "karaoke";
+  required_collection: string | null;
 }
 interface Booking {
   id: string;
@@ -69,7 +70,9 @@ function RoomsPage() {
     const [{ data: r }, { data: b }, { data: roles }, { data: ver }] = await Promise.all([
       supabase
         .from("rooms")
-        .select("id,name,description,capacity,tier,livekit_room,theme,display_order,is_locked,kind")
+        .select(
+          "id,name,description,capacity,tier,livekit_room,theme,display_order,is_locked,kind,required_collection",
+        )
         .eq("active", true)
         .order("display_order", { ascending: true, nullsFirst: false })
         .order("name"),
@@ -84,11 +87,15 @@ function RoomsPage() {
       user
         ? supabase
             .from("user_verifications")
-            .select("bayc_verified,otherpage_verified")
+            .select("bayc_verified,otherpage_verified,verified_collections")
             .eq("user_id", user.id)
             .maybeSingle()
         : Promise.resolve({
-            data: null as { bayc_verified: boolean; otherpage_verified: boolean } | null,
+            data: null as {
+              bayc_verified: boolean;
+              otherpage_verified: boolean;
+              verified_collections: string[];
+            } | null,
           }),
     ]);
     const allRooms = (r as Room[]) ?? [];
@@ -107,7 +114,16 @@ function RoomsPage() {
 
     setBaycVerified(bayc);
     setOtherpageVerified(op);
-    setRooms(seesLiferRooms ? allRooms : allRooms.filter((rm) => rm.tier !== "lifer"));
+    // Collection rooms (e.g. Punks Brunch) only show to that collection's
+    // holders; the LiveKit token gate enforces it server-side as well.
+    const held = ver?.verified_collections ?? [];
+    setRooms(
+      allRooms.filter(
+        (rm) =>
+          (seesLiferRooms || rm.tier !== "lifer") &&
+          (!rm.required_collection || admin || held.includes(rm.required_collection)),
+      ),
+    );
     setBookings((b as Booking[]) ?? []);
     setIsAdmin(admin);
     setLoading(false);

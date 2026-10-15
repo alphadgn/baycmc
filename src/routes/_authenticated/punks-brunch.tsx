@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect } from "react";
-import { Loader2, Lock } from "lucide-react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Loader2, Lock, Video } from "lucide-react";
 import { LobbyChat } from "@/components/LobbyChat";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import punksBackdrop from "@/assets/punks/punks-brunch.jpg";
@@ -25,6 +26,18 @@ export const Route = createFileRoute("/_authenticated/punks-brunch")({
 function PunksBrunchPage() {
   const { loading, isAdmin, collections } = useVerificationStatus();
   const allowed = isAdmin || collections.includes("PUNKS");
+  const [videoRoomId, setVideoRoomId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!allowed) return;
+    void supabase
+      .from("rooms")
+      .select("id")
+      .eq("required_collection", "PUNKS")
+      .eq("active", true)
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => setVideoRoomId((data?.id as string | undefined) ?? null));
+  }, [allowed]);
 
   // Like the lobby: only the chat thread scrolls, never the page.
   useEffect(() => {
@@ -59,9 +72,20 @@ function PunksBrunchPage() {
           <p className="inline-flex items-center rounded-full border border-gold/50 bg-background/70 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-gold backdrop-blur">
             CryptoPunks holders
           </p>
-          <h1 className="mt-2 font-display text-3xl text-gradient-gold drop-shadow sm:text-5xl">
-            Punks Brunch
-          </h1>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+            <h1 className="font-display text-3xl text-gradient-gold drop-shadow sm:text-5xl">
+              Punks Brunch
+            </h1>
+            {allowed && videoRoomId && (
+              <Link
+                to="/rooms/$roomId"
+                params={{ roomId: videoRoomId }}
+                className="inline-flex items-center gap-2 rounded-full bg-gradient-gold px-4 py-2 text-xs font-semibold text-gold-foreground shadow-gold"
+              >
+                <Video className="h-4 w-4" /> Join video room
+              </Link>
+            )}
+          </div>
         </header>
 
         {loading ? (

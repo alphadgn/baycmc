@@ -4,7 +4,7 @@ import { runOtherpageCheckAndPersist } from "@/server/otherpage.server";
 import { runLuminaCheckAndPersist } from "@/server/lumina.server";
 import { resolveOwnership, touchLinkedWallets } from "@/server/ownership/resolveOwnership";
 import { collectionLabel } from "@/server/ownership/collections";
-import { ALLOWED_COLLECTIONS } from "@/lib/web3/constants";
+import { ALLOWED_COLLECTIONS, FULL_ACCESS_LABELS } from "@/lib/web3/constants";
 
 /**
  * Persisted snapshot shape (kept for backwards compatibility with existing
@@ -55,9 +55,29 @@ export async function recomputeOwnership(userId: string): Promise<OwnershipSnaps
       .map((o) => collectionLabel(o.contract))
       .filter((l): l is NonNullable<typeof l> => !!l),
   );
+  // A check that ERRORED (RPC outage / rate limit) is "unknown", not "0":
+  // keep whatever was verified for that collection before, so a flaky node
+  // can't silently strip a collection the member really holds.
+  const failed = new Set(result.failedContracts.map((c) => c.toLowerCase()));
+  if (failed.size > 0) {
+    const { data: prev } = await supabaseAdmin
+      .from("user_verifications")
+      .select("verified_collections")
+      .eq("user_id", userId)
+      .maybeSingle();
+    for (const label of (prev?.verified_collections as string[] | null) ?? []) {
+      const col = ALLOWED_COLLECTIONS.find((c) => c.label === label);
+      if (col && failed.has(col.contract.toLowerCase())) heldLabels.add(col.label);
+    }
+  }
   const collections = ALLOWED_COLLECTIONS.map((c) => c.label).filter((l) => heldLabels.has(l));
-  const collection = collections[0] ?? (winner ? collectionLabel(winner.contract) : null);
-  const tokenProof = result.allowed;
+  // Holder clubhouse access (bayc_verified) comes ONLY from full-access
+  // collections (BAYC / MAYC / CryptoPunks). Partner collections (Temp
+  // Agency, Orca Business, Ugly Duck Labs) are recorded and shown as
+  // verified, but unlock just the regular menu + Ape Rides.
+  const fullLabels = collections.filter((l) => FULL_ACCESS_LABELS.includes(l));
+  const collection = fullLabels[0] ?? collections[0] ?? null;
+  const tokenProof = fullLabels.length > 0;
 
   const updates: {
     user_id: string;
@@ -72,16 +92,15 @@ export async function recomputeOwnership(userId: string): Promise<OwnershipSnaps
     delegation_verified: !!delegationVault,
     delegation_vault: delegationVault,
   };
+  if (result.scanned.length > 0) updates.verified_collections = collections;
   if (tokenProof) {
     updates.bayc_verified = true;
     updates.bayc_collection = collection;
-    updates.verified_collections = collections;
     updates.verified_at = new Date().toISOString();
-  } else if (result.scanned.length > 0) {
-    // Only flip to false on a real scan — never on RPC outages (scanned=[]).
+  } else if (result.scanned.length > 0 && failed.size === 0) {
+    // Only flip to false on a clean scan — never on RPC errors/outages.
     updates.bayc_verified = false;
-    updates.bayc_collection = null;
-    updates.verified_collections = [];
+    updates.bayc_collection = collection; // partner label (or null)
     updates.verified_at = null;
   }
 

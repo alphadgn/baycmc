@@ -27,6 +27,7 @@ export const COLLECTION_REGISTRY = [
     contract: BAYC_CONTRACT,
     chainId: CHAIN_ETHEREUM,
     tips: true,
+    access: "full",
     active: true,
   },
   {
@@ -35,6 +36,7 @@ export const COLLECTION_REGISTRY = [
     contract: MAYC_CONTRACT,
     chainId: CHAIN_ETHEREUM,
     tips: true,
+    access: "full",
     active: true,
   },
   {
@@ -43,6 +45,7 @@ export const COLLECTION_REGISTRY = [
     contract: "0xb47e3cd837dDF8e4c57F05d70Ab865de6e193BBB",
     chainId: CHAIN_ETHEREUM,
     tips: true,
+    access: "full",
     active: true,
   },
   {
@@ -51,6 +54,7 @@ export const COLLECTION_REGISTRY = [
     contract: "0xc60283eBe17F6A6d7b49C1Df3602f440D98f5d25",
     chainId: CHAIN_ROBINHOOD,
     tips: true,
+    access: "partner",
     active: true,
   },
   {
@@ -59,6 +63,7 @@ export const COLLECTION_REGISTRY = [
     contract: "0xc3914cc9B40996532F1690Fa570B25B742c34b9a",
     chainId: CHAIN_ETHEREUM,
     tips: true,
+    access: "partner",
     active: true,
   },
   {
@@ -67,6 +72,7 @@ export const COLLECTION_REGISTRY = [
     contract: "0xF3DFD71822b10F9F1e6f21097C29E36c4f3952c0",
     chainId: CHAIN_APECHAIN,
     tips: true,
+    access: "partner",
     active: true,
   },
   {
@@ -75,6 +81,7 @@ export const COLLECTION_REGISTRY = [
     contract: "0xBd3531dA5CF5857e7CfAA92426877b022e612cf8",
     chainId: CHAIN_ETHEREUM,
     tips: false,
+    access: "full",
     active: false, // inactive — kept for later activation
   },
   {
@@ -83,6 +90,7 @@ export const COLLECTION_REGISTRY = [
     contract: "0x524cAB2ec69124574082676e6F654a18df49A048",
     chainId: CHAIN_ETHEREUM,
     tips: false,
+    access: "full",
     active: false, // inactive — kept for later activation
   },
 ] as const;
@@ -94,6 +102,26 @@ export type AllowedCollection = RegisteredCollection;
 export const ALLOWED_COLLECTIONS: readonly AllowedCollection[] = COLLECTION_REGISTRY.filter(
   (c) => c.active,
 );
+
+/**
+ * Access tiers:
+ *  - "full"    (BAYC, MAYC, CryptoPunks): the holder clubhouse — Holders Chat,
+ *              Conference Rooms, Calendar, Ape Rides, … (bayc_verified).
+ *  - "partner" (Temp Agency, Orca Business, Ugly Duck Labs): the regular
+ *              member menu PLUS Ape Rides only.
+ */
+export const FULL_ACCESS_LABELS: readonly string[] = ALLOWED_COLLECTIONS.filter(
+  (c) => c.access === "full",
+).map((c) => c.label);
+export const PARTNER_LABELS: readonly string[] = ALLOWED_COLLECTIONS.filter(
+  (c) => c.access === "partner",
+).map((c) => c.label);
+export function hasFullAccess(labels: readonly string[]): boolean {
+  return labels.some((l) => FULL_ACCESS_LABELS.includes(l));
+}
+export function hasPartnerAccess(labels: readonly string[]): boolean {
+  return labels.some((l) => PARTNER_LABELS.includes(l));
+}
 
 /** Human name for a stored label (e.g. "UGLY_DUCK_LABS" → "Ugly Duck Labs"). */
 export function collectionNameForLabel(label: string | null | undefined): string | null {

@@ -9,3 +9,5 @@
 - Collections live in COLLECTION_REGISTRY (src/lib/web3/constants.ts) with chainId + active; only active ones (ALLOWED_COLLECTIONS) grant access, display or tips. user_verifications.verified_collections stores every held label.
 - Chat channels share lobby_messages via `channel`; access is decided by can_access_chat_channel() in RLS (punks-brunch = holds_collection(uid,'PUNKS')).
 - Display wallet addresses with shortAddress() (src/lib/short-address.ts) — email accounts have no wallet.
+- Access tiers: collections have `access` "full" (BAYC/MAYC/CryptoPunks → bayc_verified, holder clubhouse) or "partner" (Temp Agency/Orca Business/Ugly Duck Labs → regular menu + Ape Rides via can_use_ape_rides()). Rooms can require one collection via rooms.required_collection (enforced in the LiveKit token gate).
+- Ownership scans batch JSON-RPC calls and retry; a failed check is "unknown" (ScanResult.failed) and must never be stored as "not held".

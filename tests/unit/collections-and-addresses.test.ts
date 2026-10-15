@@ -35,3 +35,13 @@ describe("shortAddress", () => {
     expect(shortAddress("0xd796bd30280ac676a1a2f01b3c0279f786ed33c0")).toBe("0xd796…33c0");
   });
 });
+
+import { hasFullAccess, hasPartnerAccess } from "@/lib/web3/constants";
+describe("access tiers", () => {
+  it("BAYC / MAYC / CryptoPunks are full; Temp Agency, Orca, Ugly Duck are partner", () => {
+    expect(hasFullAccess(["PUNKS"])).toBe(true);
+    expect(hasFullAccess(["TEMP_AGENCY", "ORCA_BUSINESS", "UGLY_DUCK_LABS"])).toBe(false);
+    expect(hasPartnerAccess(["UGLY_DUCK_LABS"])).toBe(true);
+    expect(hasPartnerAccess(["BAYC"])).toBe(false);
+  });
+});

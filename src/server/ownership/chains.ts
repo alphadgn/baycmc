@@ -63,7 +63,9 @@ export function publicClientFor(chainId: CollectionChainId): PublicClient {
   const client = createPublicClient({
     chain: cfg.chain,
     transport: fallback(
-      urls.map((u) => http(u, { timeout: 8_000, retryCount: 1 })),
+      urls.map((u) =>
+        http(u, { timeout: 10_000, retryCount: 2, batch: { batchSize: 50, wait: 16 } }),
+      ),
       { rank: false, retryCount: 1 },
     ),
   }) as unknown as PublicClient;

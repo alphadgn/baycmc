@@ -1173,6 +1173,7 @@ export type Database = {
       }
       rooms: {
         Row: {
+          required_collection: string | null
           active: boolean
           capacity: number
           created_at: string
@@ -1187,6 +1188,7 @@ export type Database = {
           tier: Database["public"]["Enums"]["room_tier"]
         }
         Insert: {
+          required_collection?: string | null
           active?: boolean
           capacity?: number
           created_at?: string
@@ -1201,6 +1203,7 @@ export type Database = {
           tier?: Database["public"]["Enums"]["room_tier"]
         }
         Update: {
+          required_collection?: string | null
           active?: boolean
           capacity?: number
           created_at?: string
@@ -1346,6 +1349,8 @@ export type Database = {
       }
     }
     Functions: {
+      can_use_ape_rides: { Args: { _uid: string }; Returns: boolean }
+      can_join_punks_room: { Args: { _uid: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
