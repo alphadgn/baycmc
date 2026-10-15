@@ -63,7 +63,13 @@ export function useWalletStack(): WalletStackState {
 
 function makeConfig(): Config {
   return createConfig({
-    chains: [mainnet, apeChain],
+    // ApeChain FIRST. Glyph is an ApeChain wallet: its connector connects on
+    // the config's first chain (Glyph's own GlyphWalletProvider uses Glyph's
+    // chain list, ApeChain first). With Ethereum first, Glyph's "Approve
+    // Connection" was asked to connect on chain 1 ("0 ETH") and failed with
+    // "Something went wrong" after Approve. Browser wallets / WalletConnect
+    // are unaffected (they connect on whatever chain they're on).
+    chains: [apeChain, mainnet],
     ssr: true,
     // EIP-6963: every installed browser wallet shows up as its own button.
     multiInjectedProviderDiscovery: true,

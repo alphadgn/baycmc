@@ -161,7 +161,9 @@ function glyphSessionFromStorage(): { token: string; nonce: string } | undefined
 }
 
 function WalletBridge() {
-  const { address: wagmiAddress, isConnected, connector } = useAccount();
+  const { address: wagmiAddress, isConnected, connector, chainId } = useAccount();
+  const chainIdRef = useRef<number | undefined>(chainId);
+  chainIdRef.current = chainId;
   const { signMessageAsync } = useSignMessage();
   const { disconnectAsync } = useDisconnect();
   const config = useConfig();
@@ -248,7 +250,9 @@ function WalletBridge() {
         statement: "Sign in to BAYCmc. This does not cost gas or move funds.",
         uri: window.location.origin,
         version: "1",
-        chainId: 1,
+        // The chain the wallet is actually on (Glyph = ApeChain); the server
+        // verifies signature + nonce, not the chain.
+        chainId: chainIdRef.current ?? 1,
         nonce: pre.nonce,
         issuedAt: new Date().toISOString(),
         expirationTime: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
