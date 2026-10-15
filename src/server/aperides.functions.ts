@@ -29,13 +29,9 @@ export const startApeRide = createServerFn({ method: "POST" })
       };
     }
 
-    const { data: ver } = await supabase
-      .from("user_verifications")
-      .select("bayc_verified")
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (!ver?.bayc_verified) {
-      return { ok: false as const, error: "Verified BAYC/MAYC holder access required." };
+    const { data: rideOk } = await supabase.rpc("can_use_ape_rides", { _uid: userId });
+    if (!rideOk) {
+      return { ok: false as const, error: "Ape Rides is for verified holders (BAYC, MAYC, CryptoPunks, Temp Agency, Orca Business or Ugly Duck Labs)." };
     }
 
     // End any prior live ride from the same host
@@ -107,13 +103,9 @@ export const requestApeRide = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
-    const { data: ver } = await supabase
-      .from("user_verifications")
-      .select("bayc_verified")
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (!ver?.bayc_verified) {
-      return { ok: false as const, error: "Verified BAYC/MAYC holder access required." };
+    const { data: rideOk } = await supabase.rpc("can_use_ape_rides", { _uid: userId });
+    if (!rideOk) {
+      return { ok: false as const, error: "Ape Rides is for verified holders (BAYC, MAYC, CryptoPunks, Temp Agency, Orca Business or Ugly Duck Labs)." };
     }
 
     const { data: ride } = await supabase
@@ -152,13 +144,9 @@ export const respondApeRideRequest = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
 
     // Host must still be Token-Proof verified to accept/decline.
-    const { data: ver } = await supabase
-      .from("user_verifications")
-      .select("bayc_verified")
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (!ver?.bayc_verified) {
-      return { ok: false as const, error: "Verified BAYC/MAYC holder access required." };
+    const { data: rideOk } = await supabase.rpc("can_use_ape_rides", { _uid: userId });
+    if (!rideOk) {
+      return { ok: false as const, error: "Ape Rides is for verified holders (BAYC, MAYC, CryptoPunks, Temp Agency, Orca Business or Ugly Duck Labs)." };
     }
 
     // Verify caller is the host of the ride
@@ -198,13 +186,9 @@ export const getApeRideToken = createServerFn({ method: "POST" })
 
     // Re-verify Token Proof on every token mint. is_lifer is intentionally
     // NOT required here — Ape Rides are not lifer-gated, only BAYC-gated.
-    const { data: ver } = await supabase
-      .from("user_verifications")
-      .select("bayc_verified")
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (!ver?.bayc_verified) {
-      return { ok: false as const, error: "Verified BAYC/MAYC holder access required." };
+    const { data: rideOk } = await supabase.rpc("can_use_ape_rides", { _uid: userId });
+    if (!rideOk) {
+      return { ok: false as const, error: "Ape Rides is for verified holders (BAYC, MAYC, CryptoPunks, Temp Agency, Orca Business or Ugly Duck Labs)." };
     }
 
     const { data: ride } = await supabase

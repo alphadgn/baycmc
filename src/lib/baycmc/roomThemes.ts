@@ -16,7 +16,8 @@ export type RoomTheme =
   | "studio-a"
   | "studio-b"
   | "karaoke"
-  | "game-room";
+  | "game-room"
+  | "punks-brunch";
 
 const THEME_IMAGE: Record<RoomTheme, string> = {
   conservatory: "/cam.png",
@@ -31,6 +32,7 @@ const THEME_IMAGE: Record<RoomTheme, string> = {
   "studio-b": "/mic.png",
   karaoke: "/karaoke.png",
   "game-room": "/gameroom.png",
+  "punks-brunch": "/punks-brunch.jpg",
 };
 
 const THEME_AMBIENCE: Record<RoomTheme, string> = {
@@ -46,6 +48,7 @@ const THEME_AMBIENCE: Record<RoomTheme, string> = {
   "studio-b": "Studio B · blue-lit booth",
   karaoke: "Karaoke lounge · grab the mic",
   "game-room": "Game room · PvP arcade",
+  "punks-brunch": "Punks Brunch · CryptoPunks holders only",
 };
 
 export function getRoomThemeImage(theme: string | null | undefined): string | null {

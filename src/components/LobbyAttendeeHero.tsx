@@ -105,7 +105,9 @@ export function LobbyAttendeeHero() {
     <section
       aria-label="Lobby attendees"
       className="relative flex w-full shrink-0 flex-col items-center justify-start overflow-hidden border-b border-gold/20"
-      style={{ height: 220 }}
+      // ~35% shorter when it's just you (was 220px); grows back only when
+      // other attendees need the row. Avatar / text sizes are unchanged.
+      style={{ height: others.length === 0 ? 143 : 220 }}
     >
       {/* Featured background — karaoke lounge photo, darkened so the
           avatar + name stay legible on top. */}
@@ -133,12 +135,8 @@ export function LobbyAttendeeHero() {
         </div>
 
         {/* Other attendees — wrap dynamically */}
-        <div className="flex w-full flex-1 items-center justify-center overflow-hidden pt-2">
-          {others.length === 0 ? (
-            <p className="text-[11px] text-muted-foreground">
-              You're the first one here. Invite the apes.
-            </p>
-          ) : (
+        {others.length > 0 && (
+          <div className="flex w-full flex-1 items-center justify-center overflow-hidden pt-2">
             <ul className="flex max-h-full flex-wrap items-center justify-center gap-2">
               {others.map((m) => (
                 <li key={m.user_id} title={displayName(m)}>
@@ -146,8 +144,8 @@ export function LobbyAttendeeHero() {
                 </li>
               ))}
             </ul>
-          )}
-        </div>
+          </div>
+        )}
 
         <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
           {members.length} in the lobby
@@ -158,10 +156,7 @@ export function LobbyAttendeeHero() {
 }
 
 function displayName(m: OnlineMember): string {
-  return (
-    m.username ??
-    (m.wallet_address ? `${shortAddress(m.wallet_address)}` : "anon")
-  );
+  return m.username ?? (m.wallet_address ? `${shortAddress(m.wallet_address)}` : "anon");
 }
 
 function Avatar({

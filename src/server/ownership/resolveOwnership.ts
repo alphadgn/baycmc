@@ -2,7 +2,7 @@ import { createPublicClient, http, fallback, getAddress, isAddress, type PublicC
 import { mainnet } from "viem/chains";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { resolveDelegations } from "./delegateResolver";
-import { scanAllCollections, type OwnershipRow } from "./collectionScanner";
+import { scanAllCollectionsDetailed, type OwnershipRow } from "./collectionScanner";
 
 export interface OwnershipResult {
   userId: string;
@@ -10,6 +10,8 @@ export interface OwnershipResult {
   linked: string[];
   allowed: boolean;
   ownership: OwnershipRow[];
+  /** Contracts whose check errored this time (unknown, not "0"). */
+  failedContracts: string[];
   scanned: string[];
   edges: Array<{ from: string; to: string; via: "linked" | "delegate-in" | "delegate-out" }>;
   blockNumber: string; // serialized bigint for SSR safety
@@ -31,7 +33,9 @@ function publicClient(): PublicClient {
   return createPublicClient({
     chain: mainnet,
     transport: fallback(
-      urls.map((u) => http(u, { timeout: 8_000, retryCount: 1 })),
+      urls.map((u) =>
+        http(u, { timeout: 10_000, retryCount: 2, batch: { batchSize: 50, wait: 16 } }),
+      ),
       { rank: false, retryCount: 1 },
     ),
   });
@@ -83,6 +87,7 @@ export async function resolveOwnership(userId: string): Promise<OwnershipResult>
       linked: [],
       allowed: false,
       ownership: [],
+      failedContracts: [],
       scanned: [],
       edges: [],
       blockNumber: "0",
@@ -131,7 +136,7 @@ export async function resolveOwnership(userId: string): Promise<OwnershipResult>
 
   const capped = [...addresses].slice(0, MAX_ADDRESSES).map((a) => getAddress(a) as `0x${string}`);
 
-  const ownership = await scanAllCollections(client, capped, block);
+  const { rows: ownership, failed } = await scanAllCollectionsDetailed(client, capped, block);
   const allowed = ownership.length > 0;
 
   // Structured log — drives observability the spec asks for.
@@ -162,6 +167,7 @@ export async function resolveOwnership(userId: string): Promise<OwnershipResult>
     linked,
     allowed,
     ownership,
+    failedContracts: [...failed],
     scanned: capped,
     edges,
     blockNumber: block.toString(),

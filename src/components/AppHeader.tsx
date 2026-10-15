@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { EntranceDialog } from "@/components/EntranceDialog";
 import { EmbroideredImage } from "@/components/EmbroideredImage";
 import { WalletPill } from "@/components/WalletPill";
+import { hasPartnerAccess } from "@/lib/web3/constants";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
@@ -34,7 +35,10 @@ interface NavItem {
   // Rooms hall (it lives there as a karaoke-kind tile), so a duplicate
   // top-level entry would be redundant for them. Lobby visitors still
   // need a direct way in since Conference Rooms is gated.
-  tier: "all" | "lobby_only" | "verified" | "punks" | "lifer" | "admin" | "super_admin";
+  // "ape_rides" = full holders AND partner holders (Temp Agency, Orca
+  // Business, Ugly Duck Labs) — partners see the regular menu + this item.
+  tier:
+    "all" | "lobby_only" | "verified" | "ape_rides" | "punks" | "lifer" | "admin" | "super_admin";
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -42,7 +46,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/feed", label: "Holders Chat", tier: "verified" },
   { to: "/punks-brunch", label: "Punks Brunch", tier: "punks" },
   { to: "/rooms", label: "Conference Rooms", tier: "verified" },
-  { to: "/ape-rides", label: "Ape Rides", tier: "verified" },
+  { to: "/ape-rides", label: "Ape Rides", tier: "ape_rides" },
   { to: "/lifers/messages", label: "Lifer Chat", tier: "lifer" },
   { to: "/karaoke", label: "Karaoke Room", tier: "all" },
   { to: "/profile", label: "Profile", tier: "all" },
@@ -225,6 +229,8 @@ export function AppHeader() {
                     {NAV_ITEMS.filter((item) => {
                       // Hide gated items entirely from users without access.
                       if (item.tier === "verified") return isVerifiedHolder;
+                      if (item.tier === "ape_rides")
+                        return isVerifiedHolder || isAdmin || hasPartnerAccess(collections);
                       if (item.tier === "punks") return isAdmin || collections.includes("PUNKS");
                       if (item.tier === "lifer") return isLifer;
                       if (item.tier === "super_admin") return isSuperAdmin;

@@ -1,3 +1,4 @@
+import { collectionNameForLabel } from "@/lib/web3/constants";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -33,7 +34,7 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data: room, error } = await supabaseAdmin
     .from("rooms")
-    .select("id,name,tier,kind,livekit_room,capacity,active,is_locked")
+    .select("id,name,tier,kind,livekit_room,capacity,active,is_locked,required_collection")
     .eq("id", roomId)
     .maybeSingle();
   if (error || !room || !room.active) {
@@ -123,6 +124,27 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
       code: "bayc_revoked",
     };
   }
+  // Collection-specific rooms (e.g. Punks Brunch = CryptoPunks holders).
+  const required = (room as { required_collection?: string | null }).required_collection;
+  if (required && !isAdmin) {
+    const held =
+      fresh?.collections ??
+      ((
+        await supabaseAdmin
+          .from("user_verifications")
+          .select("verified_collections")
+          .eq("user_id", userId)
+          .maybeSingle()
+      ).data?.verified_collections as string[] | null) ??
+      [];
+    if (!held.includes(required)) {
+      return {
+        ok: false,
+        error: `This room is only for verified ${collectionNameForLabel(required)} holders.`,
+        code: "bayc_revoked",
+      };
+    }
+  }
   if (room.tier === "lifer" && !isAdmin && !(ver?.bayc_verified && ver?.otherpage_verified)) {
     return {
       ok: false,
@@ -206,9 +228,7 @@ export const getLivekitToken = createServerFn({ method: "POST" })
     const identity = userId;
     const name =
       profile?.username ||
-      (profile?.wallet_address
-        ? `${shortAddress(profile.wallet_address)}`
-        : "Member");
+      (profile?.wallet_address ? `${shortAddress(profile.wallet_address)}` : "Member");
 
     const host = await isRoomHost(userId, data.roomId);
 

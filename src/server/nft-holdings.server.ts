@@ -8,7 +8,7 @@
  *
  * Only collections in ALLOWED_COLLECTIONS are ever returned.
  */
-import { parseAbi } from "viem";
+import { parseAbi, parseAbiItem } from "viem";
 import {
   ALLOWED_COLLECTIONS,
   CHAIN_APECHAIN,
@@ -25,6 +25,8 @@ export interface NftItem {
   name: string | null;
   collection: string | null;
   image: string | null;
+  /** tokenURI to load in the browser when the server didn't fetch it. */
+  metadataUrl?: string | null;
   openseaUrl: string;
 }
 
@@ -33,8 +35,11 @@ const ENUM_ABI = parseAbi([
   "function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)",
   "function tokenURI(uint256 tokenId) view returns (string)",
 ]);
+const OWNER_ABI = parseAbi(["function ownerOf(uint256 tokenId) view returns (address)"]);
+const TRANSFER_EVENT = parseAbiItem(
+  "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)",
+);
 
-const MAX_PER_COLLECTION = 24;
 const TIMEOUT_MS = 12_000;
 
 async function fetchJson<T>(url: string): Promise<T> {
@@ -129,7 +134,88 @@ async function viaBlockscout(owner: string, cols: AllowedCollection[]): Promise<
   return out;
 }
 
-/** Plain RPC fallback: balanceOf, then enumerate + tokenURI when supported. */
+const MAX_IDS = 300; // per collection per wallet
+const SERVER_METADATA = 24; // rest load their metadata in the browser
+
+/** Token ids owned via ERC721Enumerable, or null if unsupported. */
+async function idsViaEnumerable(
+  client: ReturnType<typeof publicClientFor>,
+  address: `0x${string}`,
+  owner: `0x${string}`,
+  balance: bigint,
+): Promise<string[] | null> {
+  const n = Number(balance > BigInt(MAX_IDS) ? BigInt(MAX_IDS) : balance);
+  try {
+    const first = await client.readContract({
+      address,
+      abi: ENUM_ABI,
+      functionName: "tokenOfOwnerByIndex",
+      args: [owner, 0n],
+    });
+    // The transport batches these into one HTTP request.
+    const rest = await Promise.all(
+      Array.from({ length: n - 1 }, (_, i) =>
+        client
+          .readContract({
+            address,
+            abi: ENUM_ABI,
+            functionName: "tokenOfOwnerByIndex",
+            args: [owner, BigInt(i + 1)],
+          })
+          .catch(() => null),
+      ),
+    );
+    return [first, ...rest].filter((x): x is bigint => x !== null).map((x) => x.toString());
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Non-enumerable contracts (e.g. Temp Agency on Robinhood Chain, whose
+ * explorer API blocks server requests): find every token ever transferred
+ * TO the wallet from the contract's Transfer logs, then keep the ones it
+ * still owns (ownerOf). Used off-Ethereum only (young chains, cheap logs).
+ */
+async function idsViaTransferLogs(
+  client: ReturnType<typeof publicClientFor>,
+  address: `0x${string}`,
+  owner: `0x${string}`,
+): Promise<string[] | null> {
+  try {
+    const logs = await client.getLogs({
+      address,
+      event: TRANSFER_EVENT,
+      args: { to: owner },
+      fromBlock: 0n,
+      toBlock: "latest",
+    });
+    const candidates = [
+      ...new Set(
+        logs
+          .map((l) => (l.args as { tokenId?: bigint }).tokenId)
+          .filter((t): t is bigint => typeof t === "bigint"),
+      ),
+    ].slice(0, MAX_IDS * 2);
+    const owners = await Promise.all(
+      candidates.map((id) =>
+        client
+          .readContract({ address, abi: OWNER_ABI, functionName: "ownerOf", args: [id] })
+          .catch(() => null),
+      ),
+    );
+    const mine = candidates.filter(
+      (_, i) => (owners[i] as string | null)?.toLowerCase() === owner.toLowerCase(),
+    );
+    mine.sort((x, y) => (x < y ? -1 : 1));
+    return mine.slice(0, MAX_IDS).map((x) => x.toString());
+  } catch (e) {
+    console.warn("[nft-holdings] transfer-log lookup failed", address, e);
+    return null;
+  }
+}
+
+/** Plain RPC path: balanceOf → token ids → tokenURI (+ metadata). */
 async function viaRpc(owner: `0x${string}`, cols: AllowedCollection[]): Promise<NftItem[]> {
   const out: NftItem[] = [];
   await Promise.all(
@@ -149,22 +235,12 @@ async function viaRpc(owner: `0x${string}`, cols: AllowedCollection[]): Promise<
         return;
       }
       if (balance === 0n) return;
-      const n = Number(balance > BigInt(MAX_PER_COLLECTION) ? BigInt(MAX_PER_COLLECTION) : balance);
-      const ids: string[] = [];
-      for (let i = 0; i < n; i++) {
-        try {
-          const id = await client.readContract({
-            address,
-            abi: ENUM_ABI,
-            functionName: "tokenOfOwnerByIndex",
-            args: [owner, BigInt(i)],
-          });
-          ids.push(id.toString());
-        } catch {
-          break; // not enumerable
-        }
+
+      let ids = await idsViaEnumerable(client, address, owner, balance);
+      if (!ids && col.chainId !== CHAIN_ETHEREUM) {
+        ids = await idsViaTransferLogs(client, address, owner);
       }
-      if (ids.length === 0) {
+      if (!ids || ids.length === 0) {
         // Holder confirmed, token ids unknown — show one summary card.
         out.push({
           contract,
@@ -176,29 +252,40 @@ async function viaRpc(owner: `0x${string}`, cols: AllowedCollection[]): Promise<
         });
         return;
       }
-      await Promise.all(
-        ids.map(async (tokenId) => {
-          let image: string | null = null;
-          let name: string | null = null;
-          try {
-            const uri = await client.readContract({
+
+      const uris = await Promise.all(
+        ids.map((id) =>
+          client
+            .readContract({
               address,
               abi: ENUM_ABI,
               functionName: "tokenURI",
-              args: [BigInt(tokenId)],
-            });
-            const meta = await fetchJson<{ name?: string; image?: string }>(ipfs(uri) ?? uri);
-            image = ipfs(meta.image);
-            name = meta.name ?? null;
-          } catch {
-            /* metadata optional */
+              args: [BigInt(id)],
+            })
+            .catch(() => null),
+        ),
+      );
+      await Promise.all(
+        ids.map(async (tokenId, i) => {
+          const uri = uris[i] ? (ipfs(uris[i]) ?? uris[i]) : null;
+          let image: string | null = null;
+          let name: string | null = null;
+          if (uri && i < SERVER_METADATA) {
+            try {
+              const meta = await fetchJson<{ name?: string; image?: string }>(uri);
+              image = ipfs(meta.image);
+              name = meta.name ?? null;
+            } catch {
+              /* metadata optional */
+            }
           }
           out.push({
             contract,
             tokenId,
-            name,
+            name: name ?? `${col.name} #${tokenId}`,
             collection: col.name,
             image,
+            metadataUrl: image ? null : uri,
             openseaUrl: nftLink(col.chainId, contract, tokenId),
           });
         }),
@@ -233,7 +320,9 @@ export async function listAllowedNfts(
     );
 
   const rh = byChain(CHAIN_ROBINHOOD);
-  if (rh.length) jobs.push(viaBlockscout(owner, rh).catch(() => viaRpc(owner, rh)));
+  // Robinhood's Blockscout API answers servers with a Cloudflare challenge
+  // (403), so read the chain directly.
+  if (rh.length) jobs.push(viaRpc(owner, rh));
 
   const settled = await Promise.allSettled(jobs);
   const ok = settled.filter(
