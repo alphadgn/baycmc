@@ -102,6 +102,18 @@ export function AmaConference({
     );
   }
 
+  if (karaoke) {
+    return (
+      <KaraokeStageLayout
+        performer={hostParticipant}
+        audienceParticipants={audienceParticipants}
+        cameraTracks={cameraTracks}
+        profiles={profiles}
+        vipUserIds={vipUserIds}
+      />
+    );
+  }
+
   return (
     <AmaGridLayout
       roomName={roomName}
@@ -203,7 +215,7 @@ function AmaGridLayout({
         </div>
       )}
 
-      <div className={`flex flex-col gap-2 ${karaoke && showHostTile ? "mt-24 sm:mt-32" : ""}`}>
+      <div className="flex flex-col gap-2">
         {visibleCount === 0 ? (
           // Hide the "no one else here yet" copy when the host is alone —
           // their big solo card already speaks for itself.
@@ -304,6 +316,98 @@ function ScreenShareLayout({
           />
         ))}
       </aside>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Karaoke stage layout
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Karaoke rooms read like a venue: the singer who holds the stage (server
+ * session) is the ONLY tile at the top, under a spotlight; everyone else —
+ * including the booking host — sits lower in the audience. The stage area is
+ * reserved even when it's empty so the audience never jumps up to the top.
+ */
+function KaraokeStageLayout({
+  performer,
+  audienceParticipants,
+  cameraTracks,
+  profiles,
+  vipUserIds,
+}: {
+  performer: Participant | null;
+  audienceParticipants: Participant[];
+  cameraTracks: TrackReferenceOrPlaceholder[];
+  profiles: Map<string, ProfileMini>;
+  vipUserIds: Set<string>;
+}) {
+  const visible = audienceParticipants.slice(0, MAX_AUDIENCE_TILES);
+  const overflow = audienceParticipants.slice(MAX_AUDIENCE_TILES);
+  const performerName = performer
+    ? profiles.get(performer.identity)?.username ||
+      performer.name ||
+      `${performer.identity.slice(0, 6)}…`
+    : null;
+
+  return (
+    <div className="flex min-h-[60vh] flex-col p-4 sm:p-6">
+      {/* Stage */}
+      <section aria-label="Stage" className="relative flex flex-col items-center pt-1">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -top-6 left-1/2 h-48 w-64 -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_top,rgba(212,175,55,0.28),transparent_70%)]"
+        />
+        {performer ? (
+          <>
+            <div className="relative w-28 sm:w-36">
+              <ParticipantVideoTile
+                participant={performer}
+                cameraTracks={cameraTracks}
+                profile={profiles.get(performer.identity) ?? null}
+                variant="stage"
+                isVip={vipUserIds.has(performer.identity)}
+              />
+            </div>
+            <span className="relative mt-2 inline-flex max-w-[16rem] items-center gap-1.5 rounded-full border border-gold/60 bg-background/75 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-gold backdrop-blur">
+              <Mic className="h-3 w-3 shrink-0" />
+              <span className="truncate">On stage · {performerName}</span>
+            </span>
+          </>
+        ) : (
+          <div className="relative flex h-28 w-28 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gold/40 bg-background/40 text-center backdrop-blur sm:h-36 sm:w-36">
+            <Mic className="h-5 w-5 text-gold/70" />
+            <span className="mt-1 text-[10px] font-semibold uppercase tracking-widest text-gold/80">
+              Stage open
+            </span>
+          </div>
+        )}
+      </section>
+
+      {/* Audience — always below the stage */}
+      <section aria-label="Audience" className="mt-16 flex flex-col gap-2 sm:mt-24">
+        <p className="text-center text-[10px] font-semibold uppercase tracking-[0.3em] text-muted-foreground">
+          Audience · {audienceParticipants.length}
+        </p>
+        {visible.length > 0 && (
+          <div className="flex flex-wrap justify-center gap-2 sm:gap-3">
+            {visible.map((p) => (
+              <div key={p.identity} className="w-16 min-w-0 sm:w-20">
+                <AudienceTile
+                  participant={p}
+                  cameraTracks={cameraTracks}
+                  profile={profiles.get(p.identity) ?? null}
+                  isVip={vipUserIds.has(p.identity)}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+        {overflow.length > 0 && (
+          <OverflowStrip overflow={overflow} profiles={profiles} count={overflow.length} />
+        )}
+      </section>
     </div>
   );
 }
@@ -412,7 +516,7 @@ function ParticipantVideoTile({
   participant: Participant;
   cameraTracks: TrackReferenceOrPlaceholder[];
   profile: ProfileMini | null;
-  variant: "host" | "host-compact" | "host-solo" | "audience" | "solo";
+  variant: "host" | "host-compact" | "host-solo" | "audience" | "solo" | "stage";
   isVip?: boolean;
 }) {
   const isSpeaking = useIsSpeaking(participant);
@@ -442,12 +546,14 @@ function ParticipantVideoTile({
 
   const ringClasses = isSpeaking
     ? "border-gold shadow-[0_0_22px_-4px_rgba(212,175,55,0.7)]"
-    : variant.startsWith("host")
-      ? "border-gold/40"
-      : "border-border/60";
+    : variant === "stage"
+      ? "border-gold/80 shadow-[0_0_40px_-6px_rgba(212,175,55,0.65)]"
+      : variant.startsWith("host")
+        ? "border-gold/40"
+        : "border-border/60";
 
   const isHostVariant = variant === "host" || variant === "host-solo";
-  const isLargeNoCam = isHostVariant || variant === "solo";
+  const isLargeNoCam = isHostVariant || variant === "solo" || variant === "stage";
 
   return (
     <div

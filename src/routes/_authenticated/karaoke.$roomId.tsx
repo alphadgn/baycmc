@@ -6,6 +6,7 @@ import { KaraokeStage } from "@/components/KaraokeStage";
 import { SingerLiveIndicator } from "@/components/karaoke/SingerLiveIndicator";
 import { KaraokeHub } from "@/components/karaoke/KaraokeHub";
 import { KaraokeErrorBoundary } from "@/components/karaoke/KaraokeErrorBoundary";
+import { KaraokeTipJar, KaraokeTipNotifier } from "@/components/karaoke/KaraokeTipJar";
 import { useKaraokeStage } from "@/lib/karaoke/stageStore";
 import { getRoomThemeImage, getRoomThemeAmbience } from "@/lib/baycmc/roomThemes";
 
@@ -126,6 +127,10 @@ function KaraokeRoomPage() {
           recording={stage.isMyTurn && stage.recording}
         />
       )}
+      <KaraokeErrorBoundary name="tip jar" silent>
+        <KaraokeTipJar roomId={roomId} />
+        <KaraokeTipNotifier />
+      </KaraokeErrorBoundary>
       <KaraokeErrorBoundary name="hub">
         <KaraokeHub roomId={roomId} roomName={meta.name} bookingHostUserId={hostUserId} />
       </KaraokeErrorBoundary>

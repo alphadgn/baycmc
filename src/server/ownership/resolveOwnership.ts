@@ -1,9 +1,8 @@
 import { createPublicClient, http, fallback, getAddress, isAddress, type PublicClient } from "viem";
 import { mainnet } from "viem/chains";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { REQUIRED_COLLECTIONS } from "./collections";
 import { resolveDelegations } from "./delegateResolver";
-import { scanCollections, type OwnershipRow } from "./collectionScanner";
+import { scanAllCollections, type OwnershipRow } from "./collectionScanner";
 
 export interface OwnershipResult {
   userId: string;
@@ -132,7 +131,7 @@ export async function resolveOwnership(userId: string): Promise<OwnershipResult>
 
   const capped = [...addresses].slice(0, MAX_ADDRESSES).map((a) => getAddress(a) as `0x${string}`);
 
-  const ownership = await scanCollections(client, capped, REQUIRED_COLLECTIONS, block);
+  const ownership = await scanAllCollections(client, capped, block);
   const allowed = ownership.length > 0;
 
   // Structured log — drives observability the spec asks for.

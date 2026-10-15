@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarClock, GripVertical, Mic, Users } from "lucide-react";
+import { CalendarClock, ChevronLeft, GripVertical, Mic, Users } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
@@ -535,11 +535,15 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
   const hasSong = !!session.video_id || !!session.backing_track_id;
   const isPlaying = hasSong && !paused;
   const [forceWaitlistVisible, setForceWaitlistVisible] = useState(false);
+  // Each new turn / song starts tucked away again for the singer.
   useEffect(() => {
-    if (!isPlaying) setForceWaitlistVisible(false);
-  }, [isPlaying]);
-  // Auto-hide only applies to the current singer; everyone else always sees it.
-  const waitlistHidden = isMyTurn && isPlaying && !forceWaitlistVisible;
+    setForceWaitlistVisible(false);
+  }, [isPlaying, isMyTurn]);
+  // Hide/reveal applies ONLY to the singer whose turn it is (so the list stays
+  // out of their way while they perform). Everyone else always sees the
+  // waiting list; they can only drag it somewhere else.
+  const singerMode = isMyTurn && isPlaying;
+  const waitlistHidden = singerMode && !forceWaitlistVisible;
 
   const resetAllPanels = useCallback(() => {
     setPos({ dx: 0, dy: 0 });
@@ -588,6 +592,17 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
           <GripVertical className="h-3 w-3 text-gold/60" />
           <Mic className="h-3.5 w-3.5" />
           <span className="font-display text-[10px] uppercase tracking-[0.25em]">On stage</span>
+          {singerMode && !waitlistHidden && (
+            <button
+              type="button"
+              aria-label="Hide waiting list"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => setForceWaitlistVisible(false)}
+              className="ml-auto rounded-sm px-1 text-gold/70 hover:bg-gold/10 hover:text-gold"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
         <div className="p-3 pt-2">
           <div className="mt-1 truncate text-sm font-semibold text-foreground">

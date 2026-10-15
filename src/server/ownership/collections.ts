@@ -11,9 +11,7 @@ export { BAYC_CONTRACT, MAYC_CONTRACT, REQUIRED_COLLECTIONS };
 
 // CryptoPunks' market contract also exposes `balanceOf(address)`, so one ABI
 // works for every whitelisted collection.
-export const ERC721_ABI = parseAbi([
-  "function balanceOf(address owner) view returns (uint256)",
-]);
+export const ERC721_ABI = parseAbi(["function balanceOf(address owner) view returns (uint256)"]);
 
 export function collectionLabel(contract: string): CollectionLabel | null {
   const c = contract.toLowerCase();

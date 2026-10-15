@@ -57,6 +57,43 @@ function friendlyConnectError(e: unknown): string {
   return msg || "Couldn't connect.";
 }
 
+type DisconnectFn = (args: { connector: Connector }) => Promise<void>;
+
+/** End every trace of an existing session for this connector. */
+async function resetConnectorSession(c: Connector, disconnectAsync: DisconnectFn) {
+  await disconnectAsync({ connector: c }).catch(() => undefined);
+  if (c.id === WALLETCONNECT_CONNECTOR_ID) {
+    try {
+      const provider = (await c.getProvider()) as {
+        session?: unknown;
+        disconnect?: () => Promise<void>;
+      } | null;
+      if (provider?.session && provider.disconnect) await provider.disconnect();
+    } catch {
+      /* no session to clear */
+    }
+  }
+}
+
+/**
+ * Ask a browser wallet to show its account picker even if this site was
+ * already approved (EIP-2255). Wallets without support just skip it.
+ */
+async function requestAccountPicker(c: Connector) {
+  try {
+    const provider = (await c.getProvider()) as {
+      request?: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+    } | null;
+    await provider?.request?.({
+      method: "wallet_requestPermissions",
+      params: [{ eth_accounts: {} }],
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e ?? "");
+    if (/rejected|denied/i.test(msg)) throw e; // user closed the picker
+  }
+}
+
 export function EntranceDialog({ open, onOpenChange, mode = "signin" }: EntranceDialogProps) {
   const ready = useGlyphReady();
   useEffect(() => {
@@ -165,10 +202,15 @@ function EntranceBody({
   async function linkWith(c: Connector) {
     setPendingId(c.uid);
     try {
-      if (active && c.uid === active.uid) {
-        // Already connected with this wallet → end that session so its own
-        // modal opens from the beginning and another account can be chosen.
-        await disconnectAsync({ connector: c }).catch(() => undefined);
+      // Start FRESH, never from an "already connected" state:
+      //  • end any wagmi connection this connector has (active or not);
+      //  • WalletConnect keeps its own saved session and wagmi silently reuses
+      //    it (no QR / wallet list) — kill that session first;
+      //  • browser wallets hand back the already-approved account without
+      //    asking — request permissions again so the account picker opens.
+      await resetConnectorSession(c, disconnectAsync);
+      if (c.type === "injected" && c.id !== GLYPH_CONNECTOR_ID) {
+        await requestAccountPicker(c);
       }
       const res = await connectAsync({ connector: c });
       const target = res.accounts[0];
