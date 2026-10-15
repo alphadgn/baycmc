@@ -9,7 +9,7 @@ export function renderErrorPage(): string {
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>BAYCMC — Something went wrong</title>
+<title>BAYCmc — Something went wrong</title>
 <style>
   :root { color-scheme: dark; }
   html,body { margin:0; padding:0; height:100%; background:#0a0a0a; color:#f5f5f4;

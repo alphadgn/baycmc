@@ -4,7 +4,7 @@ import { convertToModelMessages, streamText, type UIMessage } from "ai";
 import { createClient } from "@supabase/supabase-js";
 import { createLovableAiGatewayRunIdFetch } from "@/lib/ai-gateway.server";
 
-const SYSTEM_CONTRACT = `You are a senior smart-contract auditor for BAYCMC (RWA provenance, phygital NFTs, marketplace). Analyze Solidity/EVM code with a security-first mindset: check auth, reentrancy, access control, oracle risk, upgrade patterns, storage layout, event emission, and gas. Return findings as markdown grouped by severity (Critical / High / Medium / Low / Informational) with code references and recommended fixes.`;
+const SYSTEM_CONTRACT = `You are a senior smart-contract auditor for BAYCmc (RWA provenance, phygital NFTs, marketplace). Analyze Solidity/EVM code with a security-first mindset: check auth, reentrancy, access control, oracle risk, upgrade patterns, storage layout, event emission, and gas. Return findings as markdown grouped by severity (Critical / High / Medium / Low / Informational) with code references and recommended fixes.`;
 
 type AuditRequestBody = { messages?: unknown };
 

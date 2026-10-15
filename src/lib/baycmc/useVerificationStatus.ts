@@ -14,6 +14,8 @@ export interface VerificationStatus {
   isLobby: boolean;
   tokenProof: boolean;
   collection: BaycCollection;
+  /** Every whitelisted collection verified for this account (labels). */
+  collections: string[];
   otherpage: boolean;
   lumina: boolean;
   delegationVerified: boolean;
@@ -45,7 +47,7 @@ export function VerificationStatusProvider({ children }: { children: ReactNode }
         supabase
           .from("user_verifications")
           .select(
-            "bayc_verified, bayc_collection, otherpage_verified, lumina_verified, delegation_verified",
+            "bayc_verified, bayc_collection, verified_collections, otherpage_verified, lumina_verified, delegation_verified",
           )
           .eq("user_id", userId)
           .maybeSingle(),
@@ -85,8 +87,13 @@ export function VerificationStatusProvider({ children }: { children: ReactNode }
     isVerifiedHolder,
     isLobby: isAuthenticated && !isVerifiedHolder,
     tokenProof: isVerifiedHolder,
-    collection:
-ver?.bayc_collection ?? null,
+    collection: ver?.bayc_collection ?? null,
+    collections:
+      ver?.verified_collections && ver.verified_collections.length > 0
+        ? ver.verified_collections
+        : ver?.bayc_collection
+          ? [ver.bayc_collection]
+          : [],
     otherpage: !!ver?.otherpage_verified,
     lumina: !!ver?.lumina_verified,
     delegationVerified: !!ver?.delegation_verified,

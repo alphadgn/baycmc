@@ -13,12 +13,13 @@ import {
 } from "@/lib/web3/constants";
 
 // The installed viem release does not export Robinhood Chain, so define it
-// locally. RPC comes from the ROBINHOOD_RPC_URL secret.
+// locally. ROBINHOOD_RPC_URL (secret) first, then Robinhood's public RPC
+// (rate-limited, but verified working for balanceOf reads).
 const robinhood = defineChain({
   id: CHAIN_ROBINHOOD,
   name: "Robinhood Chain",
   nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-  rpcUrls: { default: { http: [] as string[] } },
+  rpcUrls: { default: { http: ["https://rpc.mainnet.chain.robinhood.com"] } },
   blockExplorers: {
     default: { name: "Blockscout", url: "https://robinhoodchain.blockscout.com" },
   },

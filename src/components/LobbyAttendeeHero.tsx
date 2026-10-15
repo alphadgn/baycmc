@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
 import { avatarShapeClass } from "@/lib/profile-avatar";
 import karaokeLobbyBg from "@/assets/karaoke-lobby-bg.png.asset.json";
+import { shortAddress } from "@/lib/short-address";
 
 interface OnlineMember {
   user_id: string;
@@ -159,7 +160,7 @@ export function LobbyAttendeeHero() {
 function displayName(m: OnlineMember): string {
   return (
     m.username ??
-    (m.wallet_address ? `${m.wallet_address.slice(0, 6)}…${m.wallet_address.slice(-4)}` : "anon")
+    (m.wallet_address ? `${shortAddress(m.wallet_address)}` : "anon")
   );
 }
 

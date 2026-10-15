@@ -19,10 +19,10 @@ const projectRef =
 
 export default defineMcp({
   name: "baycmc-mcp",
-  title: "BAYCMC MCP",
+  title: "BAYCmc MCP",
   version: "0.2.0",
   instructions:
-    "Tools for the BAYCMC clubhouse app. Read and manage conference rooms, karaoke sessions and recordings, Ape Rides streams, verification, and linked wallets — always as the signed-in BAYCMC user under RLS. Use `echo` to verify connectivity.",
+    "Tools for the BAYCmc clubhouse app. Read and manage conference rooms, karaoke sessions and recordings, Ape Rides streams, verification, and linked wallets — always as the signed-in BAYCmc user under RLS. Use `echo` to verify connectivity.",
   auth: auth.oauth.issuer({
     issuer: `https://${projectRef}.supabase.co/auth/v1`,
     acceptedAudiences: "authenticated",

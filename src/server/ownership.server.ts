@@ -4,6 +4,7 @@ import { runOtherpageCheckAndPersist } from "@/server/otherpage.server";
 import { runLuminaCheckAndPersist } from "@/server/lumina.server";
 import { resolveOwnership, touchLinkedWallets } from "@/server/ownership/resolveOwnership";
 import { collectionLabel } from "@/server/ownership/collections";
+import { ALLOWED_COLLECTIONS } from "@/lib/web3/constants";
 
 /**
  * Persisted snapshot shape (kept for backwards compatibility with existing
@@ -15,6 +16,7 @@ export interface OwnershipSnapshot {
   wallet: string | null;
   tokenProof: boolean;
   collection: string | null;
+  collections: string[];
   delegationVerified: boolean;
   delegationVault: string | null;
   linkedHolder: string | null;
@@ -45,7 +47,16 @@ export async function recomputeOwnership(userId: string): Promise<OwnershipSnaps
     }
   }
 
-  const collection = winner ? collectionLabel(winner.contract) : null;
+  // EVERY whitelisted collection held anywhere in the walked graph, in
+  // allowlist order (previously only the first hit was stored, so a wallet
+  // holding several collections showed just one).
+  const heldLabels = new Set(
+    result.ownership
+      .map((o) => collectionLabel(o.contract))
+      .filter((l): l is NonNullable<typeof l> => !!l),
+  );
+  const collections = ALLOWED_COLLECTIONS.map((c) => c.label).filter((l) => heldLabels.has(l));
+  const collection = collections[0] ?? (winner ? collectionLabel(winner.contract) : null);
   const tokenProof = result.allowed;
 
   const updates: {
@@ -54,6 +65,7 @@ export async function recomputeOwnership(userId: string): Promise<OwnershipSnaps
     delegation_vault: string | null;
     bayc_verified?: boolean;
     bayc_collection?: string | null;
+    verified_collections?: string[];
     verified_at?: string | null;
   } = {
     user_id: userId,
@@ -63,11 +75,13 @@ export async function recomputeOwnership(userId: string): Promise<OwnershipSnaps
   if (tokenProof) {
     updates.bayc_verified = true;
     updates.bayc_collection = collection;
+    updates.verified_collections = collections;
     updates.verified_at = new Date().toISOString();
   } else if (result.scanned.length > 0) {
     // Only flip to false on a real scan — never on RPC outages (scanned=[]).
     updates.bayc_verified = false;
     updates.bayc_collection = null;
+    updates.verified_collections = [];
     updates.verified_at = null;
   }
 
@@ -95,6 +109,7 @@ export async function recomputeOwnership(userId: string): Promise<OwnershipSnaps
     wallet: result.connected,
     tokenProof,
     collection,
+    collections,
     delegationVerified: !!delegationVault,
     delegationVault,
     linkedHolder,

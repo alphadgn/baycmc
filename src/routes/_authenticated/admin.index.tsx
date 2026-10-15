@@ -25,7 +25,7 @@ export const Route = createFileRoute("/_authenticated/admin/")({
     if (!ok) throw redirect({ to: "/" });
   },
   head: () => ({
-    meta: [{ title: "Admin · Audit — BAYCMC" }],
+    meta: [{ title: "Admin · Audit — BAYCmc" }],
   }),
   component: AdminPage,
 });

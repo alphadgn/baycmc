@@ -4,7 +4,7 @@ import { BrandLogo } from "@/components/BrandLogo";
 
 export const Route = createFileRoute("/_authenticated/lifers/messages")({
   head: () => ({
-    meta: [{ title: "Lifer Chat — BAYCMC" }],
+    meta: [{ title: "Lifer Chat — BAYCmc" }],
   }),
   component: LiferMessages,
 });

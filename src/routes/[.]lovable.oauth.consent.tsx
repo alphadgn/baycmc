@@ -111,11 +111,11 @@ function Consent() {
     <main className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-md flex-col justify-center px-4 py-12">
       <div className="glass rounded-2xl border border-gold/20 p-6 shadow-card sm:p-8">
         <h1 className="font-display text-2xl font-bold">
-          Connect {clientName} to BAYCMC
+          Connect {clientName} to BAYCmc
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          This lets {clientName} use BAYCMC's enabled tools while you are
-          signed in. It does not bypass BAYCMC's permissions or backend
+          This lets {clientName} use BAYCmc's enabled tools while you are
+          signed in. It does not bypass BAYCmc's permissions or backend
           policies.
         </p>
 

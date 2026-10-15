@@ -6,7 +6,7 @@ import { ConferenceRoom } from "@/components/ConferenceRoom";
 
 export const Route = createFileRoute("/_authenticated/lifers/room")({
   head: () => ({
-    meta: [{ title: "Lifer Conference Room — BAYCMC" }],
+    meta: [{ title: "Lifer Conference Room — BAYCmc" }],
   }),
   component: LiferRoom,
 });

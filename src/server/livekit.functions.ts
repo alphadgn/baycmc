@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { shortAddress } from "@/lib/short-address";
 
 type RoomRecord = {
   id: string;
@@ -206,7 +207,7 @@ export const getLivekitToken = createServerFn({ method: "POST" })
     const name =
       profile?.username ||
       (profile?.wallet_address
-        ? `${profile.wallet_address.slice(0, 6)}…${profile.wallet_address.slice(-4)}`
+        ? `${shortAddress(profile.wallet_address)}`
         : "Member");
 
     const host = await isRoomHost(userId, data.roomId);

@@ -28,7 +28,7 @@ function NotFoundComponent() {
             to="/"
             className="inline-flex items-center justify-center rounded-md bg-gradient-gold px-4 py-2 text-sm font-semibold text-gold-foreground shadow-gold"
           >
-            Back to BAYCMC
+            Back to BAYCmc
           </Link>
         </div>
       </div>

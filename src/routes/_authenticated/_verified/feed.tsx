@@ -4,7 +4,7 @@ import { SocialFeed } from "@/components/SocialFeed";
 export const Route = createFileRoute("/_authenticated/_verified/feed")({
   head: () => ({
     meta: [
-      { title: "Feed — BAYCMC" },
+      { title: "Feed — BAYCmc" },
       { name: "description", content: "Realtime social feed for verified BAYC members." },
     ],
   }),

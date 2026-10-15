@@ -27,6 +27,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { GifPicker } from "@/components/GifPicker";
 import type { GifResult } from "@/server/giphy.functions";
+import { shortAddress } from "@/lib/short-address";
 
 // New tables aren't in the generated Database type yet — see profile-side
 // notes. Cast through an untyped client so this file compiles before regen.
@@ -165,6 +166,7 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
       const { data, error } = await supabase
         .from("lobby_messages")
         .select("id,user_id,body,image_url,gif_url,reply_to_id,created_at")
+        .eq("channel", channelName)
         .order("created_at", { ascending: false })
         .limit(300);
       if (cancelled) return;
@@ -201,10 +203,15 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
   // Realtime
   useEffect(() => {
     const ch = supabase
-      .channel("lobby-chat")
+      .channel(`lobby-chat:${channelName}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "lobby_messages" },
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "lobby_messages",
+          filter: `channel=eq.${channelName}`,
+        },
         async (payload) => {
           const m = payload.new as LobbyMessage;
           setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
@@ -213,7 +220,12 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
       )
       .on(
         "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "lobby_messages" },
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "lobby_messages",
+          filter: `channel=eq.${channelName}`,
+        },
         (payload) => {
           const m = payload.new as LobbyMessage;
           setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, ...m } : x)));
@@ -234,6 +246,8 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
         (payload) => {
           const r = payload.new as ReactionRow;
           setReactions((prev) => {
+            // Ignore reactions on messages from other channels.
+            if (!messageIdsRef.current.has(r.message_id)) return prev;
             const list = prev[r.message_id] ?? [];
             if (list.some((x) => x.user_id === r.user_id && x.emoji === r.emoji)) {
               return prev;
@@ -259,7 +273,10 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
     return () => {
       void supabase.removeChannel(ch);
     };
-  }, [hydrateProfiles]);
+  }, [hydrateProfiles, channelName]);
+
+  const messageIdsRef = useRef<Set<string>>(new Set());
+  messageIdsRef.current = new Set(messages.map((m) => m.id));
 
   const messageById = useMemo(() => {
     const m = new Map<string, LobbyMessage>();
@@ -327,6 +344,7 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
         imageUrl = await uploadPendingImage();
       }
       const { error } = await supabase.from("lobby_messages").insert({
+        channel: channelName,
         user_id: user.id,
         body: text || null,
         image_url: imageUrl,
@@ -455,7 +473,7 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
                   const name =
                     p.username ??
                     (p.wallet_address
-                      ? `${p.wallet_address.slice(0, 6)}…${p.wallet_address.slice(-4)}`
+                      ? `${shortAddress(p.wallet_address)}`
                       : "anon");
                   return (
                     <li
@@ -914,7 +932,7 @@ function MessageRow({
   const name =
     author?.username ??
     (author?.wallet_address
-      ? `${author.wallet_address.slice(0, 6)}…${author.wallet_address.slice(-4)}`
+      ? `${shortAddress(author.wallet_address)}`
       : "anon");
   const initials = (name ?? "??").slice(0, 2).toUpperCase();
 

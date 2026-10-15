@@ -17,13 +17,17 @@ export type CollectionChainId =
 // contract and Temp Agency a Robinhood Chain contract; checking them on
 // Ethereum always returned 0 (those addresses are empty accounts there).
 // `tips: true` = holders may receive $APE tips while performing karaoke.
-export const ALLOWED_COLLECTIONS = [
+// Every collection the app knows about. `active: false` keeps a collection's
+// name + address on file for later activation but grants NOTHING: no sign-in
+// / VIP access, no NFT display, no tips. Flip to `true` to re-enable.
+export const COLLECTION_REGISTRY = [
   {
     label: "BAYC",
     name: "Bored Ape Yacht Club",
     contract: BAYC_CONTRACT,
     chainId: CHAIN_ETHEREUM,
     tips: true,
+    active: true,
   },
   {
     label: "MAYC",
@@ -31,6 +35,7 @@ export const ALLOWED_COLLECTIONS = [
     contract: MAYC_CONTRACT,
     chainId: CHAIN_ETHEREUM,
     tips: true,
+    active: true,
   },
   {
     label: "PUNKS",
@@ -38,6 +43,7 @@ export const ALLOWED_COLLECTIONS = [
     contract: "0xb47e3cd837dDF8e4c57F05d70Ab865de6e193BBB",
     chainId: CHAIN_ETHEREUM,
     tips: true,
+    active: true,
   },
   {
     label: "TEMP_AGENCY",
@@ -45,6 +51,7 @@ export const ALLOWED_COLLECTIONS = [
     contract: "0xc60283eBe17F6A6d7b49C1Df3602f440D98f5d25",
     chainId: CHAIN_ROBINHOOD,
     tips: true,
+    active: true,
   },
   {
     label: "UGLY_DUCK_LABS",
@@ -52,6 +59,7 @@ export const ALLOWED_COLLECTIONS = [
     contract: "0xc3914cc9B40996532F1690Fa570B25B742c34b9a",
     chainId: CHAIN_ETHEREUM,
     tips: true,
+    active: true,
   },
   {
     label: "ORCA_BUSINESS",
@@ -59,6 +67,7 @@ export const ALLOWED_COLLECTIONS = [
     contract: "0xF3DFD71822b10F9F1e6f21097C29E36c4f3952c0",
     chainId: CHAIN_APECHAIN,
     tips: true,
+    active: true,
   },
   {
     label: "PUDGY_PENGUINS",
@@ -66,6 +75,7 @@ export const ALLOWED_COLLECTIONS = [
     contract: "0xBd3531dA5CF5857e7CfAA92426877b022e612cf8",
     chainId: CHAIN_ETHEREUM,
     tips: false,
+    active: false, // inactive — kept for later activation
   },
   {
     label: "LIL_PUDGYS",
@@ -73,10 +83,23 @@ export const ALLOWED_COLLECTIONS = [
     contract: "0x524cAB2ec69124574082676e6F654a18df49A048",
     chainId: CHAIN_ETHEREUM,
     tips: false,
+    active: false, // inactive — kept for later activation
   },
 ] as const;
 
-export type AllowedCollection = (typeof ALLOWED_COLLECTIONS)[number];
+export type RegisteredCollection = (typeof COLLECTION_REGISTRY)[number];
+export type AllowedCollection = RegisteredCollection;
+
+/** Collections that currently count for anything (sign-in, display, tips). */
+export const ALLOWED_COLLECTIONS: readonly AllowedCollection[] = COLLECTION_REGISTRY.filter(
+  (c) => c.active,
+);
+
+/** Human name for a stored label (e.g. "UGLY_DUCK_LABS" → "Ugly Duck Labs"). */
+export function collectionNameForLabel(label: string | null | undefined): string | null {
+  if (!label) return null;
+  return COLLECTION_REGISTRY.find((c) => c.label === label)?.name ?? label;
+}
 
 export function collectionByContract(contract: string): AllowedCollection | null {
   const c = contract.toLowerCase();

@@ -1,3 +1,4 @@
+import { getAddress } from "viem";
 /**
  * Account-merge / keep-separate flow.
  *
@@ -328,10 +329,27 @@ export const mergeAccounts = createServerFn({ method: "POST" })
       avatar_url: pick("avatar_url") ?? null,
       bio: pick("bio") ?? null,
     };
-    // If survivor has no wallet, inherit the removed one.
+    // If survivor has no wallet, inherit the removed one. Otherwise keep the
+    // removed account's wallet as a VERIFIED linked wallet of the survivor
+    // (it signed in with SIWE, so control is proven) — it used to be dropped,
+    // and signing in with it later minted a new account without the
+    // survivor's roles (e.g. super_admin).
     const survivorProf = survivor === me ? myProf : otherProf;
     if (!survivorProf.wallet_address && removedWallet) {
       survivorPatch.wallet_address = removedWallet;
+    } else if (removedWallet && /^0x[0-9a-fA-F]{40}$/.test(removedWallet)) {
+      const nowIso = new Date().toISOString();
+      const { error: linkErr } = await admin.from("linked_wallets").upsert(
+        {
+          user_id: survivor,
+          address: getAddress(removedWallet),
+          label: "Merged account",
+          verified_at: nowIso,
+          last_checked_at: nowIso,
+        },
+        { onConflict: "user_id,address" },
+      );
+      if (linkErr) console.warn("[mergeAccounts] keep removed wallet:", linkErr.message);
     }
     const { error: patchErr } = await admin
       .from("profiles")
@@ -341,7 +359,17 @@ export const mergeAccounts = createServerFn({ method: "POST" })
 
     // 3. Promote any role/verification rows from removed → survivor
     //    (ignore conflicts where survivor already holds them).
-    await admin.from("user_roles").update({ user_id: survivor }).eq("user_id", removed);
+    // Copy roles the survivor doesn't already hold (a blanket UPDATE failed
+    // on the (user_id, role) unique key and silently moved nothing).
+    const { data: removedRoles } = await admin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", removed);
+    for (const r of removedRoles ?? []) {
+      await admin
+        .from("user_roles")
+        .upsert({ user_id: survivor, role: r.role }, { onConflict: "user_id,role" });
+    }
     // user_verifications has UNIQUE(user_id); only move if survivor lacks one.
     const { data: survVer } = await admin
       .from("user_verifications")

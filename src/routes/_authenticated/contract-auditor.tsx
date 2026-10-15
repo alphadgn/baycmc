@@ -14,15 +14,15 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/_authenticated/contract-auditor")({
   head: () => ({
     meta: [
-      { title: "Contract Auditor — BAYCMC" },
+      { title: "Contract Auditor — BAYCmc" },
       {
         name: "description",
-        content: "Review smart contracts with Claude in your private BAYCMC audit conversation.",
+        content: "Review smart contracts with Claude in your private BAYCmc audit conversation.",
       },
-      { property: "og:title", content: "Contract Auditor — BAYCMC" },
+      { property: "og:title", content: "Contract Auditor — BAYCmc" },
       {
         property: "og:description",
-        content: "Review smart contracts with Claude in your private BAYCMC audit conversation.",
+        content: "Review smart contracts with Claude in your private BAYCmc audit conversation.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

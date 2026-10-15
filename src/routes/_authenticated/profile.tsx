@@ -10,20 +10,21 @@ import { LinkedWalletsPanel } from "@/components/LinkedWalletsPanel";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import { AvatarPicker } from "@/components/AvatarPicker";
 import { avatarShapeClass } from "@/lib/profile-avatar";
+import { collectionNameForLabel } from "@/lib/web3/constants";
 import type { NftItem } from "@/server/wallet-assets.functions";
 
 export const Route = createFileRoute("/_authenticated/profile")({
   head: () => ({
     meta: [
-      { title: "Your Profile — BAYCMC" },
+      { title: "Your Profile — BAYCmc" },
       {
         name: "description",
-        content: "Manage your BAYCMC profile, linked wallets and live holder verification.",
+        content: "Manage your BAYCmc profile, linked wallets and live holder verification.",
       },
-      { property: "og:title", content: "Your Profile — BAYCMC" },
+      { property: "og:title", content: "Your Profile — BAYCmc" },
       {
         property: "og:description",
-        content: "Manage your BAYCMC profile, linked wallets and live holder verification.",
+        content: "Manage your BAYCmc profile, linked wallets and live holder verification.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -112,8 +113,6 @@ function ProfilePage() {
           id: user.id,
           username: username || null,
           bio: bio || null,
-          // Preserve wallet if already linked; otherwise leave null.
-          ...(profile?.wallet_address ? { wallet_address: profile.wallet_address } : {}),
         },
         { onConflict: "id" },
       )
@@ -157,7 +156,6 @@ function ProfilePage() {
           {
             id: user.id,
             avatar_url: publicUrl,
-            ...(profile?.wallet_address ? { wallet_address: profile.wallet_address } : {}),
           },
           { onConflict: "id" },
         )
@@ -185,7 +183,6 @@ function ProfilePage() {
         {
           id: user.id,
           avatar_url: nft.image,
-          ...(profile?.wallet_address ? { wallet_address: profile.wallet_address } : {}),
         },
         { onConflict: "id" },
       )
@@ -295,13 +292,17 @@ function ProfilePage() {
                   {r.replace("_", " ")}
                 </span>
               ))}
-              {verification.isVerifiedHolder && (
-                <span className="rounded-full border border-success/30 bg-success/10 px-3 py-1 text-xs font-semibold text-success">
-                  {verification.collection
-                    ? `${verification.collection} verified`
-                    : "BAYC/MAYC verified"}
-                </span>
-              )}
+              {verification.isVerifiedHolder &&
+                (verification.collections.length > 0 ? verification.collections : [null]).map(
+                  (label) => (
+                    <span
+                      key={label ?? "holder"}
+                      className="rounded-full border border-success/30 bg-success/10 px-3 py-1 text-xs font-semibold text-success"
+                    >
+                      {label ? `${collectionNameForLabel(label)} verified` : "Holder verified"}
+                    </span>
+                  ),
+                )}
               {!verification.isVerifiedHolder && (
                 <span className="rounded-full border border-border bg-muted/30 px-3 py-1 text-xs text-muted-foreground">
                   {verification.loading

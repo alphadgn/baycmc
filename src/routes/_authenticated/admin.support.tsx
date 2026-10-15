@@ -5,6 +5,7 @@ import { LifeBuoy } from "lucide-react";
 import { supabase as typedSupabase } from "@/integrations/supabase/client";
 import { SupportThread } from "@/components/SupportThread";
 import { avatarShapeClass } from "@/lib/profile-avatar";
+import { shortAddress } from "@/lib/short-address";
 
 // support_messages isn't in the generated Database type yet — cast through
 // an untyped client (same pattern as LobbyChat / SupportThread).
@@ -35,12 +36,12 @@ interface ThreadSummary {
 export const Route = createFileRoute("/_authenticated/admin/support")({
   head: () => ({
     meta: [
-      { title: "Support inbox — BAYCMC admin" },
-      { name: "description", content: "Member support conversations for BAYCMC administrators." },
-      { property: "og:title", content: "Support inbox — BAYCMC admin" },
+      { title: "Support inbox — BAYCmc admin" },
+      { name: "description", content: "Member support conversations for BAYCmc administrators." },
+      { property: "og:title", content: "Support inbox — BAYCmc admin" },
       {
         property: "og:description",
-        content: "Member support conversations for BAYCMC administrators.",
+        content: "Member support conversations for BAYCmc administrators.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -149,7 +150,7 @@ function AdminSupport() {
                 const name =
                   t.profile?.username ??
                   (t.profile?.wallet_address
-                    ? `${t.profile.wallet_address.slice(0, 6)}…${t.profile.wallet_address.slice(-4)}`
+                    ? `${shortAddress(t.profile.wallet_address)}`
                     : t.threadUserId.slice(0, 8));
                 const active = t.threadUserId === selected;
                 return (

@@ -24,13 +24,13 @@ const LINK_NONCE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 function buildLinkMessage(userId: string, address: string, nonce: string): string {
   return [
-    "BAYCMC — Link wallet",
+    "BAYCmc — Link wallet",
     "",
     `Account: ${userId}`,
     `Wallet:  ${address}`,
     `Nonce:   ${nonce}`,
     "",
-    "Sign this message to prove you control this wallet and link it to your BAYCMC account.",
+    "Sign this message to prove you control this wallet and link it to your BAYCmc account.",
     "This signature does not authorize any on-chain action.",
   ].join("\n");
 }
@@ -139,7 +139,9 @@ export const verifyAndLinkWallet = createServerFn({ method: "POST" })
     await supabaseAdmin.from("auth_nonces").update({ consumed: true }).eq("id", nonceRow.id);
 
     const nowIso = new Date().toISOString();
-    const { error } = await supabase.from("linked_wallets").upsert(
+    // Server-only write: members can no longer insert/update linked_wallets
+    // themselves (they could previously self-stamp verified_at).
+    const { error } = await supabaseAdmin.from("linked_wallets").upsert(
       {
         user_id: userId,
         address,

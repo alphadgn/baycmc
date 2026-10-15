@@ -17,7 +17,7 @@ export const Route = createFileRoute("/_authenticated/admin/karaoke")({
     const ok = roles?.some((r) => r.role === "admin" || r.role === "super_admin");
     if (!ok) throw redirect({ to: "/" });
   },
-  head: () => ({ meta: [{ title: "Admin · Karaoke Catalog — BAYCMC" }] }),
+  head: () => ({ meta: [{ title: "Admin · Karaoke Catalog — BAYCmc" }] }),
   component: AdminKaraokePage,
 });
 

@@ -6,7 +6,7 @@ export default defineTool({
   name: "list_rooms",
   title: "List clubhouse rooms",
   description:
-    "List active BAYCMC clubhouse rooms (conference/Zoom-style rooms, karaoke rooms, and other tiered rooms) the signed-in user can see.",
+    "List active BAYCmc clubhouse rooms (conference/Zoom-style rooms, karaoke rooms, and other tiered rooms) the signed-in user can see.",
   inputSchema: {
     kind: z
       .string()

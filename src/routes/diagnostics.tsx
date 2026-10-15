@@ -15,7 +15,7 @@ import { getQueueState } from "@/lib/wallet/txQueue";
 export const Route = createFileRoute("/diagnostics")({
   head: () => ({
     meta: [
-      { title: "Diagnostics — BAYCMC" },
+      { title: "Diagnostics — BAYCmc" },
       { name: "description", content: "Latest client errors and structured wallet/auth events." },
       { name: "robots", content: "noindex,nofollow" },
     ],
