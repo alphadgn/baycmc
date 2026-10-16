@@ -14,6 +14,7 @@ import type { Chain } from "viem";
 import { importWithRetry } from "@/lib/import-with-retry";
 import { ensureBrowserPolyfills } from "@/lib/polyfill-check";
 import { REOWN_PROJECT_ID } from "@/lib/web3/constants";
+import { injectedTarget } from "@/lib/web3/injected-target";
 
 /**
  * Wallet stack: wagmi + Glyph Global Wallet + browser wallets + WalletConnect.
@@ -84,7 +85,7 @@ function makeConfig(): Config {
     ssr: true,
     // EIP-6963: every installed browser wallet shows up as its own button.
     multiInjectedProviderDiscovery: true,
-    connectors: [injected({ shimDisconnect: true })],
+    connectors: [injected({ shimDisconnect: true, target: injectedTarget })],
     transports: {
       [mainnet.id]: fallback([
         http(import.meta.env.VITE_ETH_RPC_URL || undefined),
@@ -134,7 +135,7 @@ function makeGlyphFactoryConfig(mod: GlyphModule, glyphChains: readonly AnyChain
     chains: list as [AnyChain, ...AnyChain[]],
     ssr: true,
     multiInjectedProviderDiscovery: true,
-    connectors: [mod.glyphWalletConnector(), injected({ shimDisconnect: true })],
+    connectors: [mod.glyphWalletConnector(), injected({ shimDisconnect: true, target: injectedTarget })],
     transports,
   }) as unknown as Config;
 }
