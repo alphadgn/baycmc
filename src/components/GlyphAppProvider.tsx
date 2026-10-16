@@ -205,10 +205,11 @@ export function GlyphAppProvider({ children }: { children: ReactNode }) {
         return;
       }
       try {
-        // Glyph's own styles, as in Glyph's documented setup.
-        await importWithRetry(() => import("@use-glyph/sdk-react/style.css") as Promise<unknown>, {
-          label: "glyph-styles",
-        }).catch(() => undefined);
+        // NOTE: do NOT import "@use-glyph/sdk-react/style.css". It ships an
+        // unlayered Tailwind v3 reset (`*{border-width:0}`, transparent
+        // buttons, --tw-* variable resets) that overrides our Tailwind v4
+        // utilities site-wide — borders, backgrounds, shadows and backdrops
+        // all vanished. We render no Glyph widget UI, so we need none of it.
         const mod = await importWithRetry(() => import("@use-glyph/sdk-react"), {
           label: "glyph-sdk-react",
         });
