@@ -120,12 +120,12 @@ export const searchKaraokeSongs = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ query: z.string().min(1).max(120) }).parse(input))
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    void context;
     const q = data.query.trim();
     const norm = normalize(q);
 
-    // 1) Local catalog (trigram ILIKE)
-    const { data: local } = await supabase
+    // 1) Local catalog (trigram ILIKE). The catalogue is server-read only.
+    const { data: local } = await supabaseAdmin
       .from("karaoke_songs")
       .select("id,title,artist,playable_url,youtube_id")
       .or(`normalized_title.ilike.%${norm}%,artist.ilike.%${norm}%`)

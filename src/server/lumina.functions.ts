@@ -47,7 +47,8 @@ export const verifyLuminaOwnership = createServerFn({ method: "POST" })
     }
     const checksummed = getAddress(wallet);
 
-    const { data: gate } = await supabase
+    const { supabaseAdmin: settingsDb } = await import("@/integrations/supabase/client.server");
+    const { data: gate } = await settingsDb
       .from("app_settings")
       .select("value")
       .eq("key", "lumina_gate")

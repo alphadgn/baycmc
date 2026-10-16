@@ -171,10 +171,12 @@ interface OtherpageGate {
 }
 
 async function loadOtherpageGate(
+  // Settings are staff/server-read only; the caller's client is ignored.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: any,
+  _caller?: any,
 ): Promise<OtherpageGate | null> {
-  const { data, error } = await supabase
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data, error } = await supabaseAdmin
     .from("app_settings")
     .select("value")
     .eq("key", "otherpage_gate")
