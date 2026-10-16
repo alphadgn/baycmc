@@ -68,11 +68,16 @@ function ProfilePage() {
 
     void (async () => {
       try {
-        const profileRes = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", user.id)
-          .maybeSingle();
+        // Full wallet addresses are not readable from profiles (members see
+        // only wallet_display); the owner gets their own via get_my_wallet().
+        const [profileRes, walletRes] = await Promise.all([
+          supabase
+            .from("profiles")
+            .select("id,username,bio,avatar_url,created_at,updated_at")
+            .eq("id", user.id)
+            .maybeSingle(),
+          supabase.rpc("get_my_wallet"),
+        ]);
         if (cancelled) return;
 
         const firstError = profileRes.error;
@@ -83,7 +88,10 @@ function ProfilePage() {
         }
 
         if (profileRes.data) {
-          const p = profileRes.data as ProfileRow;
+          const p = {
+            ...profileRes.data,
+            wallet_address: (walletRes.data as string | null) ?? "",
+          } as unknown as ProfileRow;
           setProfile(p);
           setUsername(p.username ?? "");
           setBio(p.bio ?? "");

@@ -320,12 +320,9 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
     }
     let cancelled = false;
     void supabase
-      .from("profiles")
-      .select("wallet_address")
-      .eq("id", user.id)
-      .maybeSingle()
+      .rpc("get_my_wallet")
       .then(({ data }) => {
-        if (!cancelled) setWalletAddress(data?.wallet_address ?? null);
+        if (!cancelled) setWalletAddress((data as string | null) ?? null);
       });
     return () => {
       cancelled = true;

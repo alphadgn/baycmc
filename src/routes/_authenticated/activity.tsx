@@ -43,13 +43,9 @@ function ActivityPage() {
     if (!user) return;
     let cancelled = false;
     (async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("wallet_address")
-        .eq("id", user.id)
-        .maybeSingle();
+      const { data } = await supabase.rpc("get_my_wallet");
       if (cancelled) return;
-      setWallet(data?.wallet_address ?? null);
+      setWallet((data as string | null) ?? null);
     })();
     return () => {
       cancelled = true;

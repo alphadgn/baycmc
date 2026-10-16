@@ -1140,6 +1140,7 @@ export type Database = {
           updated_at: string
           username: string | null
           wallet_address: string | null
+          wallet_display: string | null
         }
         Insert: {
           avatar_url?: string | null
@@ -1385,6 +1386,7 @@ export type Database = {
       }
     }
     Functions: {
+      get_my_wallet: { Args: never; Returns: string }
       can_use_ape_rides: { Args: { _uid: string }; Returns: boolean }
       can_join_punks_room: { Args: { _uid: string }; Returns: boolean }
       has_role: {
