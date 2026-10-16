@@ -158,16 +158,28 @@ export function ApeRidesAdminTab() {
           {!editing && (
             <label className="text-xs">
               Host username
-              <input className={input} value={form.hostUsername} onChange={(e) => setForm({ ...form, hostUsername: e.target.value })} />
+              <input
+                className={input}
+                value={form.hostUsername}
+                onChange={(e) => setForm({ ...form, hostUsername: e.target.value })}
+              />
             </label>
           )}
           <label className="text-xs">
             Title
-            <input className={input} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+            <input
+              className={input}
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+            />
           </label>
           <label className="text-xs">
             Location
-            <select className={input} value={form.venue} onChange={(e) => setForm({ ...form, venue: e.target.value })}>
+            <select
+              className={input}
+              value={form.venue}
+              onChange={(e) => setForm({ ...form, venue: e.target.value })}
+            >
               {data.venues.map((v) => (
                 <option key={v.slug} value={v.slug}>
                   {v.name}
@@ -177,22 +189,50 @@ export function ApeRidesAdminTab() {
           </label>
           <label className="text-xs">
             Price (APE, 0 = free)
-            <input className={input} type="number" min={0} step="0.01" value={form.priceApe} onChange={(e) => setForm({ ...form, priceApe: e.target.value })} />
+            <input
+              className={input}
+              type="number"
+              min={0}
+              step="0.01"
+              value={form.priceApe}
+              onChange={(e) => setForm({ ...form, priceApe: e.target.value })}
+            />
           </label>
           <label className="text-xs">
             Starts
-            <input className={input} type="datetime-local" value={form.start} onChange={(e) => setForm({ ...form, start: e.target.value })} />
+            <input
+              className={input}
+              type="datetime-local"
+              value={form.start}
+              onChange={(e) => setForm({ ...form, start: e.target.value })}
+            />
           </label>
           <label className="text-xs">
             Ends
-            <input className={input} type="datetime-local" value={form.end} onChange={(e) => setForm({ ...form, end: e.target.value })} />
+            <input
+              className={input}
+              type="datetime-local"
+              value={form.end}
+              onChange={(e) => setForm({ ...form, end: e.target.value })}
+            />
           </label>
           <label className="text-xs">
             Seats (viewers)
-            <input className={input} type="number" min={1} max={50} value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} />
+            <input
+              className={input}
+              type="number"
+              min={1}
+              max={50}
+              value={form.capacity}
+              onChange={(e) => setForm({ ...form, capacity: e.target.value })}
+            />
           </label>
           <label className="flex items-center gap-2 self-end text-xs">
-            <input type="checkbox" checked={form.overrideLocation} onChange={(e) => setForm({ ...form, overrideLocation: e.target.checked })} />
+            <input
+              type="checkbox"
+              checked={form.overrideLocation}
+              onChange={(e) => setForm({ ...form, overrideLocation: e.target.checked })}
+            />
             Waive the GPS location check for this ride
           </label>
         </div>
@@ -217,23 +257,36 @@ export function ApeRidesAdminTab() {
                   <div className="min-w-0">
                     <p className="font-semibold">
                       {r.title}{" "}
-                      <span className="ml-1 rounded-sm bg-gold/10 px-1.5 py-0.5 text-[10px] uppercase text-gold">{r.status}</span>
+                      <span className="ml-1 rounded-sm bg-gold/10 px-1.5 py-0.5 text-[10px] uppercase text-gold">
+                        {r.status}
+                      </span>
                     </p>
                     <p className="text-[11px] text-muted-foreground">
                       Host {data.names[r.host_id] ?? "Member"} ·{" "}
                       {data.venues.find((v) => v.slug === r.venue_slug)?.name ?? "—"} ·{" "}
-                      {Number(r.price_ape) > 0 ? `${Number(r.price_ape)} APE` : "Free"} · {resv.filter((x) => x.status !== "cancelled").length}/{r.capacity} seats ·{" "}
+                      {Number(r.price_ape) > 0 ? `${Number(r.price_ape)} APE` : "Free"} ·{" "}
+                      {resv.filter((x) => x.status !== "cancelled").length}/{r.capacity} seats ·{" "}
                       {(paidByRide.get(r.id) ?? 0).toString()} APE collected
-                      {r.scheduled_start ? ` · ${new Date(r.scheduled_start).toLocaleString()}` : ""}
+                      {r.scheduled_start
+                        ? ` · ${new Date(r.scheduled_start).toLocaleString()}`
+                        : ""}
                       {r.admin_override ? " · GPS waived" : ""}
                     </p>
                   </div>
                   {(r.status === "scheduled" || r.status === "live") && (
                     <div className="flex gap-2">
-                      <button type="button" onClick={() => edit(r)} className="rounded-md border border-gold/40 px-2 py-1 text-xs text-gold">
+                      <button
+                        type="button"
+                        onClick={() => edit(r)}
+                        className="rounded-md border border-gold/40 px-2 py-1 text-xs text-gold"
+                      >
                         Edit
                       </button>
-                      <button type="button" onClick={() => void cancel(r)} className="rounded-md border border-destructive/40 px-2 py-1 text-xs text-destructive">
+                      <button
+                        type="button"
+                        onClick={() => void cancel(r)}
+                        className="rounded-md border border-destructive/40 px-2 py-1 text-xs text-destructive"
+                      >
                         Cancel ride
                       </button>
                     </div>
@@ -251,7 +304,10 @@ export function ApeRidesAdminTab() {
                           value={x.status}
                           onChange={async (e) => {
                             const res = await setResv({
-                              data: { reservationId: x.id, status: e.target.value as "reserved" | "paid" | "cancelled" },
+                              data: {
+                                reservationId: x.id,
+                                status: e.target.value as "reserved" | "paid" | "cancelled",
+                              },
                             });
                             if (!res.ok) toast.error(res.error);
                             void load();
@@ -269,7 +325,9 @@ export function ApeRidesAdminTab() {
               </li>
             );
           })}
-          {data.rides.length === 0 && <li className="text-sm text-muted-foreground">No rides yet.</li>}
+          {data.rides.length === 0 && (
+            <li className="text-sm text-muted-foreground">No rides yet.</li>
+          )}
         </ul>
       </section>
     </div>

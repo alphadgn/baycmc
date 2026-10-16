@@ -52,7 +52,8 @@ export const getEventStreamStats = createServerFn({ method: "POST" })
     const names = new Map<string, string>();
     if (hostIds.length) {
       const { data: profs } = await admin.from("profiles").select("id,username").in("id", hostIds);
-      for (const p of profs ?? []) names.set(p.id as string, (p.username as string | null) ?? "Member");
+      for (const p of profs ?? [])
+        names.set(p.id as string, (p.username as string | null) ?? "Member");
     }
     const base: StreamStats = {
       configured: false,

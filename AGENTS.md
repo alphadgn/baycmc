@@ -13,3 +13,9 @@
 - Ownership scans batch JSON-RPC calls and retry; a failed check is "unknown" (ScanResult.failed) and must never be stored as "not held".
 - Verification is per sign-in session: wallet sign-in (verifyOwnership) and email sign-in (startVerificationSession) recompute with `fresh: true` (no carry-over, failed checks grant nothing); sign-out (signOut / InactivityWatcher) calls endVerificationSession to wipe it. Mid-session recomputes may keep labels whose check errored (they were verified this session).
 - NFT display (listAllowedNfts) is live per wallet and per chain with its own time budget; partial results + `warnings`, never all-or-nothing.
+- Menu + access to gated areas (holders_chat, conference_rooms, punks_brunch, ape_rides, event_stream) come from collection_menu_items via can_access_area()/my_menu_items(); the super admin edits it (Super Admin → Menu access). Route guard (_verified), RLS and the LiveKit gate all use it.
+- profiles.wallet_address / linked_wallets are not readable by members (column grants); show others' wallets via profiles.wallet_display, read your own via rpc get_my_wallet(), and read full wallets server-side with the service role.
+- Ape Rides payments are APE on ApeChain verified server-side (confirmRidePayment: success, to = host wallet, from = payer wallet, amount >= price, unique tx). Reservations/payments are server-write only.
+- Event Stream (rooms.kind = 'stream', livekit_room 'event-stream', 250 cap): only event_stream_hosts may publish; admin stats at /admin/event-stream.
+- Karaoke only serves YouTube videos confirmed embeddable (oEmbed, cached in karaoke_video_status); catalogue songs without a video resolve on pick (resolveKaraokeSong).
+- Never import a third-party stylesheet with unlayered global resets (Glyph's style.css broke the site); Relay's is scoped to .relay-kit-reset and is fine.

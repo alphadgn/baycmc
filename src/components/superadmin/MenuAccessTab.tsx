@@ -13,7 +13,9 @@ import { MENU_ITEMS } from "@/lib/baycmc/menu-items";
 export function MenuAccessTab() {
   const fetchMatrix = useServerFn(getMenuMatrix);
   const save = useServerFn(setMenuItem);
-  const [collections, setCollections] = useState<{ label: string; name: string; access: string }[]>([]);
+  const [collections, setCollections] = useState<{ label: string; name: string; access: string }[]>(
+    [],
+  );
   const [enabled, setEnabled] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -23,7 +25,9 @@ export function MenuAccessTab() {
       const res = await fetchMatrix();
       setCollections(res.collections);
       setEnabled(
-        new Set(res.rows.filter((r) => r.enabled).map((r) => `${r.collection_label}|${r.item_key}`)),
+        new Set(
+          res.rows.filter((r) => r.enabled).map((r) => `${r.collection_label}|${r.item_key}`),
+        ),
       );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't load menu access");

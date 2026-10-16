@@ -94,11 +94,18 @@ export const cancelMyReservation = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!r || r.viewer_id !== context.userId) return { ok: false as const, error: "Not found" };
     if (r.status === "paid") {
-      return { ok: false as const, error: "Paid reservations can only be cancelled by the super admin." };
+      return {
+        ok: false as const,
+        error: "Paid reservations can only be cancelled by the super admin.",
+      };
     }
     await admin
       .from("ape_ride_reservations")
-      .update({ status: "cancelled", cancelled_by: context.userId, updated_at: new Date().toISOString() })
+      .update({
+        status: "cancelled",
+        cancelled_by: context.userId,
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", r.id);
     return { ok: true as const };
   });
@@ -119,7 +126,11 @@ export const getReservationPayTo = createServerFn({ method: "POST" })
     if (!r || r.viewer_id !== context.userId) return { ok: false as const, error: "Not found" };
     if (r.status !== "reserved") return { ok: false as const, error: "Nothing to pay." };
     if (!(Number(r.price_ape) > 0)) return { ok: false as const, error: "This ride is free." };
-    const { data: ride } = await admin.from("ape_rides").select("host_id").eq("id", r.ride_id).maybeSingle();
+    const { data: ride } = await admin
+      .from("ape_rides")
+      .select("host_id")
+      .eq("id", r.ride_id)
+      .maybeSingle();
     if (!ride) return { ok: false as const, error: "Ride not found" };
     const { accountWallets } = await import("@/server/account-wallets.server");
     const host = await accountWallets(ride.host_id);
@@ -160,8 +171,13 @@ export const confirmRidePayment = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!r || r.viewer_id !== uid) return { ok: false as const, error: "Not found" };
     if (r.status === "paid") return { ok: true as const, duplicate: true };
-    if (r.status !== "reserved") return { ok: false as const, error: "This reservation was cancelled." };
-    const { data: ride } = await admin.from("ape_rides").select("id,host_id").eq("id", r.ride_id).maybeSingle();
+    if (r.status !== "reserved")
+      return { ok: false as const, error: "This reservation was cancelled." };
+    const { data: ride } = await admin
+      .from("ape_rides")
+      .select("id,host_id")
+      .eq("id", r.ride_id)
+      .maybeSingle();
     if (!ride) return { ok: false as const, error: "Ride not found" };
 
     const { accountWallets } = await import("@/server/account-wallets.server");
@@ -173,9 +189,13 @@ export const confirmRidePayment = createServerFn({ method: "POST" })
     try {
       receipt = await client.waitForTransactionReceipt({ hash, timeout: 60_000, confirmations: 1 });
     } catch {
-      return { ok: false as const, error: "Couldn't find that transaction on ApeChain yet. Try again in a moment." };
+      return {
+        ok: false as const,
+        error: "Couldn't find that transaction on ApeChain yet. Try again in a moment.",
+      };
     }
-    if (receipt.status !== "success") return { ok: false as const, error: "The payment transaction failed on-chain." };
+    if (receipt.status !== "success")
+      return { ok: false as const, error: "The payment transaction failed on-chain." };
     const tx = await client.getTransaction({ hash });
     if (!tx.to) return { ok: false as const, error: "That transaction isn't an APE transfer." };
     const to = getAddress(tx.to);
@@ -184,10 +204,14 @@ export const confirmRidePayment = createServerFn({ method: "POST" })
       return { ok: false as const, error: "That transaction didn't pay this ride's host." };
     }
     if (!payer.wallets.some((w) => getAddress(w) === from)) {
-      return { ok: false as const, error: "Pay from a wallet connected or linked to your account." };
+      return {
+        ok: false as const,
+        error: "Pay from a wallet connected or linked to your account.",
+      };
     }
     const due = parseEther(String(r.price_ape));
-    if (tx.value < due) return { ok: false as const, error: "The amount sent is less than the ride price." };
+    if (tx.value < due)
+      return { ok: false as const, error: "The amount sent is less than the ride price." };
 
     const { error } = await admin.from("ape_ride_payments").insert({
       reservation_id: r.id,
@@ -235,7 +259,8 @@ export const startGrantedRide = createServerFn({ method: "POST" })
       .eq("id", data.rideId)
       .maybeSingle();
     if (!ride || ride.host_id !== uid) return { ok: false as const, error: "Not your ride." };
-    if (ride.status !== "scheduled") return { ok: false as const, error: "This ride isn't scheduled." };
+    if (ride.status !== "scheduled")
+      return { ok: false as const, error: "This ride isn't scheduled." };
     if (!ride.admin_override) {
       if (data.lat == null || data.lng == null) {
         return { ok: false as const, error: "Check your location first." };
@@ -247,7 +272,10 @@ export const startGrantedRide = createServerFn({ method: "POST" })
         .maybeSingle();
       const { haversineMeters } = await import("@/lib/baycmc/wynwood");
       if (!venue || haversineMeters({ lat: data.lat, lng: data.lng }, venue) > venue.radius_m) {
-        return { ok: false as const, error: `You must be inside the ${venue?.name ?? "venue"} area.` };
+        return {
+          ok: false as const,
+          error: `You must be inside the ${venue?.name ?? "venue"} area.`,
+        };
       }
     }
     await admin
@@ -268,15 +296,26 @@ export const adminListRides = createServerFn({ method: "POST" })
     const [{ data: rides }, { data: reservations }, { data: payments }, { data: venues }] =
       await Promise.all([
         admin.from("ape_rides").select("*").order("created_at", { ascending: false }).limit(100),
-        admin.from("ape_ride_reservations").select("*").order("created_at", { ascending: false }).limit(500),
-        admin.from("ape_ride_payments").select("*").order("created_at", { ascending: false }).limit(500),
+        admin
+          .from("ape_ride_reservations")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(500),
+        admin
+          .from("ape_ride_payments")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(500),
         admin.from("ape_ride_venues").select("slug,name").order("display_order"),
       ]);
     const ids = new Set<string>();
     for (const r of rides ?? []) ids.add(r.host_id);
     for (const r of reservations ?? []) ids.add(r.viewer_id);
     const { data: profs } = ids.size
-      ? await admin.from("profiles").select("id,username").in("id", [...ids])
+      ? await admin
+          .from("profiles")
+          .select("id,username")
+          .in("id", [...ids])
       : { data: [] };
     const names = Object.fromEntries((profs ?? []).map((p) => [p.id, p.username ?? "Member"]));
     return {
@@ -336,9 +375,7 @@ export const adminGrantRide = createServerFn({ method: "POST" })
 
 export const adminUpdateRide = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
-    rideFields.extend({ rideId: z.string().uuid() }).parse(input),
-  )
+  .inputValidator((input: unknown) => rideFields.extend({ rideId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     await requireSuperAdmin(context.userId);
     const admin = await db();

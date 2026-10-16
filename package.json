@@ -58,6 +58,8 @@
     "@radix-ui/react-toggle-group": "^1.1.11",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@rainbow-me/rainbowkit": "^2.2.11",
+    "@relayprotocol/relay-kit-ui": "12.0.5",
+    "@relayprotocol/relay-sdk": "8.0.4",
     "@supabase/supabase-js": "^2.105.1",
     "@tailwindcss/vite": "^4.2.1",
     "@tanstack/react-query": "^5.100.6",

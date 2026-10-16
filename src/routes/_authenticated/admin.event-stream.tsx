@@ -74,10 +74,15 @@ function EventStreamAdmin() {
       <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-3xl text-gradient-gold sm:text-4xl">Event Stream</h1>
-          <p className="mt-1 text-xs text-muted-foreground sm:text-sm">Live statistics · refreshes every 5 seconds</p>
+          <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
+            Live statistics · refreshes every 5 seconds
+          </p>
         </div>
         <div className="flex gap-2 text-xs">
-          <Link to="/event-stream" className="rounded-md border border-gold/40 bg-gold/10 px-3 py-2 text-gold">
+          <Link
+            to="/event-stream"
+            className="rounded-md border border-gold/40 bg-gold/10 px-3 py-2 text-gold"
+          >
             Open stream →
           </Link>
           <Link to="/admin" className="rounded-md border border-border px-3 py-2">
@@ -94,7 +99,9 @@ function EventStreamAdmin() {
       ) : (
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="glass rounded-2xl p-5 shadow-card">
-            <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Live stream</p>
+            <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+              Live stream
+            </p>
             <div className="mt-3 flex items-center gap-3">
               <span className="font-display text-2xl">Live</span>
               <span
@@ -106,7 +113,9 @@ function EventStreamAdmin() {
                 }`}
               />
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">{live ? "Broadcasting now" : "No live broadcast"}</p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {live ? "Broadcasting now" : "No live broadcast"}
+            </p>
           </div>
           <div className="glass rounded-2xl p-5 shadow-card">
             <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Capacity</p>
@@ -121,7 +130,9 @@ function EventStreamAdmin() {
             {stats.hostedBy.length ? (
               <ul className="mt-3 space-y-1">
                 {stats.hostedBy.map((h) => (
-                  <li key={h.userId} className="font-semibold text-gold">{h.name}</li>
+                  <li key={h.userId} className="font-semibold text-gold">
+                    {h.name}
+                  </li>
                 ))}
               </ul>
             ) : (
@@ -131,7 +142,9 @@ function EventStreamAdmin() {
         </div>
       )}
       {stats && !stats.configured && (
-        <p className="mt-3 text-xs text-amber-300">LiveKit isn't configured on the server, so live numbers are unavailable.</p>
+        <p className="mt-3 text-xs text-amber-300">
+          LiveKit isn't configured on the server, so live numbers are unavailable.
+        </p>
       )}
 
       <section className="glass mt-6 rounded-2xl p-5 shadow-card">

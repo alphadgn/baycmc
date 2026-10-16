@@ -181,7 +181,9 @@ function Stage({ capacity, canPublish }: { capacity: number; canPublish: boolean
             <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-center">
               <Radio className="h-8 w-8 text-gold/60" />
               <p className="font-display text-lg text-gold">The show starts soon</p>
-              <p className="text-xs text-muted-foreground">Stay seated — the stream appears here when the host goes live.</p>
+              <p className="text-xs text-muted-foreground">
+                Stay seated — the stream appears here when the host goes live.
+              </p>
             </div>
           )}
           {live && (
@@ -220,7 +222,9 @@ function Stage({ capacity, canPublish }: { capacity: number; canPublish: boolean
                     : "border-border/40 bg-secondary/20 opacity-50 grayscale"
                 }`}
               >
-                <span className={`truncate text-[8px] leading-tight ${me ? "font-bold text-gold" : "text-muted-foreground"}`}>
+                <span
+                  className={`truncate text-[8px] leading-tight ${me ? "font-bold text-gold" : "text-muted-foreground"}`}
+                >
                   {name}
                 </span>
               </div>

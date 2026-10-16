@@ -32,7 +32,13 @@ function when(r: Pick<Ride, "scheduled_start" | "scheduled_end" | "status">) {
 }
 function apeAmount(wei: number | string) {
   try {
-    return formatEther(BigInt(typeof wei === "number" ? Math.round(wei).toLocaleString("fullwide", { useGrouping: false }) : wei));
+    return formatEther(
+      BigInt(
+        typeof wei === "number"
+          ? Math.round(wei).toLocaleString("fullwide", { useGrouping: false })
+          : wei,
+      ),
+    );
   } catch {
     return (Number(wei) / 1e18).toString();
   }
@@ -73,7 +79,11 @@ export function ApeRidesBookings() {
         .select("*")
         .eq("viewer_id", user.id)
         .order("created_at", { ascending: false }),
-      supabase.from("ape_ride_payments").select("*").order("created_at", { ascending: false }).limit(50),
+      supabase
+        .from("ape_ride_payments")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(50),
       supabase.from("ape_ride_venues").select("slug,name"),
     ]);
     const rideRows = (r.data ?? []) as Ride[];
@@ -99,7 +109,11 @@ export function ApeRidesBookings() {
     void load();
     const ch = supabase
       .channel("ape-ride-bookings")
-      .on("postgres_changes", { event: "*", schema: "public", table: "ape_rides" }, () => void load())
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "ape_rides" },
+        () => void load(),
+      )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "ape_ride_reservations" },
@@ -209,7 +223,9 @@ export function ApeRidesBookings() {
         <h2 className="flex items-center gap-2 font-display text-2xl">
           <CalendarClock className="h-5 w-5 text-gold" /> Rides
         </h2>
-        <p className="mt-1 text-xs text-muted-foreground">Scheduled and live rides you can reserve.</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Scheduled and live rides you can reserve.
+        </p>
         {loading ? (
           <p className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" /> Loading…
@@ -231,7 +247,8 @@ export function ApeRidesBookings() {
                     <p className="truncate font-semibold">{r.title}</p>
                     <p className="text-[11px] text-muted-foreground">
                       {when(r)} · Host {names[r.host_id] ?? "Member"} ·{" "}
-                      <MapPin className="inline h-3 w-3" /> {venues[r.venue_slug ?? ""] ?? "Clubhouse"}
+                      <MapPin className="inline h-3 w-3" />{" "}
+                      {venues[r.venue_slug ?? ""] ?? "Clubhouse"}
                       {r.admin_override ? " · location waived" : ""}
                     </p>
                   </div>
@@ -289,7 +306,8 @@ export function ApeRidesBookings() {
             {mine.map((m) => {
               const r = rideById.get(m.ride_id);
               const owes = m.status === "reserved" && Number(m.price_ape) > 0;
-              const label = m.status === "reserved" && Number(m.price_ape) === 0 ? "booked" : m.status;
+              const label =
+                m.status === "reserved" && Number(m.price_ape) === 0 ? "booked" : m.status;
               return (
                 <li key={m.id} className={row}>
                   <div className="min-w-0">

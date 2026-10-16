@@ -80,8 +80,7 @@ export const verifyLuminaOwnership = createServerFn({ method: "POST" })
         return { ok: false as const, verified: false, error: `Lumina ${res.status}` };
       }
       const body = (await res.json()) as
-        | { owns?: boolean; balance?: number | string; tokens?: unknown[] }
-        | unknown[];
+        { owns?: boolean; balance?: number | string; tokens?: unknown[] } | unknown[];
       if (Array.isArray(body)) {
         verified = body.length > 0;
       } else {
