@@ -115,8 +115,13 @@ export const listRoomKaraokeRecordings = createServerFn({ method: "POST" })
     );
     const paths = visible.map((r) => r.storage_path as string);
     const signed = paths.length
-      ? ((
-          await supabase.storage
+      ? (// Rows above were already filtered by RLS + visibility for this
+        // caller; the files themselves are owner/staff-only in storage, so
+        // the server signs links just for those rows.
+        (
+          await (
+            await import("@/integrations/supabase/client.server")
+          ).supabaseAdmin.storage
             .from("karaoke-recordings")
             .createSignedUrls(paths, SIGNED_URL_TTL_S)
         ).data ?? [])

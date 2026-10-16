@@ -384,6 +384,38 @@ export function KaraokeMusicBoard({
     return () => window.removeEventListener("karaoke:reset-panels", onReset);
   }, []);
 
+  // ── One-time "scroll for more" hint ───────────────────────────────────
+  // Each time the player changes size (playing ⇄ choosing music) and its
+  // content no longer fits, a down-arrow slides once beside the player —
+  // on the side facing the middle of the screen — then disappears.
+  // (Hooks must stay ABOVE the early "closed" return below — placing them
+  // after it crashed the room with "Rendered more hooks…" on open.)
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const [scrollHint, setScrollHint] = useState<{
+    x: number;
+    y: number;
+    side: "left" | "right";
+    n: number;
+  } | null>(null);
+  const sizeMode = `${minimized ? "mini" : "full"}-${hasSong ? "song" : "pick"}`;
+  useEffect(() => {
+    const el = panelRef.current;
+    if (!el) return;
+    // Wait for the width transition / content swap to settle.
+    const t = window.setTimeout(() => {
+      if (el.scrollHeight - el.clientHeight < 8) return;
+      const r = el.getBoundingClientRect();
+      const onRight = r.left + r.width / 2 > window.innerWidth / 2;
+      setScrollHint((prev) => ({
+        side: onRight ? "left" : "right",
+        x: onRight ? r.left - 30 : r.right + 6,
+        y: r.top + r.height / 2 - 30,
+        n: (prev?.n ?? 0) + 1,
+      }));
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [sizeMode, open]);
+
   if (!open) {
     return (
       <button
@@ -427,36 +459,6 @@ export function KaraokeMusicBoard({
 
   const btn =
     "inline-flex items-center gap-1 rounded-sm border px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider transition disabled:cursor-not-allowed disabled:opacity-40";
-
-  // ── One-time "scroll for more" hint ───────────────────────────────────
-  // Each time the player changes size (playing ⇄ choosing music) and its
-  // content no longer fits, a down-arrow slides once beside the player —
-  // on the side facing the middle of the screen — then disappears.
-  const panelRef = useRef<HTMLDivElement | null>(null);
-  const [scrollHint, setScrollHint] = useState<{
-    x: number;
-    y: number;
-    side: "left" | "right";
-    n: number;
-  } | null>(null);
-  const sizeMode = `${minimized ? "mini" : "full"}-${hasSong ? "song" : "pick"}`;
-  useEffect(() => {
-    const el = panelRef.current;
-    if (!el) return;
-    // Wait for the width transition / content swap to settle.
-    const t = window.setTimeout(() => {
-      if (el.scrollHeight - el.clientHeight < 8) return;
-      const r = el.getBoundingClientRect();
-      const onRight = r.left + r.width / 2 > window.innerWidth / 2;
-      setScrollHint((prev) => ({
-        side: onRight ? "left" : "right",
-        x: onRight ? r.left - 30 : r.right + 6,
-        y: r.top + r.height / 2 - 30,
-        n: (prev?.n ?? 0) + 1,
-      }));
-    }, 400);
-    return () => window.clearTimeout(t);
-  }, [sizeMode, open]);
 
   // Size is locked to the compact player (header, screen, transport, mix
   // sliders). Anything more — song search, queue, add-music — scrolls
