@@ -2,7 +2,10 @@
  * VIP Entrance modal — "sign in your way".
  *
  *   ① Glyph  — email, social login or an existing Glyph wallet, through
- *              Glyph's own sign-in popup (Glyph Global Wallet connector).
+ *              Glyph's FACTORY flow: Glyph's own connector on Glyph's own
+ *              chain config, connected exactly like Glyph's
+ *              useNativeGlyphConnection() (connect({ connector }), no chain
+ *              override).
  *   ② Wallet — any installed browser wallet (MetaMask, Rabby, Coinbase,
  *              Brave… discovered via EIP-6963), or WalletConnect for mobile
  *              wallets. On phones without an injected wallet we offer
@@ -20,7 +23,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Loader2, Mail, Wallet as WalletIcon, X, Smartphone } from "lucide-react";
 import { toast } from "sonner";
-import { apeChain } from "viem/chains";
 import { useAccount, useConnect, useDisconnect, useSignMessage, type Connector } from "wagmi";
 import { useServerFn } from "@tanstack/react-start";
 import { requestLinkedWalletNonce, verifyAndLinkWallet } from "@/lib/linked-wallets.functions";
@@ -47,10 +49,17 @@ function sliceAddress(a: string) {
 function isMobile() {
   return typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 }
+function inIframe() {
+  try {
+    return typeof window !== "undefined" && window.self !== window.top;
+  } catch {
+    return true;
+  }
+}
 function friendlyConnectError(e: unknown): string {
   const msg = e instanceof Error ? e.message : String(e ?? "");
   if (/rejected|denied|closed/i.test(msg)) return "Connection cancelled.";
-  if (/frame ancestor|popup/i.test(msg)) {
+  if (/frame ancestor|popup/i.test(msg) || inIframe()) {
     return "The sign-in popup was blocked. Allow popups, or open the site in its own tab (not an embedded preview).";
   }
   if (/already pending/i.test(msg))
@@ -213,9 +222,7 @@ function EntranceBody({
       if (c.type === "injected" && c.id !== GLYPH_CONNECTOR_ID) {
         await requestAccountPicker(c);
       }
-      const res = await connectAsync(
-        c.id === GLYPH_CONNECTOR_ID ? { connector: c, chainId: apeChain.id } : { connector: c },
-      );
+      const res = await connectAsync({ connector: c });
       const target = res.accounts[0];
       if (!target) throw new Error("No account returned from wallet");
       const { message, nonce } = await requestNonce({ data: { address: target } });
@@ -241,10 +248,8 @@ function EntranceBody({
     setPendingId(c.uid);
     try {
       // Called directly from the click so popups (Glyph) / extensions open.
-      // Glyph always connects on ApeChain — its home chain.
-      await connectAsync(
-        c.id === GLYPH_CONNECTOR_ID ? { connector: c, chainId: apeChain.id } : { connector: c },
-      );
+      // Same call as Glyph's own useNativeGlyphConnection().connect().
+      await connectAsync({ connector: c });
     } catch (e) {
       toast.error(friendlyConnectError(e), { duration: 7000 });
     } finally {
@@ -354,6 +359,23 @@ function EntranceBody({
               </span>
             </span>
             {pendingId === wc.uid && <Loader2 className="h-4 w-4 animate-spin" />}
+          </button>
+        )}
+        {!(browserWallets.length > 0 && hasInjected) && !wc && glyph && (
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={() => void connectWith(glyph)}
+            className={optionBtn}
+          >
+            <Mail className="h-6 w-6 text-gold" />
+            <span className="flex-1">
+              <span className="block text-sm font-semibold">Continue with Glyph</span>
+              <span className="block text-[11px] text-muted-foreground">
+                Sign in with email, social login or any wallet through Glyph
+              </span>
+            </span>
+            {pendingId === glyph.uid && <Loader2 className="h-4 w-4 animate-spin" />}
           </button>
         )}
         {isMobile() && !hasInjected && (
