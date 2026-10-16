@@ -14,6 +14,144 @@ export type Database = {
   }
   public: {
     Tables: {
+      collection_menu_items: {
+        Row: {
+          collection_label: string
+          enabled: boolean
+          item_key: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          collection_label: string
+          enabled?: boolean
+          item_key: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          collection_label?: string
+          enabled?: boolean
+          item_key?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      ape_ride_reservations: {
+        Row: {
+          cancelled_by: string | null
+          created_at: string
+          id: string
+          price_ape: number
+          ride_id: string
+          status: string
+          updated_at: string
+          viewer_id: string
+        }
+        Insert: {
+          cancelled_by?: string | null
+          created_at?: string
+          id?: string
+          price_ape?: number
+          ride_id: string
+          status?: string
+          updated_at?: string
+          viewer_id: string
+        }
+        Update: {
+          cancelled_by?: string | null
+          created_at?: string
+          id?: string
+          price_ape?: number
+          ride_id?: string
+          status?: string
+          updated_at?: string
+          viewer_id?: string
+        }
+        Relationships: []
+      }
+      ape_ride_payments: {
+        Row: {
+          amount_wei: number
+          chain_id: number
+          created_at: string
+          from_address: string
+          host_id: string
+          id: string
+          payer_id: string
+          reservation_id: string
+          ride_id: string
+          to_address: string
+          tx_hash: string
+        }
+        Insert: {
+          amount_wei: number
+          chain_id: number
+          created_at?: string
+          from_address: string
+          host_id: string
+          id?: string
+          payer_id: string
+          reservation_id: string
+          ride_id: string
+          to_address: string
+          tx_hash: string
+        }
+        Update: {
+          amount_wei?: number
+          chain_id?: number
+          created_at?: string
+          from_address?: string
+          host_id?: string
+          id?: string
+          payer_id?: string
+          reservation_id?: string
+          ride_id?: string
+          to_address?: string
+          tx_hash?: string
+        }
+        Relationships: []
+      }
+      event_stream_hosts: {
+        Row: {
+          assigned_by: string | null
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          assigned_by?: string | null
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          assigned_by?: string | null
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      karaoke_video_status: {
+        Row: {
+          checked_at: string
+          embeddable: boolean
+          reason: string | null
+          youtube_id: string
+        }
+        Insert: {
+          checked_at?: string
+          embeddable: boolean
+          reason?: string | null
+          youtube_id: string
+        }
+        Update: {
+          checked_at?: string
+          embeddable?: boolean
+          reason?: string | null
+          youtube_id?: string
+        }
+        Relationships: []
+      }
       account_merge_decisions: {
         Row: {
           decided_at: string
@@ -143,6 +281,14 @@ export type Database = {
       }
       ape_rides: {
         Row: {
+          price_ape: number
+          scheduled_start: string | null
+          scheduled_end: string | null
+          admin_override: boolean
+          granted_by: string | null
+          cancelled_by: string | null
+          cancel_reason: string | null
+          capacity: number
           created_at: string
           ended_at: string | null
           host_id: string
@@ -155,6 +301,14 @@ export type Database = {
           venue_slug: string | null
         }
         Insert: {
+          price_ape?: number
+          scheduled_start?: string | null
+          scheduled_end?: string | null
+          admin_override?: boolean
+          granted_by?: string | null
+          cancelled_by?: string | null
+          cancel_reason?: string | null
+          capacity?: number
           created_at?: string
           ended_at?: string | null
           host_id: string
@@ -167,6 +321,14 @@ export type Database = {
           venue_slug?: string | null
         }
         Update: {
+          price_ape?: number
+          scheduled_start?: string | null
+          scheduled_end?: string | null
+          admin_override?: boolean
+          granted_by?: string | null
+          cancelled_by?: string | null
+          cancel_reason?: string | null
+          capacity?: number
           created_at?: string
           ended_at?: string | null
           host_id?: string
@@ -1386,6 +1548,8 @@ export type Database = {
       }
     }
     Functions: {
+      can_access_area: { Args: { _item: string; _uid: string }; Returns: boolean }
+      my_menu_items: { Args: never; Returns: string[] }
       get_my_wallet: { Args: never; Returns: string }
       can_use_ape_rides: { Args: { _uid: string }; Returns: boolean }
       can_join_punks_room: { Args: { _uid: string }; Returns: boolean }
@@ -1677,7 +1841,7 @@ export type Database = {
     }
     Enums: {
       ape_ride_request_status: "pending" | "accepted" | "declined" | "cancelled"
-      ape_ride_status: "live" | "ended"
+      ape_ride_status: "live" | "ended" | "scheduled" | "cancelled"
       app_role: "super_admin" | "admin" | "verified_user" | "chapter_leader"
       chapter_submission_status: "pending" | "approved" | "rejected"
       room_tier: "token_proof" | "lifer" | "public"
@@ -1809,7 +1973,7 @@ export const Constants = {
   public: {
     Enums: {
       ape_ride_request_status: ["pending", "accepted", "declined", "cancelled"],
-      ape_ride_status: ["live", "ended"],
+      ape_ride_status: ["live", "ended", "scheduled", "cancelled"],
       app_role: ["super_admin", "admin", "verified_user", "chapter_leader"],
       chapter_submission_status: ["pending", "approved", "rejected"],
       room_tier: ["token_proof", "lifer", "public"],

@@ -6,6 +6,8 @@ import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import { useAuthGate } from "@/state/authGate";
 import { useGlyphAuthState } from "@/lib/auth/useGlyphBridge";
 import { supabase } from "@/integrations/supabase/client";
+import { useMenuItems } from "@/lib/baycmc/useMenuItems";
+import type { MenuItemKey } from "@/lib/baycmc/menu-items";
 import { EntranceDialog } from "@/components/EntranceDialog";
 import { EmbroideredImage } from "@/components/EmbroideredImage";
 import { WalletPill } from "@/components/WalletPill";
@@ -27,6 +29,7 @@ interface NavItem {
     | "/lifers/messages"
     | "/support"
     | "/punks-brunch"
+    | "/event-stream"
     | "/admin"
     | "/super-admin";
   label: string;
@@ -37,16 +40,19 @@ interface NavItem {
   // need a direct way in since Conference Rooms is gated.
   // "ape_rides" = full holders AND partner holders (Temp Agency, Orca
   // Business, Ugly Duck Labs) — partners see the regular menu + this item.
-  tier:
-    "all" | "lobby_only" | "verified" | "ape_rides" | "punks" | "lifer" | "admin" | "super_admin";
+  // "area" = a gated area unlocked per collection by the super admin's
+  // menu matrix (Super Admin → Menu access); `area` names which one.
+  tier: "all" | "lobby_only" | "area" | "lifer" | "admin" | "super_admin";
+  area?: MenuItemKey;
 }
 
 const NAV_ITEMS: NavItem[] = [
   { to: "/lobby", label: "Public Lobby", tier: "all" },
-  { to: "/feed", label: "Holders Chat", tier: "verified" },
-  { to: "/punks-brunch", label: "Punks Brunch", tier: "punks" },
-  { to: "/rooms", label: "Conference Rooms", tier: "verified" },
-  { to: "/ape-rides", label: "Ape Rides", tier: "ape_rides" },
+  { to: "/feed", label: "Holders Chat", tier: "area", area: "holders_chat" },
+  { to: "/punks-brunch", label: "Punks Brunch", tier: "area", area: "punks_brunch" },
+  { to: "/rooms", label: "Conference Rooms", tier: "area", area: "conference_rooms" },
+  { to: "/event-stream", label: "Event Stream", tier: "area", area: "event_stream" },
+  { to: "/ape-rides", label: "Ape Rides", tier: "area", area: "ape_rides" },
   { to: "/lifers/messages", label: "Lifer Chat", tier: "lifer" },
   { to: "/karaoke", label: "Karaoke Room", tier: "all" },
   { to: "/profile", label: "Profile", tier: "all" },
@@ -71,6 +77,7 @@ export function AppHeader() {
   const isVerifiedHolder = gate.ownsRequiredAsset;
   const isLifer = gate.showLifers;
   const { collections } = useVerificationStatus();
+  const menuItems = useMenuItems();
   const [entranceOpen, setEntranceOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   useEffect(() => {
@@ -228,10 +235,7 @@ export function AppHeader() {
                   <nav className="flex flex-col p-3">
                     {NAV_ITEMS.filter((item) => {
                       // Hide gated items entirely from users without access.
-                      if (item.tier === "verified") return isVerifiedHolder;
-                      if (item.tier === "ape_rides")
-                        return isVerifiedHolder || isAdmin || hasPartnerAccess(collections);
-                      if (item.tier === "punks") return isAdmin || collections.includes("PUNKS");
+                      if (item.tier === "area") return !!item.area && (isAdmin || menuItems.has(item.area));
                       if (item.tier === "lifer") return isLifer;
                       if (item.tier === "super_admin") return isSuperAdmin;
                       if (item.tier === "admin") return isAdmin;

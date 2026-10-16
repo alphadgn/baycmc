@@ -1,5 +1,5 @@
 import { createFileRoute, redirect, Outlet } from "@tanstack/react-router";
-import { hasPartnerAccess } from "@/lib/web3/constants";
+import { areaForPath } from "@/lib/baycmc/menu-items";
 import { supabase } from "@/integrations/supabase/client";
 import { revalidateOwnership } from "@/server/verification.functions";
 
@@ -41,24 +41,22 @@ export const Route = createFileRoute("/_authenticated/_verified")({
       console.warn("_verified beforeLoad: revalidate failed, falling back to cached row", e);
     }
 
-    // Partner collections (Temp Agency, Orca Business, Ugly Duck Labs) get
-    // Ape Rides only — every other verified-tier route stays BAYC/MAYC/Punks.
-    const apeRides = location.pathname.startsWith("/ape-rides");
-
-    if (snap) {
-      if (snap.tokenProof) return;
-      if (apeRides && hasPartnerAccess(snap.collections ?? [])) return;
+    // Which gated area this page belongs to; the super admin's
+    // per-collection menu matrix (can_access_area in the database, read
+    // AFTER the fresh ownership recompute above) decides access.
+    void snap;
+    const area = areaForPath(location.pathname);
+    if (!area) {
+      const { data: v } = await supabase
+        .from("user_verifications")
+        .select("bayc_verified")
+        .eq("user_id", sess.session.user.id)
+        .maybeSingle();
+      if (v?.bayc_verified) return;
       throw redirect({ to: "/lobby" });
     }
-
-    // Fallback: trust the stored row when the on-chain check is unreachable.
-    const { data } = await supabase
-      .from("user_verifications")
-      .select("bayc_verified, verified_collections")
-      .eq("user_id", sess.session.user.id)
-      .maybeSingle();
-    if (data?.bayc_verified) return;
-    if (apeRides && hasPartnerAccess(data?.verified_collections ?? [])) return;
+    const { data: allowed } = await supabase.rpc("my_menu_items");
+    if ((allowed ?? []).includes(area)) return;
     throw redirect({ to: "/lobby" });
   },
   component: () => <Outlet />,

@@ -14,6 +14,7 @@ import { useAuth } from "@/lib/auth/useAuth";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 import { ApeArFilter } from "@/components/ApeArFilter";
+import { ApeRidesBookings } from "@/components/aperides/ApeRidesBookings";
 
 type Ride = Database["public"]["Tables"]["ape_rides"]["Row"];
 type Venue = Pick<
@@ -290,6 +291,8 @@ function ApeRidesPage() {
           </p>
         )}
       </section>
+
+      <ApeRidesBookings />
 
       {/* ApeRides Checkpoint — unified chronological feed of ride signups
           (hosts going live) and pairing requests. */}

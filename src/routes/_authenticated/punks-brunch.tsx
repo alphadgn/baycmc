@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Lock, Video } from "lucide-react";
 import { LobbyChat } from "@/components/LobbyChat";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
+import { useMenuItems } from "@/lib/baycmc/useMenuItems";
 import punksBackdrop from "@/assets/punks/punks-brunch.jpg";
 
 /**
@@ -24,8 +25,9 @@ export const Route = createFileRoute("/_authenticated/punks-brunch")({
 });
 
 function PunksBrunchPage() {
-  const { loading, isAdmin, collections } = useVerificationStatus();
-  const allowed = isAdmin || collections.includes("PUNKS");
+  const { loading, isAdmin } = useVerificationStatus();
+  const menuItems = useMenuItems();
+  const allowed = isAdmin || menuItems.has("punks_brunch");
   const [videoRoomId, setVideoRoomId] = useState<string | null>(null);
   useEffect(() => {
     if (!allowed) return;

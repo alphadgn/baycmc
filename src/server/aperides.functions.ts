@@ -223,14 +223,31 @@ export const getApeRideToken = createServerFn({ method: "POST" })
     if (isHost) {
       canPublish = true;
     } else {
-      const { data: req } = await supabase
-        .from("ape_ride_requests")
-        .select("status")
-        .eq("ride_id", data.rideId)
-        .eq("viewer_id", userId)
-        .maybeSingle();
-      if (!req || req.status !== "accepted") {
-        return { ok: false as const, error: "Pairing not yet accepted by the host" };
+      // A viewer gets in with an accepted pairing request OR a reservation
+      // that is paid (or free).
+      const { supabaseAdmin: rideDb } = await import("@/integrations/supabase/client.server");
+      const [{ data: req }, { data: resv }] = await Promise.all([
+        supabase
+          .from("ape_ride_requests")
+          .select("status")
+          .eq("ride_id", data.rideId)
+          .eq("viewer_id", userId)
+          .maybeSingle(),
+        rideDb
+          .from("ape_ride_reservations")
+          .select("status,price_ape")
+          .eq("ride_id", data.rideId)
+          .eq("viewer_id", userId)
+          .neq("status", "cancelled")
+          .maybeSingle(),
+      ]);
+      const reservedOk =
+        !!resv && (resv.status === "paid" || Number(resv.price_ape) === 0);
+      if (req?.status !== "accepted" && !reservedOk) {
+        return {
+          ok: false as const,
+          error: resv ? "Pay for your reservation to join this ride." : "Pairing not yet accepted by the host",
+        };
       }
     }
 
@@ -241,7 +258,8 @@ export const getApeRideToken = createServerFn({ method: "POST" })
       return { ok: false as const, error: "LiveKit not configured" };
     }
 
-    const { data: profile } = await supabase
+    const { supabaseAdmin: profileDb } = await import("@/integrations/supabase/client.server");
+    const { data: profile } = await profileDb
       .from("profiles")
       .select("username, wallet_address")
       .eq("id", userId)
