@@ -17,9 +17,8 @@ alter table public.profiles
     end
   ) stored;
 
-revoke select on public.profiles from anon, authenticated;
-grant select (id, username, bio, avatar_url, created_at, updated_at, wallet_display)
-  on public.profiles to authenticated;
+-- (The column-level lock-down itself is in 20261016000008, applied after
+--  the app version that reads wallet_display is live.)
 
 create or replace function public.get_my_wallet()
 returns text language sql stable security definer set search_path = public as $$
