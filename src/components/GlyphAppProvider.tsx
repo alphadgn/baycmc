@@ -197,16 +197,24 @@ export function GlyphAppProvider({ children }: { children: ReactNode }) {
     setMounted(true);
     if (import.meta.env.SSR) return;
     let cancelled = false;
-    // Signed-in members get their saved wallet connection back; signed-out
-    // visitors don't (see buildFactory).
-    void import("@/integrations/supabase/client").then(async ({ supabase }) => {
+    // Signed-in members get their saved wallet connection back. Signed-out
+    // visitors start a brand-new session: every cached wallet / Glyph /
+    // WalletConnect connection from a previous session is wiped BEFORE the
+    // Glyph SDK loads, so the sign-in window never resumes an old selection.
+    const sessionCheck = import("@/integrations/supabase/client").then(async ({ supabase }) => {
       const { data } = await supabase.auth.getSession();
-      if (data.session && !cancelled) {
-        const { reconnect } = await import("wagmi/actions");
-        await reconnect(config).catch(() => undefined);
+      if (data.session) {
+        if (!cancelled) {
+          const { reconnect } = await import("wagmi/actions");
+          await reconnect(config).catch(() => undefined);
+        }
+        return;
       }
+      const { clearWalletAuthLocalState } = await import("@/lib/auth/useGlyphBridge");
+      clearWalletAuthLocalState();
     });
     void (async () => {
+      await sessionCheck.catch(() => undefined);
       try {
         await import("@/lib/polyfill-shim").then((m) => m.installBrowserPolyfills());
       } catch (e) {

@@ -98,6 +98,10 @@ export function clearWalletAuthLocalState() {
           k.startsWith("baycmc:verified:") ||
           k.startsWith("glyph:") ||
           k.startsWith("privy:") ||
+          // Glyph's cross-app connection cache (wallet address + encryption
+          // keys for this site). Missing before → a previous Glyph
+          // connection could carry into the next session.
+          k.startsWith("privy-caw:") ||
           k.startsWith("__glyph-widget-") ||
           k.startsWith("wagmi.") ||
           k.startsWith("wc@2") ||
