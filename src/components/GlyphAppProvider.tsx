@@ -135,7 +135,10 @@ function makeGlyphFactoryConfig(mod: GlyphModule, glyphChains: readonly AnyChain
     chains: list as [AnyChain, ...AnyChain[]],
     ssr: true,
     multiInjectedProviderDiscovery: true,
-    connectors: [mod.glyphWalletConnector(), injected({ shimDisconnect: true, target: injectedTarget })],
+    connectors: [
+      mod.glyphWalletConnector(),
+      injected({ shimDisconnect: true, target: injectedTarget }),
+    ],
     transports,
   }) as unknown as Config;
 }
@@ -194,6 +197,15 @@ export function GlyphAppProvider({ children }: { children: ReactNode }) {
     setMounted(true);
     if (import.meta.env.SSR) return;
     let cancelled = false;
+    // Signed-in members get their saved wallet connection back; signed-out
+    // visitors don't (see buildFactory).
+    void import("@/integrations/supabase/client").then(async ({ supabase }) => {
+      const { data } = await supabase.auth.getSession();
+      if (data.session && !cancelled) {
+        const { reconnect } = await import("wagmi/actions");
+        await reconnect(config).catch(() => undefined);
+      }
+    });
     void (async () => {
       try {
         await import("@/lib/polyfill-shim").then((m) => m.installBrowserPolyfills());
@@ -238,9 +250,15 @@ export function GlyphAppProvider({ children }: { children: ReactNode }) {
           await addWalletConnect(next);
           setConfig(next);
           setGlyphLoaded(true);
-          // Restore a saved session (Glyph or browser wallet) on the new config.
-          const { reconnect } = await import("wagmi/actions");
-          await reconnect(next).catch(() => undefined);
+          // Restore a saved wallet connection ONLY for a signed-in member. A
+          // signed-out visitor starts clean: tapping VIP opens the sign-in
+          // window with every option, instead of a stale "Sign to enter".
+          const { supabase } = await import("@/integrations/supabase/client");
+          const { data: sess } = await supabase.auth.getSession();
+          if (sess.session) {
+            const { reconnect } = await import("wagmi/actions");
+            await reconnect(next).catch(() => undefined);
+          }
         } catch (e) {
           console.warn("[wallet] Glyph factory config failed:", e);
           setGlyphError("Glyph sign-in is unavailable right now.");
@@ -260,11 +278,13 @@ export function GlyphAppProvider({ children }: { children: ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <WagmiProvider config={config} reconnectOnMount>
+      <WagmiProvider config={config} reconnectOnMount={false}>
         <WalletStackContext.Provider value={{ ready: mounted, glyphLoaded, glyphError }}>
           {children}
         </WalletStackContext.Provider>
-        {glyphMod && !glyphLoaded ? <GlyphChainsProbe mod={glyphMod} onChains={buildFactory} /> : null}
+        {glyphMod && !glyphLoaded ? (
+          <GlyphChainsProbe mod={glyphMod} onChains={buildFactory} />
+        ) : null}
       </WagmiProvider>
     </QueryClientProvider>
   );

@@ -235,7 +235,8 @@ export function AppHeader() {
                   <nav className="flex flex-col p-3">
                     {NAV_ITEMS.filter((item) => {
                       // Hide gated items entirely from users without access.
-                      if (item.tier === "area") return !!item.area && (isAdmin || menuItems.has(item.area));
+                      if (item.tier === "area")
+                        return !!item.area && (isAdmin || menuItems.has(item.area));
                       if (item.tier === "lifer") return isLifer;
                       if (item.tier === "super_admin") return isSuperAdmin;
                       if (item.tier === "admin") return isAdmin;
@@ -323,11 +324,9 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
       return;
     }
     let cancelled = false;
-    void supabase
-      .rpc("get_my_wallet")
-      .then(({ data }) => {
-        if (!cancelled) setWalletAddress((data as string | null) ?? null);
-      });
+    void supabase.rpc("get_my_wallet").then(({ data }) => {
+      if (!cancelled) setWalletAddress((data as string | null) ?? null);
+    });
     return () => {
       cancelled = true;
     };
@@ -351,26 +350,10 @@ function EntranceControls({ onOpen }: { onOpen: () => void }) {
     return <EmailAccountPill email={user?.email ?? ""} onLinkWallet={onOpen} />;
   }
 
-  if (glyph.authenticated && glyph.address) {
-    return (
-      <button
-        type="button"
-        disabled={glyph.verifying}
-        onClick={() => window.dispatchEvent(new Event("baycmc:wallet-verify"))}
-        className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-full border border-gold/40 bg-gold/10 px-3 text-xs font-semibold text-gold transition hover:border-gold/70 hover:bg-gold/20 disabled:cursor-wait disabled:opacity-70"
-        title={`Sign to enter (${sliceAddress(glyph.address)})`}
-      >
-        {glyph.verifying ? (
-          <>
-            <Loader2 className="h-3.5 w-3.5 animate-spin text-gold/70" /> Signing…
-          </>
-        ) : (
-          "Sign to enter"
-        )}
-      </button>
-    );
-  }
-
+  // Signed out → always the VIP button. (A wallet that is still connected
+  // from an earlier visit used to replace it with "Sign to enter"; the VIP
+  // Entrance window now handles that case itself.)
+  void glyph;
   return (
     <button
       type="button"
