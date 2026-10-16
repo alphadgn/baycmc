@@ -32,6 +32,7 @@ import {
   useGlyphReady,
   useWalletStack,
 } from "@/components/GlyphAppProvider";
+import { walletLabel } from "@/lib/web3/injected-target";
 import { EmbroideredImage } from "@/components/EmbroideredImage";
 import { useAuth } from "@/lib/auth/useAuth";
 import { useGlyphAuthState } from "@/lib/auth/useGlyphBridge";
@@ -228,7 +229,7 @@ function EntranceBody({
       const { message, nonce } = await requestNonce({ data: { address: target } });
       const signature = await signMessageAsync({ message, account: target, connector: c });
       const out = await verifyLink({
-        data: { address: target, nonce, signature, label: c.name },
+        data: { address: target, nonce, signature, label: walletLabel(c.name) },
       });
       if (!out.ok) throw new Error("Verification failed");
       toast.success("Wallet linked. Refreshing ownership…");
@@ -281,7 +282,7 @@ function EntranceBody({
     return (
       <div className="mt-2 space-y-3">
         <p className="text-sm leading-relaxed text-muted-foreground">
-          Connected {active?.name ? `with ${active.name}` : ""} as{" "}
+          Connected {active?.name ? `with ${walletLabel(active.name)}` : ""} as{" "}
           <span className="font-mono text-foreground">{sliceAddress(address)}</span>. Tap “Sign to
           enter” and approve the message — no gas, no transaction.
         </p>
@@ -332,7 +333,7 @@ function EntranceBody({
               ) : (
                 <WalletIcon className="h-6 w-6 text-gold" />
               )}
-              <span className="flex-1 text-sm font-semibold">{c.name}</span>
+              <span className="flex-1 text-sm font-semibold">{walletLabel(c.name)}</span>
               {pendingId === c.uid && <Loader2 className="h-4 w-4 animate-spin" />}
             </button>
           ))

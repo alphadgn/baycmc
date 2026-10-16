@@ -145,7 +145,8 @@ export const verifyAndLinkWallet = createServerFn({ method: "POST" })
       {
         user_id: userId,
         address,
-        label: data.label?.trim() || null,
+        // Never store the generic connector name.
+        label: data.label?.trim() && !/^injected$/i.test(data.label.trim()) ? data.label.trim() : null,
         verified_at: nowIso,
         last_checked_at: nowIso,
       },
