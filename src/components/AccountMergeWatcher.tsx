@@ -55,7 +55,21 @@ export function AccountMergeWatcher() {
         void check(session.user.id);
       }
     });
-    return () => sub.subscription.unsubscribe();
+    // A wallet was just linked: if it already has its own (wallet-only)
+    // account, offer the merge screen right away instead of at next sign-in.
+    function onLinked() {
+      void supabase.auth.getSession().then(({ data }) => {
+        const id = data.session?.user?.id;
+        if (!id) return;
+        checkedForUserRef.current = null;
+        void check(id);
+      });
+    }
+    window.addEventListener("baycmc:linked-wallets-changed", onLinked);
+    return () => {
+      sub.subscription.unsubscribe();
+      window.removeEventListener("baycmc:linked-wallets-changed", onLinked);
+    };
   }, [check]);
 
   return null;

@@ -107,12 +107,17 @@ async function detectCollision(
       if (primaryDupes && primaryDupes.length > 0) {
         return { otherId: primaryDupes[0].id as string, reason: "wallet" };
       }
+      // Filter by address in the query (addresses are stored checksummed,
+      // so match case-insensitively). Previously this read the first 200
+      // linked wallets of ANY user and filtered in memory, which stopped
+      // finding duplicates once the table grew past 200 rows.
       const { data: linkedDupes } = await admin
         .from("linked_wallets")
         .select("user_id,address")
         .neq("user_id", me)
         .not("verified_at", "is", null)
-        .limit(200);
+        .or(walletArr.map((w) => `address.ilike.${w}`).join(","))
+        .limit(50);
       const hit = (linkedDupes ?? []).find((r) => myWallets.has(String(r.address).toLowerCase()));
       if (hit) return { otherId: hit.user_id as string, reason: "wallet" };
     }
