@@ -65,7 +65,7 @@ function ApeRideViewer() {
         <div className="glass mt-4 rounded-2xl p-6 text-center shadow-card sm:p-12">
           <h1 className="font-display text-3xl text-gradient-gold sm:text-4xl">Ape Ride</h1>
           <p className="mt-3 text-sm text-muted-foreground">
-            Join the live stream from inside the Wynwood clubhouse.
+            Join the live stream from inside the clubhouse.
           </p>
           {error && (
             <p className="mt-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">

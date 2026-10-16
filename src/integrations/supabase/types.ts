@@ -108,6 +108,39 @@ export type Database = {
           },
         ]
       }
+      ape_ride_venues: {
+        Row: {
+          active: boolean
+          created_at: string
+          display_order: number
+          lat: number
+          lng: number
+          name: string
+          radius_m: number
+          slug: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          display_order?: number
+          lat: number
+          lng: number
+          name: string
+          radius_m: number
+          slug: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          display_order?: number
+          lat?: number
+          lng?: number
+          name?: string
+          radius_m?: number
+          slug?: string
+        }
+        Relationships: []
+      }
       ape_rides: {
         Row: {
           created_at: string
@@ -119,6 +152,7 @@ export type Database = {
           status: Database["public"]["Enums"]["ape_ride_status"]
           title: string
           updated_at: string
+          venue_slug: string | null
         }
         Insert: {
           created_at?: string
@@ -130,6 +164,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["ape_ride_status"]
           title?: string
           updated_at?: string
+          venue_slug?: string | null
         }
         Update: {
           created_at?: string
@@ -141,6 +176,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["ape_ride_status"]
           title?: string
           updated_at?: string
+          venue_slug?: string | null
         }
         Relationships: []
       }
