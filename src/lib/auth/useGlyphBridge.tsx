@@ -187,18 +187,41 @@ function WalletBridge() {
   const inFlightRef = useRef<string | null>(null);
   const prefetched = useRef<{ address: string; nonce: string; expiresAt: number } | null>(null);
 
+  // One nonce request at a time per address. Tapping "Sign to enter" while
+  // the on-connect prefetch is still in flight used to start a second,
+  // racing request; if either failed, the user only saw "Couldn't start
+  // sign-in". Now the tap waits for the in-flight request, retries once, and
+  // reports the server's actual reason.
+  const nonceInFlight = useRef<{ address: string; promise: Promise<void> } | null>(null);
+  const lastNonceError = useRef<string | null>(null);
   const prefetchNonce = useCallback(async (addr: string) => {
+    const key = addr.toLowerCase();
+    if (nonceInFlight.current?.address === key) return nonceInFlight.current.promise;
+    const promise = (async () => {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const res = await nonceRef.current({ data: { address: addr } });
+          prefetched.current = {
+            address: key,
+            nonce: res.nonce,
+            expiresAt: new Date(res.expiresAt).getTime(),
+          };
+          lastNonceError.current = null;
+          return;
+        } catch (e) {
+          const message = e instanceof Error ? e.message : String(e);
+          lastNonceError.current = message;
+          logEvent("auth", "warn", "nonce prefetch failed", { message, attempt });
+          if (/too many/i.test(message)) return; // rate-limited: retrying won't help
+          await new Promise((r) => setTimeout(r, 600));
+        }
+      }
+    })();
+    nonceInFlight.current = { address: key, promise };
     try {
-      const res = await nonceRef.current({ data: { address: addr } });
-      prefetched.current = {
-        address: addr.toLowerCase(),
-        nonce: res.nonce,
-        expiresAt: new Date(res.expiresAt).getTime(),
-      };
-    } catch (e) {
-      logEvent("auth", "warn", "nonce prefetch failed", {
-        message: e instanceof Error ? e.message : String(e),
-      });
+      await promise;
+    } finally {
+      if (nonceInFlight.current?.promise === promise) nonceInFlight.current = null;
     }
   }, []);
 
@@ -234,6 +257,10 @@ function WalletBridge() {
     const toastId = `wallet-verify-${addr.toLowerCase()}`;
     patchGlyphSnapshot({ verifying: true });
     try {
+      // A prefetch may still be running from the moment the wallet connected.
+      if (nonceInFlight.current?.address === addr.toLowerCase()) {
+        await nonceInFlight.current.promise;
+      }
       let pre = prefetched.current;
       if (!pre || pre.address !== addr.toLowerCase() || pre.expiresAt - Date.now() < 30_000) {
         // Only hit when the prefetch is missing/expired. Browser wallets sign
@@ -241,7 +268,13 @@ function WalletBridge() {
         await prefetchNonce(addr);
         pre = prefetched.current;
       }
-      if (!pre) throw new Error("Couldn't start sign-in. Please try again.");
+      if (!pre) {
+        throw new Error(
+          lastNonceError.current && !/^failed to fetch$/i.test(lastNonceError.current)
+            ? lastNonceError.current
+            : "Couldn't reach the sign-in server. Check your connection and try again.",
+        );
+      }
       prefetched.current = null; // single use
 
       const message = new SiweMessage({
@@ -287,10 +320,13 @@ function WalletBridge() {
       markVerified(addr);
       window.dispatchEvent(new Event("baycmc:verification-refresh"));
       if (result.verified) {
-        toast.success(`Welcome aboard — ${collectionNameForLabel(result.collection) ?? "holder"} verified`, {
-          id: toastId,
-          duration: 3000,
-        });
+        toast.success(
+          `Welcome aboard — ${collectionNameForLabel(result.collection) ?? "holder"} verified`,
+          {
+            id: toastId,
+            duration: 3000,
+          },
+        );
       } else {
         // No "You're in the lobby / No BAYC/MAYC found" notification — removed
         // app-wide by request. Just clear the "Checking ownership…" spinner.
