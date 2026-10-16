@@ -65,7 +65,7 @@ export function LobbyAttendeeHero() {
     void (async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("username,avatar_url,wallet_address")
+        .select("username,avatar_url,wallet_address:wallet_display")
         .eq("id", user.id)
         .maybeSingle();
       if (cancelled) return;

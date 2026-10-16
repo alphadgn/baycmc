@@ -48,6 +48,69 @@ function extractYouTubeId(input: string | null | undefined): string | null {
   return null;
 }
 
+// ── Embeddability ────────────────────────────────────────────────────────
+// Some YouTube uploads refuse to play outside youtube.com ("Video
+// unavailable — playback on other websites has been disabled"). YouTube's
+// public oEmbed endpoint answers 401/403 for exactly those, 404 for removed
+// videos, 200 when embedding is allowed. Results are cached for 7 days.
+const EMBED_TTL_MS = 7 * 24 * 3600 * 1000;
+
+async function oembedStatus(id: string): Promise<boolean | null> {
+  try {
+    const res = await fetch(
+      `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${id}`)}`,
+      { signal: AbortSignal.timeout(5000) },
+    );
+    if (res.ok) return true;
+    if (res.status === 401 || res.status === 403 || res.status === 404) return false;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** youtubeId → embeddable (true/false); unknown ids are left out. */
+export async function embeddableMap(ids: string[], force = false): Promise<Map<string, boolean>> {
+  const uniq = [...new Set(ids.filter((i) => /^[A-Za-z0-9_-]{11}$/.test(i)))];
+  const out = new Map<string, boolean>();
+  if (uniq.length === 0) return out;
+  if (!force) {
+    const { data } = await supabaseAdmin
+      .from("karaoke_video_status")
+      .select("youtube_id,embeddable,checked_at")
+      .in("youtube_id", uniq);
+    for (const r of data ?? []) {
+      if (Date.now() - new Date(r.checked_at).getTime() < EMBED_TTL_MS)
+        out.set(r.youtube_id, r.embeddable);
+    }
+  }
+  const todo = uniq.filter((i) => !out.has(i)).slice(0, 12);
+  const checked = await Promise.all(todo.map(async (id) => [id, await oembedStatus(id)] as const));
+  const rows = checked
+    .filter(([, ok]) => ok !== null)
+    .map(([id, ok]) => ({
+      youtube_id: id,
+      embeddable: !!ok,
+      reason: ok ? null : "oembed",
+      checked_at: new Date().toISOString(),
+    }));
+  if (rows.length)
+    await supabaseAdmin.from("karaoke_video_status").upsert(rows, { onConflict: "youtube_id" });
+  for (const [id, ok] of checked) if (ok !== null) out.set(id, ok);
+  return out;
+}
+
+/** Keep only hits whose video is confirmed playable outside YouTube. */
+async function onlyEmbeddable(hits: SongHit[]): Promise<SongHit[]> {
+  const map = await embeddableMap(hits.map((h) => h.youtubeId ?? "").filter(Boolean));
+  return hits.filter((h) => {
+    if (!h.youtubeId) return h.source === "catalog"; // catalogue songs resolve on pick
+    return (
+      map.get(h.youtubeId) !== false && (map.get(h.youtubeId) === true || h.source === "catalog")
+    );
+  });
+}
+
 /**
  * Search the local karaoke catalog first; if nothing matches, fall back
  * to Firecrawl web search for "<query> karaoke" and pull playable URLs
@@ -69,9 +132,8 @@ export const searchKaraokeSongs = createServerFn({ method: "POST" })
       .limit(20);
 
     if (local && local.length > 0) {
-      return {
-        source: "catalog" as const,
-        hits: local.map<SongHit>((r) => ({
+      const hits = await onlyEmbeddable(
+        local.map<SongHit>((r) => ({
           id: r.id,
           title: r.title,
           artist: r.artist,
@@ -79,7 +141,21 @@ export const searchKaraokeSongs = createServerFn({ method: "POST" })
           youtubeId: r.youtube_id ?? extractYouTubeId(r.playable_url),
           url: r.playable_url,
         })),
-      };
+      );
+      // A catalogue video that turned out to be blocked: offer the song
+      // without it (it re-resolves to a playable upload on pick).
+      const blocked = local.filter((r) => r.youtube_id && !hits.some((h) => h.id === r.id));
+      for (const r of blocked) {
+        hits.push({
+          id: r.id,
+          title: r.title,
+          artist: r.artist,
+          source: "catalog",
+          youtubeId: null,
+          url: null,
+        });
+      }
+      if (hits.length > 0) return { source: "catalog" as const, hits };
     }
 
     // 2) Cache check
@@ -92,7 +168,8 @@ export const searchKaraokeSongs = createServerFn({ method: "POST" })
     const fresh =
       cached && Date.now() - new Date(cached.fetched_at).getTime() < 7 * 24 * 3600 * 1000;
     if (fresh && Array.isArray(cached.results) && cached.results.length > 0) {
-      return { source: "web" as const, hits: cached.results as unknown as SongHit[] };
+      const hits = await onlyEmbeddable(cached.results as unknown as SongHit[]);
+      if (hits.length > 0) return { source: "web" as const, hits };
     }
 
     // 3) Firecrawl search
@@ -128,8 +205,9 @@ export const searchKaraokeSongs = createServerFn({ method: "POST" })
             url: r.url,
           };
         })
-        .filter((x): x is SongHit => x !== null)
+        .filter((x): x is SongHit => x !== null && !!x.youtubeId)
         .slice(0, 8);
+      hits = await onlyEmbeddable(hits);
     } catch (e) {
       console.error("[karaoke] firecrawl search failed", e);
       return { source: "web" as const, hits: [] as SongHit[], error: "Search failed" };
@@ -326,4 +404,76 @@ export const getKaraokeCatalogStats = createServerFn({ method: "GET" })
       lastSkipped: v.last_skipped ?? null,
       lastTotalCollected: v.last_total_collected ?? null,
     };
+  });
+
+/**
+ * Pick a catalogue song: return a YouTube video for it that is confirmed
+ * playable outside YouTube, finding (and remembering) one if needed.
+ */
+export const resolveKaraokeSong = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ songId: z.string().uuid() }).parse(input))
+  .handler(async ({ data }) => {
+    const { data: song } = await supabaseAdmin
+      .from("karaoke_songs")
+      .select("id,title,artist,youtube_id")
+      .eq("id", data.songId)
+      .maybeSingle();
+    if (!song) return { ok: false as const, error: "Song not found" };
+    if (song.youtube_id) {
+      const ok = (await embeddableMap([song.youtube_id])).get(song.youtube_id);
+      if (ok) return { ok: true as const, youtubeId: song.youtube_id };
+    }
+    const apiKey = process.env.FIRECRAWL_API_KEY;
+    if (!apiKey) return { ok: false as const, error: "Search unavailable" };
+    const { default: Firecrawl } = await import("@mendable/firecrawl-js");
+    const fc = new Firecrawl({ apiKey });
+    try {
+      const res = await fc.search(
+        `${song.title} ${song.artist ?? ""} karaoke version with lyrics youtube`,
+        { limit: 10 },
+      );
+      const results =
+        (res as { web?: Array<{ url?: string }> }).web ??
+        (res as { results?: { web?: Array<{ url?: string }> } }).results?.web ??
+        [];
+      const ids = results.map((r) => extractYouTubeId(r.url)).filter((x): x is string => !!x);
+      const map = await embeddableMap(ids);
+      const pick = ids.find((id) => map.get(id) === true);
+      if (!pick)
+        return { ok: false as const, error: "No playable karaoke version found for this song." };
+      await supabaseAdmin
+        .from("karaoke_songs")
+        .update({
+          youtube_id: pick,
+          playable_url: `https://www.youtube.com/watch?v=${pick}`,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", song.id);
+      return { ok: true as const, youtubeId: pick };
+    } catch (e) {
+      console.error("[karaoke] resolve failed", e);
+      return { ok: false as const, error: "Couldn't find a playable version right now." };
+    }
+  });
+
+/**
+ * A player reported "embedding disabled". Re-check with YouTube before
+ * recording it (a client can't blacklist a song on its own say-so).
+ */
+export const reportUnplayableVideo = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({ videoId: z.string().regex(/^[A-Za-z0-9_-]{11}$/) }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const map = await embeddableMap([data.videoId], true);
+    const embeddable = map.get(data.videoId);
+    if (embeddable === false) {
+      await supabaseAdmin
+        .from("karaoke_songs")
+        .update({ youtube_id: null, updated_at: new Date().toISOString() })
+        .eq("youtube_id", data.videoId);
+    }
+    return { ok: true as const, embeddable: embeddable ?? null };
   });

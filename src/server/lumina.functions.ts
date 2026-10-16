@@ -34,7 +34,8 @@ export const verifyLuminaOwnership = createServerFn({ method: "POST" })
 
     let wallet = data.wallet ?? null;
     if (!wallet) {
-      const { data: profile } = await supabase
+      const { supabaseAdmin: profileDb } = await import("@/integrations/supabase/client.server");
+      const { data: profile } = await profileDb
         .from("profiles")
         .select("wallet_address")
         .eq("id", userId)
@@ -79,8 +80,7 @@ export const verifyLuminaOwnership = createServerFn({ method: "POST" })
         return { ok: false as const, verified: false, error: `Lumina ${res.status}` };
       }
       const body = (await res.json()) as
-        | { owns?: boolean; balance?: number | string; tokens?: unknown[] }
-        | unknown[];
+        { owns?: boolean; balance?: number | string; tokens?: unknown[] } | unknown[];
       if (Array.isArray(body)) {
         verified = body.length > 0;
       } else {

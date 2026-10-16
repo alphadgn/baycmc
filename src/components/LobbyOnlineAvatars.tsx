@@ -74,7 +74,7 @@ export function LobbyOnlineAvatars({ max = 12 }: LobbyOnlineAvatarsProps) {
       // their real avatar / username instead of a wallet placeholder.
       const { data } = await supabase
         .from("profiles")
-        .select("username,avatar_url,wallet_address")
+        .select("username,avatar_url,wallet_address:wallet_display")
         .eq("id", user.id)
         .maybeSingle();
       if (cancelled) return;

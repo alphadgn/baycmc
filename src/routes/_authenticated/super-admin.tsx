@@ -11,6 +11,8 @@ import {
   reviewChapterSubmission,
 } from "@/server/admin.functions";
 import { shortAddress } from "@/lib/short-address";
+import { MenuAccessTab } from "@/components/superadmin/MenuAccessTab";
+import { ApeRidesAdminTab } from "@/components/superadmin/ApeRidesAdminTab";
 
 interface UserRow {
   id: string;
@@ -58,7 +60,7 @@ export const Route = createFileRoute("/_authenticated/super-admin")({
 });
 
 function SuperAdminPage() {
-  const [tab, setTab] = useState<"users" | "chapters">("users");
+  const [tab, setTab] = useState<"users" | "chapters" | "menu" | "rides">("users");
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
@@ -101,9 +103,35 @@ function SuperAdminPage() {
         >
           Chapter Submissions
         </button>
+        <button
+          onClick={() => setTab("menu")}
+          className={`rounded-md px-3 py-2 ${tab === "menu" ? "bg-gradient-gold text-gold-foreground shadow-gold" : "border border-border hover:bg-muted"}`}
+        >
+          Menu access
+        </button>
+        <button
+          onClick={() => setTab("rides")}
+          className={`rounded-md px-3 py-2 ${tab === "rides" ? "bg-gradient-gold text-gold-foreground shadow-gold" : "border border-border hover:bg-muted"}`}
+        >
+          Ape Rides
+        </button>
+        <Link
+          to="/admin/event-stream"
+          className="rounded-md border border-border px-3 py-2 hover:bg-muted"
+        >
+          Event Stream
+        </Link>
       </div>
 
-      {tab === "users" ? <UsersTab /> : <ChaptersTab />}
+      {tab === "users" ? (
+        <UsersTab />
+      ) : tab === "chapters" ? (
+        <ChaptersTab />
+      ) : tab === "menu" ? (
+        <MenuAccessTab />
+      ) : (
+        <ApeRidesAdminTab />
+      )}
     </main>
   );
 }

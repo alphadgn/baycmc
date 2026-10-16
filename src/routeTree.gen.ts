@@ -35,9 +35,11 @@ import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as AuthenticatedVerifiedApeRidesRouteImport } from './routes/_authenticated/_verified/ape-rides'
 import { Route as AuthenticatedVerifiedCalendarRouteImport } from './routes/_authenticated/_verified/calendar'
+import { Route as AuthenticatedVerifiedEventStreamRouteImport } from './routes/_authenticated/_verified/event-stream'
 import { Route as AuthenticatedVerifiedFeedRouteImport } from './routes/_authenticated/_verified/feed'
 import { Route as AuthenticatedVerifiedRoomsRouteImport } from './routes/_authenticated/_verified/rooms'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
+import { Route as AuthenticatedAdminEventStreamRouteImport } from './routes/_authenticated/admin.event-stream'
 import { Route as AuthenticatedAdminKaraokeRouteImport } from './routes/_authenticated/admin.karaoke'
 import { Route as AuthenticatedAdminLuminaRouteImport } from './routes/_authenticated/admin.lumina'
 import { Route as AuthenticatedAdminOtherpageRouteImport } from './routes/_authenticated/admin.otherpage'
@@ -188,6 +190,12 @@ const AuthenticatedVerifiedCalendarRoute =
     path: '/calendar',
     getParentRoute: () => AuthenticatedVerifiedRoute,
   } as any)
+const AuthenticatedVerifiedEventStreamRoute =
+  AuthenticatedVerifiedEventStreamRouteImport.update({
+    id: '/event-stream',
+    path: '/event-stream',
+    getParentRoute: () => AuthenticatedVerifiedRoute,
+  } as any)
 const AuthenticatedVerifiedFeedRoute =
   AuthenticatedVerifiedFeedRouteImport.update({
     id: '/feed',
@@ -205,6 +213,12 @@ const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
+const AuthenticatedAdminEventStreamRoute =
+  AuthenticatedAdminEventStreamRouteImport.update({
+    id: '/event-stream',
+    path: '/event-stream',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminKaraokeRoute =
   AuthenticatedAdminKaraokeRouteImport.update({
     id: '/karaoke',
@@ -305,8 +319,10 @@ export interface FileRoutesByFullPath {
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/ape-rides': typeof AuthenticatedVerifiedApeRidesRouteWithChildren
   '/calendar': typeof AuthenticatedVerifiedCalendarRoute
+  '/event-stream': typeof AuthenticatedVerifiedEventStreamRoute
   '/feed': typeof AuthenticatedVerifiedFeedRoute
   '/rooms': typeof AuthenticatedVerifiedRoomsRoute
+  '/admin/event-stream': typeof AuthenticatedAdminEventStreamRoute
   '/admin/karaoke': typeof AuthenticatedAdminKaraokeRoute
   '/admin/lumina': typeof AuthenticatedAdminLuminaRoute
   '/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
@@ -345,8 +361,10 @@ export interface FileRoutesByTo {
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/ape-rides': typeof AuthenticatedVerifiedApeRidesRouteWithChildren
   '/calendar': typeof AuthenticatedVerifiedCalendarRoute
+  '/event-stream': typeof AuthenticatedVerifiedEventStreamRoute
   '/feed': typeof AuthenticatedVerifiedFeedRoute
   '/rooms': typeof AuthenticatedVerifiedRoomsRoute
+  '/admin/event-stream': typeof AuthenticatedAdminEventStreamRoute
   '/admin/karaoke': typeof AuthenticatedAdminKaraokeRoute
   '/admin/lumina': typeof AuthenticatedAdminLuminaRoute
   '/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
@@ -390,8 +408,10 @@ export interface FileRoutesById {
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/_authenticated/_verified/ape-rides': typeof AuthenticatedVerifiedApeRidesRouteWithChildren
   '/_authenticated/_verified/calendar': typeof AuthenticatedVerifiedCalendarRoute
+  '/_authenticated/_verified/event-stream': typeof AuthenticatedVerifiedEventStreamRoute
   '/_authenticated/_verified/feed': typeof AuthenticatedVerifiedFeedRoute
   '/_authenticated/_verified/rooms': typeof AuthenticatedVerifiedRoomsRoute
+  '/_authenticated/admin/event-stream': typeof AuthenticatedAdminEventStreamRoute
   '/_authenticated/admin/karaoke': typeof AuthenticatedAdminKaraokeRoute
   '/_authenticated/admin/lumina': typeof AuthenticatedAdminLuminaRoute
   '/_authenticated/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
@@ -434,8 +454,10 @@ export interface FileRouteTypes {
     | '/.mcp/invoke-tool/$tool'
     | '/ape-rides'
     | '/calendar'
+    | '/event-stream'
     | '/feed'
     | '/rooms'
+    | '/admin/event-stream'
     | '/admin/karaoke'
     | '/admin/lumina'
     | '/admin/otherpage'
@@ -474,8 +496,10 @@ export interface FileRouteTypes {
     | '/.mcp/invoke-tool/$tool'
     | '/ape-rides'
     | '/calendar'
+    | '/event-stream'
     | '/feed'
     | '/rooms'
+    | '/admin/event-stream'
     | '/admin/karaoke'
     | '/admin/lumina'
     | '/admin/otherpage'
@@ -518,8 +542,10 @@ export interface FileRouteTypes {
     | '/.mcp/invoke-tool/$tool'
     | '/_authenticated/_verified/ape-rides'
     | '/_authenticated/_verified/calendar'
+    | '/_authenticated/_verified/event-stream'
     | '/_authenticated/_verified/feed'
     | '/_authenticated/_verified/rooms'
+    | '/_authenticated/admin/event-stream'
     | '/_authenticated/admin/karaoke'
     | '/_authenticated/admin/lumina'
     | '/_authenticated/admin/otherpage'
@@ -737,6 +763,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedVerifiedCalendarRouteImport
       parentRoute: typeof AuthenticatedVerifiedRoute
     }
+    '/_authenticated/_verified/event-stream': {
+      id: '/_authenticated/_verified/event-stream'
+      path: '/event-stream'
+      fullPath: '/event-stream'
+      preLoaderRoute: typeof AuthenticatedVerifiedEventStreamRouteImport
+      parentRoute: typeof AuthenticatedVerifiedRoute
+    }
     '/_authenticated/_verified/feed': {
       id: '/_authenticated/_verified/feed'
       path: '/feed'
@@ -756,6 +789,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/admin/'
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/event-stream': {
+      id: '/_authenticated/admin/event-stream'
+      path: '/event-stream'
+      fullPath: '/admin/event-stream'
+      preLoaderRoute: typeof AuthenticatedAdminEventStreamRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
     '/_authenticated/admin/karaoke': {
@@ -870,6 +910,7 @@ const AuthenticatedVerifiedApeRidesRouteWithChildren =
 interface AuthenticatedVerifiedRouteChildren {
   AuthenticatedVerifiedApeRidesRoute: typeof AuthenticatedVerifiedApeRidesRouteWithChildren
   AuthenticatedVerifiedCalendarRoute: typeof AuthenticatedVerifiedCalendarRoute
+  AuthenticatedVerifiedEventStreamRoute: typeof AuthenticatedVerifiedEventStreamRoute
   AuthenticatedVerifiedFeedRoute: typeof AuthenticatedVerifiedFeedRoute
   AuthenticatedVerifiedRoomsRoute: typeof AuthenticatedVerifiedRoomsRoute
   AuthenticatedVerifiedRoomsRoomIdRoute: typeof AuthenticatedVerifiedRoomsRoomIdRoute
@@ -879,6 +920,7 @@ const AuthenticatedVerifiedRouteChildren: AuthenticatedVerifiedRouteChildren = {
   AuthenticatedVerifiedApeRidesRoute:
     AuthenticatedVerifiedApeRidesRouteWithChildren,
   AuthenticatedVerifiedCalendarRoute: AuthenticatedVerifiedCalendarRoute,
+  AuthenticatedVerifiedEventStreamRoute: AuthenticatedVerifiedEventStreamRoute,
   AuthenticatedVerifiedFeedRoute: AuthenticatedVerifiedFeedRoute,
   AuthenticatedVerifiedRoomsRoute: AuthenticatedVerifiedRoomsRoute,
   AuthenticatedVerifiedRoomsRoomIdRoute: AuthenticatedVerifiedRoomsRoomIdRoute,
@@ -890,6 +932,7 @@ const AuthenticatedVerifiedRouteWithChildren =
   )
 
 interface AuthenticatedAdminRouteChildren {
+  AuthenticatedAdminEventStreamRoute: typeof AuthenticatedAdminEventStreamRoute
   AuthenticatedAdminKaraokeRoute: typeof AuthenticatedAdminKaraokeRoute
   AuthenticatedAdminLuminaRoute: typeof AuthenticatedAdminLuminaRoute
   AuthenticatedAdminOtherpageRoute: typeof AuthenticatedAdminOtherpageRoute
@@ -899,6 +942,7 @@ interface AuthenticatedAdminRouteChildren {
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
+  AuthenticatedAdminEventStreamRoute: AuthenticatedAdminEventStreamRoute,
   AuthenticatedAdminKaraokeRoute: AuthenticatedAdminKaraokeRoute,
   AuthenticatedAdminLuminaRoute: AuthenticatedAdminLuminaRoute,
   AuthenticatedAdminOtherpageRoute: AuthenticatedAdminOtherpageRoute,

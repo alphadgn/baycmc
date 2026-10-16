@@ -148,7 +148,7 @@ export function SupportThread({
     if (!missing.length) return;
     const { data } = await supabase
       .from("profiles")
-      .select("id,username,avatar_url,wallet_address")
+      .select("id,username,avatar_url,wallet_address:wallet_display")
       .in("id", missing);
     if (data) {
       setProfiles((prev) => {

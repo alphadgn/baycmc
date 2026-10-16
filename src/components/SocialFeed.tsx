@@ -81,7 +81,7 @@ export function SocialFeed({ liferOnly = false }: SocialFeedProps) {
     if (!missing.length) return;
     const { data } = await supabase
       .from("profiles")
-      .select("id,username,wallet_address,avatar_url")
+      .select("id,username,wallet_address:wallet_display,avatar_url")
       .in("id", missing);
     if (data) {
       setProfiles((prev) => {

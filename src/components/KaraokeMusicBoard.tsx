@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
+  ChevronDown,
   GripVertical,
   Headphones,
   Loader2,
@@ -17,7 +18,12 @@ import {
   Volume2,
   X,
 } from "lucide-react";
-import { searchKaraokeSongs, type SongHit } from "@/lib/karaoke.functions";
+import {
+  reportUnplayableVideo,
+  resolveKaraokeSong,
+  searchKaraokeSongs,
+  type SongHit,
+} from "@/lib/karaoke.functions";
 import { unlockKaraokeAudio } from "@/lib/karaoke/audioMixBus";
 import {
   livePositionMs,
@@ -187,10 +193,15 @@ export function KaraokeMusicBoard({
   }, [songKey]);
   const ytStateRef = useRef<number | null>(null); // YT: -1 unstarted, 0 ended, 1 playing, 2 paused, 3 buffering, 5 cued
   const [needsTap, setNeedsTap] = useState(false);
+  // YouTube refused to play this video outside youtube.com (errors 101/150)
+  // or the video is gone (100) — the player can never start it.
+  const [embedBlocked, setEmbedBlocked] = useState(false);
+  const reportUnplayable = useServerFn(reportUnplayableVideo);
   useEffect(() => {
     ytTimeRef.current = null;
     ytStateRef.current = null;
     setNeedsTap(false);
+    setEmbedBlocked(false);
   }, [songKey]);
 
   useEffect(() => {
@@ -206,6 +217,8 @@ export function KaraokeMusicBoard({
           if (typeof d.info.playerState === "number") ytStateRef.current = d.info.playerState;
         } else if (d.event === "onStateChange" && typeof d.info === "number") {
           ytStateRef.current = d.info;
+        } else if (d.event === "onError" && typeof d.info === "number") {
+          if ([100, 101, 150, 2, 5].includes(d.info)) setEmbedBlocked(true);
         }
         if (ytStateRef.current === 1) setNeedsTap(false);
       } catch {
@@ -215,6 +228,13 @@ export function KaraokeMusicBoard({
     window.addEventListener("message", onMsg);
     return () => window.removeEventListener("message", onMsg);
   }, []);
+
+  // Tell the server (it re-checks with YouTube) so this video stops being
+  // offered to anyone.
+  useEffect(() => {
+    if (embedBlocked && videoId)
+      void reportUnplayable({ data: { videoId } }).catch(() => undefined);
+  }, [embedBlocked, videoId, reportUnplayable]);
 
   // Follow the server's play / pause (only when it actually changes).
   useEffect(() => {
@@ -307,8 +327,22 @@ export function KaraokeMusicBoard({
       setSearching(false);
     }
   }
-  function pickHit(hit: SongHit) {
-    const id = hit.youtubeId ?? (hit.url ? extractYouTubeId(hit.url) : null);
+  const resolveSong = useServerFn(resolveKaraokeSong);
+  async function pickHit(hit: SongHit) {
+    let id = hit.youtubeId ?? (hit.url ? extractYouTubeId(hit.url) : null);
+    if (!id && hit.source === "catalog" && hit.id) {
+      setSearching(true);
+      try {
+        const res = await resolveSong({ data: { songId: hit.id } });
+        if (!res.ok) {
+          setSearchError(res.error);
+          return;
+        }
+        id = res.youtubeId;
+      } finally {
+        setSearching(false);
+      }
+    }
     if (id) onChangeTrack({ videoId: id, title: hit.title, artist: hit.artist });
     setResults(null);
   }
@@ -394,440 +428,506 @@ export function KaraokeMusicBoard({
   const btn =
     "inline-flex items-center gap-1 rounded-sm border px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider transition disabled:cursor-not-allowed disabled:opacity-40";
 
+  // ── One-time "scroll for more" hint ───────────────────────────────────
+  // Each time the player changes size (playing ⇄ choosing music) and its
+  // content no longer fits, a down-arrow slides once beside the player —
+  // on the side facing the middle of the screen — then disappears.
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const [scrollHint, setScrollHint] = useState<{
+    x: number;
+    y: number;
+    side: "left" | "right";
+    n: number;
+  } | null>(null);
+  const sizeMode = `${minimized ? "mini" : "full"}-${hasSong ? "song" : "pick"}`;
+  useEffect(() => {
+    const el = panelRef.current;
+    if (!el) return;
+    // Wait for the width transition / content swap to settle.
+    const t = window.setTimeout(() => {
+      if (el.scrollHeight - el.clientHeight < 8) return;
+      const r = el.getBoundingClientRect();
+      const onRight = r.left + r.width / 2 > window.innerWidth / 2;
+      setScrollHint((prev) => ({
+        side: onRight ? "left" : "right",
+        x: onRight ? r.left - 30 : r.right + 6,
+        y: r.top + r.height / 2 - 30,
+        n: (prev?.n ?? 0) + 1,
+      }));
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [sizeMode, open]);
+
   // Size is locked to the compact player (header, screen, transport, mix
   // sliders). Anything more — song search, queue, add-music — scrolls
   // vertically inside the player instead of growing it.
   return (
-    <div
-      className={`fixed bottom-4 right-4 z-40 max-h-[min(85vh,25.5rem)] touch-pan-y overflow-y-auto overflow-x-hidden overscroll-contain rounded-xl border border-gold/40 bg-[#0a0a0a] shadow-gold transition-[width] duration-300 ${
-        minimized ? "w-[min(96vw,18rem)]" : "w-[min(96vw,22rem)]"
-      }`}
-      style={{ transform: `translate(${-pos.dx}px, ${-pos.dy}px)` }}
-    >
-      {/* Chassis bar / drag handle */}
-      <div
-        onPointerDown={onDragPointerDown}
-        onPointerMove={onDragPointerMove}
-        onPointerUp={onDragPointerUp}
-        onPointerCancel={onDragPointerUp}
-        className="sticky top-0 z-10 flex cursor-grab touch-none select-none items-center justify-between border-b border-gold/20 bg-gradient-to-b from-[#1a1a1a] to-[#0a0a0a] px-2 py-1.5 active:cursor-grabbing"
-      >
-        <div className="flex items-center gap-1.5">
-          <GripVertical className="h-3 w-3 text-gold/60" />
-          <span className="font-display text-[9px] uppercase tracking-[0.25em] text-gold">
-            Karaoke Machine
-          </span>
-          {stage.recording && (
-            <span className="rounded-sm bg-destructive/20 px-1 text-[7px] font-bold uppercase text-destructive">
-              ● Rec
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-1">
-          {isMyTurn ? (
-            <span className="rounded-sm bg-emerald-500/20 px-1 py-0.5 text-[7px] font-bold uppercase tracking-wider text-emerald-300">
-              Your Turn
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-0.5 rounded-sm bg-amber-500/15 px-1 py-0.5 text-[7px] font-bold uppercase tracking-wider text-amber-300">
-              <Lock className="h-2 w-2" /> Locked
-            </span>
-          )}
-          {hasSong && (
-            <button
-              type="button"
-              aria-label={minimized ? "Expand music machine" : "Collapse music machine"}
-              onClick={() => setForceExpanded((v) => !v)}
-              className="rounded-md p-0.5 text-gold/70 transition hover:bg-gold/10 hover:text-gold"
-            >
-              <Maximize2 className="h-2.5 w-2.5" />
-            </button>
-          )}
-          <button
-            type="button"
-            aria-label="Close music machine"
-            onClick={() => setOpen(false)}
-            className="rounded-md p-0.5 text-gold/70 transition hover:bg-gold/10 hover:text-gold"
-          >
-            <X className="h-2.5 w-2.5" />
-          </button>
-        </div>
-      </div>
-
-      {/* Turn status */}
-      <div className="flex items-center justify-between gap-2 border-b border-gold/15 bg-[#0a0a0a] px-2 py-1 text-[8px] uppercase tracking-wider text-gold/70">
-        <span className="min-w-0 truncate">
-          <span className="text-gold/50">Now:</span>{" "}
-          <span className="text-gold">{performerName ?? "Stage open"}</span>
-          {reserved && <span className="ml-1 text-gold/50">(reserved)</span>}
-        </span>
-        <span className="shrink-0 text-right">
-          {myQueuePosition === 0 ? (
-            <span className="text-emerald-300">You're up</span>
-          ) : myQueuePosition && myQueuePosition > 0 ? (
-            <>
-              <span className="text-gold/50">You:</span>{" "}
-              <span className="text-gold">#{myQueuePosition}</span>
-              <span className="ml-1 text-gold/70">~{formatEta(myQueuePosition)}</span>
-            </>
-          ) : (
-            <span className="text-gold/40">Not in line</span>
-          )}
-        </span>
-      </div>
-
-      {isMyTurn && !stage.engineMounted && (
-        <div className="border-b border-amber-400/30 bg-amber-500/10 p-2 text-[10px] text-amber-200">
-          You're up, but you're not connected to the room audio.
-          <button
-            type="button"
-            onClick={() => window.dispatchEvent(new Event("karaoke:request-join"))}
-            className="ml-2 rounded-sm border border-amber-300/50 px-2 py-0.5 font-semibold"
-          >
-            Connect
-          </button>
+    <>
+      {scrollHint && (
+        <div
+          key={scrollHint.n}
+          aria-hidden
+          onAnimationEnd={() => setScrollHint(null)}
+          className="kara-scroll-hint pointer-events-none fixed z-50 flex h-6 w-6 items-center justify-center rounded-full border border-gold/60 bg-black/80 text-gold shadow-gold"
+          style={{
+            left: Math.max(4, Math.min(window.innerWidth - 28, scrollHint.x)),
+            top: scrollHint.y,
+          }}
+        >
+          <ChevronDown className="h-4 w-4" />
         </div>
       )}
+      <div
+        ref={panelRef}
+        className={`fixed bottom-4 right-4 z-40 max-h-[min(85vh,25.5rem)] touch-pan-y overflow-y-auto overflow-x-hidden overscroll-contain rounded-xl border border-gold/40 bg-[#0a0a0a] shadow-gold transition-[width] duration-300 ${
+          minimized ? "w-[min(96vw,18rem)]" : "w-[min(96vw,22rem)]"
+        }`}
+        style={{ transform: `translate(${-pos.dx}px, ${-pos.dy}px)` }}
+      >
+        {/* Chassis bar / drag handle */}
+        <div
+          onPointerDown={onDragPointerDown}
+          onPointerMove={onDragPointerMove}
+          onPointerUp={onDragPointerUp}
+          onPointerCancel={onDragPointerUp}
+          className="sticky top-0 z-10 flex cursor-grab touch-none select-none items-center justify-between border-b border-gold/20 bg-gradient-to-b from-[#1a1a1a] to-[#0a0a0a] px-2 py-1.5 active:cursor-grabbing"
+        >
+          <div className="flex items-center gap-1.5">
+            <GripVertical className="h-3 w-3 text-gold/60" />
+            <span className="font-display text-[9px] uppercase tracking-[0.25em] text-gold">
+              Karaoke Machine
+            </span>
+            {stage.recording && (
+              <span className="rounded-sm bg-destructive/20 px-1 text-[7px] font-bold uppercase text-destructive">
+                ● Rec
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            {isMyTurn ? (
+              <span className="rounded-sm bg-emerald-500/20 px-1 py-0.5 text-[7px] font-bold uppercase tracking-wider text-emerald-300">
+                Your Turn
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-0.5 rounded-sm bg-amber-500/15 px-1 py-0.5 text-[7px] font-bold uppercase tracking-wider text-amber-300">
+                <Lock className="h-2 w-2" /> Locked
+              </span>
+            )}
+            {hasSong && (
+              <button
+                type="button"
+                aria-label={minimized ? "Expand music machine" : "Collapse music machine"}
+                onClick={() => setForceExpanded((v) => !v)}
+                className="rounded-md p-0.5 text-gold/70 transition hover:bg-gold/10 hover:text-gold"
+              >
+                <Maximize2 className="h-2.5 w-2.5" />
+              </button>
+            )}
+            <button
+              type="button"
+              aria-label="Close music machine"
+              onClick={() => setOpen(false)}
+              className="rounded-md p-0.5 text-gold/70 transition hover:bg-gold/10 hover:text-gold"
+            >
+              <X className="h-2.5 w-2.5" />
+            </button>
+          </div>
+        </div>
 
-      {/* Screen */}
-      <div className="border-b border-gold/10 bg-[#050505] p-1.5">
-        <div className="aspect-video overflow-hidden rounded-sm border border-gold/20 bg-black">
-          {screenSrc ? (
-            <iframe
-              ref={iframeRef}
-              key={songKey ?? "none"}
-              src={screenSrc}
-              title="Karaoke screen"
-              allow="autoplay; encrypted-media; picture-in-picture"
-              allowFullScreen
-              onLoad={() => {
-                // Ask the player to stream currentTime back (drift correction).
-                const w = iframeRef.current?.contentWindow;
-                w?.postMessage(
-                  JSON.stringify({ event: "listening", id: "kara", channel: "widget" }),
-                  "https://www.youtube.com",
-                );
-                w?.postMessage(
-                  JSON.stringify({
-                    event: "command",
-                    func: "addEventListener",
-                    args: ["onStateChange"],
-                    id: "kara",
-                    channel: "widget",
-                  }),
-                  "https://www.youtube.com",
-                );
-                if (muteLocal) postToPlayer("mute");
-              }}
-              className="h-full w-full"
-            />
-          ) : hasBacking ? (
-            <div className="flex h-full w-full flex-col p-2">
-              <div className="truncate font-display text-[10px] text-gold">
-                ♪ {songTitle}
-                {(session.song_artist ?? backingTrack?.artist) && (
-                  <span className="text-gold/60">
-                    {" "}
-                    · {session.song_artist ?? backingTrack?.artist}
-                  </span>
-                )}
+        {/* Turn status */}
+        <div className="flex items-center justify-between gap-2 border-b border-gold/15 bg-[#0a0a0a] px-2 py-1 text-[8px] uppercase tracking-wider text-gold/70">
+          <span className="min-w-0 truncate">
+            <span className="text-gold/50">Now:</span>{" "}
+            <span className="text-gold">{performerName ?? "Stage open"}</span>
+            {reserved && <span className="ml-1 text-gold/50">(reserved)</span>}
+          </span>
+          <span className="shrink-0 text-right">
+            {myQueuePosition === 0 ? (
+              <span className="text-emerald-300">You're up</span>
+            ) : myQueuePosition && myQueuePosition > 0 ? (
+              <>
+                <span className="text-gold/50">You:</span>{" "}
+                <span className="text-gold">#{myQueuePosition}</span>
+                <span className="ml-1 text-gold/70">~{formatEta(myQueuePosition)}</span>
+              </>
+            ) : (
+              <span className="text-gold/40">Not in line</span>
+            )}
+          </span>
+        </div>
+
+        {isMyTurn && !stage.engineMounted && (
+          <div className="border-b border-amber-400/30 bg-amber-500/10 p-2 text-[10px] text-amber-200">
+            You're up, but you're not connected to the room audio.
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new Event("karaoke:request-join"))}
+              className="ml-2 rounded-sm border border-amber-300/50 px-2 py-0.5 font-semibold"
+            >
+              Connect
+            </button>
+          </div>
+        )}
+
+        {/* Screen */}
+        <div className="border-b border-gold/10 bg-[#050505] p-1.5">
+          <div className="aspect-video overflow-hidden rounded-sm border border-gold/20 bg-black">
+            {screenSrc ? (
+              <iframe
+                ref={iframeRef}
+                key={songKey ?? "none"}
+                src={screenSrc}
+                title="Karaoke screen"
+                allow="autoplay; encrypted-media; picture-in-picture"
+                allowFullScreen
+                onLoad={() => {
+                  // Ask the player to stream currentTime back (drift correction).
+                  const w = iframeRef.current?.contentWindow;
+                  w?.postMessage(
+                    JSON.stringify({ event: "listening", id: "kara", channel: "widget" }),
+                    "https://www.youtube.com",
+                  );
+                  w?.postMessage(
+                    JSON.stringify({
+                      event: "command",
+                      func: "addEventListener",
+                      args: ["onStateChange"],
+                      id: "kara",
+                      channel: "widget",
+                    }),
+                    "https://www.youtube.com",
+                  );
+                  w?.postMessage(
+                    JSON.stringify({
+                      event: "command",
+                      func: "addEventListener",
+                      args: ["onError"],
+                      id: "kara",
+                      channel: "widget",
+                    }),
+                    "https://www.youtube.com",
+                  );
+                  if (muteLocal) postToPlayer("mute");
+                }}
+                className="h-full w-full"
+              />
+            ) : hasBacking ? (
+              <div className="flex h-full w-full flex-col p-2">
+                <div className="truncate font-display text-[10px] text-gold">
+                  ♪ {songTitle}
+                  {(session.song_artist ?? backingTrack?.artist) && (
+                    <span className="text-gold/60">
+                      {" "}
+                      · {session.song_artist ?? backingTrack?.artist}
+                    </span>
+                  )}
+                </div>
+                <div className="mt-1 min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap text-[10px] leading-snug text-gold/80">
+                  {backingTrack?.lyrics ||
+                    (isMyTurn
+                      ? "Sing it! (Add lyrics when uploading to show them here.)"
+                      : "Live performance")}
+                </div>
+                <div className="mt-1 flex items-center gap-1 text-[8px] text-gold/50">
+                  <span>{clock(positionMs)}</span>
+                  {durationMs > 0 && (
+                    <>
+                      <div className="h-0.5 flex-1 overflow-hidden rounded bg-gold/15">
+                        <div
+                          className="h-full bg-gold"
+                          style={{ width: `${Math.min(100, (positionMs / durationMs) * 100)}%` }}
+                        />
+                      </div>
+                      <span>{clock(durationMs)}</span>
+                    </>
+                  )}
+                </div>
               </div>
-              <div className="mt-1 min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap text-[10px] leading-snug text-gold/80">
-                {backingTrack?.lyrics ||
-                  (isMyTurn
-                    ? "Sing it! (Add lyrics when uploading to show them here.)"
-                    : "Live performance")}
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-[8px] uppercase tracking-widest text-gold/40">
+                {isMyTurn ? "Pick a song below" : "No track"}
               </div>
-              <div className="mt-1 flex items-center gap-1 text-[8px] text-gold/50">
-                <span>{clock(positionMs)}</span>
-                {durationMs > 0 && (
-                  <>
-                    <div className="h-0.5 flex-1 overflow-hidden rounded bg-gold/15">
-                      <div
-                        className="h-full bg-gold"
-                        style={{ width: `${Math.min(100, (positionMs / durationMs) * 100)}%` }}
-                      />
-                    </div>
-                    <span>{clock(durationMs)}</span>
-                  </>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-[8px] uppercase tracking-widest text-gold/40">
-              {isMyTurn ? "Pick a song below" : "No track"}
-            </div>
+            )}
+          </div>
+          {videoId && ((!paused && needsTap) || embedBlocked) && (
+            <p
+              role="alert"
+              key={`${songKey}-${embedBlocked ? "blocked" : "paused"}`}
+              className="kara-alert mt-1 rounded-sm border border-amber-400/70 bg-amber-500/15 px-2 py-1.5 text-[9px] font-semibold leading-snug text-amber-200"
+            >
+              Your browser paused the playback of this music. This track is not available for
+              playback outside of YouTube. Please select another track to continue your performance.
+            </p>
+          )}
+          {!isMyTurn && videoId && !muteLocal && (
+            <p className="mt-1 text-[8px] leading-snug text-amber-200/70">
+              Music is playing from your own device — the singer hasn't shared their track, so it
+              may not line up perfectly with their voice.
+            </p>
           )}
         </div>
-        {videoId && !paused && needsTap && (
-          <p className="mt-1 rounded-sm border border-gold/40 bg-gold/10 px-2 py-1 text-[9px] font-semibold text-gold">
-            Your browser paused the music — tap ▶ on the video once to resume.
-          </p>
-        )}
-        {!isMyTurn && videoId && !muteLocal && (
-          <p className="mt-1 text-[8px] leading-snug text-amber-200/70">
-            Music is playing from your own device — the singer hasn't shared their track, so it may
-            not line up perfectly with their voice.
-          </p>
-        )}
-      </div>
 
-      {/* Transport */}
-      <div className="flex flex-wrap items-center justify-center gap-1.5 border-b border-gold/10 bg-[#0a0a0a] px-2 py-2">
-        {hasSong && (
-          <>
-            <button
-              type="button"
-              onClick={handlePause}
-              disabled={!isMyTurn}
-              className={`${btn} border-gold/40 bg-gold/10 text-gold hover:bg-gold/20`}
-            >
-              {paused ? <Play className="h-3 w-3" /> : <Pause className="h-3 w-3" />}
-              {paused ? "Play" : "Pause"}
-            </button>
-            <button
-              type="button"
-              onClick={handleStop}
-              disabled={!isMyTurn}
-              className={`${btn} border-rose-400/50 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20`}
-            >
-              <Square className="h-3 w-3" /> Stop
-            </button>
-          </>
-        )}
-        <button
-          type="button"
-          onClick={toggleMic}
-          className={`${btn} ${
-            micOn
-              ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"
-              : "border-gold/40 bg-gold/10 text-gold hover:bg-gold/20"
-          }`}
-        >
-          {micOn ? <Mic className="h-3 w-3" /> : <MicOff className="h-3 w-3" />}
-          {isMyTurn
-            ? micOn
-              ? stage.engineLive
-                ? "On air"
-                : "Starting…"
-              : "Go live"
-            : micOn
-              ? "Mic on"
-              : "Mic off"}
-        </button>
-        {isMyTurn && (
+        {/* Transport */}
+        <div className="flex flex-wrap items-center justify-center gap-1.5 border-b border-gold/10 bg-[#0a0a0a] px-2 py-2">
+          {hasSong && (
+            <>
+              <button
+                type="button"
+                onClick={handlePause}
+                disabled={!isMyTurn}
+                className={`${btn} border-gold/40 bg-gold/10 text-gold hover:bg-gold/20`}
+              >
+                {paused ? <Play className="h-3 w-3" /> : <Pause className="h-3 w-3" />}
+                {paused ? "Play" : "Pause"}
+              </button>
+              <button
+                type="button"
+                onClick={handleStop}
+                disabled={!isMyTurn}
+                className={`${btn} border-rose-400/50 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20`}
+              >
+                <Square className="h-3 w-3" /> Stop
+              </button>
+            </>
+          )}
           <button
             type="button"
-            onClick={() => patchKaraokeStage({ headphones: !stage.headphones })}
-            title={
-              stage.headphones
-                ? "Headphones mode: studio-quality mic. Switch to speaker mode if you're not wearing headphones."
-                : "Speaker mode: echo cancellation on so the music isn't picked up twice."
-            }
-            className={`${btn} border-gold/40 bg-gold/10 text-gold hover:bg-gold/20`}
-          >
-            {stage.headphones ? (
-              <Headphones className="h-3 w-3" />
-            ) : (
-              <Speaker className="h-3 w-3" />
-            )}
-            {stage.headphones ? "Headphones" : "Speaker"}
-          </button>
-        )}
-        {isMyTurn && videoId && (
-          <button
-            type="button"
-            onClick={shareTabAudio}
-            title="Desktop: puts this tab's YouTube audio into your mix so the room hears music + voice in sync"
+            onClick={toggleMic}
             className={`${btn} ${
-              stage.musicInMyMix
-                ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-300"
+              micOn
+                ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"
                 : "border-gold/40 bg-gold/10 text-gold hover:bg-gold/20"
             }`}
           >
-            <Music className="h-3 w-3" />
-            {stage.musicInMyMix ? "Music in mix" : "Add music to mix"}
+            {micOn ? <Mic className="h-3 w-3" /> : <MicOff className="h-3 w-3" />}
+            {isMyTurn
+              ? micOn
+                ? stage.engineLive
+                  ? "On air"
+                  : "Starting…"
+                : "Go live"
+              : micOn
+                ? "Mic on"
+                : "Mic off"}
           </button>
+          {isMyTurn && (
+            <button
+              type="button"
+              onClick={() => patchKaraokeStage({ headphones: !stage.headphones })}
+              title={
+                stage.headphones
+                  ? "Headphones mode: studio-quality mic. Switch to speaker mode if you're not wearing headphones."
+                  : "Speaker mode: echo cancellation on so the music isn't picked up twice."
+              }
+              className={`${btn} border-gold/40 bg-gold/10 text-gold hover:bg-gold/20`}
+            >
+              {stage.headphones ? (
+                <Headphones className="h-3 w-3" />
+              ) : (
+                <Speaker className="h-3 w-3" />
+              )}
+              {stage.headphones ? "Headphones" : "Speaker"}
+            </button>
+          )}
+          {isMyTurn && videoId && (
+            <button
+              type="button"
+              onClick={shareTabAudio}
+              title="Desktop: puts this tab's YouTube audio into your mix so the room hears music + voice in sync"
+              className={`${btn} ${
+                stage.musicInMyMix
+                  ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-300"
+                  : "border-gold/40 bg-gold/10 text-gold hover:bg-gold/20"
+              }`}
+            >
+              <Music className="h-3 w-3" />
+              {stage.musicInMyMix ? "Music in mix" : "Add music to mix"}
+            </button>
+          )}
+        </div>
+
+        {isMyTurn && (
+          <div className="grid grid-cols-2 gap-3 border-b border-gold/10 bg-[#0a0a0a] px-3 py-2">
+            <label className="flex flex-col gap-1">
+              <span className="flex items-center gap-1 text-[8px] uppercase tracking-widest text-gold/70">
+                <Music className="h-2.5 w-2.5" /> Music · {Math.round(stage.musicVolume * 100)}
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={Math.round(stage.musicVolume * 100)}
+                onChange={(e) => patchKaraokeStage({ musicVolume: Number(e.target.value) / 100 })}
+                aria-label="Music volume"
+                className="h-1 w-full cursor-pointer appearance-none rounded-full bg-gold/20 accent-gold"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="flex items-center gap-1 text-[8px] uppercase tracking-widest text-gold/70">
+                <Volume2 className="h-2.5 w-2.5" /> Voice · {Math.round(stage.micVolume * 100)}
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={150}
+                value={Math.round(stage.micVolume * 100)}
+                onChange={(e) => patchKaraokeStage({ micVolume: Number(e.target.value) / 100 })}
+                aria-label="Voice volume"
+                className="h-1 w-full cursor-pointer appearance-none rounded-full bg-gold/20 accent-emerald-400"
+              />
+            </label>
+          </div>
+        )}
+
+        {!minimized && (
+          <>
+            {/* Source tabs */}
+            <div className="flex border-b border-gold/10 bg-[#0a0a0a] text-[9px] uppercase tracking-widest">
+              {settings.allow_youtube && (
+                <button
+                  type="button"
+                  onClick={() => setTab("youtube")}
+                  className={`flex-1 py-1.5 ${tab === "youtube" ? "bg-gold/15 text-gold" : "text-gold/50 hover:text-gold"}`}
+                >
+                  YouTube
+                </button>
+              )}
+              {settings.allow_uploads && (
+                <button
+                  type="button"
+                  onClick={() => setTab("tracks")}
+                  className={`flex-1 py-1.5 ${tab === "tracks" ? "bg-gold/15 text-gold" : "text-gold/50 hover:text-gold"}`}
+                >
+                  My tracks
+                </button>
+              )}
+            </div>
+
+            {tab === "youtube" && settings.allow_youtube ? (
+              <>
+                <div className="space-y-1 border-b border-gold/10 bg-[#0a0a0a] p-2">
+                  <div className="flex gap-1">
+                    <input
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      disabled={!isMyTurn}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && isMyTurn) void runSearch(query);
+                      }}
+                      placeholder={isMyTurn ? "Search song or artist…" : "Locked — wait your turn"}
+                      className="flex-1 rounded-sm border border-gold/20 bg-black/60 px-1.5 py-1 text-[9px] text-gold placeholder:text-gold/30 outline-none focus:border-gold/60 disabled:cursor-not-allowed disabled:opacity-50"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void runSearch(query)}
+                      disabled={!isMyTurn || !query.trim() || searching}
+                      className="inline-flex items-center gap-0.5 rounded-sm bg-gradient-gold px-1.5 py-1 text-[8px] font-semibold text-gold-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {searching ? (
+                        <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                      ) : (
+                        <Search className="h-2.5 w-2.5" />
+                      )}{" "}
+                      Find
+                    </button>
+                  </div>
+                  {(results !== null || searchError) && (
+                    <div className="max-h-40 overflow-y-auto rounded-sm border border-gold/20 bg-black/50 p-1 text-[8px]">
+                      {searchSource && results && results.length > 0 && (
+                        <div className="px-1 pb-1 text-[7px] uppercase tracking-widest text-gold/50">
+                          {searchSource === "catalog" ? "From music machine" : "From the web"}
+                        </div>
+                      )}
+                      {results?.map((h, i) => (
+                        <button
+                          key={`${h.id ?? h.url ?? i}`}
+                          type="button"
+                          onClick={() => void pickHit(h)}
+                          disabled={
+                            !h.youtubeId &&
+                            !extractYouTubeId(h.url ?? "") &&
+                            !(h.source === "catalog" && h.id)
+                          }
+                          className="flex w-full items-center justify-between gap-1 rounded-sm px-1.5 py-1 text-left text-gold/90 hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <span className="truncate">
+                            <span className="font-semibold">{h.title}</span>
+                            {h.artist && <span className="text-gold/60"> · {h.artist}</span>}
+                          </span>
+                          <Play className="h-2 w-2 shrink-0 text-gold/70" />
+                        </button>
+                      ))}
+                      {searchError && <div className="px-1 py-1 text-rose-300">{searchError}</div>}
+                    </div>
+                  )}
+                  <div className="flex gap-1">
+                    <input
+                      value={urlInput}
+                      onChange={(e) => setUrlInput(e.target.value)}
+                      disabled={!isMyTurn}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && isMyTurn) playUrl();
+                      }}
+                      placeholder={isMyTurn ? "…or paste YouTube link" : "Locked — wait your turn"}
+                      className="flex-1 rounded-sm border border-gold/10 bg-black/40 px-1.5 py-1 text-[8px] text-gold placeholder:text-gold/30 outline-none focus:border-gold/60 disabled:cursor-not-allowed disabled:opacity-50"
+                    />
+                    <button
+                      type="button"
+                      onClick={playUrl}
+                      disabled={!isMyTurn || !extractYouTubeId(urlInput)}
+                      className="inline-flex items-center gap-0.5 rounded-sm border border-gold/30 bg-black/60 px-1.5 py-1 text-[8px] font-semibold text-gold hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <Play className="h-2.5 w-2.5" /> Cue
+                    </button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 gap-1 bg-[#050505] p-2">
+                  {PADS.map((p) => (
+                    <button
+                      key={p.label}
+                      type="button"
+                      onClick={() => void runSearch(p.query)}
+                      disabled={!isMyTurn}
+                      className={`relative aspect-square rounded-sm bg-gradient-to-br ${p.hue} text-[6px] font-bold uppercase leading-tight text-black/85 transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-40`}
+                    >
+                      <span className="absolute inset-0 flex items-center justify-center px-0.5 text-center">
+                        {p.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : settings.allow_uploads ? (
+              <div className="bg-[#0a0a0a] p-2">
+                <KaraokeTrackLibrary
+                  compact
+                  canPlay={isMyTurn}
+                  onPlay={(t) =>
+                    onChangeTrack({
+                      videoId: null,
+                      backingTrackId: t.id,
+                      title: t.title,
+                      artist: t.artist,
+                    })
+                  }
+                />
+              </div>
+            ) : null}
+
+            {isMyTurn && onEndSong && (
+              <div className="border-t border-gold/10 bg-[#0a0a0a] p-2">
+                <button
+                  type="button"
+                  onClick={onEndSong}
+                  className="w-full rounded-sm border border-rose-500/40 bg-rose-500/10 px-1.5 py-1 text-[8px] font-semibold uppercase tracking-wider text-rose-300 hover:bg-rose-500/20"
+                >
+                  {reserved ? "End song (keep my slot)" : "End song · Next performer"}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
-
-      {isMyTurn && (
-        <div className="grid grid-cols-2 gap-3 border-b border-gold/10 bg-[#0a0a0a] px-3 py-2">
-          <label className="flex flex-col gap-1">
-            <span className="flex items-center gap-1 text-[8px] uppercase tracking-widest text-gold/70">
-              <Music className="h-2.5 w-2.5" /> Music · {Math.round(stage.musicVolume * 100)}
-            </span>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={Math.round(stage.musicVolume * 100)}
-              onChange={(e) => patchKaraokeStage({ musicVolume: Number(e.target.value) / 100 })}
-              aria-label="Music volume"
-              className="h-1 w-full cursor-pointer appearance-none rounded-full bg-gold/20 accent-gold"
-            />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="flex items-center gap-1 text-[8px] uppercase tracking-widest text-gold/70">
-              <Volume2 className="h-2.5 w-2.5" /> Voice · {Math.round(stage.micVolume * 100)}
-            </span>
-            <input
-              type="range"
-              min={0}
-              max={150}
-              value={Math.round(stage.micVolume * 100)}
-              onChange={(e) => patchKaraokeStage({ micVolume: Number(e.target.value) / 100 })}
-              aria-label="Voice volume"
-              className="h-1 w-full cursor-pointer appearance-none rounded-full bg-gold/20 accent-emerald-400"
-            />
-          </label>
-        </div>
-      )}
-
-      {!minimized && (
-        <>
-          {/* Source tabs */}
-          <div className="flex border-b border-gold/10 bg-[#0a0a0a] text-[9px] uppercase tracking-widest">
-            {settings.allow_youtube && (
-              <button
-                type="button"
-                onClick={() => setTab("youtube")}
-                className={`flex-1 py-1.5 ${tab === "youtube" ? "bg-gold/15 text-gold" : "text-gold/50 hover:text-gold"}`}
-              >
-                YouTube
-              </button>
-            )}
-            {settings.allow_uploads && (
-              <button
-                type="button"
-                onClick={() => setTab("tracks")}
-                className={`flex-1 py-1.5 ${tab === "tracks" ? "bg-gold/15 text-gold" : "text-gold/50 hover:text-gold"}`}
-              >
-                My tracks
-              </button>
-            )}
-          </div>
-
-          {tab === "youtube" && settings.allow_youtube ? (
-            <>
-              <div className="space-y-1 border-b border-gold/10 bg-[#0a0a0a] p-2">
-                <div className="flex gap-1">
-                  <input
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    disabled={!isMyTurn}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && isMyTurn) void runSearch(query);
-                    }}
-                    placeholder={isMyTurn ? "Search song or artist…" : "Locked — wait your turn"}
-                    className="flex-1 rounded-sm border border-gold/20 bg-black/60 px-1.5 py-1 text-[9px] text-gold placeholder:text-gold/30 outline-none focus:border-gold/60 disabled:cursor-not-allowed disabled:opacity-50"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => void runSearch(query)}
-                    disabled={!isMyTurn || !query.trim() || searching}
-                    className="inline-flex items-center gap-0.5 rounded-sm bg-gradient-gold px-1.5 py-1 text-[8px] font-semibold text-gold-foreground disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    {searching ? (
-                      <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                    ) : (
-                      <Search className="h-2.5 w-2.5" />
-                    )}{" "}
-                    Find
-                  </button>
-                </div>
-                {(results !== null || searchError) && (
-                  <div className="max-h-40 overflow-y-auto rounded-sm border border-gold/20 bg-black/50 p-1 text-[8px]">
-                    {searchSource && results && results.length > 0 && (
-                      <div className="px-1 pb-1 text-[7px] uppercase tracking-widest text-gold/50">
-                        {searchSource === "catalog" ? "From music machine" : "From the web"}
-                      </div>
-                    )}
-                    {results?.map((h, i) => (
-                      <button
-                        key={`${h.id ?? h.url ?? i}`}
-                        type="button"
-                        onClick={() => pickHit(h)}
-                        disabled={!h.youtubeId && !extractYouTubeId(h.url ?? "")}
-                        className="flex w-full items-center justify-between gap-1 rounded-sm px-1.5 py-1 text-left text-gold/90 hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        <span className="truncate">
-                          <span className="font-semibold">{h.title}</span>
-                          {h.artist && <span className="text-gold/60"> · {h.artist}</span>}
-                        </span>
-                        <Play className="h-2 w-2 shrink-0 text-gold/70" />
-                      </button>
-                    ))}
-                    {searchError && <div className="px-1 py-1 text-rose-300">{searchError}</div>}
-                  </div>
-                )}
-                <div className="flex gap-1">
-                  <input
-                    value={urlInput}
-                    onChange={(e) => setUrlInput(e.target.value)}
-                    disabled={!isMyTurn}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && isMyTurn) playUrl();
-                    }}
-                    placeholder={isMyTurn ? "…or paste YouTube link" : "Locked — wait your turn"}
-                    className="flex-1 rounded-sm border border-gold/10 bg-black/40 px-1.5 py-1 text-[8px] text-gold placeholder:text-gold/30 outline-none focus:border-gold/60 disabled:cursor-not-allowed disabled:opacity-50"
-                  />
-                  <button
-                    type="button"
-                    onClick={playUrl}
-                    disabled={!isMyTurn || !extractYouTubeId(urlInput)}
-                    className="inline-flex items-center gap-0.5 rounded-sm border border-gold/30 bg-black/60 px-1.5 py-1 text-[8px] font-semibold text-gold hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <Play className="h-2.5 w-2.5" /> Cue
-                  </button>
-                </div>
-              </div>
-              <div className="grid grid-cols-4 gap-1 bg-[#050505] p-2">
-                {PADS.map((p) => (
-                  <button
-                    key={p.label}
-                    type="button"
-                    onClick={() => void runSearch(p.query)}
-                    disabled={!isMyTurn}
-                    className={`relative aspect-square rounded-sm bg-gradient-to-br ${p.hue} text-[6px] font-bold uppercase leading-tight text-black/85 transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-40`}
-                  >
-                    <span className="absolute inset-0 flex items-center justify-center px-0.5 text-center">
-                      {p.label}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </>
-          ) : settings.allow_uploads ? (
-            <div className="bg-[#0a0a0a] p-2">
-              <KaraokeTrackLibrary
-                compact
-                canPlay={isMyTurn}
-                onPlay={(t) =>
-                  onChangeTrack({
-                    videoId: null,
-                    backingTrackId: t.id,
-                    title: t.title,
-                    artist: t.artist,
-                  })
-                }
-              />
-            </div>
-          ) : null}
-
-          {isMyTurn && onEndSong && (
-            <div className="border-t border-gold/10 bg-[#0a0a0a] p-2">
-              <button
-                type="button"
-                onClick={onEndSong}
-                className="w-full rounded-sm border border-rose-500/40 bg-rose-500/10 px-1.5 py-1 text-[8px] font-semibold uppercase tracking-wider text-rose-300 hover:bg-rose-500/20"
-              >
-                {reserved ? "End song (keep my slot)" : "End song · Next performer"}
-              </button>
-            </div>
-          )}
-        </>
-      )}
-    </div>
+    </>
   );
 }

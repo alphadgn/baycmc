@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ConferenceRoom } from "@/components/ConferenceRoom";
@@ -10,7 +10,7 @@ interface RoomMeta {
   name: string;
   tier: "token_proof" | "lifer" | "public";
   theme: string | null;
-  kind: "conference" | "game" | "karaoke";
+  kind: "conference" | "game" | "karaoke" | "stream";
 }
 
 export const Route = createFileRoute("/_authenticated/_verified/rooms_/$roomId")({
@@ -75,6 +75,8 @@ function RoomDetail() {
     );
   }
 
+  // The Event Stream has its own theatre page.
+  if (meta.kind === "stream") return <Navigate to="/event-stream" replace />;
   const isKaraoke = meta.kind === "karaoke";
   return (
     <>

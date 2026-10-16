@@ -419,3 +419,37 @@ html {
   height: 0;
   display: none;
 }
+
+/* Karaoke player: attention-grabbing playback warning (shake, then glow). */
+@keyframes kara-alert-shake {
+  0%, 100% { transform: translateX(0); }
+  15% { transform: translateX(-4px); }
+  30% { transform: translateX(4px); }
+  45% { transform: translateX(-3px); }
+  60% { transform: translateX(3px); }
+  75% { transform: translateX(-1px); }
+}
+@keyframes kara-alert-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(251 191 36 / 0); border-color: rgb(251 191 36 / 0.55); }
+  50% { box-shadow: 0 0 14px 2px rgb(251 191 36 / 0.55); border-color: rgb(251 191 36 / 1); }
+}
+.kara-alert {
+  animation:
+    kara-alert-shake 0.6s ease-in-out 0s 2,
+    kara-alert-glow 1.4s ease-in-out 1.2s infinite;
+}
+
+/* Karaoke player: one-time "scroll down for more" hint. */
+@keyframes kara-scroll-hint {
+  0% { opacity: 0; transform: translateY(-10px); }
+  20% { opacity: 1; }
+  80% { opacity: 1; transform: translateY(26px); }
+  100% { opacity: 0; transform: translateY(34px); }
+}
+.kara-scroll-hint {
+  animation: kara-scroll-hint 1.6s ease-in-out 1 forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .kara-alert { animation: none; }
+  .kara-scroll-hint { animation-duration: 0.01s; }
+}

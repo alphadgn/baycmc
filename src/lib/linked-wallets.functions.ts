@@ -64,7 +64,8 @@ export const requestLinkedWalletNonce = createServerFn({ method: "POST" })
     const { userId } = context;
     const address = getAddress(data.address);
 
-    const { data: me } = await context.supabase
+    const { supabaseAdmin: adminDb } = await import("@/integrations/supabase/client.server");
+    const { data: me } = await adminDb
       .from("profiles")
       .select("wallet_address")
       .eq("id", userId)

@@ -116,11 +116,22 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
   const isAdmin = !!roleRows?.some((r) => r.role === "super_admin" || r.role === "admin");
   const bypassesBaycGate = isAdmin || !!roleRows?.some((r) => r.role === "verified_user");
 
-  if (!ver?.bayc_verified && !bypassesBaycGate) {
+  // Which collections may enter is decided by the super admin's
+  // per-collection menu matrix (can_access_area), evaluated AFTER the fresh
+  // ownership recompute above. Lifer rooms keep their own rule below.
+  void bypassesBaycGate;
+  const area = room.kind === "stream" ? "event_stream" : "conference_rooms";
+  const { data: areaOk } = await supabaseAdmin.rpc("can_access_area", {
+    _uid: userId,
+    _item: area,
+  });
+  if (!areaOk && !isAdmin) {
     return {
       ok: false,
       error:
-        "Your BAYC/MAYC access is no longer active. Reconnect a wallet that owns or is delegated an ape to enter exclusive rooms.",
+        room.kind === "stream"
+          ? "The Event Stream is for verified holders of the clubhouse collections."
+          : "Your holder access isn't active. Reconnect a wallet that owns or is delegated an eligible NFT to enter.",
       code: "bayc_revoked",
     };
   }
@@ -219,7 +230,9 @@ export const getLivekitToken = createServerFn({ method: "POST" })
     }
 
     // Display name = wallet short
-    const { data: profile } = await supabase
+    // Full wallet columns are server-only (service role).
+    const { supabaseAdmin: profileDb } = await import("@/integrations/supabase/client.server");
+    const { data: profile } = await profileDb
       .from("profiles")
       .select("username, wallet_address")
       .eq("id", userId)
@@ -235,6 +248,17 @@ export const getLivekitToken = createServerFn({ method: "POST" })
     // Muted karaoke members join as listeners: LiveKit itself refuses their
     // tracks, so a mute can't be bypassed from devtools.
     let canPublish = true;
+    // Event Stream: only accounts the super admin assigned may broadcast;
+    // everyone else joins as a viewer (LiveKit refuses their tracks).
+    if (room.kind === "stream") {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: hostRow } = await supabaseAdmin
+        .from("event_stream_hosts")
+        .select("user_id")
+        .eq("user_id", userId)
+        .maybeSingle();
+      canPublish = !!hostRow;
+    }
     if (room.kind === "karaoke" && !host) {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { data: muted } = await supabaseAdmin.rpc("karaoke_is_sanctioned", {

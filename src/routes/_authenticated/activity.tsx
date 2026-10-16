@@ -1,5 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+
+// Relay (relay.link) swap widget — client-only, loaded on demand.
+const RelaySwapPanel = lazy(() => import("@/components/activity/RelaySwapPanel"));
+
+type Range = 1 | 7 | 30 | 90;
+const RANGES: { value: Range; label: string }[] = [
+  { value: 1, label: "1 day" },
+  { value: 7, label: "7 days" },
+  { value: 30, label: "30 days" },
+  { value: 90, label: "90 days" },
+];
 import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowDownLeft,
@@ -43,13 +54,9 @@ function ActivityPage() {
     if (!user) return;
     let cancelled = false;
     (async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("wallet_address")
-        .eq("id", user.id)
-        .maybeSingle();
+      const { data } = await supabase.rpc("get_my_wallet");
       if (cancelled) return;
-      setWallet(data?.wallet_address ?? null);
+      setWallet((data as string | null) ?? null);
     })();
     return () => {
       cancelled = true;
@@ -85,6 +92,10 @@ function ActivityPage() {
   }, [wallet, fetchActivity]);
 
   const analytics = useMemo(() => computeAnalytics(items ?? [], wallet ?? ""), [items, wallet]);
+  const [range, setRange] = useState<Range>(90);
+  const chart = useMemo(() => chartFor(items ?? [], range), [items, range]);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   if (!user || !wallet) {
     return (
@@ -141,9 +152,23 @@ function ActivityPage() {
 
       <section className="mt-8 glass rounded-2xl p-6 shadow-card">
         <div className="flex items-baseline justify-between">
-          <h2 className="font-display text-xl font-semibold">Last 90 days</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="font-display text-xl font-semibold">Transactions</h2>
+            <select
+              aria-label="Time range"
+              value={range}
+              onChange={(e) => setRange(Number(e.target.value) as Range)}
+              className="rounded-md border border-gold/40 bg-background px-2 py-1 text-xs text-gold"
+            >
+              {RANGES.map((r) => (
+                <option key={r.value} value={r.value}>
+                  Last {r.label}
+                </option>
+              ))}
+            </select>
+          </div>
           <span className="text-xs text-muted-foreground">
-            {analytics.chart.reduce((s, d) => s + d.count, 0)} txs
+            {chart.reduce((s, d) => s + d.count, 0)} txs
           </span>
         </div>
         <div className="mt-4 h-48">
@@ -151,15 +176,19 @@ function ActivityPage() {
             <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
             </div>
-          ) : analytics.chart.every((d) => d.count === 0) ? (
+          ) : chart.every((d) => d.count === 0) ? (
             <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-              No transactions in the last 90 days.
+              No transactions in the last {RANGES.find((r) => r.value === range)?.label}.
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={analytics.chart}>
+              <BarChart data={chart}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
-                <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={6} />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fontSize: 11 }}
+                  interval={range === 1 ? 3 : range === 7 ? 0 : range === 30 ? 4 : 13}
+                />
                 <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={28} />
                 <Tooltip
                   contentStyle={{
@@ -174,6 +203,37 @@ function ActivityPage() {
               </BarChart>
             </ResponsiveContainer>
           )}
+        </div>
+      </section>
+
+      <section className="mt-8 glass rounded-2xl p-4 shadow-card sm:p-6">
+        <div className="flex items-baseline justify-between">
+          <h2 className="font-display text-xl font-semibold">Swap &amp; bridge</h2>
+          <a
+            href="https://relay.link"
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs text-gold hover:underline"
+          >
+            Powered by Relay ↗
+          </a>
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Exchange into any cryptocurrency across chains — live quotes from relay.link, signed in
+          your own wallet.
+        </p>
+        <div className="mx-auto mt-4 max-w-md">
+          {mounted ? (
+            <Suspense
+              fallback={
+                <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading Relay…
+                </div>
+              }
+            >
+              <RelaySwapPanel />
+            </Suspense>
+          ) : null}
         </div>
       </section>
 
@@ -363,6 +423,27 @@ function computeAnalytics(items: ActivityItem[], walletLower: string) {
     }
   }
   return { total, mints, ethOut, last30, chart, busiestDay, busiestDayCount };
+}
+
+/** Bar chart for the chosen range: hourly for 1 day, daily otherwise. */
+function chartFor(items: ActivityItem[], range: Range) {
+  const now = Date.now();
+  const hourly = range === 1;
+  const step = hourly ? 3_600_000 : 86_400_000;
+  const slots = hourly ? 24 : range;
+  const keyOf = (d: Date) =>
+    hourly ? `${dayKey(d)}T${String(d.getUTCHours()).padStart(2, "0")}` : dayKey(d);
+  const buckets = new Map<string, number>();
+  for (let i = slots - 1; i >= 0; i--) buckets.set(keyOf(new Date(now - i * step)), 0);
+  for (const it of items) {
+    if (!it.timestamp) continue;
+    const k = keyOf(new Date(it.timestamp));
+    if (buckets.has(k)) buckets.set(k, (buckets.get(k) ?? 0) + 1);
+  }
+  return Array.from(buckets.entries()).map(([k, count]) => ({
+    label: hourly ? `${k.slice(11)}:00` : k.slice(5),
+    count,
+  }));
 }
 
 function dayKey(d: Date): string {

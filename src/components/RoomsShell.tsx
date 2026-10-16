@@ -400,7 +400,7 @@ function WelcomeStrip({ title, onOpenMobileNav }: { title: string; onOpenMobileN
     (async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("username,wallet_address")
+        .select("username,wallet_address:wallet_display")
         .eq("id", user.id)
         .maybeSingle();
       if (cancelled) return;
