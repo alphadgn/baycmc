@@ -296,8 +296,11 @@ export function KaraokeMusicBoard({
   // on air. Previously this button kept its own state and drifted out of
   // sync with the bottom bar.
   const { prefs: roomPrefs, setPrefs: setRoomPrefs } = useRoomPreferences();
-  const micOn = roomPrefs.micEnabled;
+  // Karaoke rules: while someone is performing, only they control a mic.
+  const stageMicLocked = !!stage.session?.performer_user_id && !isMyTurn;
+  const micOn = roomPrefs.micEnabled && !stageMicLocked;
   function toggleMic() {
+    if (stageMicLocked) return;
     if (isMyTurn) unlockKaraokeAudio(); // resume AudioContext inside the tap (iOS)
     setRoomPrefs({ micEnabled: !micOn });
   }
@@ -695,6 +698,10 @@ export function KaraokeMusicBoard({
           <button
             type="button"
             onClick={toggleMic}
+            disabled={stageMicLocked}
+            title={
+              stageMicLocked ? "Only the singer's mic is live during a performance" : undefined
+            }
             className={`${btn} ${
               micOn
                 ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"
@@ -708,9 +715,11 @@ export function KaraokeMusicBoard({
                   ? "On air"
                   : "Starting…"
                 : "Go live"
-              : micOn
-                ? "Mic on"
-                : "Mic off"}
+              : stageMicLocked
+                ? "Mic locked"
+                : micOn
+                  ? "Mic on"
+                  : "Mic off"}
           </button>
           {isMyTurn && (
             <button

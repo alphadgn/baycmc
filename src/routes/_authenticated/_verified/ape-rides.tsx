@@ -117,7 +117,7 @@ function ApeRidesPage() {
     loadRides();
     loadRequests();
     const ch = supabase
-      .channel("ape-rides")
+      .channel(`ape-rides-${Math.random().toString(36).slice(2, 10)}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "ape_rides" }, () =>
         loadRides(),
       )

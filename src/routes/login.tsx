@@ -25,6 +25,10 @@ function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  // After a failed email/password sign-in we swap "No account? Create one"
+  // for a "Forgot your password?" reset link.
+  const [signInFailed, setSignInFailed] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   useEffect(() => {
     if (!loading && isAuthenticated) {
@@ -65,10 +69,30 @@ function LoginPage() {
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Sign-in failed.";
+      if (mode === "signin") setSignInFailed(true);
       toast.error(msg);
     } finally {
       setBusy(false);
     }
+  }
+
+  async function sendReset() {
+    const addr = email.trim();
+    if (!addr) {
+      toast.error("Enter your email above first.");
+      return;
+    }
+    setBusy(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(addr, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setBusy(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setResetSent(true);
+    toast.success("Password reset link sent. Check your inbox.");
   }
 
   return (
@@ -119,7 +143,16 @@ function LoginPage() {
         </form>
 
         <div className="mt-4 text-center text-xs text-muted-foreground">
-          {mode === "signin" ? (
+          {mode === "signin" && signInFailed ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void sendReset()}
+              className="font-semibold text-gold hover:underline disabled:opacity-60"
+            >
+              {resetSent ? "Reset link sent — send again?" : "Forgot your password?"}
+            </button>
+          ) : mode === "signin" ? (
             <>
               No account?{" "}
               <button
@@ -135,7 +168,10 @@ function LoginPage() {
               Already a member?{" "}
               <button
                 type="button"
-                onClick={() => setMode("signin")}
+                onClick={() => {
+                  setMode("signin");
+                  setSignInFailed(false);
+                }}
                 className="font-semibold text-gold hover:underline"
               >
                 Sign in

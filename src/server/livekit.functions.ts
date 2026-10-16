@@ -148,10 +148,16 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
           .maybeSingle()
       ).data?.verified_collections as string[] | null) ??
       [];
-    if (!held.includes(required)) {
+    const allowed = required
+      .split(",")
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (!allowed.some((l) => held.includes(l))) {
       return {
         ok: false,
-        error: `This room is only for verified ${collectionNameForLabel(required)} holders.`,
+        error: `This room is only for verified ${allowed
+          .map((l) => collectionNameForLabel(l))
+          .join(" / ")} holders.`,
         code: "bayc_revoked",
       };
     }
@@ -167,6 +173,83 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
 
   return { ok: true, room };
 }
+
+/**
+ * Karaoke mic rule (server-authoritative): while someone is performing, only
+ * the performer may publish audio — observers, spectators and hosts join as
+ * listeners until the turn ends. Otherwise everyone may talk unless a
+ * moderator muted them.
+ */
+async function karaokeMayPublish(roomId: string, userId: string, host: boolean) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: session } = await supabaseAdmin
+    .from("karaoke_sessions")
+    .select("performer_user_id")
+    .eq("room_id", roomId)
+    .maybeSingle();
+  const performer = session?.performer_user_id ?? null;
+  if (performer) return performer === userId;
+  if (host) return true;
+  const { data: muted } = await supabaseAdmin.rpc("karaoke_is_sanctioned", {
+    _room: roomId,
+    _uid: userId,
+    _kind: "mute",
+  });
+  return !muted;
+}
+
+/**
+ * Re-applies the karaoke mic rule to everyone currently in the room when the
+ * stage changes hands (a turn starts or ends). Idempotent and driven only by
+ * the database stage state, so any member may trigger it.
+ */
+export const syncKaraokeStageMics = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { roomId: string }) =>
+    z.object({ roomId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const cfg = getLivekitConfig();
+    if (!cfg) return { ok: false as const, error: "LiveKit not configured" };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: room } = await supabaseAdmin
+      .from("rooms")
+      .select("livekit_room, kind")
+      .eq("id", data.roomId)
+      .maybeSingle();
+    if (!room || room.kind !== "karaoke")
+      return { ok: false as const, error: "Not a karaoke room" };
+
+    const { RoomServiceClient } = await import("livekit-server-sdk");
+    const client = new RoomServiceClient(cfg.url, cfg.apiKey, cfg.apiSecret);
+    let participants: Awaited<ReturnType<typeof client.listParticipants>>;
+    try {
+      participants = await client.listParticipants(room.livekit_room);
+    } catch {
+      return { ok: true as const, updated: 0 };
+    }
+    let updated = 0;
+    for (const p of participants) {
+      if (!p.identity) continue;
+      const host = await isRoomHost(p.identity, data.roomId).catch(() => false);
+      const want = await karaokeMayPublish(data.roomId, p.identity, host);
+      if (!!p.permission?.canPublish === want) continue;
+      try {
+        await client.updateParticipant(room.livekit_room, p.identity, {
+          permission: {
+            canSubscribe: true,
+            canPublish: want,
+            canPublishData: true,
+            canUpdateMetadata: true,
+          },
+        });
+        updated++;
+      } catch (e) {
+        console.warn("[karaoke] mic permission update failed", p.identity, e);
+      }
+    }
+    return { ok: true as const, updated };
+  });
 
 async function isRoomHost(userId: string, roomId: string): Promise<boolean> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -259,14 +342,8 @@ export const getLivekitToken = createServerFn({ method: "POST" })
         .maybeSingle();
       canPublish = !!hostRow;
     }
-    if (room.kind === "karaoke" && !host) {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { data: muted } = await supabaseAdmin.rpc("karaoke_is_sanctioned", {
-        _room: data.roomId,
-        _uid: userId,
-        _kind: "mute",
-      });
-      canPublish = !muted;
+    if (room.kind === "karaoke") {
+      canPublish = await karaokeMayPublish(data.roomId, userId, host);
     }
 
     const { AccessToken } = await import("livekit-server-sdk");
