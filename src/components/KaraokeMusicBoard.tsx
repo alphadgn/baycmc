@@ -394,9 +394,12 @@ export function KaraokeMusicBoard({
   const btn =
     "inline-flex items-center gap-1 rounded-sm border px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider transition disabled:cursor-not-allowed disabled:opacity-40";
 
+  // Size is locked to the compact player (header, screen, transport, mix
+  // sliders). Anything more — song search, queue, add-music — scrolls
+  // vertically inside the player instead of growing it.
   return (
     <div
-      className={`fixed bottom-4 right-4 z-40 max-h-[85vh] overflow-y-auto overflow-x-hidden rounded-xl border border-gold/40 bg-[#0a0a0a] shadow-gold transition-[width] duration-300 ${
+      className={`fixed bottom-4 right-4 z-40 max-h-[min(85vh,25.5rem)] touch-pan-y overflow-y-auto overflow-x-hidden overscroll-contain rounded-xl border border-gold/40 bg-[#0a0a0a] shadow-gold transition-[width] duration-300 ${
         minimized ? "w-[min(96vw,18rem)]" : "w-[min(96vw,22rem)]"
       }`}
       style={{ transform: `translate(${-pos.dx}px, ${-pos.dy}px)` }}
@@ -407,7 +410,7 @@ export function KaraokeMusicBoard({
         onPointerMove={onDragPointerMove}
         onPointerUp={onDragPointerUp}
         onPointerCancel={onDragPointerUp}
-        className="flex cursor-grab touch-none select-none items-center justify-between border-b border-gold/20 bg-gradient-to-b from-[#1a1a1a] to-[#0a0a0a] px-2 py-1.5 active:cursor-grabbing"
+        className="sticky top-0 z-10 flex cursor-grab touch-none select-none items-center justify-between border-b border-gold/20 bg-gradient-to-b from-[#1a1a1a] to-[#0a0a0a] px-2 py-1.5 active:cursor-grabbing"
       >
         <div className="flex items-center gap-1.5">
           <GripVertical className="h-3 w-3 text-gold/60" />

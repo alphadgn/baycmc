@@ -57,9 +57,18 @@ function inIframe() {
     return true;
   }
 }
+/**
+ * The user closing a wallet / Glyph sheet is not an error. Glyph's sign-in
+ * sheet (Privy) rejects with an EMPTY error when it's dismissed or handed
+ * off in an in-app browser — that used to surface as "Couldn't connect."
+ * even though nothing went wrong. Those are now silent.
+ */
+function isUserCancel(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e ?? "");
+  return !msg.trim() || /rejected|denied|closed|cancel|exit|abort|dismiss/i.test(msg);
+}
 function friendlyConnectError(e: unknown): string {
   const msg = e instanceof Error ? e.message : String(e ?? "");
-  if (/rejected|denied|closed/i.test(msg)) return "Connection cancelled.";
   if (/frame ancestor|popup/i.test(msg) || inIframe()) {
     return "The sign-in popup was blocked. Allow popups, or open the site in its own tab (not an embedded preview).";
   }
@@ -237,7 +246,8 @@ function EntranceBody({
       window.dispatchEvent(new Event("baycmc:verification-refresh"));
       onOpenChange(false);
     } catch (e) {
-      toast.error(friendlyConnectError(e), { duration: 7000 });
+      if (isUserCancel(e)) console.info("[wallet] connection closed", e);
+      else toast.error(friendlyConnectError(e), { duration: 7000 });
     } finally {
       await disconnectAsync({ connector: c }).catch(() => undefined);
       setPendingId(null);
@@ -252,7 +262,8 @@ function EntranceBody({
       // Same call as Glyph's own useNativeGlyphConnection().connect().
       await connectAsync({ connector: c });
     } catch (e) {
-      toast.error(friendlyConnectError(e), { duration: 7000 });
+      if (isUserCancel(e)) console.info("[wallet] connection closed", e);
+      else toast.error(friendlyConnectError(e), { duration: 7000 });
     } finally {
       setPendingId(null);
     }

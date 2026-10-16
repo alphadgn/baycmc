@@ -1,20 +1,24 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { isInsideWynwood } from "@/lib/baycmc/wynwood";
+import { haversineMeters } from "@/lib/baycmc/wynwood";
 import { shortAddress } from "@/lib/short-address";
 
 /**
  * Host starts a new Ape Ride. Server re-validates the GPS coordinate is
- * inside the Wynwood geofence — never trust the client claim alone.
+ * inside the chosen venue geofence (ape_ride_venues) — never trust the client.
  */
 export const startApeRide = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { lat: number; lng: number; title?: string }) =>
+  .inputValidator((input: { lat: number; lng: number; venue?: string; title?: string }) =>
     z
       .object({
         lat: z.number().min(-90).max(90),
         lng: z.number().min(-180).max(180),
+        venue: z
+          .string()
+          .regex(/^[a-z0-9-]{1,40}$/)
+          .default("wynwood"),
         title: z.string().min(1).max(80).optional(),
       })
       .parse(input),
@@ -22,10 +26,21 @@ export const startApeRide = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
-    if (!isInsideWynwood({ lat: data.lat, lng: data.lng })) {
+    // The geofence comes from the database (ape_ride_venues), never from the
+    // client — the client only says WHICH venue it is checking against.
+    const { supabaseAdmin: admin } = await import("@/integrations/supabase/client.server");
+    const { data: venue } = await admin
+      .from("ape_ride_venues")
+      .select("slug,name,lat,lng,radius_m")
+      .eq("slug", data.venue)
+      .eq("active", true)
+      .maybeSingle();
+    const v = venue;
+    if (!v) return { ok: false as const, error: "That Ape Rides location isn't available." };
+    if (haversineMeters({ lat: data.lat, lng: data.lng }, { lat: v.lat, lng: v.lng }) > v.radius_m) {
       return {
         ok: false as const,
-        error: "You must be physically inside the Wynwood clubhouse to host an Ape Ride.",
+        error: `You must be physically inside the ${v.name} area to host an Ape Ride there.`,
       };
     }
 
@@ -48,6 +63,7 @@ export const startApeRide = createServerFn({ method: "POST" })
         host_id: userId,
         title: data.title ?? "Ape Ride",
         livekit_room: livekitRoom,
+        venue_slug: v.slug,
       })
       .select()
       .single();
@@ -68,7 +84,7 @@ export const startApeRide = createServerFn({ method: "POST" })
       event_type: "ape_ride.start",
       actor_id: userId,
       target_id: ride.id,
-      metadata: { lat: data.lat, lng: data.lng },
+      metadata: { lat: data.lat, lng: data.lng, venue: v.slug },
     });
 
     return { ok: true as const, ride };

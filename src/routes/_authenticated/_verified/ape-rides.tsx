@@ -8,13 +8,18 @@ import {
   requestApeRide,
   respondApeRideRequest,
 } from "@/server/aperides.functions";
-import { isInsideWynwood, WYNWOOD_RADIUS_METERS } from "@/lib/baycmc/wynwood";
+import { haversineMeters } from "@/lib/baycmc/wynwood";
+import { MapPin, X } from "lucide-react";
 import { useAuth } from "@/lib/auth/useAuth";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 import { ApeArFilter } from "@/components/ApeArFilter";
 
 type Ride = Database["public"]["Tables"]["ape_rides"]["Row"];
+type Venue = Pick<
+  Database["public"]["Tables"]["ape_ride_venues"]["Row"],
+  "slug" | "name" | "lat" | "lng" | "radius_m"
+>;
 type RideRequest = Database["public"]["Tables"]["ape_ride_requests"]["Row"];
 
 export const Route = createFileRoute("/_authenticated/_verified/ape-rides")({
@@ -23,13 +28,13 @@ export const Route = createFileRoute("/_authenticated/_verified/ape-rides")({
       { title: "Ape Rides — BAYC/MAYC Clubhouse" },
       {
         name: "description",
-        content: "Pair with a member inside the Wynwood clubhouse and stream a live Ape Ride.",
+        content: "Pair with a member at a BAYCmc clubhouse location and stream a live Ape Ride.",
       },
       { property: "og:title", content: "Ape Rides — BAYC/MAYC Clubhouse" },
       {
         property: "og:description",
         content:
-          "Remote members can request a live video pairing with hosts physically inside the Wynwood, FL clubhouse.",
+          "Remote members can request a live video pairing with hosts physically at a BAYCmc clubhouse location.",
       },
     ],
   }),
@@ -40,7 +45,7 @@ type GeoState =
   | { status: "idle" }
   | { status: "loading" }
   | { status: "denied"; reason: string }
-  | { status: "ok"; lat: number; lng: number; inside: boolean };
+  | { status: "ok"; lat: number; lng: number; inside: boolean; venue: Venue };
 
 function ApeRidesPage() {
   const { user } = useAuth();
@@ -50,6 +55,18 @@ function ApeRidesPage() {
   const [loading, setLoading] = useState(true);
   const [arOpen, setArOpen] = useState(false);
   const [pfpUrl, setPfpUrl] = useState<string | null>(null);
+  const [venues, setVenues] = useState<Venue[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  // Host locations live in the database (ape_ride_venues).
+  useEffect(() => {
+    void supabase
+      .from("ape_ride_venues")
+      .select("slug,name,lat,lng,radius_m")
+      .eq("active", true)
+      .order("display_order", { ascending: true })
+      .then(({ data }) => setVenues((data as Venue[] | null) ?? []));
+  }, []);
 
   // Load the verified BAYC PFP URL from user_verifications.
   useEffect(() => {
@@ -112,7 +129,8 @@ function ApeRidesPage() {
     };
   }, [loadRides, loadRequests]);
 
-  const checkLocation = useCallback(() => {
+  const checkLocation = useCallback((venue: Venue) => {
+    setPickerOpen(false);
     if (!("geolocation" in navigator)) {
       setGeo({ status: "denied", reason: "Geolocation is not supported on this device." });
       return;
@@ -125,7 +143,8 @@ function ApeRidesPage() {
           status: "ok",
           lat,
           lng,
-          inside: isInsideWynwood({ lat, lng }),
+          inside: haversineMeters({ lat, lng }, { lat: venue.lat, lng: venue.lng }) <= venue.radius_m,
+          venue,
         });
       },
       (err) => {
@@ -143,7 +162,7 @@ function ApeRidesPage() {
 
   async function handleStart() {
     if (geo.status !== "ok" || !geo.inside) return;
-    const res = await startRide({ data: { lat: geo.lat, lng: geo.lng } });
+    const res = await startRide({ data: { lat: geo.lat, lng: geo.lng, venue: geo.venue.slug } });
     if (!res.ok) {
       toast.error(res.error);
       return;
@@ -174,6 +193,7 @@ function ApeRidesPage() {
   }
 
   const myActiveRide = rides.find((r) => r.host_id === user?.id);
+  const venueNames = venues.map((v) => v.name).join(" or ");
   const canHost = geo.status === "ok" && geo.inside && !myActiveRide;
 
   return (
@@ -182,8 +202,9 @@ function ApeRidesPage() {
         <div>
           <h1 className="font-display text-3xl text-gradient-gold sm:text-4xl">Ape Rides</h1>
           <p className="mt-2 text-xs text-muted-foreground sm:text-sm">
-            Pair with a member physically inside the Wynwood, FL clubhouse and watch their live POV.
-            Hosting is unlocked only when your GPS places you inside the clubhouse geofence.
+            Pair with a member physically at a BAYCmc clubhouse location —{" "}
+            {venueNames || "Wynwood, FL"} — and watch their live POV. Hosting is unlocked only when
+            your GPS places you inside the chosen location's geofence.
           </p>
         </div>
         {pfpUrl && (
@@ -197,6 +218,9 @@ function ApeRidesPage() {
         )}
       </header>
       {arOpen && pfpUrl && <ApeArFilter pfpUrl={pfpUrl} onClose={() => setArOpen(false)} />}
+      {pickerOpen && (
+        <VenuePicker venues={venues} onPick={checkLocation} onClose={() => setPickerOpen(false)} />
+      )}
 
       {/* Host panel */}
       <section className="glass mb-8 rounded-2xl p-6 shadow-card">
@@ -204,12 +228,13 @@ function ApeRidesPage() {
           <div>
             <h2 className="font-display text-2xl">Host an Ape Ride</h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Available only inside Wynwood (~{WYNWOOD_RADIUS_METERS}m radius).
+              Available only inside {venueNames || "Wynwood, FL"}
+              {venues[0] ? ` (~${venues[0].radius_m}m radius)` : ""}.
             </p>
           </div>
           {geo.status === "idle" && (
             <button
-              onClick={checkLocation}
+              onClick={() => setPickerOpen(true)}
               className="rounded-md border border-border bg-secondary/50 px-4 py-2 text-sm hover:bg-secondary"
             >
               Check my location
@@ -221,11 +246,19 @@ function ApeRidesPage() {
           {geo.status === "denied" && <div className="text-xs text-destructive">{geo.reason}</div>}
           {geo.status === "ok" && !geo.inside && (
             <div className="text-xs text-muted-foreground">
-              You're outside Wynwood — request a ride from a host below.
+              You're outside {geo.venue.name} — request a ride from a host below.{" "}
+              <button
+                type="button"
+                onClick={() => setPickerOpen(true)}
+                className="font-semibold text-gold hover:underline"
+              >
+                Check again
+              </button>
             </div>
           )}
           {geo.status === "ok" && geo.inside && !myActiveRide && (
             <button
+              title={`Inside ${geo.venue.name}`}
               onClick={handleStart}
               className="rounded-md bg-gradient-gold px-5 py-2 text-sm font-semibold text-gold-foreground shadow-gold"
             >
@@ -252,8 +285,8 @@ function ApeRidesPage() {
         </div>
         {!canHost && geo.status === "ok" && !geo.inside && (
           <p className="mt-3 text-[11px] text-muted-foreground">
-            Your location was verified outside the clubhouse. Hosting requires you to be physically
-            present in Wynwood.
+            Your location was verified outside the {geo.venue.name} area. Hosting requires you to be
+            physically present there.
           </p>
         )}
       </section>
@@ -531,5 +564,75 @@ function HostRequestInbox({
         </ul>
       )}
     </section>
+  );
+}
+
+/** Pick which clubhouse location to check your GPS against. */
+function VenuePicker({
+  venues,
+  onPick,
+  onClose,
+}: {
+  venues: Venue[];
+  onPick: (v: Venue) => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center px-4 animate-in fade-in-0 duration-200"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Choose your location"
+    >
+      <button
+        type="button"
+        aria-label="Close"
+        onClick={onClose}
+        className="absolute inset-0 cursor-default bg-black/90 backdrop-blur-md"
+      />
+      <div className="relative w-full max-w-sm rounded-2xl border-2 border-gold bg-card p-6 shadow-[0_0_45px_-4px_oklch(0.82_0.15_80/0.65),0_25px_60px_-10px_rgb(0_0_0/0.9)] animate-in zoom-in-95 fade-in-0 duration-200">
+        <button
+          type="button"
+          aria-label="Close"
+          onClick={onClose}
+          className="absolute right-3 top-3 rounded-md p-1.5 text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+        >
+          <X className="h-4 w-4" />
+        </button>
+        <h2 className="font-display text-xl text-gradient-gold">Where are you hosting?</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Pick your clubhouse location. We'll check your GPS against it.
+        </p>
+        <div className="mt-4 space-y-2">
+          {venues.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Loading locations…</p>
+          ) : (
+            venues.map((v) => (
+              <button
+                key={v.slug}
+                type="button"
+                onClick={() => onPick(v)}
+                className="flex w-full items-center gap-3 rounded-lg border border-gold/30 bg-secondary/30 px-4 py-3 text-left transition hover:border-gold/60 hover:bg-gold/10"
+              >
+                <MapPin className="h-5 w-5 text-gold" />
+                <span className="flex-1">
+                  <span className="block text-sm font-semibold">{v.name}</span>
+                  <span className="block text-[11px] text-muted-foreground">
+                    Within ~{v.radius_m}m of the clubhouse
+                  </span>
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
