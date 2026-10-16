@@ -44,7 +44,15 @@ export function useVerificationRevalidation({
       }, debounceMs);
     };
 
-    const channel = supabase.channel(`verification-revalidate-${userId ?? "anon"}`);
+    // A unique topic per hook instance. With a fixed name, a second mount
+    // (another page using this hook, or a remount before the old channel is
+    // removed) got the SAME already-subscribed channel back from
+    // supabase.channel(), and adding listeners to it threw "cannot add
+    // postgres_changes callbacks … after subscribe()" — the Conference Rooms
+    // page crashed with exactly that.
+    const channel = supabase.channel(
+      `verification-revalidate-${userId ?? "anon"}-${Math.random().toString(36).slice(2, 10)}`,
+    );
     channel.on(
       "postgres_changes",
       userId

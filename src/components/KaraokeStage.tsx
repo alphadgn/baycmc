@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
 import { getBackingTrackUrl } from "@/lib/karaoke/backing.functions";
+import { syncKaraokeStageMics } from "@/server/livekit.functions";
 import { useAuth } from "@/lib/auth/useAuth";
 import { KaraokeMusicBoard, type TrackChange } from "@/components/KaraokeMusicBoard";
 import {
@@ -90,6 +91,7 @@ function hhmm(iso: string) {
  */
 export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
   const getBackingUrl = useServerFn(getBackingTrackUrl);
+  const syncStageMics = useServerFn(syncKaraokeStageMics);
   const { user } = useAuth();
   const [session, setSession] = useState<KaraokeSessionRow>(EMPTY_SESSION);
   const applySession = useCallback((row: KaraokeSessionRow) => {
@@ -291,6 +293,19 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
   const reserved = session.stage_source !== "open";
   const isMyTurn = !!user && !!performerId && user.id === performerId;
   const meInQueue = !!user && visibleQueue.some((q) => q.user_id === user.id);
+
+  // Karaoke rules: when the stage changes hands, re-apply the server-side
+  // mic rule (only the performer may publish during a performance). The
+  // server decides from the database stage state; a small jitter keeps every
+  // client from hitting it at the same instant.
+  useEffect(() => {
+    if (!user) return;
+    const t = window.setTimeout(
+      () => void syncStageMics({ data: { roomId } }).catch(() => {}),
+      performerId === user.id ? 0 : 400 + Math.random() * 1500,
+    );
+    return () => window.clearTimeout(t);
+  }, [performerId, roomId, user, syncStageMics]);
 
   // ---- Backing-track metadata (+ signed URL for the performer only) ----
   useEffect(() => {

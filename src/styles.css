@@ -453,3 +453,27 @@ html {
   .kara-alert { animation: none; }
   .kara-scroll-hint { animation-duration: 0.01s; }
 }
+
+/* On-brand toasts: dark clubhouse card, Space Grotesk, gold border. */
+.baycmc-toaster [data-sonner-toast].baycmc-toast {
+  font-family: var(--font-sans) !important;
+  background: color-mix(in oklch, var(--card) 94%, transparent) !important;
+  color: var(--foreground) !important;
+  border: 1.5px solid var(--gold) !important;
+  border-radius: 0.875rem !important;
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--gold) 25%, transparent),
+    0 10px 30px -10px color-mix(in oklch, var(--gold) 45%, transparent) !important;
+  backdrop-filter: blur(10px);
+}
+.baycmc-toaster [data-sonner-toast].baycmc-toast [data-icon] {
+  color: var(--gold) !important;
+}
+.baycmc-toaster [data-sonner-toast].baycmc-toast[data-type="error"] [data-icon] {
+  color: var(--destructive) !important;
+}
+.baycmc-toaster [data-sonner-toast].baycmc-toast [data-close-button] {
+  background: var(--card) !important;
+  border-color: var(--gold) !important;
+  color: var(--gold) !important;
+}

@@ -544,6 +544,16 @@ function PreLiveBottomBar({ onLeave }: { onLeave: () => void }) {
  * non-host members can't un-mute their microphone. Driven by LiveKit room
  * metadata so it stays in sync across every connected client.
  */
+/**
+ * Karaoke rule: while someone is performing, only the performer's mic is
+ * live. Everyone else (observers, spectators, hosts) is locked muted until
+ * the turn ends. The LiveKit token gate enforces the same rule server-side.
+ */
+function useStageMicLock(): boolean {
+  const { session, isMyTurn } = useKaraokeStage();
+  return !!session?.performer_user_id && !isMyTurn;
+}
+
 function useMicLock(): boolean {
   const { metadata } = useRoomInfo();
   return useMemo(() => {
@@ -703,8 +713,10 @@ function LiveBottomBar({
   const { prefs, setPrefs } = useRoomPreferences();
   const [screenOn, setScreenOn] = useState(false);
   const micLock = useMicLock();
-  // Host keeps full mic control even while the room-wide lock is on.
-  const micLocked = micLock && !isHost;
+  const stageLock = useStageMicLock();
+  // Host keeps full mic control even while the room-wide lock is on — but
+  // not during someone else's karaoke performance.
+  const micLocked = (micLock && !isHost) || stageLock;
 
   const mic = useMediaDeviceSelect({ kind: "audioinput", room: room ?? undefined });
   const cam = useMediaDeviceSelect({ kind: "videoinput", room: room ?? undefined });
@@ -739,6 +751,9 @@ function LiveBottomBar({
     if (!micLocked && !karaokeSinger && p.isMicrophoneEnabled !== prefs.micEnabled) {
       void p.setMicrophoneEnabled(prefs.micEnabled).catch(() => {});
     }
+    if (micLocked && !karaokeSinger && p.isMicrophoneEnabled) {
+      void p.setMicrophoneEnabled(false).catch(() => {});
+    }
     if (p.isCameraEnabled !== prefs.cameraEnabled) {
       void p.setCameraEnabled(prefs.cameraEnabled).catch(() => {});
     }
@@ -755,7 +770,11 @@ function LiveBottomBar({
   async function toggleMic() {
     const v = !prefs.micEnabled;
     if (v && micLocked) {
-      toast.error("The host has muted the room — you can't unmute until they lift it.");
+      toast.error(
+        stageLock
+          ? "Someone is performing — only the singer's mic is live until their turn ends."
+          : "The host has muted the room — you can't unmute until they lift it.",
+      );
       return;
     }
     setPrefs({ micEnabled: v });
@@ -997,11 +1016,16 @@ function LivePreferencesPanel({ isHost }: { isHost: boolean }) {
   const { prefs, setPrefs } = useRoomPreferences();
   const local = useLocalParticipant();
   const micLock = useMicLock();
-  const micLocked = micLock && !isHost;
+  const stageLock = useStageMicLock();
+  const micLocked = (micLock && !isHost) || stageLock;
 
   async function toggleMic(v: boolean) {
     if (v && micLocked) {
-      toast.error("The host has muted the room — you can't unmute until they lift it.");
+      toast.error(
+        stageLock
+          ? "Someone is performing — only the singer's mic is live until their turn ends."
+          : "The host has muted the room — you can't unmute until they lift it.",
+      );
       return;
     }
     // The karaoke performer's voice goes out through the mix bus (voice +
@@ -1084,7 +1108,9 @@ function LivePreferencesPanel({ isHost }: { isHost: boolean }) {
         />
         {micLocked && (
           <p className="pt-0.5 text-[10px] text-destructive">
-            Host muted the room — unmute is locked.
+            {stageLock
+              ? "Performance in progress — mics are locked until the singer's turn ends."
+              : "Host muted the room — unmute is locked."}
           </p>
         )}
         <label className="flex cursor-pointer items-start gap-2 pt-1 text-[10px] text-muted-foreground">

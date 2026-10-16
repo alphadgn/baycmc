@@ -121,7 +121,9 @@ function RoomsPage() {
       allRooms.filter(
         (rm) =>
           (seesLiferRooms || rm.tier !== "lifer") &&
-          (!rm.required_collection || admin || held.includes(rm.required_collection)),
+          (!rm.required_collection ||
+            admin ||
+            rm.required_collection.split(",").some((l) => held.includes(l.trim()))),
       ),
     );
     setBookings((b as Booking[]) ?? []);
@@ -224,18 +226,41 @@ function RoomsPage() {
           ))}
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {visibleRooms.map((room) => (
-            <RoomCard
-              key={room.id}
-              room={room}
-              bookings={bookings.filter((b) => b.room_id === room.id).slice(0, 2)}
-              canBook={canBook}
-              onBook={() => setSelectedRoom(room)}
-            />
-          ))}
-          {isAdmin && <CreateRoomTile />}
-        </div>
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {visibleRooms
+              .filter((r) => !isChapterRoom(r))
+              .map((room) => (
+                <RoomCard
+                  key={room.id}
+                  room={room}
+                  bookings={bookings.filter((b) => b.room_id === room.id).slice(0, 2)}
+                  canBook={canBook}
+                  onBook={() => setSelectedRoom(room)}
+                />
+              ))}
+            {isAdmin && <CreateRoomTile />}
+          </div>
+          {visibleRooms.some(isChapterRoom) && (
+            <section className="mt-8">
+              <h2 className="font-display text-2xl text-gold">Club BAYC Chapters</h2>
+              <p className="mb-4 mt-1 text-xs text-muted-foreground font-sans-display">
+                Chapter rooms for verified BAYC &amp; MAYC holders only.
+              </p>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {visibleRooms.filter(isChapterRoom).map((room) => (
+                  <RoomCard
+                    key={room.id}
+                    room={room}
+                    bookings={bookings.filter((b) => b.room_id === room.id).slice(0, 2)}
+                    canBook={canBook}
+                    onBook={() => setSelectedRoom(room)}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+        </>
       )}
 
       {selectedRoom && (
@@ -267,6 +292,11 @@ function RoomsPage() {
       )}
     </RoomsShell>
   );
+}
+
+/** Club BAYC chapter rooms (BAYC/MAYC holders only). */
+function isChapterRoom(r: Room): boolean {
+  return r.livekit_room.startsWith("bayc-chapter-");
 }
 
 function RoomCard({

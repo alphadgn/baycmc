@@ -325,7 +325,7 @@ function WalletBridge() {
       window.dispatchEvent(new Event("baycmc:verification-refresh"));
       if (result.verified) {
         toast.success(
-          `Welcome aboard — ${collectionNameForLabel(result.collection) ?? "holder"} verified`,
+          `Welcome a bored — ${collectionNameForLabel(result.collection) ?? "holder"} verified`,
           {
             id: toastId,
             duration: 3000,
