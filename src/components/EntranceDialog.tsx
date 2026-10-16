@@ -117,7 +117,7 @@ export function EntranceDialog({ open, onOpenChange, mode = "signin" }: Entrance
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center px-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center px-4 animate-in fade-in-0 duration-200"
       role="dialog"
       aria-modal="true"
       aria-label={mode === "link" ? "Add a wallet" : "VIP entrance"}
@@ -126,9 +126,9 @@ export function EntranceDialog({ open, onOpenChange, mode = "signin" }: Entrance
         type="button"
         aria-label="Close"
         onClick={() => onOpenChange(false)}
-        className="absolute inset-0 cursor-default bg-black/70 backdrop-blur-sm"
+        className="absolute inset-0 cursor-default bg-black/90 backdrop-blur-md"
       />
-      <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-gold/30 bg-card/90 p-6 shadow-card backdrop-blur sm:p-8">
+      <div className="relative w-full max-w-md overflow-hidden rounded-2xl border-2 border-gold bg-card p-6 shadow-[0_0_0_1px_var(--gold),0_0_45px_-4px_oklch(0.82_0.15_80/0.65),0_25px_60px_-10px_rgb(0_0_0/0.9)] ring-1 ring-gold/40 ring-offset-4 ring-offset-black/0 animate-in zoom-in-95 fade-in-0 duration-200 sm:p-8">
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 -z-10 opacity-70"
