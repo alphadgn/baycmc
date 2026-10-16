@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarClock, ChevronLeft, GripVertical, Mic, Users } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useServerFn } from "@tanstack/react-start";
+import { getBackingTrackUrl } from "@/lib/karaoke/backing.functions";
 import { useAuth } from "@/lib/auth/useAuth";
 import { KaraokeMusicBoard, type TrackChange } from "@/components/KaraokeMusicBoard";
 import {
@@ -87,6 +89,7 @@ function hhmm(iso: string) {
  * mirrors the session into the karaoke stage store for the audio engine.
  */
 export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
+  const getBackingUrl = useServerFn(getBackingTrackUrl);
   const { user } = useAuth();
   const [session, setSession] = useState<KaraokeSessionRow>(EMPTY_SESSION);
   const applySession = useCallback((row: KaraokeSessionRow) => {
@@ -305,10 +308,9 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
         .maybeSingle();
       let url: string | null = null;
       if (data && isMyTurn) {
-        const signed = await supabase.storage
-          .from("karaoke-backing-tracks")
-          .createSignedUrl(data.storage_path as string, 60 * 60 * 2);
-        url = signed.data?.signedUrl ?? null;
+        // Files are owner/staff-only in storage; the server signs the link.
+        const signed = await getBackingUrl({ data: { trackId: id } }).catch(() => null);
+        url = signed?.ok ? signed.url : null;
       }
       if (cancelled) return;
       setBackingTrack({
