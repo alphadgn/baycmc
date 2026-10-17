@@ -14,9 +14,15 @@ interface NotificationRow {
 }
 
 const SUPPORT_KINDS = ["support", "support_reply"];
+/** Event Stream host assignment ("start streaming"). */
+const STREAM_KINDS = ["stream_host"];
+const ALERT_KINDS = [...SUPPORT_KINDS, ...STREAM_KINDS];
 
 /**
- * Support alerts. A database trigger writes a notification for every admin
+ * Support + Event Stream alerts. Assigning an Event Stream host also writes
+ * a "Start streaming" notification for that member.
+ *
+ * A database trigger writes a notification for every admin
  * and super admin when a member sends a support message, and one for the
  * member when staff reply. This shows them as toasts — live while the app is
  * open, and any unread ones on the next visit — and marks them read once the
@@ -49,11 +55,12 @@ export function SupportAlertsWatcher() {
         void markRead([n.id]);
         return;
       }
+      const isStream = STREAM_KINDS.includes(n.kind);
       toast(n.title, {
         description: n.body ?? undefined,
-        duration: 12_000,
+        duration: isStream ? 30_000 : 12_000,
         action: {
-          label: "Open",
+          label: isStream ? "Start streaming" : "Open",
           onClick: () => {
             void markRead([n.id]);
             void router.navigate({ href: target });
@@ -68,12 +75,18 @@ export function SupportAlertsWatcher() {
         .from("notifications")
         .select("id,kind,title,body,url,read_at")
         .eq("user_id", userId)
-        .in("kind", SUPPORT_KINDS)
+        .in("kind", ALERT_KINDS)
         .is("read_at", null)
         .order("created_at", { ascending: false })
         .limit(20);
       if (cancelled || !data?.length) return;
-      const rows = data as NotificationRow[];
+      const all = data as NotificationRow[];
+      // Host assignments always get their own "Start streaming" alert.
+      const streamRows = all.filter((r) => STREAM_KINDS.includes(r.kind));
+      if (streamRows[0]) show(streamRows[0]);
+      if (streamRows.length > 1) void markRead(streamRows.slice(1).map((r) => r.id));
+      const rows = all.filter((r) => SUPPORT_KINDS.includes(r.kind));
+      if (rows.length === 0) return;
       if (rows.length === 1) show(rows[0]!);
       else {
         rows.forEach((r) => shownRef.current.add(r.id));
@@ -108,7 +121,7 @@ export function SupportAlertsWatcher() {
         },
         (payload) => {
           const n = payload.new as NotificationRow;
-          if (SUPPORT_KINDS.includes(n.kind)) show(n);
+          if (ALERT_KINDS.includes(n.kind)) show(n);
         },
       )
       .subscribe();
@@ -117,7 +130,13 @@ export function SupportAlertsWatcher() {
     const unsub = router.subscribe("onResolved", ({ toLocation }) => {
       const path = toLocation.pathname;
       const kind =
-        path === "/admin/support" ? "support" : path === "/support" ? "support_reply" : null;
+        path === "/admin/support"
+          ? "support"
+          : path === "/support"
+            ? "support_reply"
+            : path === "/event-stream"
+              ? "stream_host"
+              : null;
       if (!kind) return;
       void supabase
         .from("notifications")
