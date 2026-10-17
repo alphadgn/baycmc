@@ -8,10 +8,15 @@ import { BAYC_CONTRACT } from "@/lib/web3/constants";
  *
  * Source of truth is OpenSea (https://opensea.io/collection/boredapeyachtclub)
  * via its v2 API — the OPENSEA_API_KEY secret if set, otherwise a free
- * instant key the server mints itself. Only if OpenSea has never answered do
- * we fall back to the contract's on-chain totalSupply(). Cached 5 minutes.
+ * instant key the server mints itself. When OpenSea can't be reached we count
+ * on-chain: the contract's totalSupply() minus apes sent to burn addresses,
+ * which matches OpenSea's number. Cached 5 minutes.
  */
 const SLUG = "boredapeyachtclub";
+const BURN_ADDRESSES = [
+  "0x000000000000000000000000000000000000dEaD",
+  "0x0000000000000000000000000000000000000001",
+] as const;
 const TTL_MS = 5 * 60_000;
 let cache: { supply: number; source: "opensea" | "chain"; at: number } | null = null;
 
@@ -109,19 +114,37 @@ async function fromChain(): Promise<number | null> {
         { rank: false, retryCount: 1 },
       ),
     });
-    const n = await client.readContract({
+    const abi = [
+      {
+        type: "function",
+        name: "totalSupply",
+        stateMutability: "view",
+        inputs: [],
+        outputs: [{ type: "uint256" }],
+      },
+      {
+        type: "function",
+        name: "balanceOf",
+        stateMutability: "view",
+        inputs: [{ type: "address" }],
+        outputs: [{ type: "uint256" }],
+      },
+    ] as const;
+    const total = await client.readContract({
       address: BAYC_CONTRACT,
-      abi: [
-        {
-          type: "function",
-          name: "totalSupply",
-          stateMutability: "view",
-          inputs: [],
-          outputs: [{ type: "uint256" }],
-        },
-      ] as const,
+      abi,
       functionName: "totalSupply",
     });
+    // Apes sent to a burn address are gone for good; OpenSea leaves them
+    // out of the collection size, so we do too (10,000 minted − burned).
+    const burned = await Promise.all(
+      BURN_ADDRESSES.map((a) =>
+        client
+          .readContract({ address: BAYC_CONTRACT, abi, functionName: "balanceOf", args: [a] })
+          .catch(() => 0n),
+      ),
+    );
+    const n = burned.reduce((acc, b) => acc - b, total);
     return Number(n);
   } catch (e) {
     console.warn("[collection-stats] on-chain totalSupply failed", e);
@@ -155,21 +178,15 @@ export const getBaycSupply = createServerFn({ method: "GET" }).handler(async () 
   const result: { supply: number; source: "opensea" | "chain" } | null =
     os !== null
       ? { supply: os, source: "opensea" }
-      : prev?.supply && prev.source === "opensea"
-        ? // OpenSea briefly unavailable: keep its last number rather than
-          // switch sources (the contract counts differently than OpenSea).
-          { supply: prev.supply, source: "opensea" }
-        : await fromChain().then((n) =>
-            n !== null ? { supply: n, source: "chain" as const } : null,
-          );
+      : await fromChain().then((n) =>
+          n !== null ? { supply: n, source: "chain" as const } : null,
+        );
   if (!result) return { supply: null, source: null };
   cache = { ...result, at: Date.now() };
-  if (os !== null || !prev) {
-    await db.from("app_settings").upsert({
-      key: SUPPLY_SETTING,
-      value: { supply: result.supply, source: result.source, at: cache.at },
-      updated_at: new Date().toISOString(),
-    });
-  }
+  await db.from("app_settings").upsert({
+    key: SUPPLY_SETTING,
+    value: { supply: result.supply, source: result.source, at: cache.at },
+    updated_at: new Date().toISOString(),
+  });
   return result;
 });
