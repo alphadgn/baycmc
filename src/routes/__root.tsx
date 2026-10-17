@@ -7,6 +7,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { InactivityWatcher } from "@/components/InactivityWatcher";
 import { AuthRedirectWatcher } from "@/components/AuthRedirectWatcher";
 import { AccountMergeWatcher } from "@/components/AccountMergeWatcher";
+import { SupportAlertsWatcher } from "@/components/SupportAlertsWatcher";
 import { Toaster } from "@/components/ui/sonner";
 import { AiAssistant } from "@/components/AiAssistant";
 import { KaraokeSaveTakeDialog } from "@/components/karaoke/KaraokeSaveTakeDialog";
@@ -136,6 +137,7 @@ function RootComponent() {
           <InactivityWatcher />
           <AuthRedirectWatcher />
           <AccountMergeWatcher />
+          <SupportAlertsWatcher />
           <AiAssistant />
         </div>
       </VerificationStatusProvider>

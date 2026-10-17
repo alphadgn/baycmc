@@ -47,18 +47,42 @@ export const Route = createFileRoute("/_authenticated/admin/support")({
       { name: "twitter:card", content: "summary" },
     ],
   }),
+  validateSearch: (search: Record<string, unknown>): { thread?: string } =>
+    typeof search.thread === "string" ? { thread: search.thread } : {},
   component: AdminSupport,
 });
 
 function AdminSupport() {
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState<string | null>(null);
+  const { thread: threadParam } = Route.useSearch();
+  const [selected, setSelected] = useState<string | null>(threadParam ?? null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // A notification link (/admin/support?thread=…) opens that member's thread.
+  useEffect(() => {
+    if (threadParam) setSelected(threadParam);
+  }, [threadParam]);
+
+  // New member messages refresh the inbox live.
+  useEffect(() => {
+    const ch = supabase
+      .channel(`admin-support-inbox-${Math.random().toString(36).slice(2, 10)}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "support_messages" },
+        () => setRefreshKey((k) => k + 1),
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(ch);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      setLoading(true);
+      if (refreshKey === 0) setLoading(true);
       // Pull the most recent messages and roll them up into one row per
       // thread on the client. RLS ensures we only see messages we're
       // allowed to read — admins see every thread.
@@ -107,7 +131,7 @@ function AdminSupport() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshKey]);
 
   const activeThread = useMemo(
     () => threads.find((t) => t.threadUserId === selected) ?? null,
