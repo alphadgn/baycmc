@@ -477,3 +477,25 @@ html {
   border-color: var(--gold) !important;
   color: var(--gold) !important;
 }
+
+/* Landing page "Buy a Bored Ape" call to action: continuous gold glow. */
+@keyframes buy-ape-glow {
+  0%,
+  100% {
+    opacity: 1;
+    text-shadow: 0 0 12px color-mix(in oklch, var(--gold) 75%, transparent);
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    text-shadow: none;
+    transform: scale(0.96);
+  }
+}
+.buy-ape-cta {
+  display: inline-block;
+  animation: buy-ape-glow 1.6s ease-in-out infinite;
+}
+.buy-ape-cta:hover {
+  text-decoration: underline;
+}
