@@ -10,10 +10,12 @@ import {
   useLocalParticipantPermissions,
   useParticipants,
   useTracks,
+  useRoomContext,
+  StartMediaButton,
   isTrackReference,
   type TrackReference,
 } from "@livekit/components-react";
-import { Track } from "livekit-client";
+import { DisconnectReason, RoomEvent, Track, type RemoteParticipant } from "livekit-client";
 import {
   Camera,
   CameraOff,
@@ -89,11 +91,28 @@ export function EventStreamTheater({
           connect
           audio={false}
           video={false}
-          onDisconnected={() => setState({ phase: "idle" })}
+          onDisconnected={(reason) => {
+            if (reason === DisconnectReason.DUPLICATE_IDENTITY) {
+              setState({
+                phase: "error",
+                message:
+                  "The Event Stream was opened with this account on another device or tab, so this one was disconnected. Each account can watch from one place at a time.",
+              });
+              return;
+            }
+            setState({ phase: "idle" });
+          }}
           style={{ background: "transparent" }}
           className="relative z-10 flex flex-1 flex-col"
         >
           <RoomAudioRenderer />
+          <ForceSubscribe />
+          {/* Phones (iPhone especially) block video/audio that starts
+              without a tap — viewers walk straight in, so offer one. */}
+          <StartMediaButton
+            label="Tap to watch & listen"
+            className="fixed left-1/2 top-1/2 z-[60] -translate-x-1/2 -translate-y-1/2 rounded-xl border-2 border-gold bg-black/85 px-6 py-4 font-display text-base font-semibold text-gold shadow-gold backdrop-blur"
+          />
           <Stage capacity={capacity} tokenCanPublish={state.canPublish} goLive={goLive} />
         </LiveKitRoom>
       ) : (
@@ -217,7 +236,10 @@ function Stage({
   const viewers = participants.length - hosts.length;
   const live = hosts.length > 0;
 
-  const showing = !!feature && isTrackReference(feature);
+  // A remote feed only renders once its video is actually received.
+  const showing = !!feature && isTrackReference(feature) && !!feature.publication.track;
+  // The host is publishing but the picture hasn't arrived here yet.
+  const arriving = live && !showing;
 
   return (
     <div className={`flex flex-1 flex-col ${showing ? "" : "pt-24 sm:pt-32"}`}>
@@ -235,11 +257,23 @@ function Stage({
         <div className="mx-auto w-full max-w-6xl px-2 sm:px-4">
           <div className="relative aspect-video w-full overflow-hidden rounded-md border-2 border-gold/50 bg-black shadow-[0_0_60px_-10px_oklch(0.82_0.15_80/0.45)]">
             <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-center">
-              <Radio className="h-8 w-8 text-gold/60" />
-              <p className="font-display text-lg text-gold">The show starts soon</p>
-              <p className="text-xs text-muted-foreground">
-                Stay seated — the stream appears here when the host goes live.
-              </p>
+              {arriving ? (
+                <>
+                  <Loader2 className="h-8 w-8 animate-spin text-gold/70" />
+                  <p className="font-display text-lg text-gold">The host is live</p>
+                  <p className="text-xs text-muted-foreground">
+                    Bringing the stream to your screen…
+                  </p>
+                </>
+              ) : (
+                <>
+                  <Radio className="h-8 w-8 text-gold/60" />
+                  <p className="font-display text-lg text-gold">The show starts soon</p>
+                  <p className="text-xs text-muted-foreground">
+                    Stay seated — the stream appears here when the host goes live.
+                  </p>
+                </>
+              )}
             </div>
             <ViewerCount viewers={viewers} capacity={capacity} />
           </div>
@@ -278,6 +312,38 @@ function Stage({
       </div>
     </div>
   );
+}
+
+/**
+ * Make sure every viewer receives the host's camera, screen and mic — even
+ * if the automatic subscription was skipped (e.g. the host started while the
+ * viewer's connection was still settling). Runs on join and whenever a host
+ * publishes something new.
+ */
+function ForceSubscribe() {
+  const room = useRoomContext();
+  useEffect(() => {
+    const subscribeAll = (p: RemoteParticipant) => {
+      p.trackPublications.forEach((pub) => {
+        if (!pub.isSubscribed) pub.setSubscribed(true);
+      });
+    };
+    const all = () => room.remoteParticipants.forEach(subscribeAll);
+    all();
+    const onPublished = (_pub: unknown, p: RemoteParticipant) => subscribeAll(p);
+    room.on(RoomEvent.TrackPublished, onPublished);
+    room.on(RoomEvent.ParticipantConnected, subscribeAll);
+    room.on(RoomEvent.Connected, all);
+    // Safety net for flaky mobile networks.
+    const t = window.setInterval(all, 5_000);
+    return () => {
+      room.off(RoomEvent.TrackPublished, onPublished);
+      room.off(RoomEvent.ParticipantConnected, subscribeAll);
+      room.off(RoomEvent.Connected, all);
+      window.clearInterval(t);
+    };
+  }, [room]);
+  return null;
 }
 
 function ViewerCount({ viewers, capacity }: { viewers: number; capacity: number }) {
