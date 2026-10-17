@@ -229,7 +229,7 @@ function BaycSupply() {
       target="_blank"
       rel="noopener noreferrer"
       title="Live from OpenSea"
-      className={supply === null ? "animate-pulse" : undefined}
+      className="text-gradient-gold"
     >
       {supply === null ? "…" : supply.toLocaleString("en-US")}
     </a>
