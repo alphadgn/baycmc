@@ -1,4 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
+import { createPublicClient, fallback, http } from "viem";
+import { mainnet } from "viem/chains";
 import { BAYC_CONTRACT } from "@/lib/web3/constants";
 
 /**
@@ -93,13 +95,19 @@ async function fromOpenSea(db: AdminClient): Promise<number | null> {
 
 async function fromChain(): Promise<number | null> {
   try {
-    const { createPublicClient, http } = await import("viem");
-    const { mainnet } = await import("viem/chains");
+    const urls = [
+      process.env.ETH_RPC_URL?.trim(),
+      "https://ethereum-rpc.publicnode.com",
+      "https://eth.llamarpc.com",
+      "https://rpc.ankr.com/eth",
+      "https://cloudflare-eth.com",
+    ].filter((u): u is string => Boolean(u));
     const client = createPublicClient({
       chain: mainnet,
-      transport: http(process.env.ETH_RPC_URL?.trim() || "https://ethereum-rpc.publicnode.com", {
-        timeout: 6_000,
-      }),
+      transport: fallback(
+        urls.map((u) => http(u, { timeout: 6_000, retryCount: 1 })),
+        { rank: false, retryCount: 1 },
+      ),
     });
     const n = await client.readContract({
       address: BAYC_CONTRACT,
