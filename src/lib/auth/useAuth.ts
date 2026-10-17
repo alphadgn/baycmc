@@ -71,10 +71,19 @@ export async function signOut() {
   } catch (e) {
     console.warn("[signOut] clearing verification failed", e);
   }
+  // scope "global" revokes every BAYCmc session this account has — other
+  // tabs, browsers and devices included — not just this one. Falls back to
+  // a local sign-out if the network call fails so this device is still out.
   try {
-    await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut({ scope: "global" });
+    if (error) throw error;
   } catch (e) {
-    console.warn("[signOut] supabase signOut failed", e);
+    console.warn("[signOut] global signOut failed; signing out locally", e);
+    try {
+      await supabase.auth.signOut({ scope: "local" });
+    } catch {
+      /* ignore */
+    }
   }
   try {
     window.dispatchEvent(new Event("baycmc:wallet-logout"));
