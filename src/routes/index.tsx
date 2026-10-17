@@ -1,5 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { getBaycSupply } from "@/server/collection-stats.functions";
 import { useAuth } from "@/lib/auth/useAuth";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import { EmbroideredImage } from "@/components/EmbroideredImage";
@@ -94,7 +96,7 @@ function Index() {
           {/* Trust strip */}
           <div className="mx-auto mt-16 grid max-w-2xl grid-cols-2 gap-4 text-center">
             {[
-              { k: "10,000", v: "BAYC supply" },
+              { k: <BaycSupply />, v: "BAYC supply" },
               { k: "24/7", v: "Live rooms" },
             ].map((s) => (
               <div key={s.v} className="glass rounded-xl px-4 py-5">
@@ -196,5 +198,40 @@ function Index() {
         </div>
       </footer>
     </main>
+  );
+}
+
+/**
+ * Live BAYC collection size from OpenSea (falls back to the contract's
+ * on-chain totalSupply). Refreshes every 5 minutes while the page is open.
+ */
+function BaycSupply() {
+  const fetchSupply = useServerFn(getBaycSupply);
+  const [supply, setSupply] = useState<number | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const load = () =>
+      fetchSupply()
+        .then((r) => {
+          if (!cancelled && r.supply) setSupply(r.supply);
+        })
+        .catch(() => {});
+    void load();
+    const t = window.setInterval(load, 5 * 60_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(t);
+    };
+  }, [fetchSupply]);
+  return (
+    <a
+      href="https://opensea.io/collection/boredapeyachtclub"
+      target="_blank"
+      rel="noopener noreferrer"
+      title="Live from OpenSea"
+      className={supply === null ? "animate-pulse" : undefined}
+    >
+      {supply === null ? "…" : supply.toLocaleString("en-US")}
+    </a>
   );
 }
