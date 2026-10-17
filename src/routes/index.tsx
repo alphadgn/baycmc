@@ -6,6 +6,8 @@ import { useAuth } from "@/lib/auth/useAuth";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import { EmbroideredImage } from "@/components/EmbroideredImage";
 
+const OPENSEA_BAYC = "https://opensea.io/collection/boredapeyachtclub";
+
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
@@ -95,34 +97,39 @@ function Index() {
 
           {/* Trust strip */}
           <div className="mx-auto mt-16 grid max-w-2xl grid-cols-2 gap-4 text-center">
-            {[
-              {
-                k: <BaycSupply />,
-                v: "Buy a Bored Ape",
-                href: "https://opensea.io/collection/boredapeyachtclub",
-              },
-              { k: "24/7", v: "Live rooms", href: undefined },
-            ].map((s) => (
-              <div key={s.v} className="glass rounded-xl px-4 py-5">
-                <div className="font-display text-2xl font-bold text-gradient-gold sm:text-3xl">
-                  {s.k}
-                </div>
-                {s.href ? (
-                  <a
-                    href={s.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-1 block text-xs uppercase tracking-wide text-gold hover:underline"
-                  >
-                    {s.v}
-                  </a>
-                ) : (
-                  <div className="mt-1 text-xs text-muted-foreground uppercase tracking-wide">
-                    {s.v}
-                  </div>
-                )}
+            <a
+              href={OPENSEA_BAYC}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Live from OpenSea"
+              className="glass block rounded-xl px-4 py-5 transition hover:border-gold/50"
+            >
+              <div className="font-display text-2xl font-bold text-gradient-gold sm:text-3xl">
+                <BaycSupply />
               </div>
-            ))}
+              <div className="mt-1 text-xs uppercase tracking-wide text-muted-foreground">
+                Collection size
+              </div>
+            </a>
+            <div className="glass rounded-xl px-4 py-5">
+              <div className="font-display text-2xl font-bold text-gradient-gold sm:text-3xl">
+                24/7
+              </div>
+              <div className="mt-1 text-xs uppercase tracking-wide text-muted-foreground">
+                Live rooms
+              </div>
+            </div>
+          </div>
+          {/* Same destination as the Collection size tile. */}
+          <div className="mt-5 text-center">
+            <a
+              href={OPENSEA_BAYC}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="buy-ape-cta text-sm font-semibold uppercase tracking-[0.18em] text-gold"
+            >
+              Buy a Bored Ape
+            </a>
           </div>
         </div>
       </section>
@@ -239,14 +246,8 @@ function BaycSupply() {
     };
   }, [fetchSupply]);
   return (
-    <a
-      href="https://opensea.io/collection/boredapeyachtclub"
-      target="_blank"
-      rel="noopener noreferrer"
-      title="Live from OpenSea"
-      className="text-gradient-gold"
-    >
+    <span className="text-gradient-gold">
       {supply === null ? "…" : supply.toLocaleString("en-US")}
-    </a>
+    </span>
   );
 }
