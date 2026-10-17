@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -10,9 +10,23 @@ import {
   useLocalParticipantPermissions,
   useParticipants,
   useTracks,
+  isTrackReference,
+  type TrackReference,
 } from "@livekit/components-react";
 import { Track } from "livekit-client";
-import { Camera, CameraOff, Loader2, Mic, MicOff, Radio, RefreshCw, LogOut } from "lucide-react";
+import {
+  Camera,
+  CameraOff,
+  Expand,
+  Loader2,
+  Maximize,
+  Mic,
+  MicOff,
+  Minimize2,
+  Radio,
+  RefreshCw,
+  LogOut,
+} from "lucide-react";
 import { getLivekitToken } from "@/server/livekit.functions";
 import { useAuth } from "@/lib/auth/useAuth";
 
@@ -203,14 +217,23 @@ function Stage({
   const viewers = participants.length - hosts.length;
   const live = hosts.length > 0;
 
+  const showing = !!feature && isTrackReference(feature);
+
   return (
-    <div className="flex flex-1 flex-col pt-24 sm:pt-32">
-      {/* Main screen — full width, 16:9 (≈ a third of a phone screen). */}
-      <div className="mx-auto w-full max-w-6xl px-2 sm:px-4">
-        <div className="relative aspect-video w-full overflow-hidden rounded-md border-2 border-gold/50 bg-black shadow-[0_0_60px_-10px_oklch(0.82_0.15_80/0.45)]">
-          {feature?.publication ? (
-            <VideoTrack trackRef={feature} className="h-full w-full object-contain" />
-          ) : (
+    <div className={`flex flex-1 flex-col ${showing ? "" : "pt-24 sm:pt-32"}`}>
+      {showing && feature && isTrackReference(feature) ? (
+        // Live: the feed fills the viewer's whole screen (below the app bar),
+        // fitted to the stream's real shape — see useStreamFit.
+        <LiveScreen
+          trackRef={feature}
+          live={live}
+          viewers={viewers}
+          capacity={capacity}
+          hostControls={canPublish ? <HostControls highlight={goLive} overlay /> : null}
+        />
+      ) : (
+        <div className="mx-auto w-full max-w-6xl px-2 sm:px-4">
+          <div className="relative aspect-video w-full overflow-hidden rounded-md border-2 border-gold/50 bg-black shadow-[0_0_60px_-10px_oklch(0.82_0.15_80/0.45)]">
             <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-center">
               <Radio className="h-8 w-8 text-gold/60" />
               <p className="font-display text-lg text-gold">The show starts soon</p>
@@ -218,23 +241,11 @@ function Stage({
                 Stay seated — the stream appears here when the host goes live.
               </p>
             </div>
-          )}
-          {live && (
-            <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-sm bg-red-600 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" /> Live
-            </span>
-          )}
-          {/* Viewer count — numbers only, bottom corner. */}
-          <div className="absolute bottom-2 right-2 flex items-baseline gap-1.5 rounded-sm bg-black/75 px-2 py-1 text-[10px] uppercase tracking-wider text-gold/80 backdrop-blur">
-            <span>Viewers</span>
-            <span className="font-mono text-sm font-semibold text-gold">
-              {viewers}/{capacity}
-            </span>
-            <span>Capacity</span>
+            <ViewerCount viewers={viewers} capacity={capacity} />
           </div>
+          {canPublish && <HostControls highlight={goLive} />}
         </div>
-        {canPublish && <HostControls highlight={goLive} />}
-      </div>
+      )}
 
       {/* Seats — proof of attendance. You're highlighted; others are greyed. */}
       <div className="mx-auto mt-5 w-full max-w-6xl flex-1 px-2 pb-6 sm:px-4">
@@ -269,13 +280,186 @@ function Stage({
   );
 }
 
+function ViewerCount({ viewers, capacity }: { viewers: number; capacity: number }) {
+  return (
+    <div className="absolute bottom-2 right-2 z-20 flex items-baseline gap-1.5 rounded-sm bg-black/75 px-2 py-1 text-[10px] uppercase tracking-wider text-gold/80 backdrop-blur">
+      <span>Viewers</span>
+      <span className="font-mono text-sm font-semibold text-gold">
+        {viewers}/{capacity}
+      </span>
+      <span>Capacity</span>
+    </div>
+  );
+}
+
+type Fit = "cover" | "contain";
+
+/**
+ * Fit the stream to the viewer's screen. Reads the stream's real size from
+ * the video element (it changes when the host rotates their phone) and the
+ * viewer's viewport (it changes on rotate / resize):
+ *   - same orientation (portrait phone → portrait phone, landscape →
+ *     landscape) → "cover": the feed fills the whole screen edge to edge;
+ *   - different orientation (portrait stream on a landscape screen, or the
+ *     reverse) → "contain": the whole picture stays visible, centred.
+ * The viewer can flip between Fill and Fit at any time.
+ */
+function useStreamFit(video: HTMLVideoElement | null) {
+  const [stream, setStream] = useState<{ w: number; h: number } | null>(null);
+  const [screen, setScreen] = useState(() =>
+    typeof window === "undefined"
+      ? { w: 390, h: 844 }
+      : { w: window.innerWidth, h: window.innerHeight },
+  );
+  const [override, setOverride] = useState<Fit | null>(null);
+
+  useEffect(() => {
+    const onResize = () => setScreen({ w: window.innerWidth, h: window.innerHeight });
+    window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!video) return;
+    const read = () => {
+      if (video.videoWidth && video.videoHeight) {
+        setStream({ w: video.videoWidth, h: video.videoHeight });
+      }
+    };
+    read();
+    video.addEventListener("loadedmetadata", read);
+    video.addEventListener("resize", read);
+    return () => {
+      video.removeEventListener("loadedmetadata", read);
+      video.removeEventListener("resize", read);
+    };
+  }, [video]);
+
+  const auto: Fit = !stream
+    ? "cover"
+    : stream.h > stream.w === screen.h > screen.w
+      ? "cover"
+      : "contain";
+  return { fit: override ?? auto, setOverride, auto };
+}
+
+function LiveScreen({
+  trackRef,
+  live,
+  viewers,
+  capacity,
+  hostControls,
+}: {
+  trackRef: TrackReference;
+  live: boolean;
+  viewers: number;
+  capacity: number;
+  hostControls: React.ReactNode;
+}) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [video, setVideo] = useState<HTMLVideoElement | null>(null);
+  const { fit, setOverride } = useStreamFit(video);
+  const [isFull, setIsFull] = useState(false);
+
+  useEffect(() => {
+    const onChange = () => setIsFull(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  function toggleFullscreen() {
+    const el = wrapRef.current;
+    if (document.fullscreenElement) {
+      void document.exitFullscreen().catch(() => {});
+      return;
+    }
+    if (el?.requestFullscreen) {
+      void el.requestFullscreen().catch(() => {
+        // iPhone Safari only lets the <video> itself go full screen.
+        (
+          video as HTMLVideoElement & { webkitEnterFullscreen?: () => void }
+        )?.webkitEnterFullscreen?.();
+      });
+    } else {
+      (
+        video as HTMLVideoElement & { webkitEnterFullscreen?: () => void }
+      )?.webkitEnterFullscreen?.();
+    }
+  }
+
+  const pill =
+    "inline-flex items-center gap-1 rounded-sm bg-black/70 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-gold backdrop-blur";
+  return (
+    <div
+      ref={wrapRef}
+      className="relative w-full overflow-hidden bg-black"
+      // Whole visible screen under the 4rem app bar (dynamic viewport so
+      // mobile browser bars don't push it off-screen).
+      style={{ height: isFull ? "100dvh" : "calc(100dvh - 4rem)" }}
+    >
+      <VideoTrack
+        ref={setVideo}
+        trackRef={trackRef}
+        playsInline
+        className="absolute inset-0 h-full w-full"
+        style={{ objectFit: fit }}
+      />
+      {live && (
+        <span className="absolute left-2 top-2 z-20 inline-flex items-center gap-1 rounded-sm bg-red-600 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" /> Live
+        </span>
+      )}
+      <div className="absolute right-2 top-2 z-20 flex gap-1.5">
+        <button
+          type="button"
+          onClick={() => setOverride(fit === "cover" ? "contain" : "cover")}
+          className={pill}
+          aria-label={fit === "cover" ? "Show whole picture" : "Fill screen"}
+        >
+          {fit === "cover" ? <Minimize2 className="h-3 w-3" /> : <Expand className="h-3 w-3" />}
+          {fit === "cover" ? "Fit" : "Fill"}
+        </button>
+        <button type="button" onClick={toggleFullscreen} className={pill} aria-label="Full screen">
+          <Maximize className="h-3 w-3" />
+          {isFull ? "Exit" : "Full screen"}
+        </button>
+      </div>
+      {hostControls && (
+        <div className="absolute inset-x-0 bottom-12 z-20 flex justify-center px-2">
+          {hostControls}
+        </div>
+      )}
+      <ViewerCount viewers={viewers} capacity={capacity} />
+    </div>
+  );
+}
+
 function abbreviate(name: string) {
   const n = name.trim();
   return n.length > 9 ? `${n.slice(0, 8)}…` : n;
 }
 
+/**
+ * Capture in the host device's own orientation (portrait phone → 720×1280,
+ * landscape → 1280×720) so the stream keeps the device's full frame; the
+ * viewer side then fits it to each screen.
+ */
+function captureOptions(facingMode: "environment" | "user") {
+  const portrait = typeof window !== "undefined" && window.innerHeight > window.innerWidth;
+  return {
+    facingMode,
+    resolution: portrait
+      ? { width: 720, height: 1280, frameRate: 30 }
+      : { width: 1280, height: 720, frameRate: 30 },
+  };
+}
+
 /** Shown only to assigned hosts: go live from this phone. */
-function HostControls({ highlight }: { highlight: boolean }) {
+function HostControls({ highlight, overlay = false }: { highlight: boolean; overlay?: boolean }) {
   const { localParticipant, isCameraEnabled, isMicrophoneEnabled } = useLocalParticipant();
   const streaming = isCameraEnabled || isMicrophoneEnabled;
   const [facing, setFacing] = useState<"environment" | "user">("environment");
@@ -312,7 +496,7 @@ function HostControls({ highlight }: { highlight: boolean }) {
           disabled={busy}
           onClick={() =>
             void run(async () => {
-              await localParticipant.setCameraEnabled(true, { facingMode: facing });
+              await localParticipant.setCameraEnabled(true, captureOptions(facing));
               await localParticipant.setMicrophoneEnabled(true);
               toast.success("You're live.");
             })
@@ -344,14 +528,18 @@ function HostControls({ highlight }: { highlight: boolean }) {
   }
 
   return (
-    <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+    <div
+      className={`flex flex-wrap items-center justify-center gap-2 ${
+        overlay ? "rounded-xl bg-black/60 px-3 py-2 backdrop-blur" : "mt-3"
+      }`}
+    >
       <span className="mr-1 text-[10px] uppercase tracking-wider text-gold/70">Host · Live</span>
       <button
         type="button"
         disabled={busy}
         onClick={() =>
           void run(() =>
-            localParticipant.setCameraEnabled(!isCameraEnabled, { facingMode: facing }),
+            localParticipant.setCameraEnabled(!isCameraEnabled, captureOptions(facing)),
           )
         }
         className={`${btn} ${isCameraEnabled ? "border-emerald-400/50 text-emerald-300" : "border-gold/40 text-gold"}`}
@@ -377,7 +565,7 @@ function HostControls({ highlight }: { highlight: boolean }) {
             setFacing(next);
             void run(async () => {
               await localParticipant.setCameraEnabled(false);
-              await localParticipant.setCameraEnabled(true, { facingMode: next });
+              await localParticipant.setCameraEnabled(true, captureOptions(next));
             });
           }}
           className={`${btn} border-gold/40 text-gold`}
