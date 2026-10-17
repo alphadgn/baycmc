@@ -96,16 +96,31 @@ function Index() {
           {/* Trust strip */}
           <div className="mx-auto mt-16 grid max-w-2xl grid-cols-2 gap-4 text-center">
             {[
-              { k: <BaycSupply />, v: "BAYC supply" },
-              { k: "24/7", v: "Live rooms" },
+              {
+                k: <BaycSupply />,
+                v: "Buy a Bored Ape",
+                href: "https://opensea.io/collection/boredapeyachtclub",
+              },
+              { k: "24/7", v: "Live rooms", href: undefined },
             ].map((s) => (
               <div key={s.v} className="glass rounded-xl px-4 py-5">
                 <div className="font-display text-2xl font-bold text-gradient-gold sm:text-3xl">
                   {s.k}
                 </div>
-                <div className="mt-1 text-xs text-muted-foreground uppercase tracking-wide">
-                  {s.v}
-                </div>
+                {s.href ? (
+                  <a
+                    href={s.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-1 block text-xs uppercase tracking-wide text-gold hover:underline"
+                  >
+                    {s.v}
+                  </a>
+                ) : (
+                  <div className="mt-1 text-xs text-muted-foreground uppercase tracking-wide">
+                    {s.v}
+                  </div>
+                )}
               </div>
             ))}
           </div>
