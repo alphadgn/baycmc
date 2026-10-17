@@ -28,6 +28,35 @@ async function requireSuperAdmin(userId: string) {
   }
 }
 
+/**
+ * Grant / revoke broadcasting for someone already sitting in the Event
+ * Stream, so an assignment takes effect immediately (no rejoin needed).
+ * Best-effort: if they aren't in the room, their next join token carries the
+ * right permission anyway.
+ */
+async function setLivePublish(userId: string, canPublish: boolean) {
+  const apiKey = process.env.LIVEKIT_API_KEY;
+  const apiSecret = process.env.LIVEKIT_API_SECRET;
+  const url = process.env.LIVEKIT_URL;
+  if (!apiKey || !apiSecret || !url) return;
+  try {
+    const { RoomServiceClient } = await import("livekit-server-sdk");
+    const client = new RoomServiceClient(url, apiKey, apiSecret);
+    const people = await client.listParticipants(STREAM_ROOM).catch(() => []);
+    if (!people.some((p) => p.identity === userId)) return;
+    await client.updateParticipant(STREAM_ROOM, userId, {
+      permission: {
+        canSubscribe: true,
+        canPublish,
+        canPublishData: true,
+        canUpdateMetadata: true,
+      },
+    });
+  } catch (e) {
+    console.warn("[event-stream] live permission update failed", e);
+  }
+}
+
 export interface StreamStats {
   configured: boolean;
   live: boolean;
@@ -114,6 +143,9 @@ export const addEventStreamHost = createServerFn({ method: "POST" })
       actor_id: context.userId,
       target_id: prof.id,
     });
+    // The database trigger notifies the host; if they're already watching,
+    // let them broadcast right away.
+    await setLivePublish(prof.id as string, true);
     return { ok: true as const };
   });
 
@@ -131,5 +163,6 @@ export const removeEventStreamHost = createServerFn({ method: "POST" })
       actor_id: context.userId,
       target_id: data.userId,
     });
+    await setLivePublish(data.userId, false);
     return { ok: true as const };
   });

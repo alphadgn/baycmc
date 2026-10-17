@@ -7,6 +7,7 @@ import {
   RoomAudioRenderer,
   VideoTrack,
   useLocalParticipant,
+  useLocalParticipantPermissions,
   useParticipants,
   useTracks,
 } from "@livekit/components-react";
@@ -26,7 +27,16 @@ type Phase =
  * account the super admin assigned) broadcasts from their phone; up to 250
  * verified holders watch. Viewers never publish (LiveKit refuses it).
  */
-export function EventStreamTheater({ roomId, capacity }: { roomId: string; capacity: number }) {
+export function EventStreamTheater({
+  roomId,
+  capacity,
+  goLive = false,
+}: {
+  roomId: string;
+  capacity: number;
+  /** Arrived from the "you're hosting" notification. */
+  goLive?: boolean;
+}) {
   const getToken = useServerFn(getLivekitToken);
   const [state, setState] = useState<Phase>({ phase: "idle" });
 
@@ -70,7 +80,7 @@ export function EventStreamTheater({ roomId, capacity }: { roomId: string; capac
           className="relative z-10 flex flex-1 flex-col"
         >
           <RoomAudioRenderer />
-          <Stage capacity={capacity} canPublish={state.canPublish} />
+          <Stage capacity={capacity} tokenCanPublish={state.canPublish} goLive={goLive} />
         </LiveKitRoom>
       ) : (
         <div className="relative z-10 flex flex-1 flex-col items-center justify-center gap-3 px-4 text-center">
@@ -149,8 +159,31 @@ function TheaterTop() {
   );
 }
 
-function Stage({ capacity, canPublish }: { capacity: number; canPublish: boolean }) {
+function Stage({
+  capacity,
+  tokenCanPublish,
+  goLive,
+}: {
+  capacity: number;
+  tokenCanPublish: boolean;
+  goLive: boolean;
+}) {
   const { user } = useAuth();
+  // Live permission: a super admin can assign (or remove) a host while they
+  // are already in the room — LiveKit pushes the change, no rejoin needed.
+  const perms = useLocalParticipantPermissions();
+  const canPublish = perms ? !!perms.canPublish : tokenCanPublish;
+  const [wasHost, setWasHost] = useState(canPublish);
+  useEffect(() => {
+    if (canPublish && !wasHost) {
+      toast.success("You're now an Event Stream host — tap Start streaming to go live.", {
+        duration: 10_000,
+      });
+    } else if (!canPublish && wasHost) {
+      toast.info("You're no longer a host for the Event Stream.");
+    }
+    setWasHost(canPublish);
+  }, [canPublish, wasHost]);
   const participants = useParticipants();
   const tracks = useTracks(
     [
@@ -200,7 +233,7 @@ function Stage({ capacity, canPublish }: { capacity: number; canPublish: boolean
             <span>Capacity</span>
           </div>
         </div>
-        {canPublish && <HostControls />}
+        {canPublish && <HostControls highlight={goLive} />}
       </div>
 
       {/* Seats — proof of attendance. You're highlighted; others are greyed. */}
@@ -242,8 +275,9 @@ function abbreviate(name: string) {
 }
 
 /** Shown only to assigned hosts: go live from this phone. */
-function HostControls() {
+function HostControls({ highlight }: { highlight: boolean }) {
   const { localParticipant, isCameraEnabled, isMicrophoneEnabled } = useLocalParticipant();
+  const streaming = isCameraEnabled || isMicrophoneEnabled;
   const [facing, setFacing] = useState<"environment" | "user">("environment");
   const [busy, setBusy] = useState(false);
 
@@ -259,9 +293,59 @@ function HostControls() {
   }
   const btn =
     "inline-flex items-center gap-1.5 rounded-md border px-3 py-2 text-xs font-semibold disabled:opacity-50";
+  if (!streaming) {
+    // One tap: camera + mic on together → the stream appears on the main
+    // screen for every viewer.
+    return (
+      <div
+        className={`mt-3 flex flex-col items-center gap-2 rounded-xl border px-4 py-3 text-center ${
+          highlight
+            ? "border-gold bg-gold/10 shadow-[0_0_30px_-6px_oklch(0.82_0.15_80/0.6)]"
+            : "border-gold/30 bg-black/40"
+        }`}
+      >
+        <p className="text-xs text-gold/90">
+          You're a host. Your camera and mic go out to everyone in the theatre.
+        </p>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() =>
+            void run(async () => {
+              await localParticipant.setCameraEnabled(true, { facingMode: facing });
+              await localParticipant.setMicrophoneEnabled(true);
+              toast.success("You're live.");
+            })
+          }
+          className="inline-flex items-center gap-2 rounded-md bg-gradient-gold px-5 py-2.5 text-sm font-semibold text-gold-foreground shadow-gold disabled:opacity-60"
+        >
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Radio className="h-4 w-4" />}
+          Start streaming
+        </button>
+        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+          <span>Camera:</span>
+          <button
+            type="button"
+            onClick={() => setFacing("environment")}
+            className={facing === "environment" ? "text-gold underline" : ""}
+          >
+            Back
+          </button>
+          <button
+            type="button"
+            onClick={() => setFacing("user")}
+            className={facing === "user" ? "text-gold underline" : ""}
+          >
+            Selfie
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-      <span className="mr-1 text-[10px] uppercase tracking-wider text-gold/70">Host</span>
+      <span className="mr-1 text-[10px] uppercase tracking-wider text-gold/70">Host · Live</span>
       <button
         type="button"
         disabled={busy}
@@ -273,7 +357,7 @@ function HostControls() {
         className={`${btn} ${isCameraEnabled ? "border-emerald-400/50 text-emerald-300" : "border-gold/40 text-gold"}`}
       >
         {isCameraEnabled ? <Camera className="h-4 w-4" /> : <CameraOff className="h-4 w-4" />}
-        {isCameraEnabled ? "Camera on" : "Go live (camera)"}
+        {isCameraEnabled ? "Camera on" : "Camera off"}
       </button>
       <button
         type="button"
