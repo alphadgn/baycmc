@@ -172,12 +172,8 @@ function VerifyPage() {
           <ShieldCheck className="h-3 w-3" /> VIP onboarding
         </div>
         <h1 className="mt-4 font-display text-3xl font-bold sm:text-5xl">
-          Verify your <span className="text-gradient-gold">Bored Ape</span> end-to-end
+          Verify your <span className="text-gradient-gold">Bored Ape</span>
         </h1>
-        <p className="mx-auto mt-3 max-w-2xl text-sm text-muted-foreground sm:text-base">
-          Five live steps. Every check runs against mainnet at request time — no cached snapshots,
-          no manual approvals. Production-grade.
-        </p>
       </header>
 
       {/* Live status banner */}
@@ -188,12 +184,7 @@ function VerifyPage() {
           </div>
         ) : !isAuthenticated ? (
           <div className="flex flex-col items-center justify-between gap-3 rounded-xl border border-gold/30 bg-gold/5 px-4 py-4 text-sm sm:flex-row">
-            <div>
-              <div className="font-semibold">Not signed in yet</div>
-              <div className="text-muted-foreground">
-                Sign in to run the live ownership check against your wallet.
-              </div>
-            </div>
+            <div className="font-semibold">Sign in to get full access.</div>
             <Link
               to="/"
               className="rounded-md bg-gradient-gold px-3 py-1.5 text-sm font-semibold text-gold-foreground shadow-gold"
