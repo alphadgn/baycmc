@@ -475,8 +475,6 @@ function reattach(video: HTMLVideoElement) {
     video.srcObject = null;
     video.srcObject = stream;
   }
-  // Nudge a repaint (WebKit sometimes keeps a decoded video unpainted).
-  video.style.transform = video.style.transform === "translateZ(0)" ? "" : "translateZ(0)";
   void video.play().catch(() => {});
 }
 
@@ -489,15 +487,25 @@ function decodedFrames(video: HTMLVideoElement): number | null {
 }
 
 /**
- * Keep the host's video actually playing on the viewer's phone:
- *  - start it (muted video may autoplay; sound comes separately), retry when
- *    it stalls or pauses, and ask for one tap if the browser refuses;
- *  - on iPhone browsers apply the re-attach fix as soon as the stream lands;
- *  - if frames stop advancing, re-attach; if still nothing, re-request the
- *    video from the server.
+ * Keep the host's video playing on screen.
+ *
+ * Host (own camera): only make sure the preview element plays — nothing
+ * else touches it.
+ *
+ * Audience (remote video):
+ *  - start the (muted) element, retry when it stalls/pauses, and ask for one
+ *    tap if the browser refuses;
+ *  - on iPhone browsers apply the re-attach fix ONCE, a moment after the
+ *    first frame arrives. (The previous version re-attached on every
+ *    "loaded" event — but re-attaching itself fires that event, so it looped
+ *    forever and no video ever showed, not even the host's own preview.)
+ *  - if frames stop advancing for a while, re-attach once more, and after
+ *    that re-request the video from the server — each step rate-limited.
  */
 function useVideoPlayback(video: HTMLVideoElement | null, trackRef: TrackReference) {
   const [needsTap, setNeedsTap] = useState(false);
+  const remote = trackRef.publication instanceof RemoteTrackPublication;
+  const trackSid = trackRef.publication.trackSid;
   useEffect(() => {
     if (!video) return;
     video.muted = true;
@@ -505,74 +513,111 @@ function useVideoPlayback(video: HTMLVideoElement | null, trackRef: TrackReferen
     video.autoplay = true;
     video.setAttribute("playsinline", "true");
     video.setAttribute("webkit-playsinline", "true");
-    const webkit = isAppleWebKit();
     let cancelled = false;
-    let staleSince: number | null = null;
-    let lastFrames: number | null = null;
-    let lastTime = -1;
-    let reattached = 0;
     const timers: number[] = [];
 
     const tryPlay = () => {
-      if (cancelled) return;
-      if (video.paused) {
-        video
-          .play()
-          .then(() => !cancelled && setNeedsTap(false))
-          .catch(() => !cancelled && setNeedsTap(true));
-      } else if (video.readyState >= 2) {
-        setNeedsTap(false);
-      }
+      if (cancelled || !video.paused) return;
+      video
+        .play()
+        .then(() => !cancelled && setNeedsTap(false))
+        .catch(() => !cancelled && setNeedsTap(true));
     };
-    const onLoaded = () => {
-      tryPlay();
-      if (webkit) {
-        // Same trick LiveKit uses for Safari, applied to every WebKit browser.
-        for (const ms of [0, 250, 1000]) timers.push(window.setTimeout(() => reattach(video), ms));
-      }
+    const onPlaying = () => setNeedsTap(false);
+    video.addEventListener("loadeddata", tryPlay);
+    video.addEventListener("canplay", tryPlay);
+    video.addEventListener("pause", tryPlay);
+    video.addEventListener("playing", onPlaying);
+    tryPlay();
+
+    // Own camera preview: nothing more to do.
+    if (!remote) {
+      return () => {
+        cancelled = true;
+        video.removeEventListener("loadeddata", tryPlay);
+        video.removeEventListener("canplay", tryPlay);
+        video.removeEventListener("pause", tryPlay);
+        video.removeEventListener("playing", onPlaying);
+      };
+    }
+
+    // One-time WebKit fix, after the first frame — guarded so the
+    // re-attach's own events can't trigger it again.
+    let fixed = false;
+    const webkitFix = () => {
+      if (fixed || !isAppleWebKit()) return;
+      fixed = true;
+      timers.push(window.setTimeout(() => !cancelled && reattach(video), 300));
     };
+    if (video.readyState >= 2) webkitFix();
+    else video.addEventListener("loadeddata", webkitFix, { once: true });
+
+    // Watchdog: is the picture actually moving? Prefer the browser's own
+    // "a frame was painted" callback; fall back to counters.
+    const hasRvfc =
+      typeof (video as { requestVideoFrameCallback?: unknown }).requestVideoFrameCallback ===
+      "function";
+    let lastPaintAt = 0;
+    if (hasRvfc) {
+      const onFrame = () => {
+        lastPaintAt = Date.now();
+        if (!cancelled) video.requestVideoFrameCallback(onFrame);
+      };
+      video.requestVideoFrameCallback(onFrame);
+    }
+    let lastFrames: number | null = null;
+    let lastTime = -1;
+    let staleSince: number | null = null;
+    let lastReattach = 0;
+    let lastResubscribe = 0;
     const check = () => {
       if (cancelled) return;
       tryPlay();
       const frames = decodedFrames(video);
-      const advancing =
+      const moving =
         video.readyState >= 2 &&
         video.videoWidth > 0 &&
-        (frames !== null ? frames !== lastFrames : video.currentTime !== lastTime);
+        (hasRvfc
+          ? Date.now() - lastPaintAt < 4_000
+          : frames !== null
+            ? frames !== lastFrames
+            : video.currentTime !== lastTime);
       lastFrames = frames;
       lastTime = video.currentTime;
-      if (advancing) {
+      if (moving) {
         staleSince = null;
-        reattached = 0;
         return;
       }
       staleSince ??= Date.now();
       const stale = Date.now() - staleSince;
-      if (stale > 3_000 && reattached < 2) {
-        reattached++;
+      const now = Date.now();
+      if (stale > 5_000 && now - lastReattach > 15_000) {
+        lastReattach = now;
         reattach(video);
-      }
-      const pub = trackRef.publication;
-      if (stale > 9_000 && pub instanceof RemoteTrackPublication) {
-        staleSince = Date.now();
-        reattached = 0;
-        pub.setSubscribed(false);
-        timers.push(window.setTimeout(() => pub.setSubscribed(true), 600));
+      } else if (stale > 12_000 && now - lastResubscribe > 30_000) {
+        lastResubscribe = now;
+        staleSince = null;
+        const pub = trackRef.publication;
+        if (pub instanceof RemoteTrackPublication) {
+          pub.setSubscribed(false);
+          timers.push(window.setTimeout(() => pub.setSubscribed(true), 800));
+        }
       }
     };
-    const events = ["loadeddata", "canplay", "pause", "stalled", "emptied"];
-    events.forEach((e) => video.addEventListener(e, tryPlay));
-    video.addEventListener("loadedmetadata", onLoaded);
-    if (video.readyState >= 1) onLoaded();
-    const t = window.setInterval(check, 1_500);
+    const t = window.setInterval(check, 2_000);
     return () => {
       cancelled = true;
-      events.forEach((e) => video.removeEventListener(e, tryPlay));
-      video.removeEventListener("loadedmetadata", onLoaded);
+      video.removeEventListener("loadeddata", tryPlay);
+      video.removeEventListener("canplay", tryPlay);
+      video.removeEventListener("pause", tryPlay);
+      video.removeEventListener("playing", onPlaying);
+      video.removeEventListener("loadeddata", webkitFix);
       timers.forEach((id) => window.clearTimeout(id));
       window.clearInterval(t);
     };
-  }, [video, trackRef]);
+    // Re-run only when the element or the actual track changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [video, remote, trackSid]);
   return needsTap;
 }
 
