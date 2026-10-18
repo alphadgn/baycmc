@@ -61,11 +61,26 @@ function EventStreamAdmin() {
     setUsername("");
     void load();
   }
-  async function unassign(userId: string) {
-    setBusy(true);
-    await removeHost({ data: { userId } }).catch((e: Error) => toast.error(e.message));
-    setBusy(false);
-    void load();
+  const [removing, setRemoving] = useState<string | null>(null);
+  async function unassign(userId: string, name: string) {
+    setRemoving(userId);
+    try {
+      const res = await removeHost({ data: { userId } });
+      if (!res.ok) {
+        toast.error(res.error);
+      } else {
+        toast.success(`${name} is no longer a host`);
+        // Drop it from the list right away; the next refresh confirms it.
+        setStats((s) =>
+          s ? { ...s, assignedHosts: s.assignedHosts.filter((h) => h.userId !== userId) } : s,
+        );
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't remove host");
+    } finally {
+      setRemoving(null);
+      void load();
+    }
   }
 
   const live = !!stats?.live;
@@ -160,11 +175,12 @@ function EventStreamAdmin() {
               {isSuperAdmin && (
                 <button
                   type="button"
-                  disabled={busy}
-                  onClick={() => void unassign(h.userId)}
-                  className="inline-flex items-center gap-1 rounded-md border border-destructive/40 px-2 py-1 text-xs text-destructive"
+                  disabled={removing === h.userId}
+                  onClick={() => void unassign(h.userId, h.name)}
+                  className="relative z-10 inline-flex items-center gap-1 rounded-md border border-destructive/40 px-2 py-1 text-xs text-destructive disabled:opacity-60"
                 >
-                  <UserMinus className="h-3.5 w-3.5" /> Remove
+                  <UserMinus className="h-3.5 w-3.5" />
+                  {removing === h.userId ? "Removing…" : "Remove"}
                 </button>
               )}
             </li>

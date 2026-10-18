@@ -15,7 +15,29 @@ import {
   isTrackReference,
   type TrackReference,
 } from "@livekit/components-react";
-import { DisconnectReason, RoomEvent, Track, type RemoteParticipant } from "livekit-client";
+import {
+  DisconnectReason,
+  RemoteTrackPublication,
+  RoomEvent,
+  Track,
+  VideoCodec,
+  type RemoteParticipant,
+  type RoomOptions,
+} from "livekit-client";
+
+/**
+ * H.264 is the one video format every phone and browser can decode in
+ * hardware (iPhone/WebKit included). Publishing anything else risks viewers
+ * getting the host's audio but a blank picture.
+ */
+const ROOM_OPTIONS: RoomOptions = {
+  adaptiveStream: false,
+  dynacast: true,
+  publishDefaults: {
+    videoCodec: "h264" satisfies VideoCodec,
+    simulcast: true,
+  },
+};
 import {
   Camera,
   CameraOff,
@@ -89,6 +111,7 @@ export function EventStreamTheater({
           token={state.token}
           serverUrl={state.url}
           connect
+          options={ROOM_OPTIONS}
           audio={false}
           video={false}
           onDisconnected={(reason) => {
@@ -331,12 +354,22 @@ function ForceSubscribe() {
     const all = () => room.remoteParticipants.forEach(subscribeAll);
     all();
     const onPublished = (_pub: unknown, p: RemoteParticipant) => subscribeAll(p);
+    const onFailed = (_sid: string, p: RemoteParticipant) => {
+      p.trackPublications.forEach((pub) => {
+        if (!pub.track) {
+          pub.setSubscribed(false);
+          window.setTimeout(() => pub.setSubscribed(true), 600);
+        }
+      });
+    };
+    room.on(RoomEvent.TrackSubscriptionFailed, onFailed);
     room.on(RoomEvent.TrackPublished, onPublished);
     room.on(RoomEvent.ParticipantConnected, subscribeAll);
     room.on(RoomEvent.Connected, all);
     // Safety net for flaky mobile networks.
     const t = window.setInterval(all, 5_000);
     return () => {
+      room.off(RoomEvent.TrackSubscriptionFailed, onFailed);
       room.off(RoomEvent.TrackPublished, onPublished);
       room.off(RoomEvent.ParticipantConnected, subscribeAll);
       room.off(RoomEvent.Connected, all);
@@ -413,6 +446,63 @@ function useStreamFit(video: HTMLVideoElement | null) {
   return { fit: override ?? auto, setOverride, auto };
 }
 
+/**
+ * Keep the host's video actually playing on the viewer's phone:
+ *  - start it (muted video may autoplay; sound comes separately), and retry
+ *    whenever it stalls or pauses;
+ *  - if the browser refuses, ask for one tap;
+ *  - if no picture arrives for a while although the host is publishing,
+ *    re-request the video from the server.
+ */
+function useVideoPlayback(video: HTMLVideoElement | null, trackRef: TrackReference) {
+  const [needsTap, setNeedsTap] = useState(false);
+  useEffect(() => {
+    if (!video) return;
+    video.muted = true;
+    video.playsInline = true;
+    video.autoplay = true;
+    let cancelled = false;
+    let staleSince: number | null = null;
+    const tryPlay = () => {
+      if (cancelled) return;
+      if (video.paused) {
+        video
+          .play()
+          .then(() => !cancelled && setNeedsTap(false))
+          .catch(() => !cancelled && setNeedsTap(true));
+      } else if (video.readyState >= 2) {
+        setNeedsTap(false);
+      }
+    };
+    const check = () => {
+      tryPlay();
+      // HAVE_CURRENT_DATA (2) = at least one frame has been decoded.
+      const hasPicture = video.readyState >= 2 && video.videoWidth > 0;
+      if (hasPicture) {
+        staleSince = null;
+        return;
+      }
+      staleSince ??= Date.now();
+      const pub = trackRef.publication;
+      if (Date.now() - staleSince > 8_000 && pub instanceof RemoteTrackPublication) {
+        staleSince = Date.now();
+        pub.setSubscribed(false);
+        window.setTimeout(() => pub.setSubscribed(true), 600);
+      }
+    };
+    const events = ["loadedmetadata", "loadeddata", "canplay", "pause", "stalled", "emptied"];
+    events.forEach((e) => video.addEventListener(e, tryPlay));
+    check();
+    const t = window.setInterval(check, 1_500);
+    return () => {
+      cancelled = true;
+      events.forEach((e) => video.removeEventListener(e, tryPlay));
+      window.clearInterval(t);
+    };
+  }, [video, trackRef]);
+  return needsTap;
+}
+
 function LiveScreen({
   trackRef,
   live,
@@ -429,6 +519,8 @@ function LiveScreen({
   const wrapRef = useRef<HTMLDivElement>(null);
   const [video, setVideo] = useState<HTMLVideoElement | null>(null);
   const { fit, setOverride } = useStreamFit(video);
+  const needsTap = useVideoPlayback(video, trackRef);
+  const room = useRoomContext();
   const [isFull, setIsFull] = useState(false);
 
   useEffect(() => {
@@ -471,9 +563,24 @@ function LiveScreen({
         ref={setVideo}
         trackRef={trackRef}
         playsInline
+        muted
+        autoPlay
         className="absolute inset-0 h-full w-full"
         style={{ objectFit: fit }}
       />
+      {needsTap && (
+        <button
+          type="button"
+          onClick={() => {
+            void room.startVideo().catch(() => {});
+            void room.startAudio().catch(() => {});
+            void video?.play().catch(() => {});
+          }}
+          className="absolute left-1/2 top-1/2 z-30 -translate-x-1/2 -translate-y-1/2 rounded-xl border-2 border-gold bg-black/85 px-6 py-4 font-display text-base font-semibold text-gold shadow-gold backdrop-blur"
+        >
+          Tap to start video
+        </button>
+      )}
       {live && (
         <span className="absolute left-2 top-2 z-20 inline-flex items-center gap-1 rounded-sm bg-red-600 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
           <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" /> Live

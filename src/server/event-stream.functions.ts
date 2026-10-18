@@ -35,6 +35,14 @@ async function requireSuperAdmin(userId: string) {
  * right permission anyway.
  */
 async function setLivePublish(userId: string, canPublish: boolean) {
+  // Never let a slow LiveKit call hold up the admin action.
+  await Promise.race([
+    setLivePublishInner(userId, canPublish),
+    new Promise((resolve) => setTimeout(resolve, 4_000)),
+  ]);
+}
+
+async function setLivePublishInner(userId: string, canPublish: boolean) {
   const apiKey = process.env.LIVEKIT_API_KEY;
   const apiSecret = process.env.LIVEKIT_API_SECRET;
   const url = process.env.LIVEKIT_URL;
@@ -157,7 +165,13 @@ export const removeEventStreamHost = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await requireSuperAdmin(context.userId);
     const admin = await db();
-    await admin.from("event_stream_hosts").delete().eq("user_id", data.userId);
+    const { data: removed, error } = await admin
+      .from("event_stream_hosts")
+      .delete()
+      .eq("user_id", data.userId)
+      .select("user_id");
+    if (error) return { ok: false as const, error: error.message };
+    if (!removed?.length) return { ok: false as const, error: "That host was already removed." };
     await admin.from("audit_logs").insert({
       event_type: "event_stream.host_remove",
       actor_id: context.userId,
