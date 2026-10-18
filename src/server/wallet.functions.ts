@@ -300,17 +300,44 @@ export const getSiweNonce = createServerFn({ method: "POST" })
         `Too many sign-in attempts. Try again in ${Math.ceil(rl.retryAfterMs / 1000)}s.`,
       );
     }
-    const nonce = crypto.randomUUID().replace(/-/g, "");
-    const expiresAt = new Date(Date.now() + SIWE_NONCE_TTL_MS).toISOString();
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin.from("auth_nonces").insert({
-      wallet_address: address.toLowerCase(),
-      nonce,
-      expires_at: expiresAt,
-      consumed: false,
-    });
-    if (error) throw new Error("Could not start sign-in. Please try again.");
-    return { nonce, expiresAt };
+    // Transient database / network hiccups used to surface straight away as
+    // "Could not start sign-in". Retry a few times (fresh nonce each try) and
+    // log the real reason so a persistent failure can be diagnosed.
+    let lastError: { message?: string; code?: string } | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const nonce = crypto.randomUUID().replace(/-/g, "");
+      const expiresAt = new Date(Date.now() + SIWE_NONCE_TTL_MS).toISOString();
+      try {
+        const { error } = await supabaseAdmin.from("auth_nonces").insert({
+          wallet_address: address.toLowerCase(),
+          nonce,
+          expires_at: expiresAt,
+          consumed: false,
+        });
+        if (!error) {
+          // Housekeeping, best effort: drop nonces that expired over a day ago.
+          if (Math.random() < 0.1) {
+            void supabaseAdmin
+              .from("auth_nonces")
+              .delete()
+              .lt("expires_at", new Date(Date.now() - 86_400_000).toISOString())
+              .then(() => undefined);
+          }
+          return { nonce, expiresAt };
+        }
+        lastError = error;
+      } catch (e) {
+        lastError = { message: e instanceof Error ? e.message : String(e) };
+      }
+      console.error("[siwe] nonce insert failed", { attempt, ...lastError });
+      await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+    }
+    throw new Error(
+      `Could not start sign-in. Please try again.${
+        lastError?.code ? ` (ref ${lastError.code})` : ""
+      }`,
+    );
   });
 
 /**
@@ -807,7 +834,6 @@ export const verifyOwnership = createServerFn({ method: "POST" })
       },
     };
   });
-
 
 /**
  * Session for an existing account the caller has just proven control of
