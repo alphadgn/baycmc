@@ -206,6 +206,13 @@ function EntranceBody({
     if (!linking && isAuthenticated && isWalletSession) onOpenChange(false);
   }, [linking, isAuthenticated, isWalletSession, onOpenChange]);
 
+  // "Sign to enter" step showing → have a fresh sign-in nonce ready.
+  useEffect(() => {
+    if (!linking && isConnected && address) {
+      window.dispatchEvent(new Event("baycmc:wallet-prefetch"));
+    }
+  }, [linking, isConnected, address]);
+
   const glyph = connectors.find((c) => c.id === GLYPH_CONNECTOR_ID);
   const wc = connectors.find((c) => c.id === WALLETCONNECT_CONNECTOR_ID);
   const browserWallets = useMemo(() => {

@@ -202,7 +202,7 @@ function WalletBridge() {
     const key = addr.toLowerCase();
     if (nonceInFlight.current?.address === key) return nonceInFlight.current.promise;
     const promise = (async () => {
-      for (let attempt = 0; attempt < 2; attempt++) {
+      for (let attempt = 0; attempt < 3; attempt++) {
         try {
           const res = await nonceRef.current({ data: { address: addr } });
           prefetched.current = {
@@ -217,7 +217,7 @@ function WalletBridge() {
           lastNonceError.current = message;
           logEvent("auth", "warn", "nonce prefetch failed", { message, attempt });
           if (/too many/i.test(message)) return; // rate-limited: retrying won't help
-          await new Promise((r) => setTimeout(r, 600));
+          await new Promise((r) => setTimeout(r, 700 * (attempt + 1)));
         }
       }
     })();
@@ -350,6 +350,20 @@ function WalletBridge() {
       inFlightRef.current = null;
       patchGlyphSnapshot({ verifying: false });
     }
+  }, [prefetchNonce]);
+
+  // The VIP Entrance asks for a fresh nonce as soon as it opens with a
+  // connected wallet, so "Sign to enter" never has to fetch one first.
+  useEffect(() => {
+    const onPrefetch = () => {
+      const addr = addressRef.current;
+      if (!addr) return;
+      const pre = prefetched.current;
+      if (pre && pre.address === addr.toLowerCase() && pre.expiresAt - Date.now() > 60_000) return;
+      void prefetchNonce(addr);
+    };
+    window.addEventListener("baycmc:wallet-prefetch", onPrefetch);
+    return () => window.removeEventListener("baycmc:wallet-prefetch", onPrefetch);
   }, [prefetchNonce]);
 
   // "Sign to enter" taps dispatch this; dispatchEvent is synchronous, so
