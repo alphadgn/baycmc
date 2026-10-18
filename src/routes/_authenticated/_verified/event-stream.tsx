@@ -10,8 +10,13 @@ export const Route = createFileRoute("/_authenticated/_verified/event-stream")({
       { name: "description", content: "Live event broadcast for verified clubhouse holders." },
     ],
   }),
-  validateSearch: (search: Record<string, unknown>): { golive?: boolean } =>
-    search.golive === 1 || search.golive === "1" || search.golive === true ? { golive: true } : {},
+  validateSearch: (search: Record<string, unknown>): { golive?: boolean; debug?: boolean } => ({
+    ...(search.golive === 1 || search.golive === "1" || search.golive === true
+      ? { golive: true }
+      : {}),
+    // ?debug keeps a small on-screen video diagnostics readout.
+    ...(search.debug !== undefined ? { debug: true } : {}),
+  }),
   component: EventStreamPage,
 });
 

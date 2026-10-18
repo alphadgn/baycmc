@@ -16,6 +16,7 @@ export const createBooking = createServerFn({ method: "POST" })
       endsAt: string;
       notes?: string;
       override?: boolean;
+      invitees?: string[];
     }) =>
       z
         .object({
@@ -25,6 +26,7 @@ export const createBooking = createServerFn({ method: "POST" })
           endsAt: z.string().datetime(),
           notes: z.string().max(2000).optional(),
           override: z.boolean().optional(),
+          invitees: z.array(z.string().trim().min(1).max(64)).max(50).optional(),
         })
         .parse(input),
   )
@@ -115,6 +117,14 @@ export const createBooking = createServerFn({ method: "POST" })
       },
     });
 
+    // The host's approved list for this meeting.
+    let missingInvitees: string[] = [];
+    if (data.invitees?.length) {
+      const { addApproved } = await import("@/server/room-guests.server");
+      const res = await addApproved(booking.id, data.invitees, userId);
+      missingInvitees = res.missing;
+    }
+
     // Notify owner (and any future invitees)
     await supabase.from("notifications").insert({
       user_id: userId,
@@ -124,7 +134,7 @@ export const createBooking = createServerFn({ method: "POST" })
       url: `/bookings`,
     });
 
-    return { ok: true as const, booking };
+    return { ok: true as const, booking, missingInvitees };
   });
 
 export const cancelBooking = createServerFn({ method: "POST" })

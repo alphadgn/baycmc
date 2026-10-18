@@ -16,7 +16,9 @@ interface NotificationRow {
 const SUPPORT_KINDS = ["support", "support_reply"];
 /** Event Stream host assignment ("start streaming"). */
 const STREAM_KINDS = ["stream_host"];
-const ALERT_KINDS = [...SUPPORT_KINDS, ...STREAM_KINDS];
+/** Someone is waiting to be let into the host's booked meeting. */
+const MEETING_KINDS = ["room_guest_request"];
+const ALERT_KINDS = [...SUPPORT_KINDS, ...STREAM_KINDS, ...MEETING_KINDS];
 
 /**
  * Support + Event Stream alerts. Assigning an Event Stream host also writes
@@ -56,11 +58,12 @@ export function SupportAlertsWatcher() {
         return;
       }
       const isStream = STREAM_KINDS.includes(n.kind);
+      const isMeeting = MEETING_KINDS.includes(n.kind);
       toast(n.title, {
         description: n.body ?? undefined,
-        duration: isStream ? 30_000 : 12_000,
+        duration: isStream || isMeeting ? 30_000 : 12_000,
         action: {
-          label: isStream ? "Start streaming" : "Open",
+          label: isStream ? "Start streaming" : isMeeting ? "Review" : "Open",
           onClick: () => {
             void markRead([n.id]);
             void router.navigate({ href: target });
@@ -73,7 +76,7 @@ export function SupportAlertsWatcher() {
     void (async () => {
       const { data } = await supabase
         .from("notifications")
-        .select("id,kind,title,body,url,read_at")
+        .select("id,kind,title,body,url,read_at,created_at")
         .eq("user_id", userId)
         .in("kind", ALERT_KINDS)
         .is("read_at", null)
@@ -82,6 +85,16 @@ export function SupportAlertsWatcher() {
       if (cancelled || !data?.length) return;
       const all = data as NotificationRow[];
       // Host assignments always get their own "Start streaming" alert.
+      // Meeting requests are only useful while fresh — show the latest one.
+      const meetingRow = all.find(
+        (r) =>
+          MEETING_KINDS.includes(r.kind) &&
+          Date.now() - new Date((r as { created_at?: string }).created_at ?? 0).getTime() <
+            2 * 60 * 60_000,
+      );
+      if (meetingRow) show(meetingRow);
+      const staleMeetings = all.filter((r) => MEETING_KINDS.includes(r.kind) && r !== meetingRow);
+      if (staleMeetings.length) void markRead(staleMeetings.map((r) => r.id));
       const streamRows = all.filter((r) => STREAM_KINDS.includes(r.kind));
       if (streamRows[0]) show(streamRows[0]);
       if (streamRows.length > 1) void markRead(streamRows.slice(1).map((r) => r.id));
