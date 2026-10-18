@@ -27,7 +27,10 @@ type RoomAccessResult =
         | "room_full"
         | "room_banned"
         | "bayc_revoked"
-        | "otherpage_revoked";
+        | "otherpage_revoked"
+        | "awaiting_approval"
+        | "guest_denied";
+      bookingId?: string;
     };
 
 async function validateRoomAccess(userId: string, roomId: string): Promise<RoomAccessResult> {
@@ -169,6 +172,43 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
         "Lifer rooms require both a verified BAYC/MAYC holding and an Otherpage / Lifer token in your wallet.",
       code: "otherpage_revoked",
     };
+  }
+
+  // Booked meetings: while a booking is in progress, only its host, admins
+  // and approved guests may enter. Anyone else is added to the host's
+  // waiting list and let in once the host (or an admin) approves them.
+  if (room.kind === "conference" || room.kind === "game") {
+    const { activeBookingFor } = await import("@/server/room-guests.server");
+    const booking = await activeBookingFor(roomId);
+    if (booking && booking.user_id !== userId && !isAdmin) {
+      const { data: guest } = await supabaseAdmin
+        .from("room_booking_guests")
+        .select("status")
+        .eq("booking_id", booking.id)
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (guest?.status === "denied") {
+        return {
+          ok: false,
+          error: `The host didn't approve you for "${booking.title}". You can come back when the meeting ends.`,
+          code: "guest_denied",
+          bookingId: booking.id as string,
+        };
+      }
+      if (guest?.status !== "approved") {
+        if (!guest) {
+          await supabaseAdmin
+            .from("room_booking_guests")
+            .insert({ booking_id: booking.id, user_id: userId, status: "pending" });
+        }
+        return {
+          ok: false,
+          error: `"${booking.title}" is a booked meeting. The host has been asked to let you in.`,
+          code: "awaiting_approval",
+          bookingId: booking.id as string,
+        };
+      }
+    }
   }
 
   return { ok: true, room };

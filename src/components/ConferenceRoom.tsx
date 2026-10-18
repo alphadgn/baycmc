@@ -46,6 +46,9 @@ import {
 } from "lucide-react";
 import { useRoomPreferences } from "@/lib/baycmc/useRoomPreferences";
 import { RoomsShell } from "@/components/RoomsShell";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth/useAuth";
+import { MeetingGuestsPanel } from "@/components/rooms/MeetingGuestsPanel";
 
 interface ConferenceRoomProps {
   roomId: string;
@@ -61,7 +64,9 @@ type JoinState =
   | { phase: "idle" }
   | { phase: "connecting"; progress: number }
   | { phase: "live"; token: string; url: string; isHost: boolean }
-  | { phase: "error"; message: string; recoverable: boolean; accessLoss?: boolean };
+  | { phase: "error"; message: string; recoverable: boolean; accessLoss?: boolean }
+  // Booked meeting in progress — waiting for the host / an admin to approve.
+  | { phase: "waiting"; message: string };
 
 /**
  * Room-detail page surface. Owns the connection state machine and renders
@@ -102,12 +107,17 @@ export function ConferenceRoom({
 
     try {
       const res = await getToken({ data: { roomId } });
+      if (!res.ok && "code" in res && res.code === "awaiting_approval") {
+        setState({ phase: "waiting", message: res.error });
+        return;
+      }
       if (!res.ok) {
         const accessLoss =
           "code" in res &&
           (res.code === "bayc_revoked" ||
             res.code === "otherpage_revoked" ||
-            res.code === "room_banned");
+            res.code === "room_banned" ||
+            res.code === "guest_denied");
         if (accessLoss) {
           toast.error("Exclusive room locked", { description: res.error, duration: 8000 });
         } else if ("code" in res && res.code === "room_locked") {
@@ -162,6 +172,39 @@ export function ConferenceRoom({
     return () => window.removeEventListener("karaoke:request-join", onRequestJoin);
   }, [state, join]);
 
+  // Waiting room: let the guest in the moment the host approves them (live
+  // via realtime, with a slow poll as a safety net).
+  const { user: me } = useAuth();
+  useEffect(() => {
+    if (state.phase !== "waiting" || !me) return;
+    const ch = supabase
+      .channel(`meeting-guest-${me.id}-${Math.random().toString(36).slice(2, 10)}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "room_booking_guests",
+          filter: `user_id=eq.${me.id}`,
+        },
+        (payload) => {
+          const status = (payload.new as { status?: string } | null)?.status;
+          if (status === "approved") {
+            toast.success("The host let you in");
+            void join();
+          } else if (status === "denied") {
+            void join(); // the gate returns the "not approved" message
+          }
+        },
+      )
+      .subscribe();
+    const poll = window.setInterval(() => void join(), 15_000);
+    return () => {
+      window.clearInterval(poll);
+      void supabase.removeChannel(ch);
+    };
+  }, [state.phase, me, join]);
+
   // Periodic re-validation while live — drop the user out if their delegation
   // got revoked or the host locked the room mid-call.
   useEffect(() => {
@@ -170,6 +213,12 @@ export function ConferenceRoom({
     async function checkAccess() {
       const res = await revalidateAccess({ data: { roomId } }).catch(() => null);
       if (cancelled || !res || res.ok) return;
+      if ("code" in res && res.code === "awaiting_approval") {
+        // A booked meeting just started in this room — wait for the host.
+        setState({ phase: "waiting", message: res.error });
+        toast.info("A booked meeting has started", { description: res.error, duration: 8000 });
+        return;
+      }
       setState({ phase: "error", message: res.error, recoverable: false, accessLoss: true });
       toast.error("Access changed", { description: res.error, duration: 8000 });
     }
@@ -331,6 +380,20 @@ function PreLivePanel({
         />
       )}
       {state.phase === "idle" && <IdleHero roomName={roomName} kind={kind} onJoin={onRetry} />}
+      {state.phase === "waiting" && (
+        <div role="status" aria-live="polite" className="max-w-md text-center">
+          <span className="relative mx-auto flex h-12 w-12 items-center justify-center">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gold/30" />
+            <Loader2 className="relative h-8 w-8 animate-spin text-gold" />
+          </span>
+          <h2 className="mt-4 font-display text-2xl text-foreground sm:text-3xl">
+            Waiting for the host
+          </h2>
+          <p className="mt-2 text-xs text-muted-foreground font-sans-display sm:text-sm">
+            {state.message} You'll be let in automatically once you're approved.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -639,6 +702,7 @@ function LiveRightRail({
       )}
       <LivePreferencesPanel isHost={isHost} />
       {isHost && <HostControlsPanel roomId={roomId} />}
+      {isHost && <MeetingGuestsPanel roomId={roomId} />}
       {!hostPresent && (
         <Panel title="Session Status">
           <p className="text-[11px] text-muted-foreground">

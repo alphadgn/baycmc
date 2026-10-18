@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
+import { getRoomsOccupancy } from "@/server/room-guests.functions";
 import { createBooking, cancelBooking } from "@/server/bookings.functions";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -63,6 +64,26 @@ function RoomsPage() {
   const prevAccessRef = useRef<{ bayc: boolean; op: boolean } | null>(null);
 
   const create = useServerFn(createBooking);
+  const fetchOccupancy = useServerFn(getRoomsOccupancy);
+  // Live headcount per room (from LiveKit), refreshed every 10s and when the
+  // page comes back into view.
+  const [occupancy, setOccupancy] = useState<Record<string, number>>({});
+  useEffect(() => {
+    let cancelled = false;
+    const tick = () =>
+      fetchOccupancy()
+        .then((r) => !cancelled && setOccupancy(r.counts))
+        .catch(() => {});
+    void tick();
+    const t = window.setInterval(tick, 10_000);
+    const onVis = () => document.visibilityState === "visible" && void tick();
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      cancelled = true;
+      window.clearInterval(t);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [fetchOccupancy]);
   const cancel = useServerFn(cancelBooking);
 
   async function load() {
@@ -236,6 +257,7 @@ function RoomsPage() {
                   room={room}
                   bookings={bookings.filter((b) => b.room_id === room.id).slice(0, 2)}
                   canBook={canBook}
+                  inRoom={occupancy[room.id] ?? 0}
                   onBook={() => setSelectedRoom(room)}
                 />
               ))}
@@ -254,6 +276,7 @@ function RoomsPage() {
                     room={room}
                     bookings={bookings.filter((b) => b.room_id === room.id).slice(0, 2)}
                     canBook={canBook}
+                    inRoom={occupancy[room.id] ?? 0}
                     onBook={() => setSelectedRoom(room)}
                   />
                 ))}
@@ -277,6 +300,7 @@ function RoomsPage() {
                 endsAt: input.endsAt,
                 notes: input.notes,
                 override: input.override,
+                invitees: input.invitees,
               },
             });
             if (!res.ok) {
@@ -284,6 +308,9 @@ function RoomsPage() {
               return false;
             }
             toast.success("Booked");
+            if ("missingInvitees" in res && res.missingInvitees?.length) {
+              toast.error(`No member named: ${res.missingInvitees.join(", ")}`);
+            }
             setSelectedRoom(null);
             await load();
             return true;
@@ -303,13 +330,17 @@ function RoomCard({
   room,
   bookings,
   canBook,
+  inRoom,
   onBook,
 }: {
   room: Room;
   bookings: Booking[];
   canBook: boolean;
+  /** People in the room right now (live). */
+  inRoom: number;
   onBook: () => void;
 }) {
+  const inUse = inRoom > 0;
   const bg = getRoomThemeImage(room.theme);
   const ambience = getRoomThemeAmbience(room.theme);
   const isGame = room.kind === "game";
@@ -366,10 +397,18 @@ function RoomCard({
 
       <div className="flex flex-1 flex-col gap-2 p-3 text-xs font-sans-display">
         <div className="flex items-center justify-between text-muted-foreground">
-          <span className="inline-flex items-center gap-1">
-            <Users className="h-3.5 w-3.5" /> capacity {room.capacity}
+          <span className="inline-flex items-center gap-1" aria-live="polite">
+            <Users className="h-3.5 w-3.5" />
+            <span className={inUse ? "font-semibold text-foreground" : ""}>{inRoom}</span>/
+            {room.capacity} in room
           </span>
-          <span className="text-[10px] uppercase tracking-wider">{bookings.length} upcoming</span>
+          {inUse ? (
+            <span className="room-in-use inline-flex items-center gap-1.5 rounded-full border border-emerald-400/70 bg-emerald-500/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-300">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" /> In use
+            </span>
+          ) : (
+            <span className="text-[10px] uppercase tracking-wider">{bookings.length} upcoming</span>
+          )}
         </div>
         {bookings[0] && (
           <p className="truncate text-[11px] text-muted-foreground">
@@ -530,6 +569,7 @@ function BookingModal({
     endsAt: string;
     notes?: string;
     override?: boolean;
+    invitees?: string[];
   }) => Promise<boolean>;
 }) {
   const [title, setTitle] = useState("");
@@ -538,6 +578,7 @@ function BookingModal({
   const [end, setEnd] = useState("11:00");
   const [notes, setNotes] = useState("");
   const [override, setOverride] = useState(false);
+  const [invitees, setInvitees] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function submit(e: React.FormEvent) {
@@ -545,7 +586,17 @@ function BookingModal({
     setBusy(true);
     const startsAt = new Date(`${date}T${start}:00`).toISOString();
     const endsAt = new Date(`${date}T${end}:00`).toISOString();
-    const ok = await onCreate({ title, startsAt, endsAt, notes, override });
+    const ok = await onCreate({
+      title,
+      startsAt,
+      endsAt,
+      notes,
+      override,
+      invitees: invitees
+        .split(/[,\s]+/)
+        .map((u) => u.trim())
+        .filter(Boolean),
+    });
     setBusy(false);
     if (ok) onClose();
   }
@@ -599,6 +650,18 @@ function BookingModal({
             rows={2}
             className="w-full rounded-md border border-border bg-input px-3 py-2"
           />
+          <div>
+            <input
+              value={invitees}
+              onChange={(e) => setInvitees(e.target.value)}
+              placeholder="Approved guests — usernames, comma separated"
+              className="w-full rounded-md border border-border bg-input px-3 py-2"
+            />
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              During your meeting only you, admins and these guests can walk in. Anyone else waits
+              until you approve them from inside the room.
+            </p>
+          </div>
           {isAdmin && (
             <label className="flex items-center gap-2 text-xs text-muted-foreground">
               <input

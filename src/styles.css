@@ -499,3 +499,21 @@ html {
 .buy-ape-cta:hover {
   text-decoration: underline;
 }
+
+/* Conference rooms: glowing green "In use" while a room is occupied. */
+@keyframes room-in-use-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 6px 1px color-mix(in oklch, oklch(0.78 0.17 155) 55%, transparent),
+      0 0 0 0 color-mix(in oklch, oklch(0.78 0.17 155) 0%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 14px 4px color-mix(in oklch, oklch(0.78 0.17 155) 75%, transparent),
+      0 0 24px 8px color-mix(in oklch, oklch(0.78 0.17 155) 25%, transparent);
+  }
+}
+.room-in-use {
+  animation: room-in-use-glow 1.8s ease-in-out infinite;
+}

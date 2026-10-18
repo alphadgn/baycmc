@@ -454,6 +454,48 @@ function useStreamFit(video: HTMLVideoElement | null) {
  *  - if no picture arrives for a while although the host is publishing,
  *    re-request the video from the server.
  */
+/**
+ * Any iPhone/iPad browser is WebKit underneath — including in-app browsers
+ * like Rabby's, which don't call themselves "Safari". LiveKit only applies
+ * its Safari black-video workaround when it detects Safari by name, so in
+ * those browsers the video stayed black while the audio played.
+ */
+function isAppleWebKit() {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  const iOS = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  const desktopSafari = /AppleWebKit/.test(ua) && !/Chrome|Chromium|CriOS|Android|Edg/.test(ua);
+  return iOS || desktopSafari;
+}
+
+/** Re-attach the stream to the element and replay — WebKit's black-video fix. */
+function reattach(video: HTMLVideoElement) {
+  const stream = video.srcObject;
+  if (stream) {
+    video.srcObject = null;
+    video.srcObject = stream;
+  }
+  // Nudge a repaint (WebKit sometimes keeps a decoded video unpainted).
+  video.style.transform = video.style.transform === "translateZ(0)" ? "" : "translateZ(0)";
+  void video.play().catch(() => {});
+}
+
+function decodedFrames(video: HTMLVideoElement): number | null {
+  try {
+    return video.getVideoPlaybackQuality?.().totalVideoFrames ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Keep the host's video actually playing on the viewer's phone:
+ *  - start it (muted video may autoplay; sound comes separately), retry when
+ *    it stalls or pauses, and ask for one tap if the browser refuses;
+ *  - on iPhone browsers apply the re-attach fix as soon as the stream lands;
+ *  - if frames stop advancing, re-attach; if still nothing, re-request the
+ *    video from the server.
+ */
 function useVideoPlayback(video: HTMLVideoElement | null, trackRef: TrackReference) {
   const [needsTap, setNeedsTap] = useState(false);
   useEffect(() => {
@@ -461,8 +503,16 @@ function useVideoPlayback(video: HTMLVideoElement | null, trackRef: TrackReferen
     video.muted = true;
     video.playsInline = true;
     video.autoplay = true;
+    video.setAttribute("playsinline", "true");
+    video.setAttribute("webkit-playsinline", "true");
+    const webkit = isAppleWebKit();
     let cancelled = false;
     let staleSince: number | null = null;
+    let lastFrames: number | null = null;
+    let lastTime = -1;
+    let reattached = 0;
+    const timers: number[] = [];
+
     const tryPlay = () => {
       if (cancelled) return;
       if (video.paused) {
@@ -474,33 +524,83 @@ function useVideoPlayback(video: HTMLVideoElement | null, trackRef: TrackReferen
         setNeedsTap(false);
       }
     };
-    const check = () => {
+    const onLoaded = () => {
       tryPlay();
-      // HAVE_CURRENT_DATA (2) = at least one frame has been decoded.
-      const hasPicture = video.readyState >= 2 && video.videoWidth > 0;
-      if (hasPicture) {
+      if (webkit) {
+        // Same trick LiveKit uses for Safari, applied to every WebKit browser.
+        for (const ms of [0, 250, 1000]) timers.push(window.setTimeout(() => reattach(video), ms));
+      }
+    };
+    const check = () => {
+      if (cancelled) return;
+      tryPlay();
+      const frames = decodedFrames(video);
+      const advancing =
+        video.readyState >= 2 &&
+        video.videoWidth > 0 &&
+        (frames !== null ? frames !== lastFrames : video.currentTime !== lastTime);
+      lastFrames = frames;
+      lastTime = video.currentTime;
+      if (advancing) {
         staleSince = null;
+        reattached = 0;
         return;
       }
       staleSince ??= Date.now();
+      const stale = Date.now() - staleSince;
+      if (stale > 3_000 && reattached < 2) {
+        reattached++;
+        reattach(video);
+      }
       const pub = trackRef.publication;
-      if (Date.now() - staleSince > 8_000 && pub instanceof RemoteTrackPublication) {
+      if (stale > 9_000 && pub instanceof RemoteTrackPublication) {
         staleSince = Date.now();
+        reattached = 0;
         pub.setSubscribed(false);
-        window.setTimeout(() => pub.setSubscribed(true), 600);
+        timers.push(window.setTimeout(() => pub.setSubscribed(true), 600));
       }
     };
-    const events = ["loadedmetadata", "loadeddata", "canplay", "pause", "stalled", "emptied"];
+    const events = ["loadeddata", "canplay", "pause", "stalled", "emptied"];
     events.forEach((e) => video.addEventListener(e, tryPlay));
-    check();
+    video.addEventListener("loadedmetadata", onLoaded);
+    if (video.readyState >= 1) onLoaded();
     const t = window.setInterval(check, 1_500);
     return () => {
       cancelled = true;
       events.forEach((e) => video.removeEventListener(e, tryPlay));
+      video.removeEventListener("loadedmetadata", onLoaded);
+      timers.forEach((id) => window.clearTimeout(id));
       window.clearInterval(t);
     };
   }, [video, trackRef]);
   return needsTap;
+}
+
+/** ?debug=1 → small live readout of what the video element is getting. */
+function StreamDebug({
+  video,
+  trackRef,
+}: {
+  video: HTMLVideoElement | null;
+  trackRef: TrackReference;
+}) {
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const t = window.setInterval(() => tick((n) => n + 1), 1000);
+    return () => window.clearInterval(t);
+  }, []);
+  const pub = trackRef.publication;
+  return (
+    <pre className="absolute bottom-12 left-2 z-30 max-w-[70%] whitespace-pre-wrap rounded bg-black/80 p-2 text-[9px] leading-tight text-emerald-300">
+      {[
+        `webkit=${isAppleWebKit()} remote=${pub instanceof RemoteTrackPublication}`,
+        `sub=${pub instanceof RemoteTrackPublication ? pub.isSubscribed : "local"} muted=${pub.isMuted} mime=${pub.mimeType ?? "?"}`,
+        `track=${!!pub.track} src=${!!video?.srcObject}`,
+        `ready=${video?.readyState} paused=${video?.paused} size=${video?.videoWidth}x${video?.videoHeight}`,
+        `frames=${video ? decodedFrames(video) : "-"} t=${video?.currentTime.toFixed(1)}`,
+      ].join("\n")}
+    </pre>
+  );
 }
 
 function LiveScreen({
@@ -520,6 +620,8 @@ function LiveScreen({
   const [video, setVideo] = useState<HTMLVideoElement | null>(null);
   const { fit, setOverride } = useStreamFit(video);
   const needsTap = useVideoPlayback(video, trackRef);
+  const debug =
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).has("debug");
   const room = useRoomContext();
   const [isFull, setIsFull] = useState(false);
 
@@ -568,6 +670,7 @@ function LiveScreen({
         className="absolute inset-0 h-full w-full"
         style={{ objectFit: fit }}
       />
+      {debug && <StreamDebug video={video} trackRef={trackRef} />}
       {needsTap && (
         <button
           type="button"

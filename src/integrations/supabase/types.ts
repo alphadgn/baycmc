@@ -1326,6 +1326,41 @@ export type Database = {
         }
         Relationships: []
       }
+      room_booking_guests: {
+        Row: {
+          booking_id: string
+          decided_at: string | null
+          decided_by: string | null
+          requested_at: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          booking_id: string
+          decided_at?: string | null
+          decided_by?: string | null
+          requested_at?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          booking_id?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          requested_at?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_booking_guests_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "room_bookings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       room_bookings: {
         Row: {
           created_at: string
