@@ -26,7 +26,10 @@ export const revalidateOwnership = createServerFn({ method: "POST" })
 export const startVerificationSession = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { recomputeOwnership } = await import("@/server/ownership.server");
+    const { recomputeOwnership, clearSessionWallets } = await import("@/server/ownership.server");
+    // An email sign-in proves no wallet: wallets from earlier sessions
+    // don't count until they are connected and signed for again.
+    await clearSessionWallets(context.userId);
     return recomputeOwnership(context.userId, { fresh: true });
   });
 
@@ -38,6 +41,8 @@ export const endVerificationSession = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { clearSessionWallets } = await import("@/server/ownership.server");
+    await clearSessionWallets(context.userId);
     await supabaseAdmin
       .from("user_verifications")
       .update({

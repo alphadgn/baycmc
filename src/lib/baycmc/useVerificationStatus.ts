@@ -80,7 +80,9 @@ export function VerificationStatusProvider({ children }: { children: ReactNode }
   const roles = query.data?.roles ?? [];
   const ver = query.data?.verification;
   const isAdmin = roles.some((role) => role === "admin" || role === "super_admin");
-  const isVerifiedHolder = !!ver?.bayc_verified || isAdmin;
+  // The verified role counts exactly like a BAYC/MAYC holding.
+  const verifiedRole = roles.includes("verified_user");
+  const isVerifiedHolder = !!ver?.bayc_verified || verifiedRole || isAdmin;
   const value: VerificationStatus = {
     loading: authLoading || (!!userId && query.isPending),
     error: query.error?.message ?? null,
@@ -97,7 +99,7 @@ export function VerificationStatusProvider({ children }: { children: ReactNode }
     otherpage: !!ver?.otherpage_verified,
     lumina: !!ver?.lumina_verified,
     delegationVerified: !!ver?.delegation_verified,
-    isLifer: (!!ver?.bayc_verified && !!ver?.otherpage_verified) || isAdmin,
+    isLifer: ((!!ver?.bayc_verified || verifiedRole) && !!ver?.otherpage_verified) || isAdmin,
     isAdmin,
     roles,
     refresh,

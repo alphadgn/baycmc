@@ -544,7 +544,7 @@ export const verifyOwnership = createServerFn({ method: "POST" })
     let totalBayc = signerBals.bayc;
     let totalMayc = signerBals.mayc;
     let delegatedFrom: `0x${string}` | null = null;
-    let linkedHolder: `0x${string}` | null = null;
+    const linkedHolder: `0x${string}` | null = null;
 
     // Collect every additional wallet to inspect: delegate.cash vaults that
     // delegated to the signer, plus any Glyph "linked wallets" the user has
@@ -601,43 +601,10 @@ export const verifyOwnership = createServerFn({ method: "POST" })
       }
     }
 
-    // Walk Glyph-linked wallets if the signer + its delegations didn't qualify.
-    if (totalBayc === 0n && totalMayc === 0n && linkedAddrs.length > 0) {
-      for (const linked of linkedAddrs) {
-        try {
-          const b = await balancesFor(c, linked);
-          if (b.bayc > 0n || b.mayc > 0n) {
-            totalBayc += b.bayc;
-            totalMayc += b.mayc;
-            linkedHolder = linked;
-            break;
-          }
-          // Also follow delegations *into* this linked wallet.
-          const linkedVaults = await resolveDelegatedVaults(c, linked).catch(
-            () => [] as `0x${string}`[],
-          );
-          let matched = false;
-          for (const v of linkedVaults) {
-            try {
-              const vb = await balancesFor(c, v);
-              if (vb.bayc > 0n || vb.mayc > 0n) {
-                totalBayc += vb.bayc;
-                totalMayc += vb.mayc;
-                delegatedFrom = v;
-                linkedHolder = linked;
-                matched = true;
-                break;
-              }
-            } catch (e) {
-              console.error("RPC balanceOf (linked-vault) failed", v, e);
-            }
-          }
-          if (matched) break;
-        } catch (e) {
-          console.error("RPC balanceOf (linked wallet) failed", linked, e);
-        }
-      }
-    }
+    // Previously-linked and Glyph-linked wallets are NOT walked for access:
+    // only wallets proven by signature in THIS session count (the signer
+    // here; more can be proven in-session via wallet linking). They are
+    // still recorded on the profile below for account-merge detection.
 
     const verificationBasis: "direct" | "delegated" | "linked" = delegatedFrom
       ? "delegated"
@@ -768,7 +735,10 @@ export const verifyOwnership = createServerFn({ method: "POST" })
     // a previous session carries over, and a failed check grants nothing.
     {
       try {
-        const { recomputeOwnership } = await import("@/server/ownership.server");
+        const { recomputeOwnership, startSessionWallets } =
+          await import("@/server/ownership.server");
+        // New sign-in session: the signer is the only proven wallet so far.
+        await startSessionWallets(userId, lower);
         const snap = await recomputeOwnership(userId, {
           fresh: true,
           confirmedLabels: holdsApe && collection ? [collection] : [],

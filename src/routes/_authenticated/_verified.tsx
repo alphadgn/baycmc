@@ -33,6 +33,9 @@ export const Route = createFileRoute("/_authenticated/_verified")({
     if (roles?.some((r) => r.role === "admin" || r.role === "super_admin")) {
       return;
     }
+    // The verified role counts exactly like a BAYC/MAYC holding: the menu
+    // matrix (my_menu_items) applies BAYC/MAYC's settings to it.
+    const verifiedRole = !!roles?.some((r) => r.role === "verified_user");
 
     let snap: Awaited<ReturnType<typeof revalidateOwnership>> | null = null;
     try {
@@ -52,7 +55,7 @@ export const Route = createFileRoute("/_authenticated/_verified")({
         .select("bayc_verified")
         .eq("user_id", sess.session.user.id)
         .maybeSingle();
-      if (v?.bayc_verified) return;
+      if (v?.bayc_verified || verifiedRole) return;
       throw redirect({ to: "/lobby" });
     }
     const { data: allowed } = await supabase.rpc("my_menu_items");

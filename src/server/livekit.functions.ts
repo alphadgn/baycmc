@@ -43,6 +43,16 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
   if (error || !room || !room.active) {
     return { ok: false, error: "Room not found or inactive", code: "room_unavailable" };
   }
+  // Mudwater rooms are game tables with no voice/video in Phase 1 — never
+  // issue a LiveKit token for them (this also keeps the admin/public
+  // shortcuts below from applying to gated Mudwater rooms).
+  if (room.kind === "mudwater") {
+    return {
+      ok: false,
+      error: "Mudwater rooms don't have voice or video.",
+      code: "room_unavailable",
+    };
+  }
 
   const isKaraoke = room.kind === "karaoke";
   const isPublicRoom = room.tier === "public";
@@ -117,7 +127,8 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
     .select("role")
     .eq("user_id", userId);
   const isAdmin = !!roleRows?.some((r) => r.role === "super_admin" || r.role === "admin");
-  const bypassesBaycGate = isAdmin || !!roleRows?.some((r) => r.role === "verified_user");
+  const isVerifiedRole = !!roleRows?.some((r) => r.role === "verified_user");
+  const bypassesBaycGate = isAdmin || isVerifiedRole;
 
   // Which collections may enter is decided by the super admin's
   // per-collection menu matrix (can_access_area), evaluated AFTER the fresh
@@ -151,11 +162,13 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
           .maybeSingle()
       ).data?.verified_collections as string[] | null) ??
       [];
+    // The verified role counts exactly like a BAYC/MAYC holding.
+    const heldWithRole = isVerifiedRole ? [...held, "BAYC", "MAYC"] : held;
     const allowed = required
       .split(",")
       .map((l) => l.trim())
       .filter(Boolean);
-    if (!allowed.some((l) => held.includes(l))) {
+    if (!allowed.some((l) => heldWithRole.includes(l))) {
       return {
         ok: false,
         error: `This room is only for verified ${allowed
@@ -165,7 +178,11 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
       };
     }
   }
-  if (room.tier === "lifer" && !isAdmin && !(ver?.bayc_verified && ver?.otherpage_verified)) {
+  if (
+    room.tier === "lifer" &&
+    !isAdmin &&
+    !((ver?.bayc_verified || isVerifiedRole) && ver?.otherpage_verified)
+  ) {
     return {
       ok: false,
       error:

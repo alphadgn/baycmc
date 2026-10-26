@@ -33,6 +33,49 @@ export interface RecomputeOptions {
   fresh?: boolean;
   /** Labels positively confirmed on-chain moments ago in the same request. */
   confirmedLabels?: string[];
+  /**
+   * A wallet the member just proved by signature in this session. Labels
+   * that wallet (or its delegations) holds are ADDED; every other check is
+   * loss-only.
+   */
+  addedWallet?: string;
+}
+
+// ── Session wallets ────────────────────────────────────────────────────────
+// Wallets proven by signature in the CURRENT sign-in session. Only these
+// (and their delegate.xyz delegations) count toward access. Server-only.
+
+/** Start of a sign-in session: forget every earlier wallet proof. */
+export async function startSessionWallets(userId: string, signer: string | null) {
+  await supabaseAdmin.from("session_wallets").delete().eq("user_id", userId);
+  if (signer && isAddress(signer)) {
+    await supabaseAdmin
+      .from("session_wallets")
+      .upsert(
+        { user_id: userId, address: signer.toLowerCase() },
+        { onConflict: "user_id,address" },
+      );
+  }
+}
+export async function addSessionWallet(userId: string, address: string) {
+  if (!isAddress(address)) return;
+  await supabaseAdmin
+    .from("session_wallets")
+    .upsert(
+      { user_id: userId, address: address.toLowerCase(), proven_at: new Date().toISOString() },
+      { onConflict: "user_id,address" },
+    );
+}
+export async function removeSessionWallet(userId: string, address: string) {
+  if (!isAddress(address)) return;
+  await supabaseAdmin
+    .from("session_wallets")
+    .delete()
+    .eq("user_id", userId)
+    .eq("address", address.toLowerCase());
+}
+export async function clearSessionWallets(userId: string) {
+  await supabaseAdmin.from("session_wallets").delete().eq("user_id", userId);
 }
 
 export async function recomputeOwnership(
@@ -61,34 +104,57 @@ export async function recomputeOwnership(
     }
   }
 
-  // EVERY whitelisted collection held anywhere in the walked graph, in
-  // allowlist order (previously only the first hit was stored, so a wallet
-  // holding several collections showed just one).
+  // Every whitelisted collection held anywhere in this session's graph.
   const heldLabels = new Set<string>(
     result.ownership
       .map((o) => collectionLabel(o.contract))
       .filter((l): l is NonNullable<typeof l> => !!l),
   );
-  // A check that ERRORED (RPC outage / rate limit) is "unknown", not "0":
-  // keep whatever was verified for that collection before, so a flaky node
-  // can't silently strip a collection the member really holds.
   for (const l of opts.confirmedLabels ?? []) heldLabels.add(l);
   const failed = new Set(result.failedContracts.map((c) => c.toLowerCase()));
-  // Within a session only: the stored labels were verified earlier in THIS
-  // session (they are wiped at every sign-in and sign-out), so a transient
-  // RPC error mid-session doesn't kick a member out of a room.
-  if (failed.size > 0 && !opts.fresh) {
-    const { data: prev } = await supabaseAdmin
-      .from("user_verifications")
-      .select("verified_collections")
-      .eq("user_id", userId)
-      .maybeSingle();
-    for (const label of (prev?.verified_collections as string[] | null) ?? []) {
-      const col = ALLOWED_COLLECTIONS.find((c) => c.label === label);
-      if (col && failed.has(col.contract.toLowerCase())) heldLabels.add(col.label);
+
+  const { data: prevRow } = opts.fresh
+    ? { data: null }
+    : await supabaseAdmin
+        .from("user_verifications")
+        .select("verified_collections, otherpage_verified")
+        .eq("user_id", userId)
+        .maybeSingle();
+  const prev = new Set<string>((prevRow?.verified_collections as string[] | null) ?? []);
+
+  // Mid-session checks never ADD access (a purchase counts from the next
+  // sign-in) — they only detect losses. A check that ERRORED for a
+  // collection is "unknown", not "0", so that collection is kept.
+  // Exception: a wallet proven by signature just now adds what it holds.
+  let finalLabels: Set<string>;
+  if (opts.fresh) {
+    finalLabels = heldLabels;
+  } else if (result.scanned.length === 0) {
+    finalLabels = prev; // nothing to check against — change nothing
+  } else {
+    finalLabels = new Set(
+      [...prev].filter((label) => {
+        if (heldLabels.has(label)) return true;
+        const col = ALLOWED_COLLECTIONS.find((c) => c.label === label);
+        return !!col && failed.has(col.contract.toLowerCase());
+      }),
+    );
+    if (opts.addedWallet && isAddress(opts.addedWallet)) {
+      const added = opts.addedWallet.toLowerCase();
+      const reach = new Set<string>([added]);
+      for (const e of result.edges) {
+        if (e.via === "delegate-in" && e.to.toLowerCase() === added)
+          reach.add(e.from.toLowerCase());
+        if (e.via === "delegate-out" && e.from.toLowerCase() === added)
+          reach.add(e.to.toLowerCase());
+      }
+      for (const o of result.ownership) {
+        const l = collectionLabel(o.contract);
+        if (l && reach.has(o.wallet.toLowerCase())) finalLabels.add(l);
+      }
     }
   }
-  const collections = ALLOWED_COLLECTIONS.map((c) => c.label).filter((l) => heldLabels.has(l));
+  const collections = ALLOWED_COLLECTIONS.map((c) => c.label).filter((l) => finalLabels.has(l));
   // Holder clubhouse access (bayc_verified) comes ONLY from full-access
   // collections (BAYC / MAYC / CryptoPunks). Partner collections (Temp
   // Agency, Orca Business, Ugly Duck Labs) are recorded and shown as
@@ -96,6 +162,7 @@ export async function recomputeOwnership(
   const fullLabels = collections.filter((l) => FULL_ACCESS_LABELS.includes(l));
   const collection = fullLabels[0] ?? collections[0] ?? null;
   const tokenProof = fullLabels.length > 0;
+  const write = opts.fresh || result.scanned.length > 0;
 
   const updates: {
     user_id: string;
@@ -110,16 +177,11 @@ export async function recomputeOwnership(
     delegation_verified: !!delegationVault,
     delegation_vault: delegationVault,
   };
-  if (result.scanned.length > 0 || opts.fresh) updates.verified_collections = collections;
-  if (tokenProof) {
-    updates.bayc_verified = true;
-    updates.bayc_collection = collection;
-    updates.verified_at = new Date().toISOString();
-  } else if (opts.fresh || (result.scanned.length > 0 && failed.size === 0)) {
-    // Only flip to false on a clean scan — never on RPC errors/outages.
-    updates.bayc_verified = false;
+  if (write) {
+    updates.verified_collections = collections;
+    updates.bayc_verified = tokenProof;
     updates.bayc_collection = collection; // partner label (or null)
-    updates.verified_at = null;
+    updates.verified_at = tokenProof ? new Date().toISOString() : null;
   }
 
   await supabaseAdmin.from("user_verifications").upsert(updates, { onConflict: "user_id" });
@@ -136,6 +198,15 @@ export async function recomputeOwnership(
     try {
       const op = await runOtherpageCheckAndPersist({ userId, wallet: apeWallet });
       otherpageVerified = op.verified;
+      // Mid-session checks are loss-only here too: a Lifer token that
+      // appears mid-session counts from the next sign-in.
+      if (!opts.fresh && !opts.addedWallet && op.verified && !prevRow?.otherpage_verified) {
+        await supabaseAdmin
+          .from("user_verifications")
+          .update({ otherpage_verified: false })
+          .eq("user_id", userId);
+        otherpageVerified = false;
+      }
     } catch (e) {
       console.error("recompute: otherpage check failed", e);
     }

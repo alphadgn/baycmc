@@ -34,7 +34,8 @@ function PunksBrunchPage() {
     void supabase
       .from("rooms")
       .select("id")
-      .eq("required_collection", "PUNKS")
+      // By its own LiveKit room — MWroom4 is also a CryptoPunks room.
+      .eq("livekit_room", "punks-brunch")
       .eq("active", true)
       .limit(1)
       .maybeSingle()

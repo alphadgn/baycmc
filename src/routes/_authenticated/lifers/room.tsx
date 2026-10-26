@@ -22,6 +22,7 @@ function LiferRoom() {
         .from("rooms")
         .select("id,name")
         .eq("tier", "lifer")
+        .neq("kind", "mudwater")
         .order("name")
         .limit(1)
         .maybeSingle();

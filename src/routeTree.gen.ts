@@ -50,10 +50,14 @@ import { Route as AuthenticatedKaraokeRoomIdRouteImport } from './routes/_authen
 import { Route as AuthenticatedLifersIndexRouteImport } from './routes/_authenticated/lifers/index'
 import { Route as AuthenticatedLifersMessagesRouteImport } from './routes/_authenticated/lifers/messages'
 import { Route as AuthenticatedLifersRoomRouteImport } from './routes/_authenticated/lifers/room'
+import { Route as AuthenticatedMudwaterIndexRouteImport } from './routes/_authenticated/mudwater.index'
+import { Route as AuthenticatedMudwaterRoomIdRouteImport } from './routes/_authenticated/mudwater.$roomId'
 import { Route as ApiPublicHealthRouteImport } from './routes/api/public/health'
 import { Route as ApiPublicSecurityScanRouteImport } from './routes/api/public/security-scan'
 import { Route as AuthenticatedVerifiedApeRidesRideIdRouteImport } from './routes/_authenticated/_verified/ape-rides.$rideId'
 import { Route as AuthenticatedVerifiedRoomsRoomIdRouteImport } from './routes/_authenticated/_verified/rooms_.$roomId'
+import { Route as AuthenticatedMudwaterWatchIndexRouteImport } from './routes/_authenticated/mudwater.watch.index'
+import { Route as AuthenticatedMudwaterWatchMatchIdRouteImport } from './routes/_authenticated/mudwater.watch.$matchId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -277,6 +281,18 @@ const AuthenticatedLifersRoomRoute = AuthenticatedLifersRoomRouteImport.update({
   path: '/room',
   getParentRoute: () => AuthenticatedLifersRoute,
 } as any)
+const AuthenticatedMudwaterIndexRoute =
+  AuthenticatedMudwaterIndexRouteImport.update({
+    id: '/mudwater/',
+    path: '/mudwater/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedMudwaterRoomIdRoute =
+  AuthenticatedMudwaterRoomIdRouteImport.update({
+    id: '/mudwater/$roomId',
+    path: '/mudwater/$roomId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const ApiPublicHealthRoute = ApiPublicHealthRouteImport.update({
   id: '/api/public/health',
   path: '/api/public/health',
@@ -298,6 +314,18 @@ const AuthenticatedVerifiedRoomsRoomIdRoute =
     id: '/rooms_/$roomId',
     path: '/rooms/$roomId',
     getParentRoute: () => AuthenticatedVerifiedRoute,
+  } as any)
+const AuthenticatedMudwaterWatchIndexRoute =
+  AuthenticatedMudwaterWatchIndexRouteImport.update({
+    id: '/mudwater/watch/',
+    path: '/mudwater/watch/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedMudwaterWatchMatchIdRoute =
+  AuthenticatedMudwaterWatchMatchIdRouteImport.update({
+    id: '/mudwater/watch/$matchId',
+    path: '/mudwater/watch/$matchId',
+    getParentRoute: () => AuthenticatedRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -338,12 +366,16 @@ export interface FileRoutesByFullPath {
   '/karaoke/$roomId': typeof AuthenticatedKaraokeRoomIdRoute
   '/lifers/messages': typeof AuthenticatedLifersMessagesRoute
   '/lifers/room': typeof AuthenticatedLifersRoomRoute
+  '/mudwater/$roomId': typeof AuthenticatedMudwaterRoomIdRoute
   '/api/public/health': typeof ApiPublicHealthRoute
   '/api/public/security-scan': typeof ApiPublicSecurityScanRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/lifers/': typeof AuthenticatedLifersIndexRoute
+  '/mudwater/': typeof AuthenticatedMudwaterIndexRoute
   '/ape-rides/$rideId': typeof AuthenticatedVerifiedApeRidesRideIdRoute
   '/rooms/$roomId': typeof AuthenticatedVerifiedRoomsRoomIdRoute
+  '/mudwater/watch/$matchId': typeof AuthenticatedMudwaterWatchMatchIdRoute
+  '/mudwater/watch/': typeof AuthenticatedMudwaterWatchIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -381,12 +413,16 @@ export interface FileRoutesByTo {
   '/karaoke/$roomId': typeof AuthenticatedKaraokeRoomIdRoute
   '/lifers/messages': typeof AuthenticatedLifersMessagesRoute
   '/lifers/room': typeof AuthenticatedLifersRoomRoute
+  '/mudwater/$roomId': typeof AuthenticatedMudwaterRoomIdRoute
   '/api/public/health': typeof ApiPublicHealthRoute
   '/api/public/security-scan': typeof ApiPublicSecurityScanRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/lifers': typeof AuthenticatedLifersIndexRoute
+  '/mudwater': typeof AuthenticatedMudwaterIndexRoute
   '/ape-rides/$rideId': typeof AuthenticatedVerifiedApeRidesRideIdRoute
   '/rooms/$roomId': typeof AuthenticatedVerifiedRoomsRoomIdRoute
+  '/mudwater/watch/$matchId': typeof AuthenticatedMudwaterWatchMatchIdRoute
+  '/mudwater/watch': typeof AuthenticatedMudwaterWatchIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -429,12 +465,16 @@ export interface FileRoutesById {
   '/_authenticated/karaoke/$roomId': typeof AuthenticatedKaraokeRoomIdRoute
   '/_authenticated/lifers/messages': typeof AuthenticatedLifersMessagesRoute
   '/_authenticated/lifers/room': typeof AuthenticatedLifersRoomRoute
+  '/_authenticated/mudwater/$roomId': typeof AuthenticatedMudwaterRoomIdRoute
   '/api/public/health': typeof ApiPublicHealthRoute
   '/api/public/security-scan': typeof ApiPublicSecurityScanRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/lifers/': typeof AuthenticatedLifersIndexRoute
+  '/_authenticated/mudwater/': typeof AuthenticatedMudwaterIndexRoute
   '/_authenticated/_verified/ape-rides/$rideId': typeof AuthenticatedVerifiedApeRidesRideIdRoute
   '/_authenticated/_verified/rooms_/$roomId': typeof AuthenticatedVerifiedRoomsRoomIdRoute
+  '/_authenticated/mudwater/watch/$matchId': typeof AuthenticatedMudwaterWatchMatchIdRoute
+  '/_authenticated/mudwater/watch/': typeof AuthenticatedMudwaterWatchIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -476,12 +516,16 @@ export interface FileRouteTypes {
     | '/karaoke/$roomId'
     | '/lifers/messages'
     | '/lifers/room'
+    | '/mudwater/$roomId'
     | '/api/public/health'
     | '/api/public/security-scan'
     | '/admin/'
     | '/lifers/'
+    | '/mudwater/'
     | '/ape-rides/$rideId'
     | '/rooms/$roomId'
+    | '/mudwater/watch/$matchId'
+    | '/mudwater/watch/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -519,12 +563,16 @@ export interface FileRouteTypes {
     | '/karaoke/$roomId'
     | '/lifers/messages'
     | '/lifers/room'
+    | '/mudwater/$roomId'
     | '/api/public/health'
     | '/api/public/security-scan'
     | '/admin'
     | '/lifers'
+    | '/mudwater'
     | '/ape-rides/$rideId'
     | '/rooms/$roomId'
+    | '/mudwater/watch/$matchId'
+    | '/mudwater/watch'
   id:
     | '__root__'
     | '/'
@@ -566,12 +614,16 @@ export interface FileRouteTypes {
     | '/_authenticated/karaoke/$roomId'
     | '/_authenticated/lifers/messages'
     | '/_authenticated/lifers/room'
+    | '/_authenticated/mudwater/$roomId'
     | '/api/public/health'
     | '/api/public/security-scan'
     | '/_authenticated/admin/'
     | '/_authenticated/lifers/'
+    | '/_authenticated/mudwater/'
     | '/_authenticated/_verified/ape-rides/$rideId'
     | '/_authenticated/_verified/rooms_/$roomId'
+    | '/_authenticated/mudwater/watch/$matchId'
+    | '/_authenticated/mudwater/watch/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -881,6 +933,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLifersRoomRouteImport
       parentRoute: typeof AuthenticatedLifersRoute
     }
+    '/_authenticated/mudwater/': {
+      id: '/_authenticated/mudwater/'
+      path: '/mudwater'
+      fullPath: '/mudwater/'
+      preLoaderRoute: typeof AuthenticatedMudwaterIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/mudwater/$roomId': {
+      id: '/_authenticated/mudwater/$roomId'
+      path: '/mudwater/$roomId'
+      fullPath: '/mudwater/$roomId'
+      preLoaderRoute: typeof AuthenticatedMudwaterRoomIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/api/public/health': {
       id: '/api/public/health'
       path: '/api/public/health'
@@ -908,6 +974,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/rooms/$roomId'
       preLoaderRoute: typeof AuthenticatedVerifiedRoomsRoomIdRouteImport
       parentRoute: typeof AuthenticatedVerifiedRoute
+    }
+    '/_authenticated/mudwater/watch/': {
+      id: '/_authenticated/mudwater/watch/'
+      path: '/mudwater/watch'
+      fullPath: '/mudwater/watch/'
+      preLoaderRoute: typeof AuthenticatedMudwaterWatchIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/mudwater/watch/$matchId': {
+      id: '/_authenticated/mudwater/watch/$matchId'
+      path: '/mudwater/watch/$matchId'
+      fullPath: '/mudwater/watch/$matchId'
+      preLoaderRoute: typeof AuthenticatedMudwaterWatchMatchIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
   }
 }
@@ -1013,6 +1093,10 @@ interface AuthenticatedRouteChildren {
   AuthenticatedPunksBrunchRoute: typeof AuthenticatedPunksBrunchRoute
   AuthenticatedSuperAdminRoute: typeof AuthenticatedSuperAdminRoute
   AuthenticatedSupportRoute: typeof AuthenticatedSupportRoute
+  AuthenticatedMudwaterRoomIdRoute: typeof AuthenticatedMudwaterRoomIdRoute
+  AuthenticatedMudwaterIndexRoute: typeof AuthenticatedMudwaterIndexRoute
+  AuthenticatedMudwaterWatchMatchIdRoute: typeof AuthenticatedMudwaterWatchMatchIdRoute
+  AuthenticatedMudwaterWatchIndexRoute: typeof AuthenticatedMudwaterWatchIndexRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -1028,6 +1112,11 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedPunksBrunchRoute: AuthenticatedPunksBrunchRoute,
   AuthenticatedSuperAdminRoute: AuthenticatedSuperAdminRoute,
   AuthenticatedSupportRoute: AuthenticatedSupportRoute,
+  AuthenticatedMudwaterRoomIdRoute: AuthenticatedMudwaterRoomIdRoute,
+  AuthenticatedMudwaterIndexRoute: AuthenticatedMudwaterIndexRoute,
+  AuthenticatedMudwaterWatchMatchIdRoute:
+    AuthenticatedMudwaterWatchMatchIdRoute,
+  AuthenticatedMudwaterWatchIndexRoute: AuthenticatedMudwaterWatchIndexRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(

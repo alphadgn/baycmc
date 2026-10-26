@@ -95,20 +95,19 @@ export const requestLinkedWalletNonce = createServerFn({ method: "POST" })
 
 export const verifyAndLinkWallet = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator(
-    (input: { address: string; nonce: string; signature: string; label?: string }) =>
-      z
-        .object({
-          address: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
-          nonce: z.string().uuid(),
-          signature: z
-            .string()
-            .regex(/^0x[0-9a-fA-F]+$/)
-            .min(2)
-            .max(2048),
-          label: z.string().trim().max(64).optional(),
-        })
-        .parse(input),
+  .inputValidator((input: { address: string; nonce: string; signature: string; label?: string }) =>
+    z
+      .object({
+        address: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
+        nonce: z.string().uuid(),
+        signature: z
+          .string()
+          .regex(/^0x[0-9a-fA-F]+$/)
+          .min(2)
+          .max(2048),
+        label: z.string().trim().max(64).optional(),
+      })
+      .parse(input),
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
@@ -147,7 +146,8 @@ export const verifyAndLinkWallet = createServerFn({ method: "POST" })
         user_id: userId,
         address,
         // Never store the generic connector name.
-        label: data.label?.trim() && !/^injected$/i.test(data.label.trim()) ? data.label.trim() : null,
+        label:
+          data.label?.trim() && !/^injected$/i.test(data.label.trim()) ? data.label.trim() : null,
         verified_at: nowIso,
         last_checked_at: nowIso,
       },
@@ -156,8 +156,10 @@ export const verifyAndLinkWallet = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
 
     // Trigger a fresh ownership recompute so the gated nav updates immediately.
-    const { recomputeOwnership } = await import("@/server/ownership.server");
-    const snapshot = await recomputeOwnership(userId).catch((e) => {
+    // Proven by signature just now → counts for THIS session.
+    const { recomputeOwnership, addSessionWallet } = await import("@/server/ownership.server");
+    await addSessionWallet(userId, address);
+    const snapshot = await recomputeOwnership(userId, { addedWallet: address }).catch((e) => {
       console.error("verifyAndLinkWallet: recompute failed", e);
       return null;
     });
@@ -181,7 +183,8 @@ export const removeLinkedWallet = createServerFn({ method: "POST" })
       .eq("address", address);
     if (error) throw new Error(error.message);
 
-    const { recomputeOwnership } = await import("@/server/ownership.server");
+    const { recomputeOwnership, removeSessionWallet } = await import("@/server/ownership.server");
+    await removeSessionWallet(userId, address);
     await recomputeOwnership(userId).catch(() => null);
     return { ok: true };
   });
