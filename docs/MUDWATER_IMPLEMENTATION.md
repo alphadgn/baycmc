@@ -120,14 +120,22 @@ involved.
 
 | Room | Who can play | Who can watch |
 |---|---|---|
-| MWroom1, MWroom2 | Any signed-in member, including email-only | See below |
+| MWroom1, MWroom2 | Any member signed in with a wallet this session | See below |
 | MWroom3 | BAYC verified **in this sign-in session** | See below |
 | MWroom4 | CryptoPunks verified in this session | See below |
 | MWroom5 | MAYC verified in this session | See below |
 
-**Watching** is open to any member with a wallet proven by signature in
-this session, plus admins and verified-role members. It covers all five
-rooms.
+**Wallet sign-in required.** Everything Mudwater (menu entry, pages,
+server calls) is only for members signed in with a blockchain wallet in
+this session. A Glyph sign-in attached to a wallet counts. Email-only
+sessions don't see Mudwater at all.
+
+**Watching** is open to any member signed in with a wallet. It covers all
+five rooms, for admins and verified-role members too.
+
+**Gated rooms a member can't play yet** open to a screen that says what the
+room needs and offers "Connect the wallet that holds it". Linking and
+signing for that wallet counts straight away for the session.
 
 **Playing seats**
 - Playing seats use `mudwater_can_play`, which reads only this session's
@@ -159,10 +167,12 @@ it no longer collides with MWroom4.
 1. **Session wallets.** Access is decided only from wallets connected and
    proven by signature in the **current** sign-in session
    (`session_wallets`), plus their delegate.xyz delegations.
-   - At wallet sign-in, the signer is the session's first wallet.
+   - At wallet sign-in, the signer counts, plus every wallet attached to
+     the Glyph account that signed in. Glyph confirms those server-side
+     with that sign-in's signer-bound Glyph token.
    - Wallets proven via wallet linking during the session are added.
-   - Wallets linked in earlier sessions, and Glyph-linked wallets, no longer
-     count until they are proven again.
+   - Wallets linked in the app in earlier sessions don't count until they
+     are signed for again in this session.
    - An email-only sign-in proves no wallet.
    - How wallets are linked is unchanged. Linked wallets are still recorded
      for account-merge detection.
@@ -198,6 +208,7 @@ it no longer collides with MWroom4.
 Migrations:
 - `20261026000001_mudwater_core.sql`
 - `20261026000002_session_wallet_rules.sql`
+- `20261026000003_mudwater_wallet_session_rpcs.sql`
 
 Objects:
 - **Tables:**
@@ -213,6 +224,18 @@ Objects:
   - `mudwater_can_view_match`
   - `mudwater_commit` (service role only, compare-and-swap on version)
   - `mudwater_sweep`
+- **Writes:** every Mudwater write goes through one server-only database
+  function, each a single atomic transaction:
+  - `mudwater_open_table`
+  - `mudwater_join_seat`
+  - `mudwater_set_deck`
+  - `mudwater_leave_waiting`
+  - `mudwater_touch`
+- **Wallet session checks:**
+  - `mudwater_has_wallet_session`
+  - `my_mudwater_access` (for the menu)
+- **Board:** `src/assets/mudwater/board.webp` is the operator-supplied mat
+  photo, flattened to a top-down view and evened out to nine equal squares.
 - **Cleanup:** the pg_cron job `mudwater-sweep` runs every minute, using SQL
   only (no outbound calls). It:
   - releases idle waiting seats after 120 s;

@@ -218,7 +218,7 @@ async function commit(
   if (error) {
     if (/duplicate key/i.test(error.message)) fail("That move was already received.");
     console.error("mudwater_commit failed", error);
-    fail("Couldn't save the move. Please try again.");
+    fail(`Couldn't save the move (${error.code ?? "error"}: ${error.message}). Please try again.`);
   }
   if (data !== true)
     fail("The game moved on before your move arrived — the board has been refreshed.");
@@ -352,16 +352,42 @@ function toMatchView(m: MatchRow, seats: SeatRow[], userId: string | null): Matc
   };
 }
 
+async function requireWalletSession(userId: string) {
+  const { data } = await supabaseAdmin.rpc("mudwater_has_wallet_session", { _uid: userId });
+  if (data !== true) fail(NO_WALLET);
+}
+const NO_WALLET =
+  "Mudwater is for members signed in with a wallet. Sign in with your wallet to play.";
+
 export async function getRoom(userId: string, roomId: string) {
+  await requireWalletSession(userId);
   const room = await loadRoom(roomId);
-  if (!(await canPlay(roomId, userId))) {
+  const playable = await canPlay(roomId, userId);
+  if (!playable) {
     // A game in progress finishes normally even if the member lost the
     // collection mid-game; access ends when it's over.
     const open = await openMatchForRoom(roomId);
     const seated =
       open?.status === "playing" &&
       (await loadSeats(open.id)).some((s) => s.user_id === userId && s.active);
-    if (!seated) fail(noPlayAccess(room.required_collection));
+    if (!seated) {
+      // Not a player here: show what the table needs, and the game in
+      // progress (public view) for members who can watch.
+      const watch = await canWatch(userId);
+      return {
+        room: {
+          id: room.id,
+          name: room.name,
+          description: room.description,
+          requiredCollection: room.required_collection,
+        },
+        canPlay: false as const,
+        match: open && watch ? toMatchView(open, await loadSeats(open.id), userId) : null,
+        me: null,
+        agentName: AGENT_NAME,
+        canWatch: watch,
+      };
+    }
   }
   // Prefer the open match; otherwise show the last finished one (results,
   // rematch) if this member played in it.
@@ -414,6 +440,7 @@ export async function getRoom(userId: string, roomId: string) {
       description: room.description,
       requiredCollection: room.required_collection,
     },
+    canPlay: true as const,
     match: match ? toMatchView(match, seats, userId) : null,
     me,
     agentName: AGENT_NAME,
@@ -423,27 +450,26 @@ export async function getRoom(userId: string, roomId: string) {
 
 // ── Seats ──────────────────────────────────────────────────────────────────
 
-async function releaseStaleSeatsFor(userId: string) {
-  // A member can hold one active seat. Free any seat they still hold in a
-  // waiting match elsewhere (e.g. they wandered off); playing seats stay.
-  const { data } = await supabaseAdmin
-    .from("mudwater_seats")
-    .select("match_id,seat,mudwater_matches!inner(status,room_name)")
-    .eq("user_id", userId)
-    .eq("active", true);
-  for (const row of (data ?? []) as unknown as {
-    match_id: string;
-    seat: number;
-    mudwater_matches: { status: string; room_name: string };
-  }[]) {
-    if (row.mudwater_matches.status === "waiting") {
-      await leaveWaiting(row.match_id, userId);
-    } else if (row.mudwater_matches.status === "playing") {
-      fail(
-        `You're still playing in ${row.mudwater_matches.room_name}. Finish or resign that game first.`,
-      );
-    }
+/**
+ * Every Mudwater write runs inside one server-only database function (one
+ * atomic transaction). A message starting with "MW: " is meant for the
+ * member; anything else is reported with its database code so a failure
+ * is never hidden behind a generic message.
+ */
+async function mw<T>(fn: string, args: Record<string, unknown>, what: string): Promise<T> {
+  const { data, error } = await (
+    supabaseAdmin.rpc as unknown as (
+      f: string,
+      a: Record<string, unknown>,
+    ) => Promise<{ data: T; error: { message: string; code?: string } | null }>
+  )(fn, args);
+  if (error) {
+    const m = /MW:\s*(.*)$/s.exec(error.message);
+    if (m) fail(m[1]!.trim());
+    console.error(`[mudwater] ${fn} failed`, error);
+    fail(`Couldn't ${what} (${error.code ?? "error"}: ${error.message}). Please try again.`);
   }
+  return data;
 }
 
 export async function claimSeat(
@@ -452,81 +478,41 @@ export async function claimSeat(
 ) {
   const room = await loadRoom(input.roomId);
   if (!(await canPlay(room.id, userId))) fail(noPlayAccess(room.required_collection));
+  const who = await memberIdentity(userId);
 
   const open = await openMatchForRoom(room.id);
   if (open) {
-    const seats = await loadSeats(open.id);
-    if (seats.some((s) => s.user_id === userId && s.active)) return { matchId: open.id };
-    if (open.status !== "waiting" || open.mode !== "pvp") {
-      fail("This table is busy. Watch the match, or try another room.");
-    }
-    const taken = new Set(seats.filter((s) => s.active).map((s) => s.seat));
-    const free = ([0, 1] as const).find((s) => !taken.has(s));
-    if (free === undefined) fail("Both seats are taken.");
-    await releaseStaleSeatsFor(userId);
-    const who = await memberIdentity(userId);
-    const { error } = await supabaseAdmin.from("mudwater_seats").insert({
-      match_id: open.id,
-      seat: free!,
-      user_id: userId,
-      ...who,
-    });
-    if (error)
-      fail(
-        /one_active_per_user/.test(error.message)
-          ? "You already have a seat at another table."
-          : "That seat was just taken.",
-      );
-    await supabaseAdmin
-      .from("mudwater_seat_private")
-      .upsert({ match_id: open.id, seat: free!, user_id: userId, deck: [], hand: [] });
+    await mw<number>(
+      "mudwater_join_seat",
+      {
+        _match: open.id,
+        _uid: userId,
+        _display_name: who.display_name,
+        _avatar_url: who.avatar_url,
+      },
+      "join the table",
+    );
     return { matchId: open.id };
   }
 
-  await releaseStaleSeatsFor(userId);
-  const { data: created, error } = await supabaseAdmin
-    .from("mudwater_matches")
-    .insert({
-      room_id: room.id,
-      room_name: room.name,
-      room_slug: room.slug ?? room.name.toLowerCase(),
-      required_collection: room.required_collection,
-      mode: input.mode,
-      advanced: input.advanced,
-      catalog_version: CATALOG_VERSION,
-      rules_version: RULES_VERSION,
-      agent_policy: input.mode === "agent" ? AGENT_POLICY_VERSION : null,
-      created_by: userId,
-    })
-    .select("id")
-    .single();
-  if (error || !created) fail("Someone just opened this table — try again.");
-  const who = await memberIdentity(userId);
-  const { error: seatErr } = await supabaseAdmin
-    .from("mudwater_seats")
-    .insert({ match_id: created!.id, seat: 0, user_id: userId, ...who });
-  if (seatErr) {
-    await supabaseAdmin.from("mudwater_matches").delete().eq("id", created!.id);
-    fail("You already have a seat at another table.");
-  }
-  await supabaseAdmin
-    .from("mudwater_seat_private")
-    .insert({ match_id: created!.id, seat: 0, user_id: userId });
-  if (input.mode === "agent") await seatAgent(created!.id, 1);
-  return { matchId: created!.id };
-}
-
-async function seatAgent(matchId: string, seat: Seat) {
-  await supabaseAdmin.from("mudwater_seats").insert({
-    match_id: matchId,
-    seat,
-    is_agent: true,
-    display_name: AGENT_NAME,
-    ready: true,
-  });
-  await supabaseAdmin
-    .from("mudwater_seat_private")
-    .insert({ match_id: matchId, seat, deck: chooseAgentDeck(`${matchId}:${seat}`) });
+  const matchId = await mw<string>(
+    "mudwater_open_table",
+    {
+      _room: room.id,
+      _uid: userId,
+      _mode: input.mode,
+      _advanced: input.advanced,
+      _display_name: who.display_name,
+      _avatar_url: who.avatar_url,
+      _catalog_version: CATALOG_VERSION,
+      _rules_version: RULES_VERSION,
+      _agent_policy: AGENT_POLICY_VERSION,
+      _agent_name: AGENT_NAME,
+      _agent_deck: chooseAgentDeck(`${room.id}:${Date.now()}:${randomId()}`),
+    },
+    "open the table",
+  );
+  return { matchId };
 }
 
 async function mySeat(matchId: string, userId: string, activeOnly = true): Promise<SeatRow> {
@@ -542,7 +528,7 @@ export async function setDeck(
 ) {
   const match = await loadMatch(input.matchId);
   if (match.status !== "waiting") fail("The game has already started.");
-  const seat = await mySeat(match.id, userId);
+  await mySeat(match.id, userId);
   if (input.ready) {
     const problem = validateDeck(input.deck);
     if (problem) fail(problem);
@@ -552,16 +538,11 @@ export async function setDeck(
   } else if (input.deck.length > DECK_SIZE) {
     fail(`Pick ${DECK_SIZE} cards.`);
   }
-  await supabaseAdmin
-    .from("mudwater_seat_private")
-    .update({ deck: input.deck, updated_at: new Date().toISOString() })
-    .eq("match_id", match.id)
-    .eq("seat", seat.seat);
-  await supabaseAdmin
-    .from("mudwater_seats")
-    .update({ ready: input.ready, last_seen_at: new Date().toISOString() })
-    .eq("match_id", match.id)
-    .eq("seat", seat.seat);
+  await mw<null>(
+    "mudwater_set_deck",
+    { _match: match.id, _uid: userId, _deck: input.deck, _ready: input.ready },
+    "save your cards",
+  );
   if (input.ready) await maybeStart(match.id);
   return { ok: true as const };
 }
@@ -612,37 +593,7 @@ async function maybeStart(matchId: string) {
 }
 
 async function leaveWaiting(matchId: string, userId: string) {
-  const seats = await loadSeats(matchId);
-  const s = seats.find((x) => x.user_id === userId && x.active);
-  if (!s) return;
-  await supabaseAdmin
-    .from("mudwater_seat_private")
-    .delete()
-    .eq("match_id", matchId)
-    .eq("seat", s.seat);
-  await supabaseAdmin.from("mudwater_seats").delete().eq("match_id", matchId).eq("seat", s.seat);
-  const humansLeft = seats.filter((x) => !x.is_agent && x.active && x.user_id !== userId).length;
-  if (humansLeft === 0) {
-    const m = await loadMatch(matchId);
-    await supabaseAdmin
-      .from("mudwater_matches")
-      .update({
-        status: "aborted",
-        end_reason: "left",
-        finished_at: new Date().toISOString(),
-        version: m.version + 1,
-      })
-      .eq("id", matchId)
-      .eq("version", m.version);
-    await supabaseAdmin.from("mudwater_seats").update({ active: false }).eq("match_id", matchId);
-  } else {
-    // The remaining player must ready up again against whoever sits next.
-    await supabaseAdmin
-      .from("mudwater_seats")
-      .update({ ready: false })
-      .eq("match_id", matchId)
-      .eq("is_agent", false);
-  }
+  await mw<null>("mudwater_leave_waiting", { _match: matchId, _uid: userId }, "leave the table");
 }
 
 export async function leave(userId: string, input: { matchId: string }) {
@@ -695,11 +646,9 @@ export async function playAction(
       effect.ended,
     ),
   });
-  await supabaseAdmin
-    .from("mudwater_seats")
-    .update({ last_seen_at: new Date().toISOString() })
-    .eq("match_id", match.id)
-    .eq("seat", seat.seat);
+  await mw<null>("mudwater_touch", { _match: match.id, _uid: userId }, "record presence").catch(
+    () => null,
+  );
   if (!next.result) await advance(match, next, await loadSeats(match.id));
   return { ok: true as const, captured: effect.captured };
 }
@@ -714,11 +663,9 @@ export async function tick(userId: string, input: { matchId: string }) {
   const seats = await loadSeats(match.id);
   const mine = seats.find((s) => s.user_id === userId && s.active);
   if (mine) {
-    await supabaseAdmin
-      .from("mudwater_seats")
-      .update({ last_seen_at: new Date().toISOString() })
-      .eq("match_id", match.id)
-      .eq("seat", mine.seat);
+    await mw<null>("mudwater_touch", { _match: match.id, _uid: userId }, "record presence").catch(
+      () => null,
+    );
   } else if (!(await canViewMatch(match.id, userId))) {
     return { ok: false as const };
   }
@@ -746,49 +693,27 @@ export async function requestRematch(userId: string, input: { matchId: string })
   if (!mine) fail("You didn't play in this match.");
   if (!(await canPlay(prev.room_id, userId))) fail(noPlayAccess(prev.required_collection));
 
+  const who = await memberIdentity(userId);
   const open = await openMatchForRoom(prev.room_id);
   if (open) {
     if (open.rematch_of === prev.id && open.status === "waiting") {
       // The opponent already asked — take the same seat as last time.
-      const oseats = await loadSeats(open.id);
-      if (oseats.some((s) => s.user_id === userId && s.active)) return { matchId: open.id };
-      if (oseats.some((s) => s.seat === mine!.seat && s.active)) fail("That seat was just taken.");
-      await releaseStaleSeatsFor(userId);
-      const who = await memberIdentity(userId);
-      await supabaseAdmin
-        .from("mudwater_seats")
-        .insert({ match_id: open.id, seat: mine!.seat, user_id: userId, ...who });
-      await supabaseAdmin
-        .from("mudwater_seat_private")
-        .upsert({ match_id: open.id, seat: mine!.seat, user_id: userId, deck: [], hand: [] });
+      await mw<number>(
+        "mudwater_join_seat",
+        {
+          _match: open.id,
+          _uid: userId,
+          _display_name: who.display_name,
+          _avatar_url: who.avatar_url,
+          _seat: mine!.seat,
+        },
+        "join the rematch",
+      );
       return { matchId: open.id };
     }
     fail("Someone else has already started a new game at this table.");
   }
 
-  await releaseStaleSeatsFor(userId);
-  const { data: created, error } = await supabaseAdmin
-    .from("mudwater_matches")
-    .insert({
-      room_id: prev.room_id,
-      room_name: prev.room_name,
-      room_slug: prev.room_slug,
-      required_collection: prev.required_collection,
-      mode: prev.mode,
-      advanced: prev.advanced,
-      catalog_version: CATALOG_VERSION,
-      rules_version: RULES_VERSION,
-      agent_policy: prev.mode === "agent" ? AGENT_POLICY_VERSION : null,
-      rematch_of: prev.id,
-      created_by: userId,
-    })
-    .select("id")
-    .single();
-  if (error || !created) fail("Someone just opened this table — try again.");
-  const who = await memberIdentity(userId);
-  await supabaseAdmin
-    .from("mudwater_seats")
-    .insert({ match_id: created!.id, seat: mine!.seat, user_id: userId, ...who });
   // Pre-fill the member's previous selection so a rematch is one tap.
   const { data: oldPriv } = await supabaseAdmin
     .from("mudwater_seat_private")
@@ -796,19 +721,33 @@ export async function requestRematch(userId: string, input: { matchId: string })
     .eq("match_id", prev.id)
     .eq("seat", mine!.seat)
     .maybeSingle();
-  await supabaseAdmin.from("mudwater_seat_private").insert({
-    match_id: created!.id,
-    seat: mine!.seat,
-    user_id: userId,
-    deck: oldPriv?.deck ?? [],
-  });
-  if (prev.mode === "agent") await seatAgent(created!.id, other(mine!.seat as Seat));
-  return { matchId: created!.id };
+  const matchId = await mw<string>(
+    "mudwater_open_table",
+    {
+      _room: prev.room_id,
+      _uid: userId,
+      _mode: prev.mode,
+      _advanced: prev.advanced,
+      _display_name: who.display_name,
+      _avatar_url: who.avatar_url,
+      _catalog_version: CATALOG_VERSION,
+      _rules_version: RULES_VERSION,
+      _agent_policy: AGENT_POLICY_VERSION,
+      _agent_name: AGENT_NAME,
+      _agent_deck: chooseAgentDeck(`${prev.id}:rematch:${randomId()}`),
+      _rematch_of: prev.id,
+      _seat: mine!.seat,
+      _deck: oldPriv?.deck ?? [],
+    },
+    "open the rematch",
+  );
+  return { matchId };
 }
 
 // ── Lobby + Watch Matches ──────────────────────────────────────────────────
 
 export async function listRooms(userId: string) {
+  await requireWalletSession(userId);
   const { data: rooms } = await supabaseAdmin
     .from("rooms")
     .select("id,name,description,required_collection,display_order")
@@ -842,6 +781,7 @@ export async function listRooms(userId: string) {
 }
 
 export async function listWatchable(userId: string) {
+  await requireWalletSession(userId);
   if (!(await canWatch(userId))) {
     return { allowed: false as const, live: [], recent: [] };
   }

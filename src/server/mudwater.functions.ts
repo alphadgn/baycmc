@@ -36,7 +36,10 @@ async function run<T>(fn: (g: typeof import("@/server/mudwater/game.server")) =>
   } catch (e) {
     if (e instanceof g.MudwaterError) return { ok: false as const, error: e.message };
     console.error("[mudwater]", e);
-    return { ok: false as const, error: "Something went wrong. Please try again." };
+    return {
+      ok: false as const,
+      error: `Something went wrong (${e instanceof Error ? e.message : String(e)}). Please try again.`,
+    };
   }
 }
 

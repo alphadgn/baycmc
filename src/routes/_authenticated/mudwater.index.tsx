@@ -158,29 +158,15 @@ function RoomCard({ room, canWatch }: { room: RoomRow; canWatch: boolean }) {
     </>
   );
   const cls = "block rounded-2xl border border-border/60 bg-card/40 p-4 shadow-card transition";
-  if (room.canPlay) {
-    return (
-      <Link
-        to="/mudwater/$roomId"
-        params={{ roomId: room.id }}
-        className={`${cls} hover:border-gold/40 hover:shadow-gold`}
-      >
-        {body}
-      </Link>
-    );
-  }
+  // Every table opens: a gated table the member can't play yet explains
+  // what it needs, offers to connect that wallet, and links to the game.
   return (
-    <div className={`${cls} opacity-80`}>
+    <Link
+      to="/mudwater/$roomId"
+      params={{ roomId: room.id }}
+      className={`${cls} hover:border-gold/40 hover:shadow-gold ${room.canPlay ? "" : "opacity-80"}`}
+    >
       {body}
-      {room.status === "playing" && room.matchId && canWatch && (
-        <Link
-          to="/mudwater/watch/$matchId"
-          params={{ matchId: room.matchId }}
-          className="mt-3 inline-flex items-center gap-1 text-xs text-gold hover:underline"
-        >
-          <Eye className="h-3.5 w-3.5" /> Watch this game
-        </Link>
-      )}
-    </div>
+    </Link>
   );
 }
