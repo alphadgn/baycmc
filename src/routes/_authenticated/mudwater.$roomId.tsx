@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ArrowLeft, Bot, Eye, Flag, Loader2, RotateCcw, Sparkles, Users } from "lucide-react";
 import { RoomsShell } from "@/components/RoomsShell";
+import { EntranceDialog } from "@/components/EntranceDialog";
 import { supabase } from "@/integrations/supabase/client";
 import {
   mudwaterClaimSeat,
@@ -174,7 +175,9 @@ function MudwaterRoom() {
           )}
         </div>
 
-        {!match || ((match.status === "finished" || match.status === "aborted") && !me) ? (
+        {!data.canPlay ? (
+          <GatedRoom data={data} />
+        ) : !match || ((match.status === "finished" || match.status === "aborted") && !me) ? (
           <Setup roomId={room.id} onDone={load} />
         ) : match.status === "waiting" ? (
           me ? (
@@ -204,6 +207,58 @@ function MudwaterRoom() {
         )}
       </div>
     </RoomsShell>
+  );
+}
+
+// ── Gated table, member doesn't qualify ────────────────────────────────────
+
+function GatedRoom({ data }: { data: RoomData }) {
+  const [linkOpen, setLinkOpen] = useState(false);
+  const name =
+    data.room.requiredCollection === "PUNKS" ? "CryptoPunks" : (data.room.requiredCollection ?? "");
+  const m = data.match;
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-gold/40 bg-gold/5 p-5">
+        <h2 className="font-display text-lg text-gradient-gold">Playing here needs a {name}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Seats at {data.room.name} are for members holding a {name} (or one delegated to them) in a
+          wallet signed in this session. Roles don't open playing seats.
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          If the {name} is in another of your wallets, connect it below and sign the message — it
+          counts straight away for this session.
+        </p>
+        <button
+          type="button"
+          onClick={() => setLinkOpen(true)}
+          className="mt-4 rounded-md bg-gold px-4 py-2 text-sm font-semibold text-gold-foreground hover:opacity-90"
+        >
+          Connect the wallet that holds it
+        </button>
+        <EntranceDialog
+          open={linkOpen}
+          onOpenChange={(open) => {
+            setLinkOpen(open);
+            // A newly proven wallet may now qualify — re-read the table.
+            if (!open) window.setTimeout(() => window.location.reload(), 400);
+          }}
+          mode="link"
+        />
+      </div>
+      {m?.status === "playing" && data.canWatch && (
+        <div className="rounded-2xl border border-border/60 bg-card/40 p-4 text-center text-sm">
+          A game is in progress here.{" "}
+          <Link
+            to="/mudwater/watch/$matchId"
+            params={{ matchId: m.id }}
+            className="text-gold hover:underline"
+          >
+            Watch it
+          </Link>
+        </div>
+      )}
+    </div>
   );
 }
 

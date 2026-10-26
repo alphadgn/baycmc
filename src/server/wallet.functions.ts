@@ -566,7 +566,11 @@ export const verifyOwnership = createServerFn({ method: "POST" })
       if (linkedAddrs.some((a) => a.toLowerCase() === addr.toLowerCase())) return;
       linkedAddrs.push(addr);
     };
-    for (const a of await fetchGlyphLinkedWalletsServer(wallet, data.glyphSession)) pushLinked(a);
+    // Wallets attached to the Glyph account that signed in — confirmed
+    // server-side with this sign-in's signer-bound Glyph token — count for
+    // this session, the same as the signing wallet.
+    const glyphWallets = await fetchGlyphLinkedWalletsServer(wallet, data.glyphSession);
+    for (const a of glyphWallets) pushLinked(a);
     {
       const { supabaseAdmin: lwDb } = await import("@/integrations/supabase/client.server");
       const { data: owner } = await lwDb
@@ -738,7 +742,7 @@ export const verifyOwnership = createServerFn({ method: "POST" })
         const { recomputeOwnership, startSessionWallets } =
           await import("@/server/ownership.server");
         // New sign-in session: the signer is the only proven wallet so far.
-        await startSessionWallets(userId, lower);
+        await startSessionWallets(userId, lower, glyphWallets);
         const snap = await recomputeOwnership(userId, {
           fresh: true,
           confirmedLabels: holdsApe && collection ? [collection] : [],

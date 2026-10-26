@@ -4,6 +4,7 @@ import { ArrowLeft, Loader2, LogOut, Menu, User as UserIcon, Wallet, X } from "l
 import { signOut, useAuth } from "@/lib/auth/useAuth";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import { useAuthGate } from "@/state/authGate";
+import { useMudwaterAccess } from "@/lib/mudwater/useMudwaterAccess";
 import { useGlyphAuthState } from "@/lib/auth/useGlyphBridge";
 import { supabase } from "@/integrations/supabase/client";
 import { useMenuItems } from "@/lib/baycmc/useMenuItems";
@@ -76,6 +77,7 @@ let internalNavCount = 0;
 export function AppHeader() {
   const { isAuthenticated, user } = useAuth();
   const gate = useAuthGate();
+  const mudwaterOk = useMudwaterAccess();
   const isVerifiedHolder = gate.ownsRequiredAsset;
   const isLifer = gate.showLifers;
   const { collections } = useVerificationStatus();
@@ -245,6 +247,8 @@ export function AppHeader() {
                       // Karaoke Room shortcut only for lobby visitors;
                       // holders reach it via Conference Rooms.
                       if (item.tier === "lobby_only") return !isVerifiedHolder;
+                      // Mudwater: wallet-signed-in sessions only.
+                      if (item.to === "/mudwater") return mudwaterOk;
                       return true;
                     }).map((item) => {
                       const isAdminTier = item.tier === "admin" || item.tier === "super_admin";

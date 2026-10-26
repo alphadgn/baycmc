@@ -5,6 +5,7 @@ import { roman } from "@/lib/mudwater/rules";
 import type { PublicGame, PublicSquare } from "@/lib/mudwater/projections";
 import type { Family, Seat } from "@/lib/mudwater/types";
 import { EntranceDialog } from "@/components/EntranceDialog";
+import boardArt from "@/assets/mudwater/board.webp";
 
 /**
  * Shared Mudwater visuals: styled text cards (artwork comes later), the
@@ -22,8 +23,8 @@ const FAMILY_STYLE: Record<Family, { label: string; chip: string }> = {
 
 /** Seat tint: seat 0 gold, seat 1 teal — consistent for players and spectators. */
 export const SEAT_RING: Record<Seat, string> = {
-  0: "ring-2 ring-gold/80 bg-gold/10",
-  1: "ring-2 ring-teal-400/80 bg-teal-400/10",
+  0: "ring-2 ring-gold",
+  1: "ring-2 ring-teal-400",
 };
 export const SEAT_TEXT: Record<Seat, string> = { 0: "text-gold", 1: "text-teal-300" };
 
@@ -160,45 +161,54 @@ function SquareView({
       onClick={onClick}
       disabled={!onClick}
       aria-label={`Square ${index + 1}`}
-      className={`relative flex aspect-[3/4] w-full items-center justify-center rounded-xl border border-border/60 bg-background/40 p-1 transition ${
-        sq ? SEAT_RING[sq.controller] : ""
-      } ${highlight ? "outline outline-2 outline-offset-2 outline-gold/70" : ""} ${
-        lastCaptured ? "animate-pulse" : ""
-      } ${onClick ? "cursor-pointer hover:bg-secondary/40" : "cursor-default"}`}
+      className={`relative flex h-full w-full items-center justify-center p-[6%] transition ${
+        highlight ? "bg-gold/15 shadow-[inset_0_0_0_2px_rgba(234,179,8,0.85)]" : ""
+      } ${onClick ? "cursor-pointer hover:bg-gold/10" : "cursor-default"}`}
     >
-      {!sq || !top ? (
-        <span className="text-[10px] text-muted-foreground/50">{index + 1}</span>
-      ) : top.faceDown ? (
-        top.card ? (
-          // Revealed after the match.
-          <div className="relative">
-            <CardFace number={top.card} size="sm" />
-            <span className="absolute -top-1 left-1/2 -translate-x-1/2 rounded bg-stone-700 px-1 text-[8px] uppercase text-stone-100">
-              rock
-            </span>
-          </div>
-        ) : (
-          <RockFace small known={myRocks?.get(index)} />
-        )
-      ) : (
-        <CardFace number={top.card!} size="sm" />
-      )}
-      {buried.length > 0 && (
-        <span
-          className="absolute right-1 top-1 rounded-full bg-secondary px-1.5 text-[9px] font-semibold text-foreground"
-          title={buried
-            .map((l) =>
-              l.card ? `${getCard(l.card).name}${l.faceDown ? " (rock)" : ""}` : "hidden rock",
-            )
-            .join(" · ")}
+      {sq && top && (
+        <div
+          className={`relative rounded-lg shadow-[0_6px_18px_rgba(0,0,0,0.6)] ${SEAT_RING[sq.controller]} ${
+            lastCaptured ? "animate-pulse" : ""
+          }`}
         >
-          ×{sq!.layers.length}
-        </span>
+          {top.faceDown ? (
+            top.card ? (
+              // Revealed after the match.
+              <div className="relative">
+                <CardFace number={top.card} size="sm" />
+                <span className="absolute -top-1 left-1/2 -translate-x-1/2 rounded bg-stone-700 px-1 text-[8px] uppercase text-stone-100">
+                  rock
+                </span>
+              </div>
+            ) : (
+              <RockFace small known={myRocks?.get(index)} />
+            )
+          ) : (
+            <CardFace number={top.card!} size="sm" />
+          )}
+          {buried.length > 0 && (
+            <span
+              className="absolute -right-1.5 -top-1.5 rounded-full bg-secondary px-1.5 text-[9px] font-semibold text-foreground"
+              title={buried
+                .map((l) =>
+                  l.card ? `${getCard(l.card).name}${l.faceDown ? " (rock)" : ""}` : "hidden rock",
+                )
+                .join(" · ")}
+            >
+              ×{sq.layers.length}
+            </span>
+          )}
+        </div>
       )}
     </button>
   );
 }
 
+/**
+ * The Mudwater mat: black felt with gold stitching and the club emblem in
+ * the centre. The nine squares sit exactly on the mat's gold grid (the
+ * artwork's inner frame spans 1%–99% and is divided into equal thirds).
+ */
 export function Board({
   game,
   myRocks,
@@ -214,18 +224,23 @@ export function Board({
 }) {
   const rockMap = new Map((myRocks ?? []).map((r) => [r.square, r.card]));
   return (
-    <div className="mx-auto grid w-full max-w-[340px] grid-cols-3 gap-2 sm:max-w-[380px]">
-      {game.board.map((sq, i) => (
-        <SquareView
-          key={i}
-          sq={sq}
-          index={i}
-          myRocks={rockMap}
-          highlight={targets?.has(i)}
-          lastCaptured={captured?.includes(i)}
-          onClick={onSquare ? () => onSquare(i) : undefined}
-        />
-      ))}
+    <div
+      className="relative mx-auto aspect-square w-full max-w-[360px] overflow-hidden rounded-xl bg-black bg-cover bg-center shadow-[0_18px_40px_rgba(0,0,0,0.55)] sm:max-w-[420px]"
+      style={{ backgroundImage: `url(${boardArt})` }}
+    >
+      <div className="absolute inset-[1%] grid grid-cols-3 grid-rows-3">
+        {game.board.map((sq, i) => (
+          <SquareView
+            key={i}
+            sq={sq}
+            index={i}
+            myRocks={rockMap}
+            highlight={targets?.has(i)}
+            lastCaptured={captured?.includes(i)}
+            onClick={onSquare ? () => onSquare(i) : undefined}
+          />
+        ))}
+      </div>
     </div>
   );
 }

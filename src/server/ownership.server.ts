@@ -45,16 +45,26 @@ export interface RecomputeOptions {
 // Wallets proven by signature in the CURRENT sign-in session. Only these
 // (and their delegate.xyz delegations) count toward access. Server-only.
 
-/** Start of a sign-in session: forget every earlier wallet proof. */
-export async function startSessionWallets(userId: string, signer: string | null) {
+/**
+ * Start of a sign-in session: forget every earlier wallet proof. The
+ * signer counts, plus any wallets attached to the Glyph account that
+ * signed in (confirmed server-side with this sign-in's Glyph token).
+ */
+export async function startSessionWallets(
+  userId: string,
+  signer: string | null,
+  attached: string[] = [],
+) {
   await supabaseAdmin.from("session_wallets").delete().eq("user_id", userId);
-  if (signer && isAddress(signer)) {
-    await supabaseAdmin
-      .from("session_wallets")
-      .upsert(
-        { user_id: userId, address: signer.toLowerCase() },
-        { onConflict: "user_id,address" },
-      );
+  const rows = [
+    ...new Set(
+      [signer, ...attached]
+        .filter((a): a is string => !!a && isAddress(a))
+        .map((a) => a.toLowerCase()),
+    ),
+  ].map((address) => ({ user_id: userId, address }));
+  if (rows.length > 0) {
+    await supabaseAdmin.from("session_wallets").upsert(rows, { onConflict: "user_id,address" });
   }
 }
 export async function addSessionWallet(userId: string, address: string) {

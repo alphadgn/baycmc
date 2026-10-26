@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { signOut, useAuth } from "@/lib/auth/useAuth";
 import { useAuthGate } from "@/state/authGate";
+import { useMudwaterAccess } from "@/lib/mudwater/useMudwaterAccess";
 import { useRoomPreferences } from "@/lib/baycmc/useRoomPreferences";
 import { useNotificationPrefs } from "@/lib/baycmc/useNotificationPrefs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -269,6 +270,7 @@ function Sidebar({
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const gate = useAuthGate();
+  const mudwaterOk = useMudwaterAccess();
   const isVerifiedHolder = gate.ownsRequiredAsset;
   const isLifer = gate.showLifers;
   const isAdmin = gate.isAdmin;
@@ -283,6 +285,8 @@ function Sidebar({
   // Filter nav by access. Admins see every item; Lifer-only items hide for
   // non-Lifers (admins are treated as Lifers by useVerificationStatus).
   const items = NAV_ITEMS.filter((item) => {
+    // Mudwater: wallet-signed-in sessions only.
+    if (item.to === "/mudwater") return mudwaterOk;
     if (item.tier === "all") return true;
     if (item.tier === "admin") return isAdmin;
     if (item.tier === "lifer") return isLifer;
