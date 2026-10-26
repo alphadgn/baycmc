@@ -20,6 +20,7 @@ import {
   Monitor,
   Shield,
   Sparkles,
+  Swords,
   User,
   Users,
   Video,
@@ -39,6 +40,7 @@ type NavTarget =
   | "/feed"
   | "/rooms"
   | "/karaoke"
+  | "/mudwater"
   | "/calendar"
   | "/profile"
   | "/admin"
@@ -72,6 +74,13 @@ const NAV_ITEMS: NavItem[] = [
     label: "Calendar",
     tier: "verified",
     icon: <CalendarIcon className="h-4 w-4" />,
+  },
+  {
+    to: "/mudwater",
+    label: "Mudwater",
+    tier: "all",
+    icon: <Swords className="h-4 w-4" />,
+    match: "/mudwater",
   },
   { to: "/activity", label: "My Activity", tier: "all", icon: <Sparkles className="h-4 w-4" /> },
   { to: "/profile", label: "Profile", tier: "all", icon: <User className="h-4 w-4" /> },

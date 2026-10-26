@@ -5,6 +5,7 @@ import { GlyphAppProvider } from "@/components/GlyphAppProvider";
 import { GlyphBridgeMount } from "@/lib/auth/useGlyphBridge";
 import { AppHeader } from "@/components/AppHeader";
 import { InactivityWatcher } from "@/components/InactivityWatcher";
+import { AccessLossWatcher } from "@/components/AccessLossWatcher";
 import { AuthRedirectWatcher } from "@/components/AuthRedirectWatcher";
 import { AccountMergeWatcher } from "@/components/AccountMergeWatcher";
 import { SupportAlertsWatcher } from "@/components/SupportAlertsWatcher";
@@ -135,6 +136,7 @@ function RootComponent() {
           <GatedToaster />
           <KaraokeSaveTakeDialog />
           <InactivityWatcher />
+          <AccessLossWatcher />
           <AuthRedirectWatcher />
           <AccountMergeWatcher />
           <SupportAlertsWatcher />

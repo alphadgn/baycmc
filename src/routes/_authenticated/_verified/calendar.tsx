@@ -53,6 +53,7 @@ function CalendarPage() {
         .from("rooms")
         .select("id,name,tier,theme,display_order")
         .eq("active", true)
+        .neq("kind", "mudwater")
         .order("display_order", { ascending: true, nullsFirst: false })
         .order("name"),
       supabase

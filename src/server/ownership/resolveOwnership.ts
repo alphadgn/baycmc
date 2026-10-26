@@ -44,31 +44,34 @@ function publicClient(): PublicClient {
 /**
  * Single source of truth for NFT-ownership-based authorization.
  *
- * Walks: connected wallet → verified linked_wallets → delegate.cash
- * incoming vaults AND outgoing delegates for every address in the set,
- * then balanceOf-scans BAYC + MAYC across the whole graph in parallel.
+ * Walks: this session's proven wallets → delegate.cash incoming vaults AND
+ * outgoing delegates for every address in the set, then balanceOf-scans
+ * every whitelisted collection across the whole graph in parallel.
  */
 export async function resolveOwnership(userId: string): Promise<OwnershipResult> {
-  const { data: profile } = await supabaseAdmin
-    .from("profiles")
-    .select("wallet_address")
-    .eq("id", userId)
-    .maybeSingle();
-
-  const { data: linkedRows } = await supabaseAdmin
-    .from("linked_wallets")
-    .select("address")
-    .eq("user_id", userId)
-    .not("verified_at", "is", null);
-
-  const connectedRaw = profile?.wallet_address ?? null;
-  const connected =
-    connectedRaw && isAddress(connectedRaw) ? (getAddress(connectedRaw) as `0x${string}`) : null;
-
-  const linked = (linkedRows ?? [])
+  // Only wallets connected and proven by signature in the member's CURRENT
+  // sign-in session count (session_wallets — written by the server at
+  // wallet sign-in and in-session wallet linking, wiped at sign-in and
+  // sign-out). Wallets linked in earlier sessions don't count until they
+  // are proven again. Delegations INTO / OUT OF these wallets still count.
+  const [{ data: profile }, { data: sessionRows }] = await Promise.all([
+    supabaseAdmin.from("profiles").select("wallet_address").eq("id", userId).maybeSingle(),
+    supabaseAdmin
+      .from("session_wallets")
+      .select("address")
+      .eq("user_id", userId)
+      .order("proven_at"),
+  ]);
+  const session = (sessionRows ?? [])
     .map((r) => r.address)
     .filter((a): a is string => !!a && isAddress(a))
     .map((a) => getAddress(a) as `0x${string}`);
+  const primary =
+    profile?.wallet_address && isAddress(profile.wallet_address)
+      ? getAddress(profile.wallet_address).toLowerCase()
+      : null;
+  const connected = session.find((a) => a.toLowerCase() === primary) ?? session[0] ?? null;
+  const linked = session.filter((a) => a !== connected);
 
   const addresses = new Set<string>();
   const edges: OwnershipResult["edges"] = [];

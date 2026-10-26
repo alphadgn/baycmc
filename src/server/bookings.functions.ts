@@ -43,6 +43,9 @@ export const createBooking = createServerFn({ method: "POST" })
     if (!room || !room.active) {
       return { ok: false as const, error: "Room not found or inactive" };
     }
+    if (room.kind === "mudwater") {
+      return { ok: false as const, error: "Mudwater tables can't be booked." };
+    }
     const { data: ver } = await supabase
       .from("user_verifications")
       .select("bayc_verified, otherpage_verified")

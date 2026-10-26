@@ -95,6 +95,8 @@ function RoomsPage() {
           "id,name,description,capacity,tier,livekit_room,theme,display_order,is_locked,kind,required_collection",
         )
         .eq("active", true)
+        // Mudwater game tables live on their own page.
+        .neq("kind", "mudwater")
         .order("display_order", { ascending: true, nullsFirst: false })
         .order("name"),
       supabase

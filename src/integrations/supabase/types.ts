@@ -1405,9 +1405,288 @@ export type Database = {
           },
         ]
       }
+      mudwater_actions: {
+        Row: {
+          actor: string
+          action_id: string
+          captured: number[]
+          card: number | null
+          created_at: string
+          ended: boolean
+          kind: string
+          match_id: string
+          move_number: number
+          seat: number
+          square: number | null
+        }
+        Insert: {
+          actor: string
+          action_id: string
+          captured?: number[]
+          card?: number | null
+          created_at?: string
+          ended?: boolean
+          kind: string
+          match_id: string
+          move_number: number
+          seat: number
+          square?: number | null
+        }
+        Update: {
+          actor?: string
+          action_id?: string
+          captured?: number[]
+          card?: number | null
+          created_at?: string
+          ended?: boolean
+          kind?: string
+          match_id?: string
+          move_number?: number
+          seat?: number
+          square?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mudwater_actions_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "mudwater_matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mudwater_matches: {
+        Row: {
+          advanced: boolean
+          agent_policy: string | null
+          catalog_version: string
+          created_at: string
+          created_by: string | null
+          end_reason: string | null
+          finished_at: string | null
+          id: string
+          mode: string
+          public_state: Json | null
+          rematch_of: string | null
+          required_collection: string | null
+          room_id: string
+          room_name: string
+          room_slug: string
+          rules_version: string
+          scores: number[] | null
+          started_at: string | null
+          starting_seat: number | null
+          status: string
+          turn_deadline: string | null
+          turn_seconds: number
+          updated_at: string
+          version: number
+          winner_seat: number | null
+        }
+        Insert: {
+          advanced?: boolean
+          agent_policy?: string | null
+          catalog_version: string
+          created_at?: string
+          created_by?: string | null
+          end_reason?: string | null
+          finished_at?: string | null
+          id?: string
+          mode: string
+          public_state?: Json | null
+          rematch_of?: string | null
+          required_collection?: string | null
+          room_id: string
+          room_name: string
+          room_slug: string
+          rules_version: string
+          scores?: number[] | null
+          started_at?: string | null
+          starting_seat?: number | null
+          status?: string
+          turn_deadline?: string | null
+          turn_seconds?: number
+          updated_at?: string
+          version?: number
+          winner_seat?: number | null
+        }
+        Update: {
+          advanced?: boolean
+          agent_policy?: string | null
+          catalog_version?: string
+          created_at?: string
+          created_by?: string | null
+          end_reason?: string | null
+          finished_at?: string | null
+          id?: string
+          mode?: string
+          public_state?: Json | null
+          rematch_of?: string | null
+          required_collection?: string | null
+          room_id?: string
+          room_name?: string
+          room_slug?: string
+          rules_version?: string
+          scores?: number[] | null
+          started_at?: string | null
+          starting_seat?: number | null
+          status?: string
+          turn_deadline?: string | null
+          turn_seconds?: number
+          updated_at?: string
+          version?: number
+          winner_seat?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mudwater_matches_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mudwater_matches_rematch_of_fkey"
+            columns: ["rematch_of"]
+            isOneToOne: false
+            referencedRelation: "mudwater_matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mudwater_seat_private: {
+        Row: {
+          deck: number[]
+          hand: number[]
+          match_id: string
+          rocks: Json
+          seat: number
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          deck?: number[]
+          hand?: number[]
+          match_id: string
+          rocks?: Json
+          seat: number
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          deck?: number[]
+          hand?: number[]
+          match_id?: string
+          rocks?: Json
+          seat?: number
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mudwater_seat_private_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "mudwater_matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mudwater_seats: {
+        Row: {
+          active: boolean
+          avatar_url: string | null
+          display_name: string
+          is_agent: boolean
+          joined_at: string
+          last_seen_at: string
+          match_id: string
+          ready: boolean
+          seat: number
+          user_id: string | null
+        }
+        Insert: {
+          active?: boolean
+          avatar_url?: string | null
+          display_name: string
+          is_agent?: boolean
+          joined_at?: string
+          last_seen_at?: string
+          match_id: string
+          ready?: boolean
+          seat: number
+          user_id?: string | null
+        }
+        Update: {
+          active?: boolean
+          avatar_url?: string | null
+          display_name?: string
+          is_agent?: boolean
+          joined_at?: string
+          last_seen_at?: string
+          match_id?: string
+          ready?: boolean
+          seat?: number
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mudwater_seats_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "mudwater_matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mudwater_state: {
+        Row: {
+          match_id: string
+          state: Json
+          updated_at: string
+        }
+        Insert: {
+          match_id: string
+          state: Json
+          updated_at?: string
+        }
+        Update: {
+          match_id?: string
+          state?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mudwater_state_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "mudwater_matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      session_wallets: {
+        Row: {
+          address: string
+          proven_at: string
+          user_id: string
+        }
+        Insert: {
+          address: string
+          proven_at?: string
+          user_id: string
+        }
+        Update: {
+          address?: string
+          proven_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       rooms: {
         Row: {
           required_collection: string | null
+          slug: string | null
           active: boolean
           capacity: number
           created_at: string
@@ -1423,6 +1702,7 @@ export type Database = {
         }
         Insert: {
           required_collection?: string | null
+          slug?: string | null
           active?: boolean
           capacity?: number
           created_at?: string
@@ -1438,6 +1718,7 @@ export type Database = {
         }
         Update: {
           required_collection?: string | null
+          slug?: string | null
           active?: boolean
           capacity?: number
           created_at?: string
@@ -1583,6 +1864,30 @@ export type Database = {
       }
     }
     Functions: {
+      mudwater_can_play: {
+        Args: { _room: string; _uid: string }
+        Returns: boolean
+      }
+      mudwater_can_view_match: {
+        Args: { _match: string; _uid: string }
+        Returns: boolean
+      }
+      mudwater_can_watch: {
+        Args: { _uid: string }
+        Returns: boolean
+      }
+      mudwater_commit: {
+        Args: {
+          _action: Json
+          _expected_version: number
+          _match: string
+          _patch: Json
+          _private: Json
+          _state: Json
+        }
+        Returns: boolean
+      }
+      mudwater_sweep: { Args: never; Returns: undefined }
       can_access_area: { Args: { _item: string; _uid: string }; Returns: boolean }
       my_menu_items: { Args: never; Returns: string[] }
       get_my_wallet: { Args: never; Returns: string }
