@@ -130,7 +130,7 @@ function RootComponent() {
     <GlyphAppProvider>
       <VerificationStatusProvider>
         <GlyphBridgeMount />
-        <div className="min-h-screen grain">
+        <div className="min-h-dvh grain">
           <AppHeader />
           <Outlet />
           <GatedToaster />

@@ -46,6 +46,8 @@
 
 :root {
   --radius: 0.5rem;
+  /* Fallback until AppHeader measures itself: bar + safe-area padding + border. */
+  --app-header-h: calc(4rem + max(env(safe-area-inset-top, 0px), 0.75rem) + 2px);
 
   /* BAYCmc — dark luxury palette (BAYC-inspired) */
   --background: oklch(0.14 0.01 80);
@@ -190,6 +192,7 @@
       radial-gradient(circle at 80% 100%, oklch(0.62 0.18 35 / 6%) 0%, transparent 40%);
     background-attachment: fixed;
     min-height: 100vh;
+    min-height: 100dvh;
   }
 
   h1,
@@ -266,6 +269,18 @@
   }
   .pr-safe {
     padding-right: env(safe-area-inset-right, 0px);
+  }
+
+  /* Exactly the visible screen left under the top bar. --app-header-h is
+     the bar's measured height (published by AppHeader); 100dvh tracks the
+     phone's visible area as browser bars show / hide. */
+  .h-below-header {
+    height: calc(100vh - var(--app-header-h));
+    height: calc(100dvh - var(--app-header-h));
+  }
+  .min-h-below-header {
+    min-height: calc(100vh - var(--app-header-h));
+    min-height: calc(100dvh - var(--app-header-h));
   }
 
   .text-gradient-gold {

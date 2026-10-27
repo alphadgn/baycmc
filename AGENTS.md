@@ -19,3 +19,4 @@
 - Event Stream (rooms.kind = 'stream', livekit_room 'event-stream', 250 cap): only event_stream_hosts may publish; admin stats at /admin/event-stream.
 - Karaoke only serves YouTube videos confirmed embeddable (oEmbed, cached in karaoke_video_status); catalogue songs without a video resolve on pick (resolveKaraokeSong).
 - Never import a third-party stylesheet with unlayered global resets (Glyph's style.css broke the site); Relay's is scoped to .relay-kit-reset and is fine.
+- Full-screen pages lock document scroll with useLockedPageScroll (src/hooks/useLockedPageScroll.ts) and size with .h-below-header (--app-header-h, measured by AppHeader); never hand-code the header height or toggle body overflow directly — phone keyboards otherwise leave the top bar scrolled off-screen.

@@ -122,7 +122,7 @@ function ContractAuditorPage() {
   }
 
   return (
-    <main className="mx-auto flex h-[calc(100dvh-4rem)] max-w-3xl flex-col px-4 py-6 sm:px-6">
+    <main className="h-below-header mx-auto flex max-w-3xl flex-col px-4 py-6 sm:px-6">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-gradient-gold text-gold-foreground shadow-gold">

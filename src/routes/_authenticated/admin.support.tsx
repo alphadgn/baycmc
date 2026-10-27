@@ -139,10 +139,7 @@ function AdminSupport() {
   );
 
   return (
-    <main
-      className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-6 sm:px-6"
-      style={{ height: "calc(100dvh - 4rem - max(env(safe-area-inset-top, 0px), 0.75rem))" }}
-    >
+    <main className="h-below-header mx-auto flex max-w-6xl flex-col gap-4 px-4 py-6 sm:px-6">
       <header className="flex items-center gap-3">
         <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-gradient-gold text-gold-foreground shadow-gold">
           <LifeBuoy className="h-5 w-5" />

@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useLockedPageScroll } from "@/hooks/useLockedPageScroll";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Lock, Video } from "lucide-react";
 import { LobbyChat } from "@/components/LobbyChat";
@@ -43,22 +44,10 @@ function PunksBrunchPage() {
   }, [allowed]);
 
   // Like the lobby: only the chat thread scrolls, never the page.
-  useEffect(() => {
-    const prevHtml = document.documentElement.style.overflow;
-    const prevBody = document.body.style.overflow;
-    document.documentElement.style.overflow = "hidden";
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.documentElement.style.overflow = prevHtml;
-      document.body.style.overflow = prevBody;
-    };
-  }, []);
+  useLockedPageScroll();
 
   return (
-    <main
-      className="relative flex flex-col overflow-hidden bg-background"
-      style={{ height: "calc(100dvh - 4rem - max(env(safe-area-inset-top, 0px), 0.75rem))" }}
-    >
+    <main className="h-below-header relative flex flex-col overflow-hidden bg-background">
       {/* Upper half: the punks artwork, fading into the page. */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-1/2 overflow-hidden">
         <img

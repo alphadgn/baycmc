@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useLockedPageScroll } from "@/hooks/useLockedPageScroll";
 import { LobbyChat } from "@/components/LobbyChat";
 import { LobbyAttendeeHero } from "@/components/LobbyAttendeeHero";
 
@@ -35,24 +35,12 @@ export const Route = createFileRoute("/_authenticated/lobby")({
 });
 
 function LobbyPage() {
-  // Lock body scroll while the lobby is mounted so the page can't scroll
-  // behind the hero — only the chat thread's own scroll container moves.
-  useEffect(() => {
-    const prevHtml = document.documentElement.style.overflow;
-    const prevBody = document.body.style.overflow;
-    document.documentElement.style.overflow = "hidden";
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.documentElement.style.overflow = prevHtml;
-      document.body.style.overflow = prevBody;
-    };
-  }, []);
+  // Lock the page so only the chat thread scrolls, and snap it back to the
+  // top after the phone keyboard closes so the top bar is never lost.
+  useLockedPageScroll();
 
   return (
-    <main
-      className="relative flex flex-col overflow-hidden"
-      style={{ height: "calc(100dvh - 4rem - max(env(safe-area-inset-top, 0px), 0.75rem))" }}
-    >
+    <main className="h-below-header relative flex flex-col overflow-hidden">
       {/* Faded full-page backdrop using the same lobby image. Matches the
           treatment conference rooms get via RoomsShell. */}
       {LOBBY_IMAGE && (

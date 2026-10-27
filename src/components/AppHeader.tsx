@@ -1,5 +1,5 @@
 import { Link, useLocation, useRouter } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, Loader2, LogOut, Menu, User as UserIcon, Wallet, X } from "lucide-react";
 import { signOut, useAuth } from "@/lib/auth/useAuth";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
@@ -66,6 +66,38 @@ const NAV_ITEMS: NavItem[] = [
 
 // Routes treated as "home" — no back arrow shown here.
 const HOME_ROUTES = new Set<string>(["/", "/lobby"]);
+
+/**
+ * Publishes the header's real rendered height (safe-area padding + bar +
+ * border) as the `--app-header-h` CSS variable, so full-screen pages size
+ * themselves to exactly the space left below it instead of guessing.
+ */
+function usePublishedHeaderHeight() {
+  const observerRef = useRef<ResizeObserver | null>(null);
+  useEffect(
+    () => () => {
+      observerRef.current?.disconnect();
+      document.documentElement.style.setProperty("--app-header-h", "0px");
+    },
+    [],
+  );
+  return useCallback((node: HTMLElement | null) => {
+    observerRef.current?.disconnect();
+    observerRef.current = null;
+    const root = document.documentElement;
+    if (!node) {
+      root.style.setProperty("--app-header-h", "0px");
+      return;
+    }
+    const publish = () =>
+      root.style.setProperty("--app-header-h", `${node.getBoundingClientRect().height}px`);
+    publish();
+    if (typeof ResizeObserver !== "undefined") {
+      observerRef.current = new ResizeObserver(publish);
+      observerRef.current.observe(node);
+    }
+  }, []);
+}
 
 // Tracks how many in-app navigations have happened since the tab opened.
 // `window.history.length` is unreliable (counts entries from before the SPA
@@ -156,6 +188,7 @@ export function AppHeader() {
   // verify a BAYC/MAYC. Gated items render with a lock icon and pop the
   // Glyph signing modal on click.
   const showHamburger = isAuthenticated;
+  const headerHeightRef = usePublishedHeaderHeight();
   // Normalize trailing slash so /lobby/ also counts as a home route, and
   // hide the back chevron entirely on the lobby / landing pages so lobby
   // visitors never see a back arrow when they have nowhere meaningful to
@@ -176,6 +209,7 @@ export function AppHeader() {
   return (
     <>
       <header
+        ref={headerHeightRef}
         className="sticky top-0 z-50 glass pl-safe pr-safe"
         style={{ paddingTop: "max(env(safe-area-inset-top, 0px), 0.75rem)" }}
       >

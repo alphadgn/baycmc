@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
+import { useLockedPageScroll } from "@/hooks/useLockedPageScroll";
 import { toast } from "sonner";
 import {
   Bell,
@@ -133,16 +134,7 @@ export function RoomsShell({
   // Lock body scroll while the shell is mounted. Combined with the `fixed`
   // outer wrapper this guarantees the sidebar and right rail can't move,
   // even if the rest of the document grows taller than the viewport.
-  useEffect(() => {
-    const prevHtml = document.documentElement.style.overflow;
-    const prevBody = document.body.style.overflow;
-    document.documentElement.style.overflow = "hidden";
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.documentElement.style.overflow = prevHtml;
-      document.body.style.overflow = prevBody;
-    };
-  }, []);
+  useLockedPageScroll();
 
   return (
     <div className="fixed inset-0 z-0 flex bg-background">
