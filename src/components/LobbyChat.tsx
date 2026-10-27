@@ -28,6 +28,13 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { GifPicker } from "@/components/GifPicker";
 import type { GifResult } from "@/server/giphy.functions";
 import { shortAddress } from "@/lib/short-address";
+import {
+  MemberAvatar,
+  MemberSearchBox,
+  MentionText,
+  useMentionComposer,
+} from "@/components/members/MemberUi";
+import type { MemberHit } from "@/lib/members/memberSearch";
 
 // New tables aren't in the generated Database type yet — see profile-side
 // notes. Cast through an untyped client so this file compiles before regen.
@@ -133,6 +140,12 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
   const [actionTarget, setActionTarget] = useState<LobbyMessage | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  // Show only one member's messages (picked from search, the member list
+  // or a tapped @mention).
+  const [filterMember, setFilterMember] = useState<MemberHit | null>(null);
+  // Member picked in the members panel → mention / show their messages.
+  const [pickedMember, setPickedMember] = useState<MemberHit | null>(null);
+  const mention = useMentionComposer({ value: body, setValue: setBody, inputRef });
   const {
     scrollRef,
     contentRef,
@@ -431,13 +444,14 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
   // flag when its calendar day differs from the previous message's.
   const enriched = useMemo(() => {
     let prev: Date | null = null;
-    return messages.map((m) => {
+    const shown = filterMember ? messages.filter((m) => m.user_id === filterMember.id) : messages;
+    return shown.map((m) => {
       const cur = new Date(m.created_at);
       const showDate = !prev || !isSameDay(prev, cur);
       prev = cur;
       return { msg: m, showDate, date: cur };
     });
-  }, [messages]);
+  }, [messages, filterMember]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
@@ -465,20 +479,59 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
             <SheetHeader className="border-b border-border/60 p-5">
               <SheetTitle className="font-display text-base">Members in lobby</SheetTitle>
             </SheetHeader>
+            <div className="space-y-3 border-b border-border/60 p-3">
+              <MemberSearchBox onSelect={(m) => setPickedMember(m)} />
+              {pickedMember && (
+                <div className="flex items-center gap-2 rounded-lg border border-gold/30 bg-gold/5 p-2">
+                  <MemberAvatar m={pickedMember} size={32} />
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                    {pickedMember.username}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      mention.insertMention(pickedMember);
+                      setPickedMember(null);
+                      setMembersOpen(false);
+                    }}
+                    className="rounded-md bg-gold px-2.5 py-1 text-xs font-semibold text-gold-foreground"
+                  >
+                    Mention
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilterMember(pickedMember);
+                      setPickedMember(null);
+                      setMembersOpen(false);
+                    }}
+                    className="rounded-md border border-border px-2.5 py-1 text-xs text-foreground hover:bg-secondary"
+                  >
+                    Messages
+                  </button>
+                </div>
+              )}
+            </div>
             {memberList.length === 0 ? (
               <p className="p-5 text-xs italic text-muted-foreground">No members posting yet.</p>
             ) : (
               <ul className="p-2">
                 {memberList.map((p) => {
                   const name =
-                    p.username ??
-                    (p.wallet_address
-                      ? `${shortAddress(p.wallet_address)}`
-                      : "anon");
+                    p.username ?? (p.wallet_address ? `${shortAddress(p.wallet_address)}` : "anon");
                   return (
                     <li
                       key={p.id}
-                      className="flex items-center gap-3 rounded-lg p-2 transition hover:bg-secondary/60"
+                      onClick={() =>
+                        p.username &&
+                        setPickedMember({
+                          id: p.id,
+                          username: p.username,
+                          avatar_url: p.avatar_url,
+                          wallet_display: p.wallet_address ?? null,
+                        })
+                      }
+                      className={`flex items-center gap-3 rounded-lg p-2 transition hover:bg-secondary/60 ${p.username ? "cursor-pointer" : ""}`}
                     >
                       <div
                         className={`h-9 w-9 shrink-0 overflow-hidden border border-border bg-gradient-gold ${avatarShapeClass(p.avatar_url)}`}
@@ -505,6 +558,26 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
         </Sheet>
       </div>
 
+      {filterMember && (
+        <div className="flex items-center justify-between gap-2 border-b border-gold/30 bg-gold/5 px-3 py-1.5 text-xs sm:px-4">
+          <span className="flex min-w-0 items-center gap-2">
+            <MemberAvatar m={filterMember} size={20} />
+            <span className="truncate">
+              Showing messages from{" "}
+              <span className="font-semibold text-gold">{filterMember.username}</span>
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={() => setFilterMember(null)}
+            className="inline-flex items-center gap-1 rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
+            aria-label="Show all messages"
+          >
+            <X className="h-3.5 w-3.5" /> All
+          </button>
+        </div>
+      )}
+
       {/* Message stream */}
       <div className="relative flex min-h-0 flex-1 flex-col">
         <div
@@ -520,6 +593,10 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
                   <div key={i} className="h-14 animate-pulse rounded-lg bg-muted/20" />
                 ))}
               </div>
+            ) : filterMember && enriched.length === 0 ? (
+              <p className="py-12 text-center text-sm text-muted-foreground">
+                No recent messages from {filterMember.username} here.
+              </p>
             ) : messages.length === 0 ? (
               <p className="py-12 text-center text-sm text-muted-foreground">
                 Welcome to the lobby. Say hi 👋
@@ -553,6 +630,7 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
                     }}
                     onReact={(emoji) => toggleReaction(msg.id, emoji)}
                     onLongPress={() => setActionTarget(msg)}
+                    onMention={(m) => setFilterMember(m)}
                   />
                 </div>
               ))
@@ -640,10 +718,11 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
           e.preventDefault();
           void send();
         }}
-        className="flex items-end gap-1.5 border-t border-border/60 bg-card/40 px-2 py-2 sm:gap-2 sm:px-3"
+        className="relative flex items-end gap-1.5 border-t border-border/60 bg-card/40 px-2 py-2 sm:gap-2 sm:px-3"
         // Keep the composer above the iOS home-indicator safe area.
         style={{ paddingBottom: "max(env(safe-area-inset-bottom), 0.5rem)" }}
       >
+        {mention.popup}
         <button
           type="button"
           onPointerDown={() => inputRef.current?.blur()}
@@ -706,7 +785,9 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
           ref={inputRef}
           value={body}
           onChange={(e) => setBody(e.target.value)}
+          {...mention.inputProps}
           onKeyDown={(e) => {
+            if (mention.onKeyDown(e)) return;
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
               void send();
@@ -917,6 +998,7 @@ function MessageRow({
   onReply,
   onReact,
   onLongPress,
+  onMention,
 }: {
   message: LobbyMessage;
   author?: ProfileMini;
@@ -927,13 +1009,12 @@ function MessageRow({
   onReply: () => void;
   onReact: (emoji: string) => void;
   onLongPress: () => void;
+  onMention: (m: MemberHit) => void;
 }) {
   const mine = message.user_id === currentUserId;
   const name =
     author?.username ??
-    (author?.wallet_address
-      ? `${shortAddress(author.wallet_address)}`
-      : "anon");
+    (author?.wallet_address ? `${shortAddress(author.wallet_address)}` : "anon");
   const initials = (name ?? "??").slice(0, 2).toUpperCase();
 
   const grouped = reactions.reduce<Record<string, ReactionRow[]>>((acc, r) => {
@@ -1063,7 +1144,11 @@ function MessageRow({
           )}
           {message.body && (
             <p className="mt-0.5 max-w-full whitespace-pre-wrap break-words text-sm leading-relaxed [overflow-wrap:anywhere]">
-              {message.body}
+              <MentionText
+                body={message.body}
+                onMention={onMention}
+                mineHighlight={currentUserId}
+              />
             </p>
           )}
           {message.image_url && (

@@ -17,12 +17,40 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { GifPicker } from "@/components/GifPicker";
 import type { GifResult } from "@/server/giphy.functions";
 import { shortAddress } from "@/lib/short-address";
+import { MemberAvatar, useMentionComposer } from "@/components/members/MemberUi";
+import { splitMentions, useMemberDirectory, useMemberSearch } from "@/lib/members/memberSearch";
+import type { MemberHit } from "@/lib/members/memberSearch";
 
-/** Tokenize a message body, marking @mentions and #tags as clickable. */
-function renderTokens(body: string, onToken: (token: string) => void) {
+/**
+ * Render a message body: @mentions of real members (usernames may contain
+ * spaces) and #tags are clickable and filter the thread.
+ */
+function renderBody(body: string, members: MemberHit[], onToken: (token: string) => void) {
+  return splitMentions(body, members).flatMap((p, i) =>
+    p.kind === "mention"
+      ? [
+          <button
+            key={`m${i}`}
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToken(`@${p.member.username}`);
+            }}
+            className="font-semibold text-gold underline-offset-2 hover:underline"
+          >
+            {p.text}
+          </button>,
+        ]
+      : renderTokens(p.text, onToken, `t${i}`),
+  );
+}
+
+/** Tokenize plain text, marking #tags as clickable. */
+function renderTokens(body: string, onToken: (token: string) => void, keyPrefix = "") {
   const parts = body.split(/(\s+)/);
-  return parts.map((part, i) => {
-    const m = part.match(/^([@#])([A-Za-z0-9_-]+)$/);
+  return parts.map((part, j) => {
+    const i = `${keyPrefix}-${j}`;
+    const m = part.match(/^(#)([A-Za-z0-9_-]+)$/);
     if (!m) return <span key={i}>{part}</span>;
     const token = part;
     return (
@@ -95,6 +123,14 @@ export function MessageThread({
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const members = useMemberDirectory();
+  const mention = useMentionComposer({ value: input, setValue: setInput, inputRef });
+  // "@…" in the search bar → member suggestions from the database.
+  const searchingUser = query.trim().startsWith("@");
+  const userTerm = searchingUser ? query.trim().slice(1) : "";
+  const exactUser =
+    searchingUser && members.some((m) => m.username.toLowerCase() === userTerm.toLowerCase());
+  const { hits: userHits } = useMemberSearch(userTerm, searchingUser && !exactUser, 6, true);
   const { scrollRef, contentRef, handleScroll } = useChatScroll(
     channelName,
     !loading && !denied,
@@ -346,7 +382,7 @@ export function MessageThread({
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search messages, @user, #tag"
+          placeholder="Search messages, @username, #tag"
           aria-label="Search messages"
           className="min-w-0 flex-1 bg-transparent text-xs focus:outline-none placeholder:text-muted-foreground/70"
         />
@@ -361,6 +397,22 @@ export function MessageThread({
           </button>
         )}
       </div>
+      {searchingUser && !exactUser && userHits.length > 0 && (
+        <ul className="relative z-10 max-h-48 overflow-y-auto border-b border-border/60 bg-popover py-1">
+          {userHits.map((m) => (
+            <li key={m.id}>
+              <button
+                type="button"
+                onClick={() => setQuery(`@${m.username}`)}
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-secondary"
+              >
+                <MemberAvatar m={m} size={22} />
+                <span className="truncate font-medium">{m.username}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       <div
         ref={scrollRef}
         onScroll={handleScroll}
@@ -384,9 +436,7 @@ export function MessageThread({
               const mine = m.user_id === user?.id;
               const name =
                 profile?.username ??
-                (profile?.wallet_address
-                  ? `${shortAddress(profile.wallet_address)}`
-                  : "anon");
+                (profile?.wallet_address ? `${shortAddress(profile.wallet_address)}` : "anon");
               const hasAnyContent = !!m.body || !!m.image_url || !!m.gif_url;
               return (
                 <div
@@ -423,7 +473,7 @@ export function MessageThread({
                     >
                       {m.body && (
                         <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
-                          {renderTokens(m.body, (tok) => setQuery(tok))}
+                          {renderBody(m.body, members, (tok) => setQuery(tok))}
                         </p>
                       )}
                       {m.image_url && (
@@ -567,6 +617,7 @@ export function MessageThread({
         }}
         className="relative flex min-w-0 items-center gap-2 border-t border-border/60 p-3"
       >
+        {mention.popup}
         <input
           ref={fileRef}
           type="file"
@@ -612,7 +663,9 @@ export function MessageThread({
           ref={inputRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
+          {...mention.inputProps}
           onKeyDown={(e) => {
+            if (mention.onKeyDown(e)) return;
             if (e.key === "Escape" && editingId) {
               e.preventDefault();
               cancelEdit();

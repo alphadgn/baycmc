@@ -31,11 +31,7 @@ export function AiAssistant() {
   });
 
   const isLoading = status === "submitted" || status === "streaming";
-  const { scrollRef, contentRef, handleScroll } = useChatScroll(
-    "assistant",
-    open,
-    messages,
-  );
+  const { scrollRef, contentRef, handleScroll } = useChatScroll("assistant", open, messages);
 
   async function handleSend() {
     const text = input.trim();
@@ -49,7 +45,7 @@ export function AiAssistant() {
       <SheetTrigger asChild>
         <Button
           size="icon"
-          className="fixed bottom-[calc(env(safe-area-inset-bottom)+7rem)] left-3 z-40 h-9 w-9 rounded-full shadow-lg"
+          className="fixed bottom-[calc(env(safe-area-inset-bottom)+7.75rem)] right-3 z-40 h-9 w-9 rounded-full shadow-lg"
           aria-label="Open AI assistant"
         >
           <Sparkles className="h-4 w-4" />
