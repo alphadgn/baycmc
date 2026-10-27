@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "sdk_version": "0.20.0",
+  "sdk_version": "0.20.1",
   "path": "/mcp",
   "auth": {
     "type": "oauth",
@@ -13,7 +13,7 @@
     "server": {
       "name": "baycmc-mcp",
       "version": "0.2.0",
-      "title": "BAYCMC MCP"
+      "title": "BAYCmc MCP"
     },
     "tools": [
       {
@@ -44,7 +44,7 @@
       {
         "name": "list_rooms",
         "title": "List clubhouse rooms",
-        "description": "List active BAYCMC clubhouse rooms (conference/Zoom-style rooms, karaoke rooms, and other tiered rooms) the signed-in user can see.",
+        "description": "List active BAYCmc clubhouse rooms (conference/Zoom-style rooms, karaoke rooms, and other tiered rooms) the signed-in user can see.",
         "annotations": {
           "readOnlyHint": true,
           "openWorldHint": false
@@ -101,7 +101,7 @@
       {
         "name": "book_room",
         "title": "Book a clubhouse room",
-        "description": "Reserve a BAYCMC clubhouse room (conference/karaoke) for a time window. The booking is created as the signed-in user; RLS and the overlap trigger reject conflicts.",
+        "description": "Reserve a BAYCmc clubhouse room (conference/karaoke) for a time window. The booking is created as the signed-in user; RLS and the overlap trigger reject conflicts.",
         "annotations": {
           "readOnlyHint": false,
           "destructiveHint": false,
@@ -284,7 +284,7 @@
       {
         "name": "get_my_verification_status",
         "title": "Get my verification status",
-        "description": "Return the signed-in user's BAYCMC verification state (BAYC / OtherPage / delegation / Lumina) and role summary.",
+        "description": "Return the signed-in user's BAYCmc verification state (BAYC / OtherPage / delegation / Lumina) and role summary.",
         "annotations": {
           "readOnlyHint": true,
           "openWorldHint": false
@@ -299,7 +299,7 @@
       {
         "name": "list_linked_wallets",
         "title": "List my linked wallets",
-        "description": "List wallets the signed-in user has linked to their BAYCMC account, with verification and last-checked timestamps.",
+        "description": "List wallets the signed-in user has linked to their BAYCmc account, with verification and last-checked timestamps.",
         "annotations": {
           "readOnlyHint": true,
           "openWorldHint": false
