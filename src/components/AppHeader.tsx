@@ -156,6 +156,7 @@ export function AppHeader() {
   // verify a BAYC/MAYC. Gated items render with a lock icon and pop the
   // Glyph signing modal on click.
   const showHamburger = isAuthenticated;
+  const headerHeightRef = usePublishedHeaderHeight();
   // Normalize trailing slash so /lobby/ also counts as a home route, and
   // hide the back chevron entirely on the lobby / landing pages so lobby
   // visitors never see a back arrow when they have nowhere meaningful to
@@ -176,6 +177,7 @@ export function AppHeader() {
   return (
     <>
       <header
+        ref={headerHeightRef}
         className="sticky top-0 z-50 glass pl-safe pr-safe"
         style={{ paddingTop: "max(env(safe-area-inset-top, 0px), 0.75rem)" }}
       >
