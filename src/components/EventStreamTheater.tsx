@@ -104,7 +104,7 @@ export function EventStreamTheater({
   }, [join]);
 
   return (
-    <div className="relative flex min-h-[calc(100dvh-4rem)] flex-col overflow-hidden bg-[#070504]">
+    <div className="min-h-below-header relative flex flex-col overflow-hidden bg-[#070504]">
       <TheaterTop />
       {state.phase === "live" ? (
         <LiveKitRoom
@@ -704,7 +704,7 @@ function LiveScreen({
       className="relative w-full overflow-hidden bg-black"
       // Whole visible screen under the 4rem app bar (dynamic viewport so
       // mobile browser bars don't push it off-screen).
-      style={{ height: isFull ? "100dvh" : "calc(100dvh - 4rem)" }}
+      style={{ height: isFull ? "100dvh" : "calc(100dvh - var(--app-header-h))" }}
     >
       <VideoTrack
         ref={setVideo}
