@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
 import { avatarShapeClass } from "@/lib/profile-avatar";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { shortAddress } from "@/lib/short-address";
+import { MemberSearchBox, MentionText, useMentionComposer } from "@/components/members/MemberUi";
+import type { MemberHit } from "@/lib/members/memberSearch";
 
 interface Post {
   id: string;
@@ -33,6 +35,15 @@ export function SocialFeed({ liferOnly = false }: SocialFeedProps) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [profiles, setProfiles] = useState<Record<string, Profile>>({});
   const [body, setBody] = useState("");
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  // Show one member's posts (from the member search or a tapped @mention).
+  const [byMember, setByMember] = useState<MemberHit | null>(null);
+  const mention = useMentionComposer({
+    value: body,
+    setValue: setBody,
+    inputRef: composerRef,
+    placement: "below",
+  });
   const [posting, setPosting] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -135,18 +146,26 @@ export function SocialFeed({ liferOnly = false }: SocialFeedProps) {
     }
   }
 
+  const shownPosts = byMember ? posts.filter((p) => p.user_id === byMember.id) : posts;
+
   return (
     <div className="space-y-4">
       {user && (
-        <div className="glass rounded-2xl p-4 shadow-card">
+        <div className="glass relative rounded-2xl p-4 shadow-card">
           <textarea
+            ref={composerRef}
             value={body}
             onChange={(e) => setBody(e.target.value)}
+            {...mention.inputProps}
+            onKeyDown={(e) => {
+              mention.onKeyDown(e);
+            }}
             placeholder="Share with the club…"
             maxLength={4000}
             rows={3}
             className="w-full resize-none rounded-md border border-border bg-input px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-sans-display"
           />
+          {mention.popup}
           <div className="mt-2 flex items-center justify-between">
             <span className="text-[11px] text-muted-foreground">{body.length}/4000</span>
             <button
@@ -160,24 +179,40 @@ export function SocialFeed({ liferOnly = false }: SocialFeedProps) {
         </div>
       )}
 
+      <div className="space-y-2">
+        <MemberSearchBox onSelect={setByMember} placeholder="Find posts by username" />
+        {byMember && (
+          <div className="flex items-center justify-between rounded-lg border border-gold/30 bg-gold/5 px-3 py-1.5 text-xs">
+            <span>
+              Posts by <span className="font-semibold text-gold">{byMember.username}</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setByMember(null)}
+              className="rounded px-1.5 py-0.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
+            >
+              Show all
+            </button>
+          </div>
+        )}
+      </div>
+
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
             <div key={i} className="h-24 animate-pulse rounded-2xl bg-muted/20" />
           ))}
         </div>
-      ) : posts.length === 0 ? (
+      ) : shownPosts.length === 0 ? (
         <p className="py-12 text-center text-sm text-muted-foreground font-sans-display">
-          No posts yet. Be the first.
+          {byMember ? `No posts from ${byMember.username} yet.` : "No posts yet. Be the first."}
         </p>
       ) : (
-        posts.map((p) => {
+        shownPosts.map((p) => {
           const profile = profiles[p.user_id];
           const name =
             profile?.username ??
-            (profile?.wallet_address
-              ? `${shortAddress(profile.wallet_address)}`
-              : "anon");
+            (profile?.wallet_address ? `${shortAddress(profile.wallet_address)}` : "anon");
           return (
             <article key={p.id} className="glass rounded-2xl p-5 shadow-card">
               <header className="flex items-center gap-3">
@@ -200,7 +235,11 @@ export function SocialFeed({ liferOnly = false }: SocialFeedProps) {
                 </div>
               </header>
               <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed font-sans-display">
-                {p.body}
+                <MentionText
+                  body={p.body}
+                  mineHighlight={user?.id ?? null}
+                  onMention={setByMember}
+                />
               </p>
               <footer className="mt-3 flex items-center gap-4 text-xs text-muted-foreground">
                 <button
