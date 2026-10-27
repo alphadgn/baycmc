@@ -8,11 +8,11 @@ export const Route = createFileRoute("/login")({
   head: () => ({
     meta: [
       { title: "Main Entrance — BAYCmc" },
-      {
-        name: "description",
-        content:
-          "Sign in with email and password to enter the BAYCmc lobby. No wallet required for unverified clubhouse areas.",
-      },
+      { name: "description", content: "Sign in with Glyph email to enter the lobby." },
+      { property: "og:title", content: "Main Entrance — BAYCmc" },
+      { property: "og:description", content: "Sign in with Glyph email to enter the lobby." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: LoginPage,
