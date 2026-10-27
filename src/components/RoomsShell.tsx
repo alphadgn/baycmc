@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
+import { useLockedPageScroll } from "@/hooks/useLockedPageScroll";
 import { toast } from "sonner";
 import {
   Bell,

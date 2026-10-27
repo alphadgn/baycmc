@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useLockedPageScroll } from "@/hooks/useLockedPageScroll";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Lock, Video } from "lucide-react";
 import { LobbyChat } from "@/components/LobbyChat";
