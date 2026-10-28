@@ -29,66 +29,11 @@ import {
   X,
 } from "lucide-react";
 import { signOut, useAuth } from "@/lib/auth/useAuth";
-import { useAuthGate } from "@/state/authGate";
-import { useMudwaterAccess } from "@/lib/mudwater/useMudwaterAccess";
+import { ClubNavList } from "@/components/nav/ClubNavList";
 import { useRoomPreferences } from "@/lib/baycmc/useRoomPreferences";
 import { useNotificationPrefs } from "@/lib/baycmc/useNotificationPrefs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { supabase } from "@/integrations/supabase/client";
-
-type NavTarget =
-  | "/"
-  | "/lobby"
-  | "/feed"
-  | "/rooms"
-  | "/karaoke"
-  | "/mudwater"
-  | "/calendar"
-  | "/profile"
-  | "/admin"
-  | "/activity"
-  | "/lifers"
-  | "/support";
-
-interface NavItem {
-  to: NavTarget;
-  label: string;
-  icon: ReactNode;
-  tier: "all" | "verified" | "lifer" | "admin";
-  match?: string;
-}
-
-const NAV_ITEMS: NavItem[] = [
-  { to: "/lobby", label: "Home", tier: "all", icon: <Home className="h-4 w-4" /> },
-  { to: "/lobby", label: "Public Lobby", tier: "all", icon: <Users className="h-4 w-4" /> },
-  { to: "/feed", label: "Holders Chat", tier: "verified", icon: <Sparkles className="h-4 w-4" /> },
-  {
-    to: "/rooms",
-    label: "Conference Rooms",
-    tier: "verified",
-    icon: <Video className="h-4 w-4" />,
-    match: "/rooms",
-  },
-  // Karaoke is accessed via the Conference Rooms list (kind=karaoke). No
-  // separate sidebar entry — the single public Karaoke Room shows up there.
-  {
-    to: "/calendar",
-    label: "Calendar",
-    tier: "verified",
-    icon: <CalendarIcon className="h-4 w-4" />,
-  },
-  {
-    to: "/mudwater",
-    label: "Mudwater",
-    tier: "all",
-    icon: <Swords className="h-4 w-4" />,
-    match: "/mudwater",
-  },
-  { to: "/activity", label: "My Activity", tier: "all", icon: <Sparkles className="h-4 w-4" /> },
-  { to: "/profile", label: "Profile", tier: "all", icon: <User className="h-4 w-4" /> },
-  { to: "/admin", label: "Admin", tier: "admin", icon: <Shield className="h-4 w-4" /> },
-  { to: "/support", label: "Support", tier: "all", icon: <LifeBuoy className="h-4 w-4" /> },
-];
 
 interface RoomsShellProps {
   /** Big title on the welcome strip / main heading. */
@@ -258,33 +203,14 @@ function Sidebar({
   onNavigate?: () => void;
   onClose?: () => void;
 }) {
-  const location = useLocation();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
-  const gate = useAuthGate();
-  const mudwaterOk = useMudwaterAccess();
-  const isVerifiedHolder = gate.ownsRequiredAsset;
-  const isLifer = gate.showLifers;
-  const isAdmin = gate.isAdmin;
-
   async function handleSignOut() {
     await signOut();
     toast.success("Signed out");
     onNavigate?.();
     void navigate({ to: "/" });
   }
-
-  // Filter nav by access. Admins see every item; Lifer-only items hide for
-  // non-Lifers (admins are treated as Lifers by useVerificationStatus).
-  const items = NAV_ITEMS.filter((item) => {
-    // Mudwater: wallet-signed-in sessions only.
-    if (item.to === "/mudwater") return mudwaterOk;
-    if (item.tier === "all") return true;
-    if (item.tier === "admin") return isAdmin;
-    if (item.tier === "lifer") return isLifer;
-    if (item.tier === "verified") return isVerifiedHolder;
-    return false;
-  });
 
   return (
     <nav className={`flex flex-col ${className ?? ""}`} aria-label="Primary">
@@ -317,30 +243,9 @@ function Sidebar({
         )}
       </div>
 
-      <ul className="scrollbar-modern flex min-h-0 flex-1 flex-col space-y-1 overflow-x-hidden overflow-y-auto p-3">
-        {items.map((item) => {
-          const active = item.match
-            ? location.pathname.startsWith(item.match)
-            : location.pathname === item.to;
-          return (
-            <li key={item.to + item.label}>
-              <Link
-                to={item.to}
-                onClick={onNavigate}
-                aria-current={active ? "page" : undefined}
-                className={`flex items-center gap-2.5 rounded-md px-3 py-2 text-[13px] font-medium transition font-sans-display ${
-                  active
-                    ? "bg-gold/10 text-gold ring-1 ring-gold/30"
-                    : "text-foreground/80 hover:bg-secondary/50 hover:text-foreground"
-                }`}
-              >
-                <span className={active ? "text-gold" : "text-muted-foreground"}>{item.icon}</span>
-                <span className="truncate">{item.label}</span>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
+      <div className="scrollbar-modern min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-3">
+        <ClubNavList onNavigate={onNavigate} compact />
+      </div>
 
       {isAuthenticated && (
         <div className="border-t border-border/60 p-3">

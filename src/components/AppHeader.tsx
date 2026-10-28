@@ -4,65 +4,14 @@ import { ArrowLeft, Loader2, LogOut, Menu, User as UserIcon, Wallet, X } from "l
 import { signOut, useAuth } from "@/lib/auth/useAuth";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import { useAuthGate } from "@/state/authGate";
-import { useMudwaterAccess } from "@/lib/mudwater/useMudwaterAccess";
 import { useGlyphAuthState } from "@/lib/auth/useGlyphBridge";
 import { supabase } from "@/integrations/supabase/client";
-import { useMenuItems } from "@/lib/baycmc/useMenuItems";
-import type { MenuItemKey } from "@/lib/baycmc/menu-items";
 import { EntranceDialog } from "@/components/EntranceDialog";
+import { ClubNavList } from "@/components/nav/ClubNavList";
 import { EmbroideredImage } from "@/components/EmbroideredImage";
 import { WalletPill } from "@/components/WalletPill";
-import { hasPartnerAccess } from "@/lib/web3/constants";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-
-interface NavItem {
-  to:
-    | "/"
-    | "/lobby"
-    | "/feed"
-    | "/rooms"
-    | "/ape-rides"
-    | "/karaoke"
-    | "/profile"
-    | "/activity"
-    | "/lifers"
-    | "/lifers/messages"
-    | "/support"
-    | "/punks-brunch"
-    | "/mudwater"
-    | "/event-stream"
-    | "/admin"
-    | "/super-admin";
-  label: string;
-  // "lobby_only" = visible only to signed-in users who are NOT verified
-  // holders. Holders already reach the karaoke room from the Conference
-  // Rooms hall (it lives there as a karaoke-kind tile), so a duplicate
-  // top-level entry would be redundant for them. Lobby visitors still
-  // need a direct way in since Conference Rooms is gated.
-  // "ape_rides" = full holders AND partner holders (Temp Agency, Orca
-  // Business, Ugly Duck Labs) — partners see the regular menu + this item.
-  // "area" = a gated area unlocked per collection by the super admin's
-  // menu matrix (Super Admin → Menu access); `area` names which one.
-  tier: "all" | "lobby_only" | "area" | "lifer" | "admin" | "super_admin";
-  area?: MenuItemKey;
-}
-
-const NAV_ITEMS: NavItem[] = [
-  { to: "/lobby", label: "Public Lobby", tier: "all" },
-  { to: "/feed", label: "Holders Chat", tier: "area", area: "holders_chat" },
-  { to: "/punks-brunch", label: "Punks Brunch", tier: "area", area: "punks_brunch" },
-  { to: "/rooms", label: "Conference Rooms", tier: "area", area: "conference_rooms" },
-  { to: "/event-stream", label: "Event Stream", tier: "area", area: "event_stream" },
-  { to: "/ape-rides", label: "Ape Rides", tier: "area", area: "ape_rides" },
-  { to: "/lifers/messages", label: "Lifer Chat", tier: "lifer" },
-  { to: "/karaoke", label: "Karaoke Room", tier: "all" },
-  { to: "/mudwater", label: "Mudwater", tier: "all" },
-  { to: "/profile", label: "Profile", tier: "all" },
-  { to: "/support", label: "Support", tier: "all" },
-  { to: "/admin", label: "Administrator", tier: "admin" },
-  { to: "/super-admin", label: "Super Admin", tier: "super_admin" },
-];
 
 // Routes treated as "home" — no back arrow shown here.
 const HOME_ROUTES = new Set<string>(["/", "/lobby"]);
@@ -107,13 +56,10 @@ function usePublishedHeaderHeight() {
 let internalNavCount = 0;
 
 export function AppHeader() {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated } = useAuth();
   const gate = useAuthGate();
-  const mudwaterOk = useMudwaterAccess();
   const isVerifiedHolder = gate.ownsRequiredAsset;
   const isLifer = gate.showLifers;
-  const { collections } = useVerificationStatus();
-  const menuItems = useMenuItems();
   const [entranceOpen, setEntranceOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   useEffect(() => {
@@ -122,9 +68,6 @@ export function AppHeader() {
     return () => window.removeEventListener("baycmc:link-wallet-open", open);
   }, []);
   const [navOpen, setNavOpen] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
-  const [karaokeRoomId, setKaraokeRoomId] = useState<string | null>(null);
   // pendingGatedRoute removed: gated nav entries are now hidden entirely
   // until verification completes, so there's no in-menu retry flow.
 
@@ -137,51 +80,6 @@ export function AppHeader() {
   useEffect(() => {
     internalNavCount += 1;
   }, [location.pathname]);
-
-  useEffect(() => {
-    if (!user) {
-      setIsAdmin(false);
-      setIsSuperAdmin(false);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      const { data } = await supabase.from("user_roles").select("role").eq("user_id", user.id);
-      if (cancelled) return;
-      const roles = (data ?? []).map((r) => r.role);
-      setIsSuperAdmin(roles.includes("super_admin"));
-      setIsAdmin(roles.includes("admin") || roles.includes("super_admin"));
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [user]);
-
-  // Resolve the active karaoke room id once so the menu entry can link
-  // straight into the room — avoids relying on a server-side beforeLoad
-  // redirect from /karaoke that intermittently no-ops for lobby users.
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setKaraokeRoomId(null);
-      return;
-    }
-    let cancelled = false;
-    void (async () => {
-      const { data } = await supabase
-        .from("rooms")
-        .select("id")
-        .eq("kind", "karaoke")
-        .eq("active", true)
-        .order("display_order", { ascending: true, nullsFirst: false })
-        .limit(1)
-        .maybeSingle();
-      if (cancelled) return;
-      setKaraokeRoomId((data?.id as string | undefined) ?? null);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [isAuthenticated]);
 
   // Show the hamburger to every authenticated user — lobby visitors get to
   // browse the full clubhouse menu and see exactly what unlocks once they
@@ -204,7 +102,16 @@ export function AppHeader() {
     location.pathname === "/rooms" ||
     location.pathname.startsWith("/rooms/") ||
     location.pathname === "/calendar";
-  if (usesRoomsShell) return null;
+  // The rooms shell has its own sidebar; keep only the dialogs mounted so
+  // its menu can still open wallet sign-in.
+  if (usesRoomsShell) {
+    return (
+      <>
+        <EntranceDialog open={entranceOpen} onOpenChange={setEntranceOpen} />
+        <EntranceDialog open={linkOpen} onOpenChange={setLinkOpen} mode="link" />
+      </>
+    );
+  }
 
   return (
     <>
@@ -270,52 +177,12 @@ export function AppHeader() {
                       Clubhouse
                     </SheetTitle>
                   </SheetHeader>
-                  <nav className="flex flex-col p-3">
-                    {NAV_ITEMS.filter((item) => {
-                      // Hide gated items entirely from users without access.
-                      if (item.tier === "area")
-                        return !!item.area && (isAdmin || menuItems.has(item.area));
-                      if (item.tier === "lifer") return isLifer;
-                      if (item.tier === "super_admin") return isSuperAdmin;
-                      if (item.tier === "admin") return isAdmin;
-                      // Karaoke Room shortcut only for lobby visitors;
-                      // holders reach it via Conference Rooms.
-                      if (item.tier === "lobby_only") return !isVerifiedHolder;
-                      // Mudwater: wallet-signed-in sessions only.
-                      if (item.to === "/mudwater") return mudwaterOk;
-                      return true;
-                    }).map((item) => {
-                      const isAdminTier = item.tier === "admin" || item.tier === "super_admin";
-                      const sharedClass = `flex items-center justify-between rounded-md px-3 py-3 text-sm font-medium transition hover:bg-secondary/60 ${
-                        item.tier === "lifer" || isAdminTier ? "text-gold" : "text-foreground"
-                      }`;
-                      return (
-                        <Link
-                          key={item.to}
-                          {...(item.to === "/karaoke" && karaokeRoomId
-                            ? { to: "/karaoke/$roomId", params: { roomId: karaokeRoomId } }
-                            : { to: item.to })}
-                          onClick={() => setNavOpen(false)}
-                          className={sharedClass}
-                        >
-                          <span>{item.label}</span>
-                          {item.tier === "lifer" && (
-                            <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-gold">
-                              Lifer
-                            </span>
-                          )}
-                          {isAdminTier && (
-                            <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-gold">
-                              {item.tier === "super_admin" ? "Super" : "Admin"}
-                            </span>
-                          )}
-                        </Link>
-                      );
-                    })}
-                  </nav>
+                  <div className="p-3">
+                    <ClubNavList onNavigate={() => setNavOpen(false)} />
+                  </div>
                   <div className="border-t border-border/60 p-3 text-[11px] text-muted-foreground">
                     {isLifer
-                      ? "Lifer access — every door is open."
+                      ? "Lifer access granted."
                       : isVerifiedHolder
                         ? "Verified holder access."
                         : ""}

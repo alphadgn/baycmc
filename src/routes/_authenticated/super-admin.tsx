@@ -1,3 +1,4 @@
+import { LiferAccessTab } from "@/components/superadmin/LiferAccessTab";
 import { createFileRoute, redirect, Link } from "@tanstack/react-router";
 import { useEffect, useState, useCallback } from "react";
 import { useServerFn } from "@tanstack/react-start";
@@ -60,7 +61,7 @@ export const Route = createFileRoute("/_authenticated/super-admin")({
 });
 
 function SuperAdminPage() {
-  const [tab, setTab] = useState<"users" | "chapters" | "menu" | "rides">("users");
+  const [tab, setTab] = useState<"users" | "chapters" | "menu" | "rides" | "lifers">("users");
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
@@ -90,7 +91,7 @@ function SuperAdminPage() {
         </nav>
       </header>
 
-      <div className="mb-4 flex gap-2 text-xs font-sans-display">
+      <div className="mb-4 flex flex-wrap gap-2 text-xs font-sans-display">
         <button
           onClick={() => setTab("users")}
           className={`rounded-md px-3 py-2 ${tab === "users" ? "bg-gradient-gold text-gold-foreground shadow-gold" : "border border-border hover:bg-muted"}`}
@@ -115,6 +116,12 @@ function SuperAdminPage() {
         >
           Ape Rides
         </button>
+        <button
+          onClick={() => setTab("lifers")}
+          className={`rounded-md px-3 py-2 ${tab === "lifers" ? "bg-gradient-gold text-gold-foreground shadow-gold" : "border border-border hover:bg-muted"}`}
+        >
+          Lifer access
+        </button>
         <Link
           to="/admin/event-stream"
           className="rounded-md border border-border px-3 py-2 hover:bg-muted"
@@ -129,6 +136,8 @@ function SuperAdminPage() {
         <ChaptersTab />
       ) : tab === "menu" ? (
         <MenuAccessTab />
+      ) : tab === "lifers" ? (
+        <LiferAccessTab />
       ) : (
         <ApeRidesAdminTab />
       )}

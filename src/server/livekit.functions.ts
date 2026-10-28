@@ -37,7 +37,9 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data: room, error } = await supabaseAdmin
     .from("rooms")
-    .select("id,name,tier,kind,livekit_room,capacity,active,is_locked,required_collection")
+    .select(
+      "id,name,tier,kind,livekit_room,capacity,active,is_locked,required_collection,coming_soon",
+    )
     .eq("id", roomId)
     .maybeSingle();
   if (error || !room || !room.active) {
@@ -52,6 +54,27 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
       error: "Mudwater rooms don't have voice or video.",
       code: "room_unavailable",
     };
+  }
+
+  // Rooms marked "coming soon" (the Game Room for now) are listed but closed.
+  if ((room as { coming_soon?: boolean }).coming_soon) {
+    return { ok: false, error: "This room is coming soon.", code: "room_unavailable" };
+  }
+  // Club chapter rooms open only for approved chapter meetings; until that
+  // booking flow is live, only admins and the super admin may enter.
+  if (room.kind === "chapter") {
+    const { data: staff } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .in("role", ["admin", "super_admin"]);
+    if (!staff?.length) {
+      return {
+        ok: false,
+        error: "Chapter rooms open only for approved local chapter meetings.",
+        code: "room_unavailable",
+      };
+    }
   }
 
   const isKaraoke = room.kind === "karaoke";
@@ -178,23 +201,22 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
       };
     }
   }
-  if (
-    room.tier === "lifer" &&
-    !isAdmin &&
-    !((ver?.bayc_verified || isVerifiedRole) && ver?.otherpage_verified)
-  ) {
-    return {
-      ok: false,
-      error:
-        "Lifer rooms require both a verified BAYC/MAYC holding and an Otherpage / Lifer token in your wallet.",
-      code: "otherpage_revoked",
-    };
+  // Lifer rooms: super-admin grant only (lifer_grants via is_lifer).
+  if (room.tier === "lifer" && !isAdmin) {
+    const { data: lifer } = await supabaseAdmin.rpc("is_lifer", { _user_id: userId });
+    if (lifer !== true) {
+      return {
+        ok: false,
+        error: "The Lifer room is open only to members the super admin has granted Lifer access.",
+        code: "otherpage_revoked",
+      };
+    }
   }
 
   // Booked meetings: while a booking is in progress, only its host, admins
   // and approved guests may enter. Anyone else is added to the host's
   // waiting list and let in once the host (or an admin) approves them.
-  if (room.kind === "conference" || room.kind === "game") {
+  if (room.kind === "conference" || room.kind === "game" || room.kind === "chapter") {
     const { activeBookingFor } = await import("@/server/room-guests.server");
     const booking = await activeBookingFor(roomId);
     if (booking && booking.user_id !== userId && !isAdmin) {

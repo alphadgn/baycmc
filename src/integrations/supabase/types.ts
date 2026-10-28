@@ -490,6 +490,12 @@ export type Database = {
         };
         Relationships: [];
       };
+      lifer_grants: {
+        Row: { created_at: string; granted_by: string | null; user_id: string };
+        Insert: { created_at?: string; granted_by?: string | null; user_id: string };
+        Update: { created_at?: string; granted_by?: string | null; user_id?: string };
+        Relationships: [];
+      };
       karaoke_backing_tracks: {
         Row: {
           artist: string | null;
@@ -1696,6 +1702,7 @@ export type Database = {
         Row: {
           active: boolean;
           capacity: number;
+          coming_soon: boolean;
           created_at: string;
           description: string | null;
           display_order: number | null;
@@ -1712,6 +1719,7 @@ export type Database = {
         Insert: {
           active?: boolean;
           capacity?: number;
+          coming_soon?: boolean;
           created_at?: string;
           description?: string | null;
           display_order?: number | null;
@@ -1728,6 +1736,7 @@ export type Database = {
         Update: {
           active?: boolean;
           capacity?: number;
+          coming_soon?: boolean;
           created_at?: string;
           description?: string | null;
           display_order?: number | null;
@@ -1921,6 +1930,7 @@ export type Database = {
       };
     };
     Functions: {
+      set_lifer_grant: { Args: { _uid: string; _granted: boolean }; Returns: undefined };
       search_members: {
         Args: { _q?: string; _limit?: number };
         Returns: {
