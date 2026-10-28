@@ -66,9 +66,10 @@ function Index() {
                 className="mx-auto -mt-2 w-full max-w-[calc(100vw-2rem)] sm:-mt-3"
               />
             </h1>
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground sm:mt-3 sm:text-xl">
-              Yacht Club social network, live audio rooms, conference bookings, and local chapter
-              sub communities — all gated by on-chain proof of BAYC / MAYC ownership.
+            <p className="mt-2 text-sm leading-relaxed text-yellow-400 sm:mt-3 sm:text-xl">
+              Yacht Club social network, karaoke w/tipping, live PvP &amp; PvAi Mudwater gameplay,
+              free conference room bookings, closed local chapter communities rooms, club event
+              exclusive live streams and so much more!
             </p>
             <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
               {isAuthenticated ? (
