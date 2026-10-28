@@ -33,6 +33,8 @@ import { Route as AuthenticatedSuperAdminRouteImport } from './routes/_authentic
 import { Route as AuthenticatedSupportRouteImport } from './routes/_authenticated/support'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiContractAuditRouteImport } from './routes/api/contract-audit'
+import { Route as PerformanceIdRouteImport } from './routes/performance.$id'
+import { Route as PerformerUserIdRouteImport } from './routes/performer.$userId'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as AuthenticatedVerifiedApeRidesRouteImport } from './routes/_authenticated/_verified/ape-rides'
@@ -181,6 +183,16 @@ const ApiChatRoute = ApiChatRouteImport.update({
 const ApiContractAuditRoute = ApiContractAuditRouteImport.update({
   id: '/api/contract-audit',
   path: '/api/contract-audit',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PerformanceIdRoute = PerformanceIdRouteImport.update({
+  id: '/performance/$id',
+  path: '/performance/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PerformerUserIdRoute = PerformerUserIdRouteImport.update({
+  id: '/performer/$userId',
+  path: '/performer/$userId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
@@ -357,6 +369,8 @@ export interface FileRoutesByFullPath {
   '/support': typeof AuthenticatedSupportRoute
   '/api/chat': typeof ApiChatRoute
   '/api/contract-audit': typeof ApiContractAuditRoute
+  '/performance/$id': typeof PerformanceIdRoute
+  '/performer/$userId': typeof PerformerUserIdRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/ape-rides': typeof AuthenticatedVerifiedApeRidesRouteWithChildren
@@ -404,6 +418,8 @@ export interface FileRoutesByTo {
   '/support': typeof AuthenticatedSupportRoute
   '/api/chat': typeof ApiChatRoute
   '/api/contract-audit': typeof ApiContractAuditRoute
+  '/performance/$id': typeof PerformanceIdRoute
+  '/performer/$userId': typeof PerformerUserIdRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/ape-rides': typeof AuthenticatedVerifiedApeRidesRouteWithChildren
@@ -457,6 +473,8 @@ export interface FileRoutesById {
   '/_authenticated/support': typeof AuthenticatedSupportRoute
   '/api/chat': typeof ApiChatRoute
   '/api/contract-audit': typeof ApiContractAuditRoute
+  '/performance/$id': typeof PerformanceIdRoute
+  '/performer/$userId': typeof PerformerUserIdRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/_authenticated/_verified/ape-rides': typeof AuthenticatedVerifiedApeRidesRouteWithChildren
@@ -509,6 +527,8 @@ export interface FileRouteTypes {
     | '/support'
     | '/api/chat'
     | '/api/contract-audit'
+    | '/performance/$id'
+    | '/performer/$userId'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/ape-rides'
@@ -556,6 +576,8 @@ export interface FileRouteTypes {
     | '/support'
     | '/api/chat'
     | '/api/contract-audit'
+    | '/performance/$id'
+    | '/performer/$userId'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/ape-rides'
@@ -608,6 +630,8 @@ export interface FileRouteTypes {
     | '/_authenticated/support'
     | '/api/chat'
     | '/api/contract-audit'
+    | '/performance/$id'
+    | '/performer/$userId'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/_authenticated/_verified/ape-rides'
@@ -648,6 +672,8 @@ export interface RootRouteChildren {
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiContractAuditRoute: typeof ApiContractAuditRoute
+  PerformanceIdRoute: typeof PerformanceIdRoute
+  PerformerUserIdRoute: typeof PerformerUserIdRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   ApiPublicHealthRoute: typeof ApiPublicHealthRoute
@@ -822,6 +848,20 @@ declare module '@tanstack/react-router' {
       path: '/api/contract-audit'
       fullPath: '/api/contract-audit'
       preLoaderRoute: typeof ApiContractAuditRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/performance/$id': {
+      id: '/performance/$id'
+      path: '/performance/$id'
+      fullPath: '/performance/$id'
+      preLoaderRoute: typeof PerformanceIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/performer/$userId': {
+      id: '/performer/$userId'
+      path: '/performer/$userId'
+      fullPath: '/performer/$userId'
+      preLoaderRoute: typeof PerformerUserIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/.lovable/oauth/consent': {
@@ -1166,6 +1206,8 @@ const rootRouteChildren: RootRouteChildren = {
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
   ApiChatRoute: ApiChatRoute,
   ApiContractAuditRoute: ApiContractAuditRoute,
+  PerformanceIdRoute: PerformanceIdRoute,
+  PerformerUserIdRoute: PerformerUserIdRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   ApiPublicHealthRoute: ApiPublicHealthRoute,

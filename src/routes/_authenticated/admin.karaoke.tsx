@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { getKaraokeCatalogStats, seedKaraokeCatalog } from "@/lib/karaoke.functions";
 import { karaokeCreateRoom, karaokeDeleteRoom } from "@/server/karaoke-admin.functions";
+import { cleanupOrphanRecordingFiles } from "@/server/public-performances.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/karaoke")({
   beforeLoad: async () => {
@@ -30,6 +31,16 @@ interface Stats {
 }
 
 function AdminKaraokePage() {
+  const cleanup = useServerFn(cleanupOrphanRecordingFiles);
+  // Remove recording files that no performance points to (e.g. deleted
+  // pre-waiver takes). Quietly runs whenever an admin opens this page.
+  useEffect(() => {
+    void cleanup()
+      .then((r) => {
+        if (r.removed > 0) toast.success(`Removed ${r.removed} old recording file(s).`);
+      })
+      .catch(() => undefined);
+  }, [cleanup]);
   const seed = useServerFn(seedKaraokeCatalog);
   const fetchStats = useServerFn(getKaraokeCatalogStats);
   const [busy, setBusy] = useState(false);

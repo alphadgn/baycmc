@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Disc3, Eye, EyeOff, Loader2, Music, Trash2 } from "lucide-react";
+import { Disc3, Loader2, Music, Share2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   deleteKaraokeRecording,
   listRoomKaraokeRecordings,
-  setKaraokeRecordingVisibility,
   type RecordingListItem,
 } from "@/lib/karaoke/recordings.functions";
 import { supabase } from "@/integrations/supabase/client";
@@ -33,7 +32,6 @@ export function KaraokeRecordingsPanel({
   const { user } = useAuth();
   const listFn = useServerFn(listRoomKaraokeRecordings);
   const deleteFn = useServerFn(deleteKaraokeRecording);
-  const visFn = useServerFn(setKaraokeRecordingVisibility);
   const [rows, setRows] = useState<RecordingListItem[] | null>(null);
   const [names, setNames] = useState<Record<string, string>>({});
   const [mineOnly, setMineOnly] = useState(false);
@@ -75,12 +73,19 @@ export function KaraokeRecordingsPanel({
     if (!res.ok) toast.error(res.error);
     else void load();
   }
-  async function toggleVisibility(r: RecordingListItem) {
-    const res = await visFn({
-      data: { id: r.id, visibility: r.visibility === "private" ? "room" : "private" },
-    });
-    if (!res.ok) toast.error(res.error);
-    else void load();
+  // Performances are public: share a link anyone can open, no account needed.
+  async function share(r: RecordingListItem) {
+    const url = `${window.location.origin}/performance/${r.id}`;
+    const title = r.song_title ? `${r.song_title} — BAYCmc karaoke` : "BAYCmc karaoke performance";
+    try {
+      if (navigator.share) await navigator.share({ title, url });
+      else {
+        await navigator.clipboard.writeText(url);
+        toast.success("Share link copied.");
+      }
+    } catch {
+      /* share sheet dismissed */
+    }
   }
 
   return (
@@ -121,21 +126,17 @@ export function KaraokeRecordingsPanel({
                     <p className="truncate text-[10px] uppercase tracking-wider text-muted-foreground">
                       {names[r.performer_id] ?? "Member"} · {fmtDuration(r.duration_ms)} ·{" "}
                       {new Date(r.created_at).toLocaleString()}
-                      {r.visibility === "private" && " · private"}
                     </p>
                   </div>
-                  {own && (
+                  {r.visibility === "public" && (
                     <button
                       type="button"
-                      onClick={() => void toggleVisibility(r)}
-                      title={r.visibility === "private" ? "Show to the room" : "Make private"}
+                      onClick={() => void share(r)}
+                      aria-label="Share this performance"
+                      title="Share"
                       className="rounded p-1 text-muted-foreground hover:text-foreground"
                     >
-                      {r.visibility === "private" ? (
-                        <EyeOff className="h-3.5 w-3.5" />
-                      ) : (
-                        <Eye className="h-3.5 w-3.5" />
-                      )}
+                      <Share2 className="h-3.5 w-3.5" />
                     </button>
                   )}
                   {(own || isAdmin) && (

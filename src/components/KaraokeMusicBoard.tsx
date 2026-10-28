@@ -1,3 +1,4 @@
+import { KaraokeWaiverDialog } from "@/components/karaoke/KaraokeWaiverDialog";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -144,6 +145,8 @@ export function KaraokeMusicBoard({
   const paused = session.playback_status === "paused";
 
   const [open, setOpen] = useState(false);
+  // The performance waiver shows every time the machine is opened.
+  const [waiverOpen, setWaiverOpen] = useState(false);
   const [forceExpanded, setForceExpanded] = useState(false);
   const isPlaying = hasSong && !paused;
   const minimized = isPlaying && !forceExpanded;
@@ -152,7 +155,7 @@ export function KaraokeMusicBoard({
   }, [hasSong]);
   // Pop the machine open for the singer when their turn starts.
   useEffect(() => {
-    if (isMyTurn) setOpen(true);
+    if (isMyTurn) setWaiverOpen(true);
   }, [isMyTurn]);
 
   const [tab, setTab] = useState<"youtube" | "tracks">(
@@ -240,7 +243,6 @@ export function KaraokeMusicBoard({
   useEffect(() => {
     if (!videoId) return;
     postToPlayer(paused ? "pauseVideo" : "playVideo");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paused, videoId]);
 
   // Watchdog: the server says "playing" but the player sits paused/unstarted
@@ -419,25 +421,40 @@ export function KaraokeMusicBoard({
     return () => window.clearTimeout(t);
   }, [sizeMode, open]);
 
+  const waiver = (
+    <KaraokeWaiverDialog
+      open={waiverOpen}
+      onAccept={() => {
+        setWaiverOpen(false);
+        setPos({ dx: 0, dy: 0 });
+        setOpen(true);
+      }}
+      onDecline={() => {
+        setWaiverOpen(false);
+        setOpen(false);
+      }}
+    />
+  );
+
   if (!open) {
     return (
-      <button
-        type="button"
-        onClick={() => {
-          setPos({ dx: 0, dy: 0 });
-          setOpen(true);
-        }}
-        aria-label="Open music machine"
-        style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 8.5rem)" }}
-        className="group fixed left-1/2 z-50 inline-flex -translate-x-1/2 items-center gap-2 rounded-full border border-gold/60 bg-background/80 px-3 py-1.5 text-[11px] font-semibold text-gold shadow-gold backdrop-blur transition hover:bg-gold/10"
-      >
-        <span
-          aria-hidden
-          className="pointer-events-none absolute inset-0 rounded-full ring-2 ring-gold/60 animate-ping"
-        />
-        <Music className="relative h-3.5 w-3.5 animate-pulse" />
-        <span className="relative">Karaoke Machine</span>
-      </button>
+      <>
+        {waiver}
+        <button
+          type="button"
+          onClick={() => setWaiverOpen(true)}
+          aria-label="Open music machine"
+          style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 8.5rem)" }}
+          className="group fixed left-1/2 z-50 inline-flex -translate-x-1/2 items-center gap-2 rounded-full border border-gold/60 bg-background/80 px-3 py-1.5 text-[11px] font-semibold text-gold shadow-gold backdrop-blur transition hover:bg-gold/10"
+        >
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-0 rounded-full ring-2 ring-gold/60 animate-ping"
+          />
+          <Music className="relative h-3.5 w-3.5 animate-pulse" />
+          <span className="relative">Karaoke Machine</span>
+        </button>
+      </>
     );
   }
 
@@ -468,6 +485,7 @@ export function KaraokeMusicBoard({
   // vertically inside the player instead of growing it.
   return (
     <>
+      {waiver}
       {scrollHint && (
         <div
           key={scrollHint.n}
