@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth/useAuth";
 import { toast } from "sonner";
 import { VerificationStatusPanel } from "@/components/VerificationStatusPanel";
 import { NftGallery } from "@/components/NftGallery";
+import { MyPerformances } from "@/components/karaoke/MyPerformances";
 import { LinkedWalletsPanel } from "@/components/LinkedWalletsPanel";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import { AvatarPicker } from "@/components/AvatarPicker";
@@ -447,6 +448,7 @@ function ProfilePage() {
           <NftGallery address={wallet} includeLinkedWallets />
         </section>
       )}
+      {user && <MyPerformances userId={user.id} />}
     </main>
   );
 }

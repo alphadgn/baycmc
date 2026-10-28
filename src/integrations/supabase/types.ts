@@ -1930,6 +1930,8 @@ export type Database = {
       };
     };
     Functions: {
+      accept_karaoke_waiver: { Args: { _version: string }; Returns: undefined };
+      karaoke_waiver_ok: { Args: { _uid: string }; Returns: boolean };
       set_lifer_grant: { Args: { _uid: string; _granted: boolean }; Returns: undefined };
       search_members: {
         Args: { _q?: string; _limit?: number };

@@ -20,7 +20,8 @@ const InsertSchema = z.object({
     .nullable(),
   mimeType: z.string().max(64).default("audio/webm"),
   hasInstrumental: z.boolean().default(true),
-  visibility: z.enum(["room", "private"]).default("room"),
+  // Every performance is public (performance waiver, 2026-10-28).
+  visibility: z.enum(["room", "private", "public"]).default("public"),
 });
 
 const SIGNED_URL_TTL_S = 60 * 60;
@@ -73,7 +74,7 @@ export const saveKaraokeRecording = createServerFn({ method: "POST" })
         duration_ms: data.durationMs ?? null,
         mime_type: data.mimeType,
         has_instrumental: data.hasInstrumental,
-        visibility: data.visibility,
+        visibility: "public",
       })
       .select("id")
       .single();
@@ -115,10 +116,10 @@ export const listRoomKaraokeRecordings = createServerFn({ method: "POST" })
     );
     const paths = visible.map((r) => r.storage_path as string);
     const signed = paths.length
-      ? (// Rows above were already filtered by RLS + visibility for this
+      ? // Rows above were already filtered by RLS + visibility for this
         // caller; the files themselves are owner/staff-only in storage, so
         // the server signs links just for those rows.
-        (
+        ((
           await (
             await import("@/integrations/supabase/client.server")
           ).supabaseAdmin.storage

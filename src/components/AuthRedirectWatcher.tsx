@@ -52,6 +52,8 @@ export function AuthRedirectWatcher() {
       if (!wasSignedIn) return;
 
       if (PUBLIC_ROUTES.has(current)) return;
+      // Public karaoke share pages work without an account.
+      if (current.startsWith("/performance/") || current.startsWith("/performer/")) return;
 
       // Use `replace: true` so the back button doesn't take the user
       // straight back into a now-unauthorized route.
