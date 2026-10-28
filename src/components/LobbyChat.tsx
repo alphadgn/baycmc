@@ -119,9 +119,17 @@ const INSERT_EMOJI = [
 
 interface LobbyChatProps {
   channelName?: string;
+  /** Heading for the members panel (default "Members in lobby"). */
+  membersTitle?: string;
+  /** Shown when the channel has no messages yet. */
+  emptyText?: string;
 }
 
-export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
+export function LobbyChat({
+  channelName = "lobby",
+  membersTitle = "Members in lobby",
+  emptyText = "Welcome to the lobby. Say hi 👋",
+}: LobbyChatProps) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<LobbyMessage[]>([]);
   const [profiles, setProfiles] = useState<Record<string, ProfileMini>>({});
@@ -477,7 +485,7 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
             className="w-[88vw] max-w-sm border-l border-gold/20 bg-popover p-0"
           >
             <SheetHeader className="border-b border-border/60 p-5">
-              <SheetTitle className="font-display text-base">Members in lobby</SheetTitle>
+              <SheetTitle className="font-display text-base">{membersTitle}</SheetTitle>
             </SheetHeader>
             <div className="space-y-3 border-b border-border/60 p-3">
               <MemberSearchBox onSelect={(m) => setPickedMember(m)} />
@@ -598,9 +606,7 @@ export function LobbyChat({ channelName = "lobby" }: LobbyChatProps) {
                 No recent messages from {filterMember.username} here.
               </p>
             ) : messages.length === 0 ? (
-              <p className="py-12 text-center text-sm text-muted-foreground">
-                Welcome to the lobby. Say hi 👋
-              </p>
+              <p className="py-12 text-center text-sm text-muted-foreground">{emptyText}</p>
             ) : (
               enriched.map(({ msg, showDate, date }) => (
                 <div key={msg.id}>
