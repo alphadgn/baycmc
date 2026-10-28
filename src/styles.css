@@ -532,3 +532,44 @@ html {
 .room-in-use {
   animation: room-in-use-glow 1.8s ease-in-out infinite;
 }
+
+/* Home hero tagline: words rise in one after another, then a soft shimmer. */
+.hero-tagline-word {
+  display: inline-block;
+  white-space: pre;
+  opacity: 0;
+  transform: translateY(0.6em);
+  filter: blur(4px);
+  animation: hero-word-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.hero-tagline {
+  text-shadow: 0 0 0 rgba(255, 255, 255, 0);
+  animation: hero-tagline-glow 4s ease-in-out 2.5s infinite;
+}
+@keyframes hero-word-in {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+@keyframes hero-tagline-glow {
+  0%,
+  100% {
+    text-shadow: 0 0 0 rgba(255, 255, 255, 0);
+  }
+  50% {
+    text-shadow: 0 0 14px rgba(255, 255, 255, 0.35);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-tagline-word {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    animation: none;
+  }
+  .hero-tagline {
+    animation: none;
+  }
+}

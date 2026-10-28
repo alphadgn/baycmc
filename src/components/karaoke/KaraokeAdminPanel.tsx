@@ -102,7 +102,7 @@ export function KaraokeAdminPanel({
       new Set([...p.map((x) => x.user_id), ...(sanc as Sanction[]).map((s) => s.user_id)]),
     );
     if (ids.length) {
-      const { data } = await supabase.from("profiles").select("id,username").in("id", ids);
+      const { data } = await supabase.rpc("member_profiles").select("id,username").in("id", ids);
       const map: Record<string, string> = {};
       for (const id of ids) map[id] = `Member ${id.slice(0, 4)}`;
       for (const r of (data ?? []) as { id: string; username: string | null }[])

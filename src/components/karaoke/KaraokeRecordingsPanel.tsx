@@ -42,7 +42,7 @@ export function KaraokeRecordingsPanel({
       setRows(res);
       const ids = Array.from(new Set(res.map((r) => r.performer_id)));
       if (ids.length) {
-        const { data } = await supabase.from("profiles").select("id,username").in("id", ids);
+        const { data } = await supabase.rpc("member_profiles").select("id,username").in("id", ids);
         const map: Record<string, string> = {};
         for (const id of ids) map[id] = `Member ${id.slice(0, 4)}`;
         for (const p of (data ?? []) as { id: string; username: string | null }[]) {

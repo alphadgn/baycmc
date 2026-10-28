@@ -112,7 +112,7 @@ function AdminSupport() {
       const ids = Array.from(seen.keys());
       if (ids.length) {
         const { data: profs } = await supabase
-          .from("profiles")
+          .rpc("member_profiles")
           .select("id,username,avatar_url,wallet_address:wallet_display")
           .in("id", ids);
         for (const p of (profs ?? []) as ProfileMini[]) {

@@ -741,7 +741,7 @@ function useParticipantProfiles(participants: Participant[]): Map<string, Profil
     let cancelled = false;
     void (async () => {
       const { data } = await supabase
-        .from("profiles")
+        .rpc("member_profiles")
         .select("id,username,avatar_url")
         .in("id", toFetch);
       if (cancelled || !data) return;

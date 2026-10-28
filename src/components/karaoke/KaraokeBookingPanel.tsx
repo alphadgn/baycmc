@@ -84,7 +84,10 @@ export function KaraokeBookingPanel({
     setRows(list);
     const ids = Array.from(new Set(list.flatMap((r) => [r.singer_user_id, r.booked_by])));
     if (ids.length) {
-      const { data: profs } = await supabase.from("profiles").select("id,username").in("id", ids);
+      const { data: profs } = await supabase
+        .rpc("member_profiles")
+        .select("id,username")
+        .in("id", ids);
       const map: Record<string, string> = {};
       for (const id of ids) map[id] = `Member ${id.slice(0, 4)}`;
       for (const p of (profs ?? []) as { id: string; username: string | null }[]) {
@@ -122,7 +125,7 @@ export function KaraokeBookingPanel({
     }
     const t = window.setTimeout(async () => {
       const { data } = await supabase
-        .from("profiles")
+        .rpc("member_profiles")
         .select("id,username")
         .ilike("username", `%${singerQuery.trim().replace(/[%_]/g, "")}%`)
         .limit(8);

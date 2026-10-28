@@ -26,7 +26,7 @@ export function LiferAccessTab() {
       .order("created_at", { ascending: false });
     const ids = (grants ?? []).map((g) => g.user_id);
     const { data: profs } = ids.length
-      ? await supabase.from("profiles").select("id,username,avatar_url").in("id", ids)
+      ? await supabase.rpc("member_profiles").select("id,username,avatar_url").in("id", ids)
       : { data: [] as { id: string; username: string | null; avatar_url: string | null }[] };
     setRows(
       (grants ?? []).map((g) => {

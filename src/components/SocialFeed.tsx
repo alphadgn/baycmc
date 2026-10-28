@@ -91,7 +91,7 @@ export function SocialFeed({ liferOnly = false }: SocialFeedProps) {
     const missing = Array.from(new Set(userIds.filter((id) => !profiles[id])));
     if (!missing.length) return;
     const { data } = await supabase
-      .from("profiles")
+      .rpc("member_profiles")
       .select("id,username,wallet_address:wallet_display,avatar_url")
       .in("id", missing);
     if (data) {

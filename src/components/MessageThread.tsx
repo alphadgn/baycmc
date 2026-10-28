@@ -9,6 +9,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { ChatImage, useChatImageUrl } from "@/components/chat/ChatImage";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
 import { useChatScroll } from "@/hooks/use-chat-scroll";
@@ -201,7 +202,7 @@ export function MessageThread({
     const missing = Array.from(new Set(msgs.map((m) => m.user_id).filter((id) => !profiles[id])));
     if (!missing.length) return;
     const { data } = await supabase
-      .from("profiles")
+      .rpc("member_profiles")
       .select("id,username,wallet_address:wallet_display,avatar_url")
       .in("id", missing);
     if (data) {
@@ -336,7 +337,8 @@ export function MessageThread({
   }
 
   // Effective attachments shown in the edit dock (new pending > kept existing).
-  const editShownImageUrl = pendingImagePreview ?? editingImageUrl;
+  const editingImageView = useChatImageUrl(editingImageUrl);
+  const editShownImageUrl = pendingImagePreview ?? editingImageView;
   const editShownGifUrl = pendingGifUrl ?? editingGifUrl;
 
   // Filter messages by free-text search. Supports:
@@ -477,13 +479,10 @@ export function MessageThread({
                         </p>
                       )}
                       {m.image_url && (
-                        <a href={m.image_url} target="_blank" rel="noreferrer">
-                          <img
-                            src={m.image_url}
-                            alt="attachment"
-                            className="max-h-72 max-w-full rounded-lg object-cover"
-                          />
-                        </a>
+                        <ChatImage
+                          url={m.image_url}
+                          imgClassName="max-h-72 max-w-full rounded-lg object-cover"
+                        />
                       )}
                       {m.gif_url && (
                         <img

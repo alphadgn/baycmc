@@ -8,6 +8,9 @@ import { EmbroideredImage } from "@/components/EmbroideredImage";
 
 const OPENSEA_BAYC = "https://opensea.io/collection/boredapeyachtclub";
 
+const HERO_TAGLINE =
+  "Yacht Club social network, karaoke w/tipping, Mudwater gameplay PvP & PvAi, free conference room bookings, closed local chapter communities rooms, club event exclusive live streams and so much more!";
+
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
@@ -66,10 +69,20 @@ function Index() {
                 className="mx-auto -mt-2 w-full max-w-[calc(100vw-2rem)] sm:-mt-3"
               />
             </h1>
-            <p className="mt-2 text-sm leading-relaxed text-yellow-400 sm:mt-3 sm:text-xl">
-              Yacht Club social network, karaoke w/tipping, live PvP &amp; PvAi Mudwater gameplay,
-              free conference room bookings, closed local chapter communities rooms, club event
-              exclusive live streams and so much more!
+            <p
+              className="hero-tagline mt-2 text-sm leading-relaxed text-white sm:mt-3 sm:text-xl"
+              aria-label={HERO_TAGLINE}
+            >
+              {HERO_TAGLINE.split(" ").map((w, i) => (
+                <span
+                  key={i}
+                  aria-hidden="true"
+                  className="hero-tagline-word"
+                  style={{ animationDelay: `${0.25 + i * 0.06}s` }}
+                >
+                  {w}{" "}
+                </span>
+              ))}
             </p>
             <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
               {isAuthenticated ? (

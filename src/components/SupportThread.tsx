@@ -147,7 +147,7 @@ export function SupportThread({
     );
     if (!missing.length) return;
     const { data } = await supabase
-      .from("profiles")
+      .rpc("member_profiles")
       .select("id,username,avatar_url,wallet_address:wallet_display")
       .in("id", missing);
     if (data) {
