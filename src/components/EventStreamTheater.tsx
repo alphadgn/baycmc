@@ -1,3 +1,4 @@
+import { streamHostCheckIn, streamHostEnd } from "@/server/event-stream.functions";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Link } from "@tanstack/react-router";
@@ -783,6 +784,23 @@ function captureOptions(facingMode: "environment" | "user") {
 function HostControls({ highlight, overlay = false }: { highlight: boolean; overlay?: boolean }) {
   const { localParticipant, isCameraEnabled, isMicrophoneEnabled } = useLocalParticipant();
   const streaming = isCameraEnabled || isMicrophoneEnabled;
+  // Single-use grant: check in on start and every minute while live; End
+  // broadcast uses the grant up (admins stream without one).
+  const checkIn = useServerFn(streamHostCheckIn);
+  const endStream = useServerFn(streamHostEnd);
+  useEffect(() => {
+    if (!streaming) return;
+    const t = window.setInterval(() => {
+      void checkIn().then((r) => {
+        if (!r.ok) {
+          toast.error(r.error);
+          void localParticipant.setCameraEnabled(false);
+          void localParticipant.setMicrophoneEnabled(false);
+        }
+      });
+    }, 60_000);
+    return () => window.clearInterval(t);
+  }, [streaming, checkIn, localParticipant]);
   const [facing, setFacing] = useState<"environment" | "user">("environment");
   const [busy, setBusy] = useState(false);
 
@@ -817,6 +835,8 @@ function HostControls({ highlight, overlay = false }: { highlight: boolean; over
           disabled={busy}
           onClick={() =>
             void run(async () => {
+              const ok = await checkIn();
+              if (!ok.ok) throw new Error(ok.error);
               await localParticipant.setCameraEnabled(true, captureOptions(facing));
               await localParticipant.setMicrophoneEnabled(true);
               toast.success("You're live.");
@@ -900,8 +920,12 @@ function HostControls({ highlight, overlay = false }: { highlight: boolean; over
           disabled={busy}
           onClick={() =>
             void run(async () => {
+              if (!window.confirm("End the broadcast? A streaming grant covers one stream."))
+                return;
               await localParticipant.setCameraEnabled(false);
               await localParticipant.setMicrophoneEnabled(false);
+              await endStream();
+              toast.success("Broadcast ended.");
             })
           }
           className={`${btn} border-destructive/50 text-destructive`}

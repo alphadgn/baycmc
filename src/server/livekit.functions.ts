@@ -410,16 +410,27 @@ export const getLivekitToken = createServerFn({ method: "POST" })
     // Muted karaoke members join as listeners: LiveKit itself refuses their
     // tracks, so a mute can't be bypassed from devtools.
     let canPublish = true;
-    // Event Stream: only accounts the super admin assigned may broadcast;
-    // everyone else joins as a viewer (LiveKit refuses their tracks).
+    // Event Stream: admins, the super admin and members holding an open
+    // single-use grant may broadcast; everyone else joins as a viewer
+    // (LiveKit refuses their tracks). Viewing is free for BAYC/MAYC holders,
+    // admins and hosts; other collections need a ticket for the event on now.
     if (room.kind === "stream") {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { data: hostRow } = await supabaseAdmin
-        .from("event_stream_hosts")
-        .select("user_id")
-        .eq("user_id", userId)
-        .maybeSingle();
-      canPublish = !!hostRow;
+      const [{ data: canHost }, { data: free }] = await Promise.all([
+        supabaseAdmin.rpc("stream_can_host", { _uid: userId }),
+        supabaseAdmin.rpc("stream_viewer_free", { _uid: userId }),
+      ]);
+      canPublish = canHost === true;
+      if (free !== true) {
+        const { data: ticket } = await supabaseAdmin.rpc("stream_has_ticket", { _uid: userId });
+        if (ticket !== true) {
+          return {
+            ok: false as const,
+            error: "This event is pay-per-view for your collection. Buy a ticket to watch.",
+            code: "ticket_required" as const,
+          };
+        }
+      }
     }
     if (room.kind === "karaoke") {
       canPublish = await karaokeMayPublish(data.roomId, userId, host);

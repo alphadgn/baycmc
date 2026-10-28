@@ -1930,6 +1930,10 @@ export type Database = {
       };
     };
     Functions: {
+      stream_can_host: { Args: { _uid: string }; Returns: boolean };
+      stream_viewer_free: { Args: { _uid: string }; Returns: boolean };
+      stream_has_ticket: { Args: { _uid: string }; Returns: boolean };
+      stream_current_event: { Args: never; Returns: string };
       accept_karaoke_waiver: { Args: { _version: string }; Returns: undefined };
       karaoke_waiver_ok: { Args: { _uid: string }; Returns: boolean };
       set_lifer_grant: { Args: { _uid: string; _granted: boolean }; Returns: undefined };

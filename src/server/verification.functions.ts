@@ -43,6 +43,9 @@ export const endVerificationSession = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { clearSessionWallets } = await import("@/server/ownership.server");
     await clearSessionWallets(context.userId);
+    // Single-use stream grants end with the session (sign-out or timeout).
+    const { finishStreamGrant } = await import("@/server/stream-grants.server");
+    await finishStreamGrant(context.userId, "signed_out").catch(() => undefined);
     await supabaseAdmin
       .from("user_verifications")
       .update({

@@ -1,15 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { toast } from "sonner";
-import { Loader2, UserMinus, UserPlus } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { getEventStreamStats, type StreamStats } from "@/server/event-stream.functions";
 import {
-  addEventStreamHost,
-  getEventStreamStats,
-  removeEventStreamHost,
-  type StreamStats,
-} from "@/server/event-stream.functions";
-import { getMyAdminContext } from "@/server/admin.functions";
+  StreamGrantsPanel,
+  StreamPayPerViewPanel,
+} from "@/components/eventstream/StreamAdminPanels";
 
 export const Route = createFileRoute("/_authenticated/admin/event-stream")({
   head: () => ({ meta: [{ title: "Event Stream · Admin — BAYCmc" }] }),
@@ -19,19 +16,8 @@ export const Route = createFileRoute("/_authenticated/admin/event-stream")({
 /** Admin + super admin: live statistics for the Event Stream (5s refresh). */
 function EventStreamAdmin() {
   const fetchStats = useServerFn(getEventStreamStats);
-  const addHost = useServerFn(addEventStreamHost);
-  const removeHost = useServerFn(removeEventStreamHost);
-  const myCtx = useServerFn(getMyAdminContext);
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
-  useEffect(() => {
-    void myCtx()
-      .then((c) => setIsSuperAdmin(!!c.isSuperAdmin))
-      .catch(() => setIsSuperAdmin(false));
-  }, [myCtx]);
   const [stats, setStats] = useState<StreamStats | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [username, setUsername] = useState("");
-  const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -47,41 +33,6 @@ function EventStreamAdmin() {
     const t = window.setInterval(() => void load(), 5000);
     return () => window.clearInterval(t);
   }, [load]);
-
-  async function assign() {
-    if (!username.trim()) return;
-    setBusy(true);
-    const res = await addHost({ data: { username: username.trim() } }).catch((e: Error) => ({
-      ok: false as const,
-      error: e.message,
-    }));
-    setBusy(false);
-    if (!res.ok) return toast.error(res.error);
-    toast.success("Host assigned");
-    setUsername("");
-    void load();
-  }
-  const [removing, setRemoving] = useState<string | null>(null);
-  async function unassign(userId: string, name: string) {
-    setRemoving(userId);
-    try {
-      const res = await removeHost({ data: { userId } });
-      if (!res.ok) {
-        toast.error(res.error);
-      } else {
-        toast.success(`${name} is no longer a host`);
-        // Drop it from the list right away; the next refresh confirms it.
-        setStats((s) =>
-          s ? { ...s, assignedHosts: s.assignedHosts.filter((h) => h.userId !== userId) } : s,
-        );
-      }
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't remove host");
-    } finally {
-      setRemoving(null);
-      void load();
-    }
-  }
 
   const live = !!stats?.live;
   return (
@@ -162,52 +113,8 @@ function EventStreamAdmin() {
         </p>
       )}
 
-      <section className="glass mt-6 rounded-2xl p-5 shadow-card">
-        <h2 className="font-display text-xl">Assigned hosts</h2>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Only these accounts can broadcast (from their phone, in the Event Stream page).
-          {isSuperAdmin ? "" : " The super admin manages this list."}
-        </p>
-        <ul className="mt-3 divide-y divide-border/50">
-          {(stats?.assignedHosts ?? []).map((h) => (
-            <li key={h.userId} className="flex items-center justify-between py-2 text-sm">
-              <span>{h.name}</span>
-              {isSuperAdmin && (
-                <button
-                  type="button"
-                  disabled={removing === h.userId}
-                  onClick={() => void unassign(h.userId, h.name)}
-                  className="relative z-10 inline-flex items-center gap-1 rounded-md border border-destructive/40 px-2 py-1 text-xs text-destructive disabled:opacity-60"
-                >
-                  <UserMinus className="h-3.5 w-3.5" />
-                  {removing === h.userId ? "Removing…" : "Remove"}
-                </button>
-              )}
-            </li>
-          ))}
-          {stats && stats.assignedHosts.length === 0 && (
-            <li className="py-2 text-sm text-muted-foreground">No hosts assigned yet.</li>
-          )}
-        </ul>
-        {isSuperAdmin && (
-          <div className="mt-3 flex gap-2">
-            <input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Username"
-              className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm"
-            />
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void assign()}
-              className="inline-flex items-center gap-1 rounded-md bg-gradient-gold px-3 py-2 text-sm font-semibold text-gold-foreground"
-            >
-              <UserPlus className="h-4 w-4" /> Assign host
-            </button>
-          </div>
-        )}
-      </section>
+      <StreamGrantsPanel stats={stats} onChange={() => void load()} />
+      <StreamPayPerViewPanel />
     </main>
   );
 }
