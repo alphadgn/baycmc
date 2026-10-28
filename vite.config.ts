@@ -1,6 +1,7 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import { mcpPlugin } from "@lovable.dev/mcp-js/stacks/tanstack/vite";
 import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
 
 const require_ = createRequire(import.meta.url);
 const { getModules } = require_("rollup-plugin-polyfill-node/dist/modules.js") as {
@@ -31,6 +32,15 @@ const polyfills: Record<string, string> = {
   "node:process": "process",
 };
 
+// Relay's swap widget calls viem's parseUnits("") while its amount box is
+// empty, which current viem rejects (it crashed My activity). Relay's own
+// imports of "viem" go through a shim that reads unfinished amounts as 0.
+const RELAY_VIEM_SHIM = fileURLToPath(
+  new URL("./src/lib/relay/viem-relay-shim.ts", import.meta.url),
+);
+const isRelayImporter = (importer?: string) =>
+  !!importer && /[\\/]@relayprotocol[\\/]/.test(importer);
+
 export default defineConfig({
   vite: {
     optimizeDeps: {
@@ -39,6 +49,24 @@ export default defineConfig({
       // those requests as cache misses instead of returning a preview-blanking
       // 504 "Outdated Optimize Dep" response.
       ignoreOutdatedRequests: true,
+      // Dev pre-bundling uses esbuild, which skips Vite plugins: same redirect.
+      esbuildOptions: {
+        plugins: [
+          {
+            name: "baycmc:relay-viem-shim",
+            setup(build: {
+              onResolve: (
+                o: { filter: RegExp },
+                cb: (a: { importer: string }) => { path: string } | undefined,
+              ) => void;
+            }) {
+              build.onResolve({ filter: /^viem$/ }, (args) =>
+                isRelayImporter(args.importer) ? { path: RELAY_VIEM_SHIM } : undefined,
+              );
+            },
+          },
+        ],
+      },
     },
   },
   tanstackStart: {
@@ -52,6 +80,13 @@ export default defineConfig({
   },
   plugins: [
     mcpPlugin(),
+    {
+      name: "baycmc:relay-viem-shim",
+      enforce: "pre",
+      resolveId(id, importer) {
+        return id === "viem" && isRelayImporter(importer) ? RELAY_VIEM_SHIM : null;
+      },
+    },
     {
       name: "lovable:force-node-builtin-polyfills",
       enforce: "pre",
