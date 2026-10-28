@@ -26,6 +26,7 @@ import {
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
+import { SwapErrorBoundary } from "@/components/activity/SwapErrorBoundary";
 import { listWalletActivity, type ActivityItem } from "@/server/wallet-assets.functions";
 
 export const Route = createFileRoute("/_authenticated/activity")({
@@ -224,15 +225,17 @@ function ActivityPage() {
         </p>
         <div className="mx-auto mt-4 max-w-md">
           {mounted ? (
-            <Suspense
-              fallback={
-                <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading Relay…
-                </div>
-              }
-            >
-              <RelaySwapPanel />
-            </Suspense>
+            <SwapErrorBoundary>
+              <Suspense
+                fallback={
+                  <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading Relay…
+                  </div>
+                }
+              >
+                <RelaySwapPanel />
+              </Suspense>
+            </SwapErrorBoundary>
           ) : null}
         </div>
       </section>
