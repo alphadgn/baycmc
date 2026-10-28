@@ -195,6 +195,33 @@ export async function recomputeOwnership(
   }
 
   await supabaseAdmin.from("user_verifications").upsert(updates, { onConflict: "user_id" });
+  // Durable record of the last verified holdings (session verification is
+  // wiped at sign-out; chapter attendee lists need members who are offline).
+  // Written only from a fresh sign-in check or a wallet just proven by
+  // signature — never from a browser-supplied list.
+  if (write && (opts.fresh || opts.addedWallet)) {
+    // A check that errored is "unknown": keep that collection's previous label.
+    const { data: prevHold } = await supabaseAdmin
+      .from("member_holdings")
+      .select("labels")
+      .eq("user_id", userId)
+      .maybeSingle();
+    const durable = new Set<string>(collections);
+    for (const l of prevHold?.labels ?? []) {
+      const col = ALLOWED_COLLECTIONS.find((c) => c.label === l);
+      if (col && failed.has(col.contract.toLowerCase())) durable.add(l);
+    }
+    await supabaseAdmin
+      .from("member_holdings")
+      .upsert(
+        { user_id: userId, labels: [...durable], verified_at: new Date().toISOString() },
+        { onConflict: "user_id" },
+      )
+      .then(
+        () => undefined,
+        (e: unknown) => console.error("member_holdings upsert failed", e),
+      );
+  }
   if (result.linked.length > 0) {
     touchLinkedWallets(userId).catch(() => {});
   }

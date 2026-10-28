@@ -1,4 +1,5 @@
 import { LiferAccessTab } from "@/components/superadmin/LiferAccessTab";
+import { LocalChaptersTab } from "@/components/superadmin/LocalChaptersTab";
 import { createFileRoute, redirect, Link } from "@tanstack/react-router";
 import { useEffect, useState, useCallback } from "react";
 import { useServerFn } from "@tanstack/react-start";
@@ -61,7 +62,9 @@ export const Route = createFileRoute("/_authenticated/super-admin")({
 });
 
 function SuperAdminPage() {
-  const [tab, setTab] = useState<"users" | "chapters" | "menu" | "rides" | "lifers">("users");
+  const [tab, setTab] = useState<"users" | "chapters" | "menu" | "rides" | "lifers" | "local">(
+    "users",
+  );
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
@@ -122,6 +125,12 @@ function SuperAdminPage() {
         >
           Lifer access
         </button>
+        <button
+          onClick={() => setTab("local")}
+          className={`rounded-md px-3 py-2 ${tab === "local" ? "bg-gradient-gold text-gold-foreground shadow-gold" : "border border-border hover:bg-muted"}`}
+        >
+          Local chapters
+        </button>
         <Link
           to="/admin/event-stream"
           className="rounded-md border border-border px-3 py-2 hover:bg-muted"
@@ -138,6 +147,8 @@ function SuperAdminPage() {
         <MenuAccessTab />
       ) : tab === "lifers" ? (
         <LiferAccessTab />
+      ) : tab === "local" ? (
+        <LocalChaptersTab />
       ) : (
         <ApeRidesAdminTab />
       )}

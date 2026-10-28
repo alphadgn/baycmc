@@ -107,6 +107,12 @@ function AdminPage() {
           >
             Event Stream →
           </Link>
+          <Link
+            to="/admin/chapters"
+            className="inline-flex items-center gap-2 rounded-md border border-gold/40 bg-gold/10 px-3 py-2 text-xs font-semibold text-gold transition hover:bg-gold/20"
+          >
+            Chapter meetings →
+          </Link>
         </div>
       </header>
 

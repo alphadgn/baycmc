@@ -43,12 +43,15 @@ import { Route as AuthenticatedVerifiedEventStreamRouteImport } from './routes/_
 import { Route as AuthenticatedVerifiedFeedRouteImport } from './routes/_authenticated/_verified/feed'
 import { Route as AuthenticatedVerifiedRoomsRouteImport } from './routes/_authenticated/_verified/rooms'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
+import { Route as AuthenticatedAdminChaptersRouteImport } from './routes/_authenticated/admin.chapters'
 import { Route as AuthenticatedAdminEventStreamRouteImport } from './routes/_authenticated/admin.event-stream'
 import { Route as AuthenticatedAdminKaraokeRouteImport } from './routes/_authenticated/admin.karaoke'
 import { Route as AuthenticatedAdminLuminaRouteImport } from './routes/_authenticated/admin.lumina'
 import { Route as AuthenticatedAdminOtherpageRouteImport } from './routes/_authenticated/admin.otherpage'
 import { Route as AuthenticatedAdminSupportRouteImport } from './routes/_authenticated/admin.support'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin.users'
+import { Route as AuthenticatedChaptersChapterIdRouteImport } from './routes/_authenticated/chapters.$chapterId'
+import { Route as AuthenticatedChaptersBookRouteImport } from './routes/_authenticated/chapters.book'
 import { Route as AuthenticatedKaraokeRoomIdRouteImport } from './routes/_authenticated/karaoke.$roomId'
 import { Route as AuthenticatedLifersIndexRouteImport } from './routes/_authenticated/lifers/index'
 import { Route as AuthenticatedLifersMessagesRouteImport } from './routes/_authenticated/lifers/messages'
@@ -59,6 +62,8 @@ import { Route as ApiPublicHealthRouteImport } from './routes/api/public/health'
 import { Route as ApiPublicSecurityScanRouteImport } from './routes/api/public/security-scan'
 import { Route as AuthenticatedVerifiedApeRidesRideIdRouteImport } from './routes/_authenticated/_verified/ape-rides.$rideId'
 import { Route as AuthenticatedVerifiedRoomsRoomIdRouteImport } from './routes/_authenticated/_verified/rooms_.$roomId'
+import { Route as AuthenticatedChaptersMeetingMeetingIdRouteImport } from './routes/_authenticated/chapters.meeting.$meetingId'
+import { Route as AuthenticatedChaptersMinutesMeetingIdRouteImport } from './routes/_authenticated/chapters.minutes.$meetingId'
 import { Route as AuthenticatedMudwaterWatchIndexRouteImport } from './routes/_authenticated/mudwater.watch.index'
 import { Route as AuthenticatedMudwaterWatchMatchIdRouteImport } from './routes/_authenticated/mudwater.watch.$matchId'
 
@@ -241,6 +246,12 @@ const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
+const AuthenticatedAdminChaptersRoute =
+  AuthenticatedAdminChaptersRouteImport.update({
+    id: '/chapters',
+    path: '/chapters',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminEventStreamRoute =
   AuthenticatedAdminEventStreamRouteImport.update({
     id: '/event-stream',
@@ -276,6 +287,18 @@ const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
   path: '/users',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
+const AuthenticatedChaptersChapterIdRoute =
+  AuthenticatedChaptersChapterIdRouteImport.update({
+    id: '/chapters/$chapterId',
+    path: '/chapters/$chapterId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedChaptersBookRoute =
+  AuthenticatedChaptersBookRouteImport.update({
+    id: '/chapters/book',
+    path: '/chapters/book',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedKaraokeRoomIdRoute =
   AuthenticatedKaraokeRoomIdRouteImport.update({
     id: '/$roomId',
@@ -333,6 +356,18 @@ const AuthenticatedVerifiedRoomsRoomIdRoute =
     path: '/rooms/$roomId',
     getParentRoute: () => AuthenticatedVerifiedRoute,
   } as any)
+const AuthenticatedChaptersMeetingMeetingIdRoute =
+  AuthenticatedChaptersMeetingMeetingIdRouteImport.update({
+    id: '/chapters/meeting/$meetingId',
+    path: '/chapters/meeting/$meetingId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedChaptersMinutesMeetingIdRoute =
+  AuthenticatedChaptersMinutesMeetingIdRouteImport.update({
+    id: '/chapters/minutes/$meetingId',
+    path: '/chapters/minutes/$meetingId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedMudwaterWatchIndexRoute =
   AuthenticatedMudwaterWatchIndexRouteImport.update({
     id: '/watch/',
@@ -378,12 +413,15 @@ export interface FileRoutesByFullPath {
   '/event-stream': typeof AuthenticatedVerifiedEventStreamRoute
   '/feed': typeof AuthenticatedVerifiedFeedRoute
   '/rooms': typeof AuthenticatedVerifiedRoomsRoute
+  '/admin/chapters': typeof AuthenticatedAdminChaptersRoute
   '/admin/event-stream': typeof AuthenticatedAdminEventStreamRoute
   '/admin/karaoke': typeof AuthenticatedAdminKaraokeRoute
   '/admin/lumina': typeof AuthenticatedAdminLuminaRoute
   '/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
   '/admin/support': typeof AuthenticatedAdminSupportRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/chapters/$chapterId': typeof AuthenticatedChaptersChapterIdRoute
+  '/chapters/book': typeof AuthenticatedChaptersBookRoute
   '/karaoke/$roomId': typeof AuthenticatedKaraokeRoomIdRoute
   '/lifers/messages': typeof AuthenticatedLifersMessagesRoute
   '/lifers/room': typeof AuthenticatedLifersRoomRoute
@@ -395,6 +433,8 @@ export interface FileRoutesByFullPath {
   '/mudwater/': typeof AuthenticatedMudwaterIndexRoute
   '/ape-rides/$rideId': typeof AuthenticatedVerifiedApeRidesRideIdRoute
   '/rooms/$roomId': typeof AuthenticatedVerifiedRoomsRoomIdRoute
+  '/chapters/meeting/$meetingId': typeof AuthenticatedChaptersMeetingMeetingIdRoute
+  '/chapters/minutes/$meetingId': typeof AuthenticatedChaptersMinutesMeetingIdRoute
   '/mudwater/watch/$matchId': typeof AuthenticatedMudwaterWatchMatchIdRoute
   '/mudwater/watch/': typeof AuthenticatedMudwaterWatchIndexRoute
 }
@@ -427,12 +467,15 @@ export interface FileRoutesByTo {
   '/event-stream': typeof AuthenticatedVerifiedEventStreamRoute
   '/feed': typeof AuthenticatedVerifiedFeedRoute
   '/rooms': typeof AuthenticatedVerifiedRoomsRoute
+  '/admin/chapters': typeof AuthenticatedAdminChaptersRoute
   '/admin/event-stream': typeof AuthenticatedAdminEventStreamRoute
   '/admin/karaoke': typeof AuthenticatedAdminKaraokeRoute
   '/admin/lumina': typeof AuthenticatedAdminLuminaRoute
   '/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
   '/admin/support': typeof AuthenticatedAdminSupportRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/chapters/$chapterId': typeof AuthenticatedChaptersChapterIdRoute
+  '/chapters/book': typeof AuthenticatedChaptersBookRoute
   '/karaoke/$roomId': typeof AuthenticatedKaraokeRoomIdRoute
   '/lifers/messages': typeof AuthenticatedLifersMessagesRoute
   '/lifers/room': typeof AuthenticatedLifersRoomRoute
@@ -444,6 +487,8 @@ export interface FileRoutesByTo {
   '/mudwater': typeof AuthenticatedMudwaterIndexRoute
   '/ape-rides/$rideId': typeof AuthenticatedVerifiedApeRidesRideIdRoute
   '/rooms/$roomId': typeof AuthenticatedVerifiedRoomsRoomIdRoute
+  '/chapters/meeting/$meetingId': typeof AuthenticatedChaptersMeetingMeetingIdRoute
+  '/chapters/minutes/$meetingId': typeof AuthenticatedChaptersMinutesMeetingIdRoute
   '/mudwater/watch/$matchId': typeof AuthenticatedMudwaterWatchMatchIdRoute
   '/mudwater/watch': typeof AuthenticatedMudwaterWatchIndexRoute
 }
@@ -482,12 +527,15 @@ export interface FileRoutesById {
   '/_authenticated/_verified/event-stream': typeof AuthenticatedVerifiedEventStreamRoute
   '/_authenticated/_verified/feed': typeof AuthenticatedVerifiedFeedRoute
   '/_authenticated/_verified/rooms': typeof AuthenticatedVerifiedRoomsRoute
+  '/_authenticated/admin/chapters': typeof AuthenticatedAdminChaptersRoute
   '/_authenticated/admin/event-stream': typeof AuthenticatedAdminEventStreamRoute
   '/_authenticated/admin/karaoke': typeof AuthenticatedAdminKaraokeRoute
   '/_authenticated/admin/lumina': typeof AuthenticatedAdminLuminaRoute
   '/_authenticated/admin/otherpage': typeof AuthenticatedAdminOtherpageRoute
   '/_authenticated/admin/support': typeof AuthenticatedAdminSupportRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/_authenticated/chapters/$chapterId': typeof AuthenticatedChaptersChapterIdRoute
+  '/_authenticated/chapters/book': typeof AuthenticatedChaptersBookRoute
   '/_authenticated/karaoke/$roomId': typeof AuthenticatedKaraokeRoomIdRoute
   '/_authenticated/lifers/messages': typeof AuthenticatedLifersMessagesRoute
   '/_authenticated/lifers/room': typeof AuthenticatedLifersRoomRoute
@@ -499,6 +547,8 @@ export interface FileRoutesById {
   '/_authenticated/mudwater/': typeof AuthenticatedMudwaterIndexRoute
   '/_authenticated/_verified/ape-rides/$rideId': typeof AuthenticatedVerifiedApeRidesRideIdRoute
   '/_authenticated/_verified/rooms_/$roomId': typeof AuthenticatedVerifiedRoomsRoomIdRoute
+  '/_authenticated/chapters/meeting/$meetingId': typeof AuthenticatedChaptersMeetingMeetingIdRoute
+  '/_authenticated/chapters/minutes/$meetingId': typeof AuthenticatedChaptersMinutesMeetingIdRoute
   '/_authenticated/mudwater/watch/$matchId': typeof AuthenticatedMudwaterWatchMatchIdRoute
   '/_authenticated/mudwater/watch/': typeof AuthenticatedMudwaterWatchIndexRoute
 }
@@ -536,12 +586,15 @@ export interface FileRouteTypes {
     | '/event-stream'
     | '/feed'
     | '/rooms'
+    | '/admin/chapters'
     | '/admin/event-stream'
     | '/admin/karaoke'
     | '/admin/lumina'
     | '/admin/otherpage'
     | '/admin/support'
     | '/admin/users'
+    | '/chapters/$chapterId'
+    | '/chapters/book'
     | '/karaoke/$roomId'
     | '/lifers/messages'
     | '/lifers/room'
@@ -553,6 +606,8 @@ export interface FileRouteTypes {
     | '/mudwater/'
     | '/ape-rides/$rideId'
     | '/rooms/$roomId'
+    | '/chapters/meeting/$meetingId'
+    | '/chapters/minutes/$meetingId'
     | '/mudwater/watch/$matchId'
     | '/mudwater/watch/'
   fileRoutesByTo: FileRoutesByTo
@@ -585,12 +640,15 @@ export interface FileRouteTypes {
     | '/event-stream'
     | '/feed'
     | '/rooms'
+    | '/admin/chapters'
     | '/admin/event-stream'
     | '/admin/karaoke'
     | '/admin/lumina'
     | '/admin/otherpage'
     | '/admin/support'
     | '/admin/users'
+    | '/chapters/$chapterId'
+    | '/chapters/book'
     | '/karaoke/$roomId'
     | '/lifers/messages'
     | '/lifers/room'
@@ -602,6 +660,8 @@ export interface FileRouteTypes {
     | '/mudwater'
     | '/ape-rides/$rideId'
     | '/rooms/$roomId'
+    | '/chapters/meeting/$meetingId'
+    | '/chapters/minutes/$meetingId'
     | '/mudwater/watch/$matchId'
     | '/mudwater/watch'
   id:
@@ -639,12 +699,15 @@ export interface FileRouteTypes {
     | '/_authenticated/_verified/event-stream'
     | '/_authenticated/_verified/feed'
     | '/_authenticated/_verified/rooms'
+    | '/_authenticated/admin/chapters'
     | '/_authenticated/admin/event-stream'
     | '/_authenticated/admin/karaoke'
     | '/_authenticated/admin/lumina'
     | '/_authenticated/admin/otherpage'
     | '/_authenticated/admin/support'
     | '/_authenticated/admin/users'
+    | '/_authenticated/chapters/$chapterId'
+    | '/_authenticated/chapters/book'
     | '/_authenticated/karaoke/$roomId'
     | '/_authenticated/lifers/messages'
     | '/_authenticated/lifers/room'
@@ -656,6 +719,8 @@ export interface FileRouteTypes {
     | '/_authenticated/mudwater/'
     | '/_authenticated/_verified/ape-rides/$rideId'
     | '/_authenticated/_verified/rooms_/$roomId'
+    | '/_authenticated/chapters/meeting/$meetingId'
+    | '/_authenticated/chapters/minutes/$meetingId'
     | '/_authenticated/mudwater/watch/$matchId'
     | '/_authenticated/mudwater/watch/'
   fileRoutesById: FileRoutesById
@@ -920,6 +985,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/chapters': {
+      id: '/_authenticated/admin/chapters'
+      path: '/chapters'
+      fullPath: '/admin/chapters'
+      preLoaderRoute: typeof AuthenticatedAdminChaptersRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/event-stream': {
       id: '/_authenticated/admin/event-stream'
       path: '/event-stream'
@@ -961,6 +1033,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/users'
       preLoaderRoute: typeof AuthenticatedAdminUsersRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/chapters/$chapterId': {
+      id: '/_authenticated/chapters/$chapterId'
+      path: '/chapters/$chapterId'
+      fullPath: '/chapters/$chapterId'
+      preLoaderRoute: typeof AuthenticatedChaptersChapterIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/chapters/book': {
+      id: '/_authenticated/chapters/book'
+      path: '/chapters/book'
+      fullPath: '/chapters/book'
+      preLoaderRoute: typeof AuthenticatedChaptersBookRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/karaoke/$roomId': {
       id: '/_authenticated/karaoke/$roomId'
@@ -1032,6 +1118,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedVerifiedRoomsRoomIdRouteImport
       parentRoute: typeof AuthenticatedVerifiedRoute
     }
+    '/_authenticated/chapters/meeting/$meetingId': {
+      id: '/_authenticated/chapters/meeting/$meetingId'
+      path: '/chapters/meeting/$meetingId'
+      fullPath: '/chapters/meeting/$meetingId'
+      preLoaderRoute: typeof AuthenticatedChaptersMeetingMeetingIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/chapters/minutes/$meetingId': {
+      id: '/_authenticated/chapters/minutes/$meetingId'
+      path: '/chapters/minutes/$meetingId'
+      fullPath: '/chapters/minutes/$meetingId'
+      preLoaderRoute: typeof AuthenticatedChaptersMinutesMeetingIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/mudwater/watch/': {
       id: '/_authenticated/mudwater/watch/'
       path: '/watch'
@@ -1089,6 +1189,7 @@ const AuthenticatedVerifiedRouteWithChildren =
   )
 
 interface AuthenticatedAdminRouteChildren {
+  AuthenticatedAdminChaptersRoute: typeof AuthenticatedAdminChaptersRoute
   AuthenticatedAdminEventStreamRoute: typeof AuthenticatedAdminEventStreamRoute
   AuthenticatedAdminKaraokeRoute: typeof AuthenticatedAdminKaraokeRoute
   AuthenticatedAdminLuminaRoute: typeof AuthenticatedAdminLuminaRoute
@@ -1099,6 +1200,7 @@ interface AuthenticatedAdminRouteChildren {
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
+  AuthenticatedAdminChaptersRoute: AuthenticatedAdminChaptersRoute,
   AuthenticatedAdminEventStreamRoute: AuthenticatedAdminEventStreamRoute,
   AuthenticatedAdminKaraokeRoute: AuthenticatedAdminKaraokeRoute,
   AuthenticatedAdminLuminaRoute: AuthenticatedAdminLuminaRoute,
@@ -1171,6 +1273,10 @@ interface AuthenticatedRouteChildren {
   AuthenticatedPunksBrunchRoute: typeof AuthenticatedPunksBrunchRoute
   AuthenticatedSuperAdminRoute: typeof AuthenticatedSuperAdminRoute
   AuthenticatedSupportRoute: typeof AuthenticatedSupportRoute
+  AuthenticatedChaptersChapterIdRoute: typeof AuthenticatedChaptersChapterIdRoute
+  AuthenticatedChaptersBookRoute: typeof AuthenticatedChaptersBookRoute
+  AuthenticatedChaptersMeetingMeetingIdRoute: typeof AuthenticatedChaptersMeetingMeetingIdRoute
+  AuthenticatedChaptersMinutesMeetingIdRoute: typeof AuthenticatedChaptersMinutesMeetingIdRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -1187,6 +1293,12 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedPunksBrunchRoute: AuthenticatedPunksBrunchRoute,
   AuthenticatedSuperAdminRoute: AuthenticatedSuperAdminRoute,
   AuthenticatedSupportRoute: AuthenticatedSupportRoute,
+  AuthenticatedChaptersChapterIdRoute: AuthenticatedChaptersChapterIdRoute,
+  AuthenticatedChaptersBookRoute: AuthenticatedChaptersBookRoute,
+  AuthenticatedChaptersMeetingMeetingIdRoute:
+    AuthenticatedChaptersMeetingMeetingIdRoute,
+  AuthenticatedChaptersMinutesMeetingIdRoute:
+    AuthenticatedChaptersMinutesMeetingIdRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
