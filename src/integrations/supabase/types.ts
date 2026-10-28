@@ -1107,6 +1107,144 @@ export type Database = {
           },
         ];
       };
+      local_chapters: {
+        Row: {
+          id: string;
+          name: string;
+          display_order: number;
+          active: boolean;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          display_order?: number;
+          active?: boolean;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          display_order?: number;
+          active?: boolean;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      chapter_meetings: {
+        Row: {
+          id: string;
+          chapter_id: string;
+          requester_id: string;
+          room_id: string;
+          starts_at: string;
+          ends_at: string;
+          expected_capacity: number;
+          notes: string | null;
+          status: string;
+          leader_labels: string[];
+          reviewed_by: string | null;
+          reviewed_at: string | null;
+          review_note: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          chapter_id: string;
+          requester_id: string;
+          room_id: string;
+          starts_at: string;
+          ends_at: string;
+          expected_capacity: number;
+          notes?: string | null;
+          status?: string;
+          leader_labels?: string[];
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          review_note?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          chapter_id?: string;
+          requester_id?: string;
+          room_id?: string;
+          starts_at?: string;
+          ends_at?: string;
+          expected_capacity?: number;
+          notes?: string | null;
+          status?: string;
+          leader_labels?: string[];
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          review_note?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      chapter_meeting_attendees: {
+        Row: {
+          meeting_id: string;
+          user_id: string;
+          added_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          meeting_id: string;
+          user_id: string;
+          added_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          meeting_id?: string;
+          user_id?: string;
+          added_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      chapter_meeting_attendance: {
+        Row: {
+          meeting_id: string;
+          user_id: string;
+          first_joined_at: string;
+          last_seen_at: string;
+        };
+        Insert: {
+          meeting_id: string;
+          user_id: string;
+          first_joined_at?: string;
+          last_seen_at?: string;
+        };
+        Update: {
+          meeting_id?: string;
+          user_id?: string;
+          first_joined_at?: string;
+          last_seen_at?: string;
+        };
+        Relationships: [];
+      };
+      member_holdings: {
+        Row: {
+          user_id: string;
+          labels: string[];
+          verified_at: string;
+        };
+        Insert: {
+          user_id: string;
+          labels?: string[];
+          verified_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          labels?: string[];
+          verified_at?: string;
+        };
+        Relationships: [];
+      };
       lobby_messages: {
         Row: {
           body: string | null;
@@ -1930,6 +2068,41 @@ export type Database = {
       };
     };
     Functions: {
+      chapter_viewer: { Args: { _uid: string }; Returns: boolean };
+      chapter_room_catalog: {
+        Args: never;
+        Returns: { id: string; name: string; theme: string | null; capacity: number }[];
+      };
+      chapter_room_access: { Args: { _uid: string; _room: string }; Returns: boolean };
+      chapter_touch_attendance: { Args: { _room: string; _uid: string }; Returns: undefined };
+      chapter_request_meeting: {
+        Args: {
+          _chapter: string;
+          _room: string;
+          _starts: string;
+          _minutes: number;
+          _capacity: number;
+          _notes?: string | null;
+        };
+        Returns: string;
+      };
+      chapter_review_meeting: {
+        Args: { _meeting: string; _approve: boolean; _note?: string | null };
+        Returns: undefined;
+      };
+      chapter_cancel_meeting: { Args: { _meeting: string }; Returns: undefined };
+      chapter_set_attendee: {
+        Args: { _meeting: string; _user: string; _add: boolean };
+        Returns: undefined;
+      };
+      chapter_delete_meeting: { Args: { _meeting: string }; Returns: undefined };
+      chapter_save: {
+        Args: { _id: string | null; _name: string; _order: number; _active: boolean };
+        Returns: string;
+      };
+      chapter_remove: { Args: { _id: string }; Returns: undefined };
+      is_staff: { Args: { _uid: string }; Returns: boolean };
+      room_visible: { Args: { _uid: string; _room: string }; Returns: boolean };
       stream_can_host: { Args: { _uid: string }; Returns: boolean };
       stream_viewer_free: { Args: { _uid: string }; Returns: boolean };
       stream_has_ticket: { Args: { _uid: string }; Returns: boolean };

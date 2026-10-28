@@ -19,6 +19,7 @@ export function ClubNavList({
   const location = useLocation();
   const inConference =
     location.pathname.startsWith("/rooms") || location.pathname.startsWith("/punks-brunch");
+  const inChapters = location.pathname.startsWith("/chapters");
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const pad = compact ? "px-3 py-2" : "px-3 py-3";
 
@@ -39,10 +40,16 @@ export function ClubNavList({
             if (l.disabled === "wallet") onNavigate?.();
           }}
           className={cls}
-          title={l.disabled === "wallet" ? "Sign in with a wallet to play" : "Coming soon"}
+          title={
+            l.disabled === "wallet"
+              ? "Sign in with a wallet to play"
+              : l.disabled === "lifer"
+                ? "Lifer access only"
+                : "Coming soon"
+          }
         >
           <span>{l.label}</span>
-          {l.disabled === "wallet" ? (
+          {l.disabled === "wallet" || l.disabled === "lifer" ? (
             <Lock className="h-3.5 w-3.5" aria-hidden="true" />
           ) : (
             <span className="text-[10px] uppercase tracking-wider">Soon</span>
@@ -66,7 +73,7 @@ export function ClubNavList({
     <nav className="flex flex-col" aria-label="Clubhouse">
       {entries.map((e) => {
         if (e.kind === "link") return leaf(e);
-        const isOpen = open[e.key] ?? inConference;
+        const isOpen = open[e.key] ?? (e.key === "chapters" ? inChapters : inConference);
         return (
           <div key={e.key}>
             <button

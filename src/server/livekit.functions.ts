@@ -60,21 +60,29 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
   if ((room as { coming_soon?: boolean }).coming_soon) {
     return { ok: false, error: "This room is coming soon.", code: "room_unavailable" };
   }
-  // Club chapter rooms open only for approved chapter meetings; until that
-  // booking flow is live, only admins and the super admin may enter.
+  // Club chapter rooms open only during an approved local chapter meeting
+  // (from 10 minutes before the start to the end), and only to its leader,
+  // its listed attendees, admins and the super admin. Attendees were checked
+  // against their verified holdings when the leader added them.
   if (room.kind === "chapter") {
-    const { data: staff } = await supabaseAdmin
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId)
-      .in("role", ["admin", "super_admin"]);
-    if (!staff?.length) {
+    const { data: allowed } = await supabaseAdmin.rpc("chapter_room_access", {
+      _uid: userId,
+      _room: roomId,
+    });
+    if (allowed !== true) {
       return {
         ok: false,
-        error: "Chapter rooms open only for approved local chapter meetings.",
+        error:
+          "Chapter rooms open only for approved local chapter meetings, to the people on the list.",
         code: "room_unavailable",
       };
     }
+    // Attendance for the minutes (joins and periodic re-checks refresh it).
+    await supabaseAdmin.rpc("chapter_touch_attendance", { _room: roomId, _uid: userId }).then(
+      () => undefined,
+      () => undefined,
+    );
+    return { ok: true, room };
   }
 
   const isKaraoke = room.kind === "karaoke";
@@ -338,6 +346,20 @@ async function isRoomHost(userId: string, roomId: string): Promise<boolean> {
     .select("role")
     .eq("user_id", userId);
   if (roles?.some((r) => r.role === "admin" || r.role === "super_admin")) return true;
+
+  // Local chapter meetings: the leader who booked hosts while it runs.
+  const nowChapter = new Date().toISOString();
+  const { data: meeting } = await supabaseAdmin
+    .from("chapter_meetings")
+    .select("id")
+    .eq("room_id", roomId)
+    .eq("requester_id", userId)
+    .eq("status", "approved")
+    .lte("starts_at", new Date(Date.now() + 10 * 60_000).toISOString())
+    .gte("ends_at", nowChapter)
+    .limit(1)
+    .maybeSingle();
+  if (meeting) return true;
 
   // Current-slot booking owner is the host while their booking is active.
   const nowIso = new Date().toISOString();

@@ -27,7 +27,7 @@ export type NavLeaf = {
   params?: Record<string, string>;
   tone?: "gold";
   /** Greyed out; tapping shows a note or opens wallet sign-in instead. */
-  disabled?: "coming_soon" | "wallet";
+  disabled?: "coming_soon" | "wallet" | "lifer";
 };
 export type NavGroup = { kind: "group"; key: string; label: string; children: NavLeaf[] };
 export type NavEntry = NavLeaf | NavGroup;
@@ -48,6 +48,7 @@ export function useClubNav(): NavEntry[] {
   const areas = useMenuItems();
   const mudwaterOk = useMudwaterAccess();
   const [rooms, setRooms] = useState<RoomRow[]>([]);
+  const [chapters, setChapters] = useState<{ id: string; name: string }[] | null>(null);
   const userId = user?.id ?? null;
   const collectionsKey = v.collections.join(",");
 
@@ -68,11 +69,32 @@ export function useClubNav(): NavEntry[] {
         .then(({ data }) => {
           if (!cancelled) setRooms((data ?? []) as RoomRow[]);
         });
+    // Local Chapters: verified BAYC / MAYC / CryptoPunks holders and staff.
+    const loadChapters = () =>
+      void supabase.rpc("chapter_viewer", { _uid: userId }).then(async ({ data: ok }) => {
+        if (cancelled) return;
+        if (ok !== true) {
+          setChapters(null);
+          return;
+        }
+        const { data } = await supabase
+          .from("local_chapters")
+          .select("id,name")
+          .eq("active", true)
+          .order("display_order")
+          .order("name");
+        if (!cancelled) setChapters(data ?? []);
+      });
     load();
+    loadChapters();
     window.addEventListener("baycmc:verification-refresh", load);
+    window.addEventListener("baycmc:verification-refresh", loadChapters);
+    window.addEventListener("baycmc:chapters-changed", loadChapters);
     return () => {
       cancelled = true;
       window.removeEventListener("baycmc:verification-refresh", load);
+      window.removeEventListener("baycmc:verification-refresh", loadChapters);
+      window.removeEventListener("baycmc:chapters-changed", loadChapters);
     };
   }, [userId, collectionsKey]);
 
@@ -136,6 +158,32 @@ export function useClubNav(): NavEntry[] {
   } else {
     entries.push(karaokeLeaf, mudwaterLeaf);
   }
+  if (chapters) {
+    // Chapter names (super admin's list), booking, and the Lifer room (the
+    // Cellar) greyed at the bottom — open only to granted Lifers.
+    const children: NavLeaf[] = chapters.map((c) => ({
+      kind: "link",
+      key: `chapter-${c.id}`,
+      label: c.name,
+      to: "/chapters/$chapterId",
+      params: { chapterId: c.id },
+    }));
+    children.push({
+      kind: "link",
+      key: "chapter-book",
+      label: "Book a local chapter meeting",
+      to: "/chapters/book",
+      tone: "gold",
+    });
+    children.push({
+      kind: "link",
+      key: "lifer-room",
+      label: "Lifer Room (Cellar)",
+      to: "/lifers/room",
+      ...(v.isLifer ? {} : { disabled: "lifer" as const }),
+    });
+    entries.push({ kind: "group", key: "chapters", label: "Local Chapters", children });
+  }
   if (v.isLifer) {
     entries.push({
       kind: "link",
@@ -191,5 +239,7 @@ export function onDisabledNav(
     window.dispatchEvent(new Event("baycmc:link-wallet-open"));
   } else if (leaf.disabled === "coming_soon") {
     toast("Coming soon", { duration: 2000 });
+  } else if (leaf.disabled === "lifer") {
+    toast("The Lifer room is open to members granted Lifer access.", { duration: 2500 });
   }
 }
