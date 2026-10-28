@@ -99,7 +99,10 @@ export function ApeRidesBookings() {
       ]),
     ];
     if (ids.length) {
-      const { data: profs } = await supabase.from("profiles").select("id,username").in("id", ids);
+      const { data: profs } = await supabase
+        .rpc("member_profiles")
+        .select("id,username")
+        .in("id", ids);
       setNames(Object.fromEntries((profs ?? []).map((x) => [x.id, x.username ?? "Member"])));
     }
     setLoading(false);

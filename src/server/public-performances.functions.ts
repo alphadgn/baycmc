@@ -37,7 +37,7 @@ async function shape(
   const ids = [...new Set(rows.map((r) => r.performer_id))];
   const { data: profs } = await supabaseAdmin
     .from("profiles")
-    .select("id,username,avatar_url,wallet_display")
+    .select("id,username,avatar_url")
     .in("id", ids);
   const { data: signed } = await supabaseAdmin.storage.from("karaoke-recordings").createSignedUrls(
     rows.map((r) => r.storage_path),
@@ -53,7 +53,8 @@ async function shape(
       durationMs: r.duration_ms,
       createdAt: r.created_at,
       performerId: r.performer_id,
-      performerName: p?.username?.trim() || p?.wallet_display || "BAYCmc member",
+      // Public pages show the username only — never wallet details.
+      performerName: p?.username?.trim() || "BAYCmc member",
       performerAvatar: p?.avatar_url ?? null,
       url: urlBy.get(r.storage_path) ?? null,
     };
@@ -93,13 +94,13 @@ export const listPublicPerformances = createServerFn({ method: "POST" })
     const list = await shape((rows ?? []) as never);
     const { data: prof } = await supabaseAdmin
       .from("profiles")
-      .select("username,avatar_url,wallet_display")
+      .select("username,avatar_url")
       .eq("id", data.performerId)
       .maybeSingle();
     return {
       performer: prof
         ? {
-            name: prof.username?.trim() || prof.wallet_display || "BAYCmc member",
+            name: prof.username?.trim() || "BAYCmc member",
             avatar: prof.avatar_url ?? null,
           }
         : null,

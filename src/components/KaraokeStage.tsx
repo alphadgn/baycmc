@@ -267,7 +267,10 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
     if (missing.length === 0) return;
     let cancelled = false;
     void (async () => {
-      const { data } = await supabase.from("profiles").select("id,username").in("id", missing);
+      const { data } = await supabase
+        .rpc("member_profiles")
+        .select("id,username")
+        .in("id", missing);
       if (cancelled) return;
       setProfiles((prev) => {
         const next = { ...prev };

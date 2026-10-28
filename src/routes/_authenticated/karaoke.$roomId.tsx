@@ -72,7 +72,7 @@ function KaraokeRoomPage() {
       return;
     }
     void supabase
-      .from("profiles")
+      .rpc("member_profiles")
       .select("username")
       .eq("id", performerId)
       .maybeSingle()

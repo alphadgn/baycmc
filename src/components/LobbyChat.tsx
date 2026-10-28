@@ -20,6 +20,7 @@ import {
 
 import { toast } from "sonner";
 import { supabase as typedSupabase } from "@/integrations/supabase/client";
+import { ChatImage } from "@/components/chat/ChatImage";
 import { useAuth } from "@/lib/auth/useAuth";
 import { avatarShapeClass } from "@/lib/profile-avatar";
 import { useChatScroll } from "@/hooks/use-chat-scroll";
@@ -167,7 +168,7 @@ export function LobbyChat({
       const missing = Array.from(new Set(msgs.map((m) => m.user_id).filter((id) => !profiles[id])));
       if (!missing.length) return;
       const { data } = await supabase
-        .from("profiles")
+        .rpc("member_profiles")
         .select("id,username,avatar_url,wallet_address:wallet_display")
         .in("id", missing);
       if (!data) return;
@@ -1158,21 +1159,12 @@ function MessageRow({
             </p>
           )}
           {message.image_url && (
-            <a
-              href={message.image_url}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-1.5 inline-block max-w-full overflow-hidden rounded-lg border border-border sm:max-w-[260px]"
-            >
-              <img
-                src={message.image_url}
-                alt="attachment"
-                loading="lazy"
-                // No object-cover here — keep the natural aspect ratio.
-                // max-h caps absurdly tall images; everything else flows.
-                className="block h-auto max-h-72 w-full object-contain"
-              />
-            </a>
+            // Natural aspect ratio; max-h caps absurdly tall images.
+            <ChatImage
+              url={message.image_url}
+              linkClassName="mt-1.5 inline-block max-w-full overflow-hidden rounded-lg border border-border sm:max-w-[260px]"
+              imgClassName="block h-auto max-h-72 w-full object-contain"
+            />
           )}
           {message.gif_url && (
             <div className="mt-1.5 inline-block max-w-full overflow-hidden rounded-lg border border-border sm:max-w-[260px]">

@@ -308,7 +308,7 @@ export function KaraokeTipNotifier() {
           let who = "Someone";
           try {
             const { data } = await supabase
-              .from("profiles")
+              .rpc("member_profiles")
               .select("username")
               .eq("id", row.tipper_id)
               .maybeSingle();

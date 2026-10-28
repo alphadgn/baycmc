@@ -455,10 +455,6 @@ function EntranceBody({
       {glyphError && (
         <p className="text-[11px] text-amber-300">{glyphError} Use a wallet instead.</p>
       )}
-      <p className="px-1 text-[10px] leading-snug text-muted-foreground">
-        Glyph keeps its own account login on Glyph's site. If Glyph shows someone else's wallet, tap
-        the person icon on Glyph's Approve screen to sign out of Glyph or switch accounts.
-      </p>
       <button type="button" onClick={() => setMode("wallets")} className={optionBtn}>
         <WalletIcon className="h-6 w-6 text-gold" />
         <span className="flex-1">

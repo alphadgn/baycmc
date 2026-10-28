@@ -2068,6 +2068,18 @@ export type Database = {
       };
     };
     Functions: {
+      member_profiles: {
+        Args: never;
+        Returns: {
+          id: string;
+          username: string | null;
+          avatar_url: string | null;
+          bio: string | null;
+          wallet_display: string | null;
+          created_at: string;
+          updated_at: string;
+        }[];
+      };
       chapter_viewer: { Args: { _uid: string }; Returns: boolean };
       chapter_room_catalog: {
         Args: never;
