@@ -1,6 +1,5 @@
 import { createFileRoute, redirect, Outlet } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
-import { revalidateOwnership } from "@/server/verification.functions";
 
 /**
  * Lifers layout — only dual-verified users (Token Proof + Otherpage) can
@@ -28,26 +27,13 @@ export const Route = createFileRoute("/_authenticated/lifers")({
       return;
     }
 
-    let snap: Awaited<ReturnType<typeof revalidateOwnership>> | null = null;
-    try {
-      snap = await revalidateOwnership();
-    } catch (e) {
-      console.warn("lifers beforeLoad: revalidate failed, falling back to cache", e);
-    }
-    if (snap) {
-      if (!snap.tokenProof || !snap.otherpageVerified) {
-        throw redirect({ to: "/feed" });
-      }
-      return;
-    }
-    const { data } = await supabase
-      .from("user_verifications")
-      .select("bayc_verified, otherpage_verified")
+    // Lifer access is a super-admin grant only (Super Admin → Lifer access).
+    const { data: grant } = await supabase
+      .from("lifer_grants")
+      .select("user_id")
       .eq("user_id", sess.session.user.id)
       .maybeSingle();
-    if (!data?.bayc_verified || !data?.otherpage_verified) {
-      throw redirect({ to: "/feed" });
-    }
+    if (!grant) throw redirect({ to: "/lobby" });
   },
   component: () => <Outlet />,
 });

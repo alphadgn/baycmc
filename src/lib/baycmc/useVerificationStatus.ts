@@ -43,7 +43,7 @@ export function VerificationStatusProvider({ children }: { children: ReactNode }
     refetchOnReconnect: true,
     queryFn: async () => {
       if (!userId) throw new Error("Sign in to load verification");
-      const [ver, roles] = await Promise.all([
+      const [ver, roles, lifer] = await Promise.all([
         supabase
           .from("user_verifications")
           .select(
@@ -52,10 +52,16 @@ export function VerificationStatusProvider({ children }: { children: ReactNode }
           .eq("user_id", userId)
           .maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", userId),
+        // Lifer access is a super-admin grant (lifer_grants), nothing else.
+        supabase.from("lifer_grants").select("user_id").eq("user_id", userId).maybeSingle(),
       ]);
       if (ver.error) throw new Error(ver.error.message);
       if (roles.error) throw new Error(roles.error.message);
-      return { verification: ver.data, roles: (roles.data ?? []).map((r) => r.role) };
+      return {
+        verification: ver.data,
+        roles: (roles.data ?? []).map((r) => r.role),
+        liferGranted: !!lifer.data,
+      };
     },
   });
   const readLatest = async () => {
@@ -99,7 +105,7 @@ export function VerificationStatusProvider({ children }: { children: ReactNode }
     otherpage: !!ver?.otherpage_verified,
     lumina: !!ver?.lumina_verified,
     delegationVerified: !!ver?.delegation_verified,
-    isLifer: ((!!ver?.bayc_verified || verifiedRole) && !!ver?.otherpage_verified) || isAdmin,
+    isLifer: !!query.data?.liferGranted || isAdmin,
     isAdmin,
     roles,
     refresh,

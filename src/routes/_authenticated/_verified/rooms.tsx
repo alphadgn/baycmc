@@ -26,6 +26,7 @@ interface Room {
   is_locked: boolean;
   kind: "conference" | "game" | "karaoke" | "stream";
   required_collection: string | null;
+  coming_soon?: boolean;
 }
 interface Booking {
   id: string;
@@ -92,11 +93,13 @@ function RoomsPage() {
       supabase
         .from("rooms")
         .select(
-          "id,name,description,capacity,tier,livekit_room,theme,display_order,is_locked,kind,required_collection",
+          "id,name,description,capacity,tier,livekit_room,theme,display_order,is_locked,kind,required_collection,coming_soon",
         )
         .eq("active", true)
         // Mudwater game tables live on their own page.
         .neq("kind", "mudwater")
+        // Chapter rooms open only through approved chapter meetings.
+        .neq("kind", "chapter")
         .order("display_order", { ascending: true, nullsFirst: false })
         .order("name"),
       supabase
@@ -183,7 +186,11 @@ function RoomsPage() {
 
   // Verified BAYC/MAYC OR an elevated role can create bookings. Lifer rooms
   // are already filtered out above when the user isn't dual-verified.
-  const canBook = baycVerified || isAdmin;
+  // Booking moved: only club chapter rooms (Local Chapters) and studios
+  // are booked, through their own request flows.
+  const canBook = false;
+  void baycVerified;
+  void isAdmin;
 
   const cancelById = async (id: string) => {
     const res = await cancel({ data: { bookingId: id } });
@@ -213,25 +220,19 @@ function RoomsPage() {
       rightRail={rightRail}
     >
       <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
-        <button
-          type="button"
-          onClick={() => setShowCalendar((v) => !v)}
-          className="inline-flex items-center gap-2 rounded-md border border-gold/30 bg-gold/5 px-3 py-2 text-xs font-semibold text-gold transition hover:bg-gold/10 font-sans-display"
-        >
-          <Calendar className="h-3.5 w-3.5" />
-          {showCalendar ? "Hide booking calendar" : "Booking calendar"}
-        </button>
+        {canBook && (
+          <button
+            type="button"
+            onClick={() => setShowCalendar((v) => !v)}
+            className="inline-flex items-center gap-2 rounded-md border border-gold/30 bg-gold/5 px-3 py-2 text-xs font-semibold text-gold transition hover:bg-gold/10 font-sans-display"
+          >
+            <Calendar className="h-3.5 w-3.5" />
+            {showCalendar ? "Hide booking calendar" : "Booking calendar"}
+          </button>
+        )}
       </div>
 
-      {!loading && !canBook && (
-        <div className="glass mb-5 rounded-2xl border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive font-sans-display">
-          You're signed in, but no verified BAYC/MAYC holding was detected in your connected wallet.
-          Booking is disabled until verification is restored. Reconnect or refresh your wallet to
-          try again.
-        </div>
-      )}
-
-      {showCalendar && !loading && (
+      {canBook && showCalendar && !loading && (
         <div className="mb-5">
           <RoomCalendar
             rooms={visibleRooms}
@@ -349,6 +350,32 @@ function RoomCard({
 
   // The whole card is a link — click anywhere on it to enter the room. The
   // Book button inside stops propagation so it opens the modal instead.
+  if (room.coming_soon) {
+    return (
+      <div
+        aria-disabled="true"
+        className="glass relative flex flex-col overflow-hidden rounded-2xl border border-border/40 opacity-60 shadow-card"
+      >
+        <div className="relative aspect-[16/10] w-full overflow-hidden">
+          {bg && (
+            <img
+              src={bg}
+              alt=""
+              loading="lazy"
+              className="absolute inset-0 h-full w-full object-cover grayscale"
+            />
+          )}
+          <div className="absolute inset-0 bg-background/60" />
+          <span className="absolute left-3 top-3 rounded-full border border-border bg-background/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Coming soon
+          </span>
+        </div>
+        <div className="p-3">
+          <h3 className="font-display text-base text-muted-foreground">{room.name}</h3>
+        </div>
+      </div>
+    );
+  }
   return (
     <Link
       to="/rooms/$roomId"
@@ -418,7 +445,7 @@ function RoomCard({
           </p>
         )}
         <div className="mt-1 flex gap-2">
-          {!isGame && (
+          {!isGame && canBook && (
             <button
               type="button"
               onClick={(e) => {
