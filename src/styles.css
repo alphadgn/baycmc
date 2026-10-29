@@ -573,3 +573,50 @@ html {
     animation: none;
   }
 }
+
+/* Karaoke machine sliders: thin track, big thumb, full-height touch target
+   (the old 4px-tall sliders were nearly impossible to drag on a phone). */
+.karaoke-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 28px;
+  background: transparent;
+  cursor: pointer;
+  touch-action: pan-y;
+}
+.karaoke-range::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 9999px;
+  background: rgba(245, 177, 0, 0.25);
+}
+.karaoke-range::-moz-range-track {
+  height: 4px;
+  border-radius: 9999px;
+  background: rgba(245, 177, 0, 0.25);
+}
+.karaoke-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  margin-top: -9px;
+  border-radius: 9999px;
+  border: 2px solid #0a0a0a;
+  background: #f5b100;
+  box-shadow: 0 0 0 1px rgba(245, 177, 0, 0.6);
+}
+.karaoke-range::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  border: 2px solid #0a0a0a;
+  background: #f5b100;
+}
+.karaoke-range-green::-webkit-slider-thumb {
+  background: #34d399;
+  box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.6);
+}
+.karaoke-range-green::-moz-range-thumb {
+  background: #34d399;
+}

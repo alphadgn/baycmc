@@ -9,7 +9,7 @@ import { EmbroideredImage } from "@/components/EmbroideredImage";
 const OPENSEA_BAYC = "https://opensea.io/collection/boredapeyachtclub";
 
 const HERO_TAGLINE =
-  "Yacht Club social network, karaoke w/tipping, Mudwater gameplay PvP & PvAi, free conference room bookings, closed local chapter communities rooms, club event exclusive live streams and so much more!";
+  "Yacht Club social network, karaoke w/tipping, Mudwater gameplay PvP & PvAi, free conference room bookings, local chapter community rooms, club event live streams and so much more!";
 
 export const Route = createFileRoute("/")({
   head: () => ({

@@ -151,6 +151,8 @@ export class KaraokeMixBus {
   private readonly broadcastDest: MediaStreamAudioDestinationNode;
   private readonly recordDest: MediaStreamAudioDestinationNode;
   readonly monitorGain: GainNode;
+  /** Singer hears their own voice (headphones only — speakers would feed back). */
+  private readonly voiceMonitor: GainNode;
 
   // Recorder
   private recorder: MediaRecorder | null = null;
@@ -195,9 +197,14 @@ export class KaraokeMixBus {
     this.monitorGain = this.ctx.createGain();
     this.monitorGain.gain.value = config.monitor ? 0.4 : 0.0;
 
+    this.voiceMonitor = this.ctx.createGain();
+    this.voiceMonitor.gain.value = 0;
+
     // Wire mic chain
     this.micGain.connect(this.micCompressor);
     this.micCompressor.connect(this.mixGain);
+    this.micCompressor.connect(this.voiceMonitor);
+    this.voiceMonitor.connect(this.ctx.destination);
 
     // Wire music chain (to the mix AND straight to the singer's ears)
     this.musicGain.connect(this.mixGain);
@@ -330,6 +337,10 @@ export class KaraokeMixBus {
     this.musicGain.gain.setTargetAtTime(v, this.ctx.currentTime, 0.02);
     this.tabMusicGain.gain.setTargetAtTime(v, this.ctx.currentTime, 0.02);
   }
+  /** Let the singer hear their own voice (after the Voice level) — headphones only. */
+  setVoiceMonitor(on: boolean): void {
+    this.voiceMonitor.gain.setTargetAtTime(on ? 0.9 : 0, this.ctx.currentTime, 0.03);
+  }
   setMonitor(on: boolean): void {
     this.monitorGain.gain.setTargetAtTime(on ? 0.4 : 0, this.ctx.currentTime, 0.05);
   }
@@ -453,6 +464,7 @@ export class KaraokeMixBus {
       this.musicMonitor.disconnect();
       this.tabMusicGain.disconnect();
       this.monitorGain.disconnect();
+      this.voiceMonitor.disconnect();
       this.micCompressor.disconnect();
     } catch {
       /* noop */
@@ -491,4 +503,32 @@ export async function listAudioDevices(): Promise<{
     inputs: all.filter((d) => d.kind === "audioinput"),
     outputs: all.filter((d) => d.kind === "audiooutput"),
   };
+}
+
+/**
+ * iOS keeps separate volume levels for "playback" and "play and record". When
+ * the microphone turns on mid-song, Safari switches the page from one to the
+ * other and the music suddenly drops. Holding the page in play-and-record for
+ * the whole turn keeps one steady level (the phone's volume buttons set it).
+ * Safari 16.4+ only; elsewhere this does nothing.
+ */
+type AudioSessionLike = { type: string };
+export function setKaraokeAudioSession(singing: boolean): void {
+  if (typeof navigator === "undefined") return;
+  const session = (navigator as Navigator & { audioSession?: AudioSessionLike }).audioSession;
+  if (!session) return;
+  try {
+    session.type = singing ? "play-and-record" : "auto";
+  } catch {
+    /* unsupported value */
+  }
+}
+
+/** iPhone / iPad: YouTube embeds ignore volume changes from the page there. */
+export function isAppleMobile(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+  );
 }

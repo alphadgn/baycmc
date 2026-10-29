@@ -37,6 +37,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   KaraokeMixBus,
   ensureAudioContextRunning,
+  setKaraokeAudioSession,
   getBackingElement,
 } from "@/lib/karaoke/audioMixBus";
 import { saveKaraokeRecording } from "@/lib/karaoke/recordings.functions";
@@ -200,6 +201,19 @@ export function KaraokePerformerEngine({ roomId }: { roomId: string }) {
         description: e instanceof Error ? e.message : "Allow microphone access and try again.",
       });
     });
+  }, [active, micWanted, stage.headphones]);
+
+  // Steady music level on iPhone: one audio-session mode for the whole turn.
+  useEffect(() => {
+    if (!active) return;
+    setKaraokeAudioSession(true);
+    return () => setKaraokeAudioSession(false);
+  }, [active]);
+
+  // Hear yourself in headphones (the Voice slider sets the level). Never on
+  // speaker mode — the phone speaker would feed back into the mic.
+  useEffect(() => {
+    busRef.current?.setVoiceMonitor(active && micWanted && stage.headphones);
   }, [active, micWanted, stage.headphones]);
 
   // 3. Volumes.
