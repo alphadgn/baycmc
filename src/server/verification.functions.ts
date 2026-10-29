@@ -27,8 +27,9 @@ export const startVerificationSession = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { recomputeOwnership, clearSessionWallets } = await import("@/server/ownership.server");
-    // An email sign-in proves no wallet: wallets from earlier sessions
-    // don't count until they are connected and signed for again.
+    // An email sign-in proves no wallet in this session (so Mudwater stays
+    // closed), but the account's own signature-proven wallets are still
+    // checked live on-chain for collections (see resolveOwnership).
     await clearSessionWallets(context.userId);
     return recomputeOwnership(context.userId, { fresh: true });
   });

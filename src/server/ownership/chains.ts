@@ -29,11 +29,38 @@ function env(name: string): string | undefined {
   return (typeof process !== "undefined" && process.env?.[name]?.trim()) || undefined;
 }
 
+/**
+ * The project's Alchemy key: ALCHEMY_API_KEY, else parsed from an Alchemy
+ * ETH_RPC_URL. Alchemy serves all three collection chains (eth-mainnet,
+ * apechain-mainnet, robinhood-mainnet), so ownership checks no longer depend
+ * on rate-limited public nodes — those failures used to make a sign-in skip
+ * collections the member really held.
+ */
+export function alchemyKey(): string | null {
+  const direct = env("ALCHEMY_API_KEY");
+  if (direct) return direct;
+  const rpc = env("ETH_RPC_URL");
+  if (!rpc) return null;
+  try {
+    const u = new URL(rpc);
+    if (!u.hostname.endsWith("alchemy.com")) return null;
+    const parts = u.pathname.split("/").filter(Boolean);
+    return parts[parts.length - 1] || null;
+  } catch {
+    return null;
+  }
+}
+function alchemyRpc(network: string): string | undefined {
+  const key = alchemyKey();
+  return key ? `https://${network}.g.alchemy.com/v2/${key}` : undefined;
+}
+
 const CHAIN_CONFIG = {
   [CHAIN_ETHEREUM]: {
     chain: mainnet,
     urls: () => [
       env("ETH_RPC_URL"),
+      alchemyRpc("eth-mainnet"),
       "https://eth.llamarpc.com",
       "https://ethereum-rpc.publicnode.com",
       "https://rpc.ankr.com/eth",
@@ -43,13 +70,18 @@ const CHAIN_CONFIG = {
     chain: apeChain,
     urls: () => [
       env("APECHAIN_RPC_URL"),
+      alchemyRpc("apechain-mainnet"),
       "https://rpc.apechain.com/http",
       "https://apechain.calderachain.xyz/http",
     ],
   },
   [CHAIN_ROBINHOOD]: {
     chain: robinhood,
-    urls: () => [env("ROBINHOOD_RPC_URL"), ...robinhood.rpcUrls.default.http],
+    urls: () => [
+      env("ROBINHOOD_RPC_URL"),
+      alchemyRpc("robinhood-mainnet"),
+      ...robinhood.rpcUrls.default.http,
+    ],
   },
 } as const;
 
@@ -59,7 +91,7 @@ export function publicClientFor(chainId: CollectionChainId): PublicClient {
   const hit = clients.get(chainId);
   if (hit) return hit;
   const cfg = CHAIN_CONFIG[chainId];
-  const urls = cfg.urls().filter((u): u is string => Boolean(u));
+  const urls = [...new Set(cfg.urls().filter((u): u is string => Boolean(u)))];
   const client = createPublicClient({
     chain: cfg.chain,
     transport: fallback(

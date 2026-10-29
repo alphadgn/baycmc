@@ -1,5 +1,6 @@
-import { createPublicClient, http, fallback, getAddress, isAddress, type PublicClient } from "viem";
-import { mainnet } from "viem/chains";
+import { getAddress, isAddress } from "viem";
+import { CHAIN_ETHEREUM } from "@/lib/web3/constants";
+import { publicClientFor } from "./chains";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { resolveDelegations } from "./delegateResolver";
 import { scanAllCollectionsDetailed, type OwnershipRow } from "./collectionScanner";
@@ -19,28 +20,6 @@ export interface OwnershipResult {
 
 const MAX_ADDRESSES = 32;
 
-function publicClient(): PublicClient {
-  const configured = process.env.ETH_RPC_URL?.trim();
-  if (!configured) {
-    console.warn("[nft-gate] ETH_RPC_URL not set — using public RPC fallbacks");
-  }
-  const urls = [
-    configured,
-    "https://eth.llamarpc.com",
-    "https://ethereum-rpc.publicnode.com",
-    "https://rpc.ankr.com/eth",
-  ].filter((u): u is string => Boolean(u));
-  return createPublicClient({
-    chain: mainnet,
-    transport: fallback(
-      urls.map((u) =>
-        http(u, { timeout: 10_000, retryCount: 2, batch: { batchSize: 50, wait: 16 } }),
-      ),
-      { rank: false, retryCount: 1 },
-    ),
-  });
-}
-
 /**
  * Single source of truth for NFT-ownership-based authorization.
  *
@@ -49,29 +28,50 @@ function publicClient(): PublicClient {
  * every whitelisted collection across the whole graph in parallel.
  */
 export async function resolveOwnership(userId: string): Promise<OwnershipResult> {
-  // Only wallets connected and proven by signature in the member's CURRENT
-  // sign-in session count (session_wallets — written by the server at
-  // wallet sign-in and in-session wallet linking, wiped at sign-in and
-  // sign-out). Wallets linked in earlier sessions don't count until they
-  // are proven again. Delegations INTO / OUT OF these wallets still count.
-  const [{ data: profile }, { data: sessionRows }] = await Promise.all([
+  // Which wallets are checked — all server-proven, never a list from the
+  // browser:
+  //   * wallets proven by signature in the CURRENT sign-in session
+  //     (session_wallets: the signer, Glyph-attached wallets, in-session
+  //     links), and
+  //   * the account's own wallets proven by signature earlier: its primary
+  //     wallet and every linked wallet with verified_at (written by the
+  //     server only after a signature check).
+  // Every one of them is scanned live on-chain each time; nothing verified
+  // earlier is carried over. Previously only session wallets counted, so a
+  // vault wallet linked once (e.g. a cold wallet holding the ape) stopped
+  // counting at the next sign-in and the member lost access they had.
+  // Delegations INTO / OUT OF these wallets still count.
+  const [{ data: profile }, { data: sessionRows }, { data: provenLinked }] = await Promise.all([
     supabaseAdmin.from("profiles").select("wallet_address").eq("id", userId).maybeSingle(),
     supabaseAdmin
       .from("session_wallets")
       .select("address")
       .eq("user_id", userId)
       .order("proven_at"),
+    supabaseAdmin
+      .from("linked_wallets")
+      .select("address")
+      .eq("user_id", userId)
+      .not("verified_at", "is", null)
+      .limit(20),
   ]);
+  const norm = (a: string | null | undefined) =>
+    a && isAddress(a) ? (getAddress(a) as `0x${string}`) : null;
   const session = (sessionRows ?? [])
-    .map((r) => r.address)
-    .filter((a): a is string => !!a && isAddress(a))
-    .map((a) => getAddress(a) as `0x${string}`);
-  const primary =
-    profile?.wallet_address && isAddress(profile.wallet_address)
-      ? getAddress(profile.wallet_address).toLowerCase()
-      : null;
-  const connected = session.find((a) => a.toLowerCase() === primary) ?? session[0] ?? null;
-  const linked = session.filter((a) => a !== connected);
+    .map((r) => norm(r.address))
+    .filter((a): a is `0x${string}` => !!a);
+  const primary = norm(profile?.wallet_address);
+  const accountWallets = [
+    primary,
+    ...(provenLinked ?? []).map((r) => norm(r.address as string)),
+  ].filter((a): a is `0x${string}` => !!a);
+  const connected =
+    session.find((a) => a.toLowerCase() === primary?.toLowerCase()) ?? session[0] ?? primary;
+  const linked = [...session, ...accountWallets].filter(
+    (a, i, all) =>
+      a.toLowerCase() !== connected?.toLowerCase() &&
+      all.findIndex((b) => b.toLowerCase() === a.toLowerCase()) === i,
+  );
 
   const addresses = new Set<string>();
   const edges: OwnershipResult["edges"] = [];
@@ -97,7 +97,7 @@ export async function resolveOwnership(userId: string): Promise<OwnershipResult>
     };
   }
 
-  const client = publicClient();
+  const client = publicClientFor(CHAIN_ETHEREUM);
   let block = 0n;
   try {
     block = await client.getBlockNumber();

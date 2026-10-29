@@ -18,7 +18,22 @@ describe("inactive collections", () => {
       expect(isAllowedCollection(c!.contract)).toBe(false);
       expect(REQUIRED_COLLECTIONS.includes(c!.contract as `0x${string}`)).toBe(false);
     }
-    expect(ALLOWED_COLLECTIONS).toHaveLength(6);
+    expect(ALLOWED_COLLECTIONS).toHaveLength(9);
+  });
+
+  it("whitelists Geez on Ape, Gobs on Ape and StonkBrokers like Temp Agency", () => {
+    const temp = ALLOWED_COLLECTIONS.find((x) => x.label === "TEMP_AGENCY")!;
+    for (const [label, contract, chainId] of [
+      ["GEEZ_ON_APE", "0xb3443B6Bd585ba4118CaE2beDb61c7EC4a8281Df", 33139],
+      ["GOBS_ON_APE", "0xBEbaa24108d6a03C7331464270b95278bBBE6Ff7", 33139],
+      ["STONKBROKERS", "0x539CdD042c2f3d93EbC5BE7DfFf0c79F3B4fAbF0", 4663],
+    ] as const) {
+      const c = ALLOWED_COLLECTIONS.find((x) => x.label === label)!;
+      expect(c.contract).toBe(contract);
+      expect(c.chainId).toBe(chainId);
+      expect(c.access).toBe(temp.access);
+      expect(isAllowedCollection(contract.toLowerCase())).toBe(true);
+    }
   });
 
   it("shows human collection names", () => {

@@ -87,7 +87,7 @@ export function nftLink(chainId: CollectionChainId, contract: string, tokenId: s
   if (chainId === CHAIN_APECHAIN)
     return `https://opensea.io/assets/ape_chain/${contract}/${tokenId}`;
   if (chainId === CHAIN_ROBINHOOD)
-    return `https://robinhoodchain.blockscout.com/token/${contract}/instance/${tokenId}`;
+    return `https://opensea.io/item/robinhood/${contract}/${tokenId}`;
   return `https://opensea.io/assets/ethereum/${contract}/${tokenId}`;
 }
 
@@ -172,7 +172,6 @@ async function idsViaEnumerable(
     return null;
   }
 }
-
 
 const LOGS_BUDGET_MS = 15_000;
 const MAX_LOG_SPLITS = 64;
