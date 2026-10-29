@@ -605,10 +605,9 @@ export const verifyOwnership = createServerFn({ method: "POST" })
       }
     }
 
-    // Previously-linked and Glyph-linked wallets are NOT walked for access:
-    // only wallets proven by signature in THIS session count (the signer
-    // here; more can be proven in-session via wallet linking). They are
-    // still recorded on the profile below for account-merge detection.
+    // Full collection check happens below in recomputeOwnership (fresh):
+    // this session's wallets (signer + Glyph-attached) plus the account's
+    // own signature-proven wallets, every one scanned live on-chain.
 
     const verificationBasis: "direct" | "delegated" | "linked" = delegatedFrom
       ? "delegated"

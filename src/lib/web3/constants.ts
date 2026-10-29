@@ -75,6 +75,34 @@ export const COLLECTION_REGISTRY = [
     access: "partner",
     active: true,
   },
+  // Partner collections with the same access as Temp Agency (2026-10-29).
+  {
+    label: "GEEZ_ON_APE",
+    name: "Geez on Ape",
+    contract: "0xb3443B6Bd585ba4118CaE2beDb61c7EC4a8281Df",
+    chainId: CHAIN_APECHAIN,
+    tips: true,
+    access: "partner",
+    active: true,
+  },
+  {
+    label: "GOBS_ON_APE",
+    name: "Gobs on Ape",
+    contract: "0xBEbaa24108d6a03C7331464270b95278bBBE6Ff7",
+    chainId: CHAIN_APECHAIN,
+    tips: true,
+    access: "partner",
+    active: true,
+  },
+  {
+    label: "STONKBROKERS",
+    name: "StonkBrokers",
+    contract: "0x539CdD042c2f3d93EbC5BE7DfFf0c79F3B4fAbF0",
+    chainId: CHAIN_ROBINHOOD,
+    tips: true,
+    access: "partner",
+    active: true,
+  },
   {
     label: "PUDGY_PENGUINS",
     name: "Pudgy Penguins",
@@ -107,8 +135,9 @@ export const ALLOWED_COLLECTIONS: readonly AllowedCollection[] = COLLECTION_REGI
  * Access tiers:
  *  - "full"    (BAYC, MAYC, CryptoPunks): the holder clubhouse — Holders Chat,
  *              Conference Rooms, Calendar, Ape Rides, … (bayc_verified).
- *  - "partner" (Temp Agency, Orca Business, Ugly Duck Labs): the regular
- *              member menu PLUS Ape Rides only.
+ *  - "partner" (Temp Agency, Orca Business, Ugly Duck Labs, Geez on Ape,
+ *              Gobs on Ape, StonkBrokers): the regular member menu plus the
+ *              rooms and areas the super admin's matrix opens for them.
  */
 export const FULL_ACCESS_LABELS: readonly string[] = ALLOWED_COLLECTIONS.filter(
   (c) => c.access === "full",

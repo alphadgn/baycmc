@@ -10,12 +10,15 @@ import {
 import { addPendingTake, getPendingTakes, removePendingTake } from "@/lib/karaoke/pendingTakes";
 
 describe("tip eligibility collections", () => {
-  it("are exactly BAYC, MAYC, CryptoPunks, Ugly Duck Labs, Orca Business, Temp Agency", () => {
+  it("are exactly the active whitelisted collections", () => {
     expect(TIP_COLLECTIONS.map((c) => c.name).sort()).toEqual(
       [
         "Bored Ape Yacht Club",
         "CryptoPunks",
+        "Geez on Ape",
+        "Gobs on Ape",
         "Mutant Ape Yacht Club",
+        "StonkBrokers",
         "Orca Business",
         "Temp Agency",
         "Ugly Duck Labs",

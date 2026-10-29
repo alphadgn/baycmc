@@ -53,6 +53,10 @@ export function NftGallery({
           // (delegate.cash / delegate.xyz) — their NFTs show here too.
           try {
             const graph = await ownershipGraph();
+            // Every wallet the verification checked (this sign-in's wallets,
+            // Glyph-attached wallets, the account's proven wallets).
+            if (graph.connected) addresses.add(graph.connected.toLowerCase());
+            for (const a of graph.linked) addresses.add(a.toLowerCase());
             for (const e of graph.edges) {
               if (e.via === "delegate-in") addresses.add(e.from.toLowerCase());
             }

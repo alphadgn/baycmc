@@ -301,9 +301,8 @@ function ProfilePage() {
                   {r.replace("_", " ")}
                 </span>
               ))}
-              {/* Every collection verified this session — full-access AND
-                  partner collections (Temp Agency / Orca / Ugly Duck), which
-                  don't grant the holder clubhouse but are still verified. */}
+              {/* Every whitelisted collection the member holds — full-access
+                  and partner collections alike. */}
               {verification.collections.map((label) => (
                 <span
                   key={label}
@@ -378,7 +377,7 @@ function ProfilePage() {
           </p>
           <ul className="mt-5 space-y-3">
             <VerifyRow
-              label="Collections (this sign-in)"
+              label="Whitelisted collections"
               ok={verification.collections.length > 0}
               action={
                 <span className="text-right text-xs text-muted-foreground">
@@ -437,18 +436,20 @@ function ProfilePage() {
         <LinkedWalletsPanel />
       </section>
 
+      {user && <MyPerformances userId={user.id} />}
+      {/* Whitelisted-collection NFTs held across the member's verified
+          wallets — always the last section of the profile. */}
       {user && (
         <section className="mt-10">
-          <div className="mb-4 flex items-baseline justify-between">
+          <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="font-display text-2xl font-bold">Your collection</h2>
             <p className="text-xs text-muted-foreground">
-              Connected wallets · allowed collections · live from Alchemy
+              Whitelisted collections held in your verified wallets
             </p>
           </div>
           <NftGallery address={wallet} includeLinkedWallets />
         </section>
       )}
-      {user && <MyPerformances userId={user.id} />}
     </main>
   );
 }
