@@ -11,12 +11,18 @@ import { useLocalChapters, type LocalChapter } from "@/lib/chapters/chapters";
  */
 export function LocalChaptersTab() {
   const chapters = useLocalChapters(true);
-  const [draft, setDraft] = useState<Record<string, string>>({});
+  type Draft = { name: string; region: string; x: string };
+  const [draft, setDraft] = useState<Record<string, Draft>>({});
   const [newName, setNewName] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
 
   useEffect(() => {
-    if (chapters) setDraft(Object.fromEntries(chapters.map((c) => [c.id, c.name])));
+    if (chapters)
+      setDraft(
+        Object.fromEntries(
+          chapters.map((c) => [c.id, { name: c.name, region: c.region ?? "", x: c.x_url ?? "" }]),
+        ),
+      );
   }, [chapters]);
 
   const changed = () => window.dispatchEvent(new Event("baycmc:chapters-changed"));
@@ -29,6 +35,9 @@ export function LocalChaptersTab() {
       _name: patch.name,
       _order: patch.display_order ?? c?.display_order ?? (chapters?.length ?? 0) + 1,
       _active: patch.active ?? c?.active ?? true,
+      // Always send region / X link so a rename or toggle never clears them.
+      _region: patch.region !== undefined ? patch.region : (c?.region ?? null),
+      _x_url: patch.x_url !== undefined ? patch.x_url : (c?.x_url ?? null),
     });
     setBusy(null);
     if (error) return toast.error(error.message);
@@ -47,12 +56,16 @@ export function LocalChaptersTab() {
       _name: a.name,
       _order: b.display_order,
       _active: a.active,
+      _region: a.region,
+      _x_url: a.x_url,
     });
     const r2 = await supabase.rpc("chapter_save", {
       _id: b.id,
       _name: b.name,
       _order: a.display_order === b.display_order ? a.display_order + dir : a.display_order,
       _active: b.active,
+      _region: b.region,
+      _x_url: b.x_url,
     });
     setBusy(null);
     if (r1.error || r2.error) toast.error((r1.error ?? r2.error)!.message);
@@ -78,8 +91,9 @@ export function LocalChaptersTab() {
       <div>
         <h2 className="font-semibold">Local chapters</h2>
         <p className="text-xs text-muted-foreground">
-          These names appear under Local Chapters in the menu for verified BAYC, MAYC and
-          CryptoPunks holders. Hidden chapters stay in the list here but aren't shown or bookable.
+          The official BAYC local clubs. These names appear under Local Chapters in the menu for
+          verified BAYC, MAYC and CryptoPunks holders. Hidden chapters stay in the list here but
+          aren't shown or bookable.
         </p>
       </div>
       {chapters === null ? (
@@ -115,8 +129,30 @@ export function LocalChaptersTab() {
                 aria-label="Chapter name"
                 className="min-h-10 min-w-0 flex-1 rounded-md border border-border bg-input px-3 py-2 text-sm"
                 maxLength={60}
-                value={draft[c.id] ?? c.name}
-                onChange={(e) => setDraft((d) => ({ ...d, [c.id]: e.target.value }))}
+                value={draft[c.id]?.name ?? c.name}
+                onChange={(e) =>
+                  setDraft((d) => ({ ...d, [c.id]: { ...d[c.id], name: e.target.value } }))
+                }
+              />
+              <input
+                aria-label="Region"
+                placeholder="Region"
+                className="min-h-10 w-full rounded-md border border-border bg-input px-3 py-2 text-xs sm:w-40"
+                maxLength={80}
+                value={draft[c.id]?.region ?? ""}
+                onChange={(e) =>
+                  setDraft((d) => ({ ...d, [c.id]: { ...d[c.id], region: e.target.value } }))
+                }
+              />
+              <input
+                aria-label="X link"
+                placeholder="https://x.com/…"
+                inputMode="url"
+                className="min-h-10 w-full rounded-md border border-border bg-input px-3 py-2 text-xs sm:w-56"
+                value={draft[c.id]?.x ?? ""}
+                onChange={(e) =>
+                  setDraft((d) => ({ ...d, [c.id]: { ...d[c.id], x: e.target.value } }))
+                }
               />
               <label className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                 <input
@@ -129,8 +165,20 @@ export function LocalChaptersTab() {
               </label>
               <button
                 type="button"
-                disabled={!!busy || !(draft[c.id] ?? "").trim() || draft[c.id] === c.name}
-                onClick={() => void save(c, { name: draft[c.id].trim() })}
+                disabled={
+                  !!busy ||
+                  !draft[c.id]?.name.trim() ||
+                  (draft[c.id].name === c.name &&
+                    draft[c.id].region === (c.region ?? "") &&
+                    draft[c.id].x === (c.x_url ?? ""))
+                }
+                onClick={() =>
+                  void save(c, {
+                    name: draft[c.id].name.trim(),
+                    region: draft[c.id].region.trim() || null,
+                    x_url: draft[c.id].x.trim() || null,
+                  })
+                }
                 className="inline-flex min-h-10 items-center gap-1 rounded-md border border-gold/50 px-3 py-2 text-xs text-gold disabled:opacity-40"
               >
                 {busy === c.id ? (

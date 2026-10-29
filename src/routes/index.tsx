@@ -188,38 +188,24 @@ function Index() {
         <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-20">
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="font-display text-3xl font-bold sm:text-4xl">What's inside</h2>
-            <p className="mt-3 text-muted-foreground">
-              A growing platform built feature-by-feature.
-            </p>
+            <p className="mt-3 text-muted-foreground">friends - fun - excitement</p>
           </div>
           <div className="mx-auto mt-12 grid max-w-6xl gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {[
-              { t: "Social Feed", d: "Posts, likes, comments, follows. Realtime.", soon: true },
-              { t: "Audio Rooms", d: "Drop-in voice. Hosts and listeners.", soon: true },
-              { t: "Video Calls", d: "1:1 and group, powered by LiveKit.", soon: true },
+              { t: "Social Feed", d: "Posts, likes, comments, follows. Realtime." },
               {
-                t: "Conference Bookings",
-                d: "20 rooms. Calendar with conflict-free slots.",
-                soon: true,
+                t: "Karaoke!!",
+                d: "Enjoy the fun of karaoke from anywhere, on your mobile device! 🎉",
               },
-              {
-                t: "Club Chapters",
-                d: "Apply, lead, host events for your local chapter.",
-                soon: true,
-              },
+              { t: "Play MUDWATER", d: "Play the hottest brain teaser in gaming" },
+              { t: "Conference Bookings", d: "20 rooms. Calendar with conflict-free slots." },
+              { t: "Club Chapters", d: "Apply, lead, host events for your local chapter." },
             ].map((f) => (
               <div
                 key={f.t}
-                className="glass rounded-2xl p-6 shadow-card transition hover:border-gold/40"
+                className="glass rounded-2xl p-6 text-center shadow-card transition hover:border-gold/40"
               >
-                <div className="flex items-center justify-between">
-                  <h3 className="font-display text-lg font-semibold">{f.t}</h3>
-                  {f.soon && (
-                    <span className="rounded-full border border-gold/30 bg-gold/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-gold">
-                      Soon
-                    </span>
-                  )}
-                </div>
+                <h3 className="font-display text-lg font-semibold">{f.t}</h3>
                 <p className="mt-2 text-sm text-muted-foreground">{f.d}</p>
               </div>
             ))}

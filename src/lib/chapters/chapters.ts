@@ -108,7 +108,14 @@ export function useChapterRooms(): ChapterRoom[] | null {
   return rooms;
 }
 
-export type LocalChapter = { id: string; name: string; display_order: number; active: boolean };
+export type LocalChapter = {
+  id: string;
+  name: string;
+  display_order: number;
+  active: boolean;
+  region: string | null;
+  x_url: string | null;
+};
 
 export function useLocalChapters(includeInactive = false): LocalChapter[] | null {
   const [rows, setRows] = useState<LocalChapter[] | null>(null);
@@ -117,7 +124,7 @@ export function useLocalChapters(includeInactive = false): LocalChapter[] | null
     const load = () => {
       let q = supabase
         .from("local_chapters")
-        .select("id,name,display_order,active")
+        .select("id,name,display_order,active,region,x_url")
         .order("display_order")
         .order("name");
       if (!includeInactive) q = q.eq("active", true);

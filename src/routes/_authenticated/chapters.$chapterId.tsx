@@ -73,7 +73,24 @@ function ChapterDetail() {
   return (
     <ChapterPage
       title={chapter?.name ?? "Local Chapter"}
-      subtitle="Upcoming meetings for this chapter. Meetings are approved by the admins."
+      subtitle={
+        <>
+          {chapter?.region && <span className="block text-foreground/80">{chapter.region}</span>}
+          {chapter?.x_url && (
+            <a
+              href={chapter.x_url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-block text-gold hover:underline"
+            >
+              Follow {chapter.name} on X ↗
+            </a>
+          )}
+          <span className="block">
+            Upcoming meetings for this chapter. Meetings are approved by the admins.
+          </span>
+        </>
+      }
       actions={
         viewer ? (
           <Link
