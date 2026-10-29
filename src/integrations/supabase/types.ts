@@ -1115,6 +1115,8 @@ export type Database = {
           active: boolean;
           created_by: string | null;
           created_at: string;
+          region: string | null;
+          x_url: string | null;
         };
         Insert: {
           id?: string;
@@ -1123,6 +1125,8 @@ export type Database = {
           active?: boolean;
           created_by?: string | null;
           created_at?: string;
+          region?: string | null;
+          x_url?: string | null;
         };
         Update: {
           id?: string;
@@ -1131,6 +1135,8 @@ export type Database = {
           active?: boolean;
           created_by?: string | null;
           created_at?: string;
+          region?: string | null;
+          x_url?: string | null;
         };
         Relationships: [];
       };
@@ -2109,7 +2115,14 @@ export type Database = {
       };
       chapter_delete_meeting: { Args: { _meeting: string }; Returns: undefined };
       chapter_save: {
-        Args: { _id: string | null; _name: string; _order: number; _active: boolean };
+        Args: {
+          _id: string | null;
+          _name: string;
+          _order: number;
+          _active: boolean;
+          _region?: string | null;
+          _x_url?: string | null;
+        };
         Returns: string;
       };
       chapter_remove: { Args: { _id: string }; Returns: undefined };
