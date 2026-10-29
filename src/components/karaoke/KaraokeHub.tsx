@@ -6,13 +6,13 @@
  * fixed full-screen RoomsShell: the shell locks body scroll and sits on top,
  * so that section was never visible or reachable.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BookOpen, CalendarClock, Disc3, Settings2 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
 import { useKaraokeStage } from "@/lib/karaoke/stageStore";
+import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import { KaraokeBookingPanel } from "@/components/karaoke/KaraokeBookingPanel";
 import { KaraokeRecordingsPanel } from "@/components/karaoke/KaraokeRecordingsPanel";
 import { KaraokeAdminPanel } from "@/components/karaoke/KaraokeAdminPanel";
@@ -30,24 +30,21 @@ export function KaraokeHub({
   const { settings } = useKaraokeStage();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState("rules");
-  const [isAdmin, setIsAdmin] = useState(false);
+  // Live: promoting or demoting a member shows / hides the Admin tab at once
+  // (roles are watched in real time by the verification provider).
+  const { isAdmin } = useVerificationStatus();
+  const isAdminRef = useRef(isAdmin);
+  isAdminRef.current = isAdmin;
+  const isModerator = isAdmin || (!!user && bookingHostUserId === user.id);
 
   useEffect(() => {
-    if (!user?.id) return;
-    void supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .then(({ data }) =>
-        setIsAdmin(!!data?.some((r) => r.role === "admin" || r.role === "super_admin")),
-      );
-  }, [user?.id]);
-  const isModerator = isAdmin || (!!user && bookingHostUserId === user.id);
+    if (!isAdmin && tab === "admin") setTab("rules");
+  }, [isAdmin, tab]);
 
   useEffect(() => {
     function onOpen(e: Event) {
       const t = (e as CustomEvent<{ tab?: string }>).detail?.tab;
-      if (t) setTab(t);
+      if (t && (t !== "admin" || isAdminRef.current)) setTab(t);
       setOpen(true);
     }
     window.addEventListener("karaoke:open-hub", onOpen as EventListener);
@@ -75,7 +72,7 @@ export function KaraokeHub({
             <SheetTitle className="font-display text-gradient-gold">{roomName}</SheetTitle>
           </SheetHeader>
           <Tabs value={tab} onValueChange={setTab} className="mt-4">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className={`grid w-full ${isAdmin ? "grid-cols-4" : "grid-cols-3"}`}>
               <TabsTrigger value="rules" className="text-[11px]">
                 <BookOpen className="mr-1 h-3 w-3" />
                 Rules
@@ -88,10 +85,13 @@ export function KaraokeHub({
                 <Disc3 className="mr-1 h-3 w-3" />
                 Takes
               </TabsTrigger>
-              <TabsTrigger value="admin" className="text-[11px]" disabled={!isModerator}>
-                <Settings2 className="mr-1 h-3 w-3" />
-                Admin
-              </TabsTrigger>
+              {/* Admins and the super admin only — hidden (not greyed) for everyone else. */}
+              {isAdmin && (
+                <TabsTrigger value="admin" className="text-[11px]">
+                  <Settings2 className="mr-1 h-3 w-3" />
+                  Admin
+                </TabsTrigger>
+              )}
             </TabsList>
 
             <TabsContent value="rules" className="space-y-3 pt-3">
@@ -131,7 +131,7 @@ export function KaraokeHub({
               <KaraokeRecordingsPanel roomId={roomId} isAdmin={isAdmin} />
             </TabsContent>
             <TabsContent value="admin" className="pt-3">
-              {isModerator ? (
+              {isAdmin ? (
                 <KaraokeAdminPanel
                   roomId={roomId}
                   roomName={roomName}

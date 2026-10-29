@@ -25,7 +25,7 @@ import {
   searchKaraokeSongs,
   type SongHit,
 } from "@/lib/karaoke.functions";
-import { unlockKaraokeAudio } from "@/lib/karaoke/audioMixBus";
+import { isAppleMobile, unlockKaraokeAudio } from "@/lib/karaoke/audioMixBus";
 import {
   livePositionMs,
   patchKaraokeStage,
@@ -277,6 +277,7 @@ export function KaraokeMusicBoard({
   // Listeners mute their local YouTube copy whenever the singer's mix already
   // contains the music — they hear it once, in sync with the voice.
   const muteLocal = !isMyTurn && stage.performerMusicInMix;
+  const appleMobile = useMemo(() => isAppleMobile(), []);
   useEffect(() => {
     if (!videoId) return;
     postToPlayer(muteLocal ? "mute" : "unMute");
@@ -788,8 +789,13 @@ export function KaraokeMusicBoard({
                 value={Math.round(stage.musicVolume * 100)}
                 onChange={(e) => patchKaraokeStage({ musicVolume: Number(e.target.value) / 100 })}
                 aria-label="Music volume"
-                className="h-1 w-full cursor-pointer appearance-none rounded-full bg-gold/20 accent-gold"
+                className="karaoke-range karaoke-range-gold"
               />
+              {appleMobile && videoId && !hasBacking && (
+                <span className="text-[8px] leading-tight text-muted-foreground">
+                  iPhone: YouTube music follows your side volume buttons.
+                </span>
+              )}
             </label>
             <label className="flex flex-col gap-1">
               <span className="flex items-center gap-1 text-[8px] uppercase tracking-widest text-gold/70">
@@ -802,8 +808,13 @@ export function KaraokeMusicBoard({
                 value={Math.round(stage.micVolume * 100)}
                 onChange={(e) => patchKaraokeStage({ micVolume: Number(e.target.value) / 100 })}
                 aria-label="Voice volume"
-                className="h-1 w-full cursor-pointer appearance-none rounded-full bg-gold/20 accent-emerald-400"
+                className="karaoke-range karaoke-range-green"
               />
+              <span className="text-[8px] leading-tight text-muted-foreground">
+                {stage.headphones
+                  ? "You hear yourself in your headphones at this level."
+                  : "Your voice level for the room and your recording."}
+              </span>
             </label>
           </div>
         )}

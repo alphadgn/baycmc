@@ -72,6 +72,15 @@ export function useVerificationRevalidation({
         : { event: "*", schema: "public", table: "user_roles" },
       fire,
     );
+    // Role removals: realtime can't filter DELETE rows by user under row-level
+    // security, so any removal triggers a (cheap, debounced) re-read.
+    if (userId) {
+      channel.on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "user_roles" },
+        fire,
+      );
+    }
     if (watchRooms) {
       channel.on("postgres_changes", { event: "*", schema: "public", table: "rooms" }, fire);
       channel.on(
