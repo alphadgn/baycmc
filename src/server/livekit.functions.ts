@@ -3,6 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { shortAddress } from "@/lib/short-address";
+import { streamSessionId } from "@/lib/stream-lifecycle";
 
 type RoomRecord = {
   id: string;
@@ -122,7 +123,7 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
   }
 
   // Public rooms (including Karaoke) must not run BAYC/Lumina/Otherpage gates.
-  if (isPublicRoom || isKaraoke) {
+  if (isKaraoke) {
     return { ok: true, room };
   }
 
@@ -130,7 +131,7 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
   // moment access is requested or refreshed. This is the hard gate that makes
   // revoked delegations/sold tokens stop future room entry and token minting.
   const { recomputeOwnership } = await import("@/server/ownership.server");
-  const fresh = await recomputeOwnership(userId).catch((e) => {
+  const fresh = isPublicRoom ? null : await recomputeOwnership(userId).catch((e) => {
     console.error("recomputeOwnership for room access failed", e);
     return null;
   });
@@ -170,7 +171,7 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
     _uid: userId,
     _item: area,
   });
-  if (!areaOk && !isAdmin) {
+  if (!isPublicRoom && !areaOk && !isAdmin) {
     return {
       ok: false,
       error:
@@ -182,7 +183,7 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
   }
   // Collection-specific rooms (e.g. Punks Brunch = CryptoPunks holders).
   const required = (room as { required_collection?: string | null }).required_collection;
-  if (required && !isAdmin) {
+  if (!isPublicRoom && required && !isAdmin) {
     const held =
       fresh?.collections ??
       ((
@@ -432,6 +433,9 @@ export const getLivekitToken = createServerFn({ method: "POST" })
     // Muted karaoke members join as listeners: LiveKit itself refuses their
     // tracks, so a mute can't be bypassed from devtools.
     let canPublish = true;
+    let streamCanStart = false;
+    let streamResumeId: string | null = null;
+    let streamSession: string | undefined;
     // Event Stream: admins, the super admin and members holding an open
     // single-use grant may broadcast; everyone else joins as a viewer
     // (LiveKit refuses their tracks). Viewing is free for BAYC/MAYC holders,
@@ -442,7 +446,11 @@ export const getLivekitToken = createServerFn({ method: "POST" })
         supabaseAdmin.rpc("stream_can_host", { _uid: userId }),
         supabaseAdmin.rpc("stream_viewer_free", { _uid: userId }),
       ]);
-      canPublish = canHost === true;
+      streamCanStart = canHost === true;
+      canPublish = false; // EVERY entry is a viewer; explicit Start is the only publishing gate.
+      streamSession = streamSessionId(context.claims);
+      const { resumeBroadcast } = await import("@/server/stream-grants.server");
+      streamResumeId = await resumeBroadcast(userId, streamSession);
       if (free !== true) {
         const { data: ticket } = await supabaseAdmin.rpc("stream_has_ticket", { _uid: userId });
         if (ticket !== true) {
@@ -459,20 +467,23 @@ export const getLivekitToken = createServerFn({ method: "POST" })
     }
 
     const { AccessToken } = await import("livekit-server-sdk");
-    const at = new AccessToken(cfg.apiKey, cfg.apiSecret, { identity, name, ttl: "2h" });
+    const at = new AccessToken(cfg.apiKey, cfg.apiSecret, {
+      identity, name, ttl: room.kind === "stream" ? "1m" : "2h",
+      ...(streamSession ? { metadata: JSON.stringify({ streamSession }) } : {}),
+    });
     at.addGrant({
       room: room.livekit_room,
       roomJoin: true,
       canPublish,
       canSubscribe: true,
-      canPublishData: true,
+      canPublishData: room.kind !== "stream",
       // Lets the singer flag "music is in my mix" via participant attributes
       // so listeners mute their local YouTube copy (no double audio).
-      canUpdateOwnMetadata: true,
+      canUpdateOwnMetadata: room.kind !== "stream",
       // Hosts get room-admin grants so the client SDK exposes the kick/mute
       // surface. The server-side fns still re-check is_room_host before
       // acting — the grant alone is not a permission.
-      roomAdmin: host,
+      roomAdmin: room.kind !== "stream" && host,
     });
 
     const token = await at.toJwt();
@@ -493,6 +504,8 @@ export const getLivekitToken = createServerFn({ method: "POST" })
       isHost: host,
       isLocked: room.is_locked,
       canPublish,
+      streamCanStart,
+      streamResumeId,
     };
   });
 

@@ -7,6 +7,8 @@ import { getBackingTrackUrl } from "@/lib/karaoke/backing.functions";
 import { syncKaraokeStageMics } from "@/server/livekit.functions";
 import { useAuth } from "@/lib/auth/useAuth";
 import { KaraokeMusicBoard, type TrackChange } from "@/components/KaraokeMusicBoard";
+import { Button } from "@/components/ui/button";
+import { canJoinKaraokeQueue } from "@/lib/room-workflow";
 import {
   DEFAULT_ROOM_SETTINGS,
   getKaraokeStage,
@@ -296,6 +298,21 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
   const reserved = session.stage_source !== "open";
   const isMyTurn = !!user && !!performerId && user.id === performerId;
   const meInQueue = !!user && visibleQueue.some((q) => q.user_id === user.id);
+  const actuallyQueued = !!user && queue.some((q) => q.user_id === user.id);
+  const [sanctioned, setSanctioned] = useState(true);
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    const check = async () => {
+      const { data, error } = await supabase.rpc("karaoke_is_sanctioned", { _room: roomId, _uid: user.id, _kind: "mute" });
+      if (!cancelled) setSanctioned(!!error || data !== false);
+    };
+    void check();
+    const timer = window.setInterval(() => void check(), 15_000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [roomId, user]);
+  const joinAvailable = canJoinKaraokeQueue({ signedIn: !!user, queued: actuallyQueued,
+    performing: isMyTurn, bookingOnly: settings.require_booking, reserved, sanctioned });
 
   // Karaoke rules: when the stage changes hands, re-apply the server-side
   // mic rule (only the performer may publish during a performance). The
@@ -663,7 +680,7 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
                     Waiting · {visibleQueue.length}
                   </span>
                 </div>
-                {meInQueue ? (
+                {actuallyQueued ? (
                   <button
                     type="button"
                     onClick={leaveLine}
@@ -672,15 +689,15 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
                     Leave line
                   </button>
                 ) : (
-                  <button
+                  <Button
                     type="button"
-                    disabled={!user || isMyTurn || settings.require_booking}
+                    disabled={!joinAvailable}
                     onClick={joinLine}
                     title={settings.require_booking ? "This room is booking-only" : undefined}
-                    className="rounded-sm bg-gradient-gold px-2 py-0.5 text-[10px] font-semibold text-gold-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                    className={`h-auto rounded-sm bg-gradient-gold px-2 py-0.5 text-[10px] font-semibold text-gold-foreground disabled:cursor-not-allowed disabled:opacity-40 ${joinAvailable ? "motion-safe:animate-pulse" : ""}`}
                   >
-                    Join line
-                  </button>
+                    Join the waitlist
+                  </Button>
                 )}
               </div>
               {visibleQueue.length > 0 && (

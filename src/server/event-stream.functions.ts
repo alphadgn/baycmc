@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getAddress, isAddress, parseEther } from "viem";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { TIP_CHAIN_ID } from "@/lib/web3/constants";
+import { streamAttemptSchema, streamSessionId } from "@/lib/stream-lifecycle";
 
 /**
  * Event Stream.
@@ -131,8 +132,6 @@ export const grantStream = createServerFn({ method: "POST" })
       _uid: data.userId,
     });
     if (error) return { ok: false as const, error: error.message };
-    const { setLivePublish } = await import("@/server/stream-grants.server");
-    await setLivePublish(data.userId, true);
     return { ok: true as const };
   });
 
@@ -153,9 +152,11 @@ export const revokeStream = createServerFn({ method: "POST" })
 /** Host: starting / still streaming (called on Start and every minute). */
 export const streamHostCheckIn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { touchStreamGrant } = await import("@/server/stream-grants.server");
-    const ok = await touchStreamGrant(context.userId);
+  .inputValidator((d: { broadcastId: string; participantSid: string; start?: boolean }) =>
+    streamAttemptSchema.extend({ start: z.boolean().default(false) }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { authorizeBroadcast } = await import("@/server/stream-grants.server");
+    const ok = await authorizeBroadcast(context.userId, streamSessionId(context.claims), data.broadcastId, data.participantSid, data.start);
     return ok
       ? { ok: true as const }
       : {
@@ -167,9 +168,10 @@ export const streamHostCheckIn = createServerFn({ method: "POST" })
 /** Host: End broadcast — the grant is used up. */
 export const streamHostEnd = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { finishStreamGrant } = await import("@/server/stream-grants.server");
-    await finishStreamGrant(context.userId, "ended");
+  .inputValidator((d: { broadcastId: string }) => z.object({ broadcastId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { finishBroadcast } = await import("@/server/stream-grants.server");
+    await finishBroadcast(context.userId, streamSessionId(context.claims), data.broadcastId);
     return { ok: true as const };
   });
 
