@@ -14,11 +14,9 @@
  */
 import { parseAbi, parseAbiItem } from "viem";
 import {
-  ALLOWED_COLLECTIONS,
   CHAIN_APECHAIN,
   CHAIN_ETHEREUM,
   CHAIN_ROBINHOOD,
-  type AllowedCollection,
   type CollectionChainId,
 } from "@/lib/web3/constants";
 import { activeCollections } from "@/server/club-configuration.server";
@@ -109,7 +107,7 @@ async function viaAlchemy(
   network: "eth-mainnet" | "apechain-mainnet",
   key: string,
   owner: string,
-  cols: AllowedCollection[],
+  cols: ClubCollection[],
 ): Promise<NftItem[]> {
   const filter = cols.map((c) => `&contractAddresses[]=${c.contract}`).join("");
   const base = `https://${network}.g.alchemy.com/nft/v3/${key}/getNFTsForOwner?owner=${owner}&withMetadata=true&pageSize=100${filter}`;
@@ -287,7 +285,7 @@ async function tokenUris(
   return ids.map((_, i) => (i < head.length ? (head[i] ?? null) : null));
 }
 
-async function viaRpc(owner: `0x${string}`, cols: AllowedCollection[]): Promise<NftItem[]> {
+async function viaRpc(owner: `0x${string}`, cols: ClubCollection[]): Promise<NftItem[]> {
   const out: NftItem[] = [];
   await Promise.all(
     cols.map(async (col) => {
