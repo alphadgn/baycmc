@@ -40,7 +40,10 @@ export function LocalChaptersTab() {
       _region: patch.region !== undefined ? (patch.region ?? "") : (c?.region ?? ""),
       _x_url: patch.x_url !== undefined ? (patch.x_url ?? "") : (c?.x_url ?? ""),
     };
-    const { error } = await supabase.rpc("chapter_save", args as unknown as Parameters<typeof supabase.rpc<"chapter_save">>[1]);
+    const { error } = await supabase.rpc(
+      "chapter_save",
+      args as unknown as Parameters<typeof supabase.rpc<"chapter_save">>[1],
+    );
     setBusy(null);
     if (error) return toast.error(error.message);
     if (!c) setNewName("");
