@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import postgres from "postgres";
 import { readFileSync } from "node:fs";
 import { karaokeMicLocked, canJoinKaraokeQueue } from "@/lib/room-workflow";
@@ -39,7 +39,11 @@ describe("room workflow boundaries", () => {
 describe.skipIf(!isolated)("isolated PostgreSQL: actual staged lifecycle functions", () => {
   beforeAll(async () => {
     await sql.unsafe(`
-      CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;
+      DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;
+      DROP SCHEMA IF EXISTS auth CASCADE;
+      DO $$ BEGIN CREATE ROLE anon; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+      DO $$ BEGIN CREATE ROLE authenticated; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+      DO $$ BEGIN CREATE ROLE service_role; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
       CREATE SCHEMA auth;
       CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$ SELECT nullif(current_setting('test.uid',true),'')::uuid $$;
       CREATE TABLE auth.sessions(id uuid PRIMARY KEY,user_id uuid,not_after timestamptz);
@@ -51,8 +55,12 @@ describe.skipIf(!isolated)("isolated PostgreSQL: actual staged lifecycle functio
       CREATE UNIQUE INDEX one_grant ON public.stream_grants(user_id) WHERE status IN ('active','in_use');
       INSERT INTO auth.sessions VALUES('${sid}','${uid}',NULL),('${otherSession}','${uid}',NULL);
     `);
-    await sql.unsafe(readFileSync("docs/review/20261117_stream_session_lifecycle.sql", "utf8"));
+    await sql.reserve().then(async (reserved) => {
+      try { await reserved.unsafe(readFileSync("docs/review/20261117_stream_session_lifecycle.sql", "utf8")); }
+      finally { reserved.release(); }
+    });
   });
+  afterAll(async () => { await sql.end(); });
   it("member cannot start without a grant", async () => {
     const [r] = await sql`SELECT public.stream_broadcast_claim(${uid},${sid},${attempt}) AS ok`;
     expect(r.ok).toBe(false);
