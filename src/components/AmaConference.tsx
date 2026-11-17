@@ -70,7 +70,7 @@ export function AmaConference({
   // Karaoke: whoever holds the stage (server session) is the only tile at
   // the top; everyone else sits lower as the audience.
   const performerId = useKaraokeStage().session?.performer_user_id ?? null;
-  const stageUserId = karaoke ? performerId : hostUserId;
+  const stageUserId = karaoke ? performerId : null; // Meetings have peers, not a performer stage.
   const hostParticipant = useMemo(
     () => (stageUserId ? (participants.find((p) => p.identity === stageUserId) ?? null) : null),
     [participants, stageUserId],

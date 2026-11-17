@@ -50,6 +50,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
 import { MeetingGuestsPanel } from "@/components/rooms/MeetingGuestsPanel";
 import { RoomChat } from "@/components/rooms/RoomChat";
+import { karaokeMicLocked } from "@/lib/room-workflow";
 
 interface ConferenceRoomProps {
   roomId: string;
@@ -167,12 +168,13 @@ export function ConferenceRoom({
   // The karaoke machine asks us to (re)connect when the user's turn comes
   // up while they're disconnected — singing needs the LiveKit connection.
   useEffect(() => {
+    if (kind !== "karaoke") return;
     function onRequestJoin() {
       if (state.phase === "idle" || (state.phase === "error" && state.recoverable)) void join();
     }
     window.addEventListener("karaoke:request-join", onRequestJoin);
     return () => window.removeEventListener("karaoke:request-join", onRequestJoin);
-  }, [state, join]);
+  }, [state, join, kind]);
 
   // Waiting room: let the guest in the moment the host approves them (live
   // via realtime, with a slow poll as a safety net).
@@ -281,6 +283,7 @@ export function ConferenceRoom({
               isHost={state.isHost}
               connecting={false}
               hostUserId={hostUserId}
+              karaoke={kind === "karaoke"}
             />
           }
           bottomBar={
@@ -622,9 +625,13 @@ function PreLiveBottomBar({ onLeave }: { onLeave: () => void }) {
  * live. Everyone else (observers, spectators, hosts) is locked muted until
  * the turn ends. The LiveKit token gate enforces the same rule server-side.
  */
-function useStageMicLock(): boolean {
+function useStageMicLock(karaoke: boolean): boolean {
   const { session, isMyTurn } = useKaraokeStage();
-  return !!session?.performer_user_id && !isMyTurn;
+  return karaokeMicLocked(
+    karaoke ? "karaoke" : "conference",
+    session?.performer_user_id ?? null,
+    isMyTurn,
+  );
 }
 
 function useMicLock(): boolean {
@@ -689,11 +696,13 @@ function LiveRightRail({
   isHost,
   connecting,
   hostUserId,
+  karaoke,
 }: {
   roomId: string;
   isHost: boolean;
   connecting: boolean;
   hostUserId: string | null;
+  karaoke: boolean;
 }) {
   // We surface a compact "no host booked" status card here when no host is
   // present in the room — the big central HostTile has been hidden so the
@@ -710,7 +719,7 @@ function LiveRightRail({
           </div>
         </Panel>
       )}
-      <LivePreferencesPanel isHost={isHost} />
+      <LivePreferencesPanel isHost={isHost} karaoke={karaoke} />
       {isHost && <HostControlsPanel roomId={roomId} />}
       {isHost && <MeetingGuestsPanel roomId={roomId} />}
       {!hostPresent && (
@@ -791,7 +800,7 @@ function LiveBottomBar({
   const { prefs, setPrefs } = useRoomPreferences();
   const [screenOn, setScreenOn] = useState(false);
   const micLock = useMicLock();
-  const stageLock = useStageMicLock();
+  const stageLock = useStageMicLock(karaoke);
   // Host keeps full mic control even while the room-wide lock is on — but
   // not during someone else's karaoke performance.
   const micLocked = (micLock && !isHost) || stageLock;
@@ -822,7 +831,8 @@ function LiveBottomBar({
   // same as the user wanting the device live.
   // The karaoke singer's "mic" is the mixed karaoke-mix track owned by
   // KaraokePerformerEngine — never toggle the raw mic for them here.
-  const { isMyTurn: karaokeSinger } = useKaraokeStage();
+  const { isMyTurn } = useKaraokeStage();
+  const karaokeSinger = karaoke && isMyTurn;
   useEffect(() => {
     const p = local.localParticipant;
     if (!p) return;
@@ -1090,11 +1100,11 @@ function PreferencesPanel() {
   );
 }
 
-function LivePreferencesPanel({ isHost }: { isHost: boolean }) {
+function LivePreferencesPanel({ isHost, karaoke }: { isHost: boolean; karaoke: boolean }) {
   const { prefs, setPrefs } = useRoomPreferences();
   const local = useLocalParticipant();
   const micLock = useMicLock();
-  const stageLock = useStageMicLock();
+  const stageLock = useStageMicLock(karaoke);
   const micLocked = (micLock && !isHost) || stageLock;
 
   async function toggleMic(v: boolean) {
@@ -1110,7 +1120,7 @@ function LivePreferencesPanel({ isHost }: { isHost: boolean }) {
     // backing track in one track). Publishing the raw mic as well would
     // double the vocal, so route the toggle to the engine instead.
     setPrefs({ micEnabled: v });
-    if (getKaraokeStage().isMyTurn) return;
+    if (karaoke && getKaraokeStage().isMyTurn) return;
     try {
       await local.localParticipant.setMicrophoneEnabled(v);
       window.dispatchEvent(new CustomEvent("karaoke:mic-state", { detail: { enabled: v } }));
@@ -1122,6 +1132,7 @@ function LivePreferencesPanel({ isHost }: { isHost: boolean }) {
   // Bridge: the karaoke music machine sits outside this LiveKit provider
   // and dispatches "karaoke:toggle-mic" to ask us to flip the mic.
   useEffect(() => {
+    if (!karaoke) return;
     function onReq(e: Event) {
       const next = !!(e as CustomEvent<{ enabled: boolean }>).detail?.enabled;
       void toggleMic(next);
@@ -1159,7 +1170,7 @@ function LivePreferencesPanel({ isHost }: { isHost: boolean }) {
       window.removeEventListener("karaoke:set-mic-volume", onMicVol as EventListener);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prefs.micEnabled, micLocked]);
+  }, [prefs.micEnabled, micLocked, karaoke]);
 
   async function toggleCam(v: boolean) {
     setPrefs({ cameraEnabled: v });

@@ -4,6 +4,7 @@ import { createPublicClient, http, fallback, getAddress, parseAbi } from "viem";
 import { mainnet } from "viem/chains";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { BAYC_CONTRACT, DELEGATE_REGISTRY_V2 } from "@/lib/web3/constants";
+import { streamSessionId } from "@/lib/stream-lifecycle";
 
 /**
  * Force-recompute ownership for the authenticated user. Updates
@@ -46,7 +47,7 @@ export const endVerificationSession = createServerFn({ method: "POST" })
     await clearSessionWallets(context.userId);
     // Single-use stream grants end with the session (sign-out or timeout).
     const { finishStreamGrant } = await import("@/server/stream-grants.server");
-    await finishStreamGrant(context.userId, "signed_out").catch(() => undefined);
+    await finishStreamGrant(context.userId, streamSessionId(context.claims));
     await supabaseAdmin
       .from("user_verifications")
       .update({
