@@ -26,6 +26,7 @@ export function RoomChat({
           <LobbyChat
             key={roomId}
             channelName={`room:${roomId}`}
+            channelTitle={roomName}
             membersTitle="Room members"
             emptyText="No room messages yet."
           />
