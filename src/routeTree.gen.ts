@@ -59,7 +59,9 @@ import { Route as AuthenticatedLifersRoomRouteImport } from './routes/_authentic
 import { Route as AuthenticatedMudwaterIndexRouteImport } from './routes/_authenticated/mudwater.index'
 import { Route as AuthenticatedMudwaterRoomIdRouteImport } from './routes/_authenticated/mudwater.$roomId'
 import { Route as ApiPublicHealthRouteImport } from './routes/api/public/health'
+import { Route as ApiPublicLivekitStreamRouteImport } from './routes/api/public/livekit-stream'
 import { Route as ApiPublicSecurityScanRouteImport } from './routes/api/public/security-scan'
+import { Route as ApiPublicStreamLifecycleRouteImport } from './routes/api/public/stream-lifecycle'
 import { Route as AuthenticatedVerifiedApeRidesRideIdRouteImport } from './routes/_authenticated/_verified/ape-rides.$rideId'
 import { Route as AuthenticatedVerifiedRoomsRoomIdRouteImport } from './routes/_authenticated/_verified/rooms_.$roomId'
 import { Route as AuthenticatedChaptersMeetingMeetingIdRouteImport } from './routes/_authenticated/chapters.meeting.$meetingId'
@@ -339,11 +341,22 @@ const ApiPublicHealthRoute = ApiPublicHealthRouteImport.update({
   path: '/api/public/health',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicLivekitStreamRoute = ApiPublicLivekitStreamRouteImport.update({
+  id: '/api/public/livekit-stream',
+  path: '/api/public/livekit-stream',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicSecurityScanRoute = ApiPublicSecurityScanRouteImport.update({
   id: '/api/public/security-scan',
   path: '/api/public/security-scan',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicStreamLifecycleRoute =
+  ApiPublicStreamLifecycleRouteImport.update({
+    id: '/api/public/stream-lifecycle',
+    path: '/api/public/stream-lifecycle',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AuthenticatedVerifiedApeRidesRideIdRoute =
   AuthenticatedVerifiedApeRidesRideIdRouteImport.update({
     id: '/$rideId',
@@ -427,7 +440,9 @@ export interface FileRoutesByFullPath {
   '/lifers/room': typeof AuthenticatedLifersRoomRoute
   '/mudwater/$roomId': typeof AuthenticatedMudwaterRoomIdRoute
   '/api/public/health': typeof ApiPublicHealthRoute
+  '/api/public/livekit-stream': typeof ApiPublicLivekitStreamRoute
   '/api/public/security-scan': typeof ApiPublicSecurityScanRoute
+  '/api/public/stream-lifecycle': typeof ApiPublicStreamLifecycleRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/lifers/': typeof AuthenticatedLifersIndexRoute
   '/mudwater/': typeof AuthenticatedMudwaterIndexRoute
@@ -481,7 +496,9 @@ export interface FileRoutesByTo {
   '/lifers/room': typeof AuthenticatedLifersRoomRoute
   '/mudwater/$roomId': typeof AuthenticatedMudwaterRoomIdRoute
   '/api/public/health': typeof ApiPublicHealthRoute
+  '/api/public/livekit-stream': typeof ApiPublicLivekitStreamRoute
   '/api/public/security-scan': typeof ApiPublicSecurityScanRoute
+  '/api/public/stream-lifecycle': typeof ApiPublicStreamLifecycleRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/lifers': typeof AuthenticatedLifersIndexRoute
   '/mudwater': typeof AuthenticatedMudwaterIndexRoute
@@ -541,7 +558,9 @@ export interface FileRoutesById {
   '/_authenticated/lifers/room': typeof AuthenticatedLifersRoomRoute
   '/_authenticated/mudwater/$roomId': typeof AuthenticatedMudwaterRoomIdRoute
   '/api/public/health': typeof ApiPublicHealthRoute
+  '/api/public/livekit-stream': typeof ApiPublicLivekitStreamRoute
   '/api/public/security-scan': typeof ApiPublicSecurityScanRoute
+  '/api/public/stream-lifecycle': typeof ApiPublicStreamLifecycleRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/lifers/': typeof AuthenticatedLifersIndexRoute
   '/_authenticated/mudwater/': typeof AuthenticatedMudwaterIndexRoute
@@ -600,7 +619,9 @@ export interface FileRouteTypes {
     | '/lifers/room'
     | '/mudwater/$roomId'
     | '/api/public/health'
+    | '/api/public/livekit-stream'
     | '/api/public/security-scan'
+    | '/api/public/stream-lifecycle'
     | '/admin/'
     | '/lifers/'
     | '/mudwater/'
@@ -654,7 +675,9 @@ export interface FileRouteTypes {
     | '/lifers/room'
     | '/mudwater/$roomId'
     | '/api/public/health'
+    | '/api/public/livekit-stream'
     | '/api/public/security-scan'
+    | '/api/public/stream-lifecycle'
     | '/admin'
     | '/lifers'
     | '/mudwater'
@@ -713,7 +736,9 @@ export interface FileRouteTypes {
     | '/_authenticated/lifers/room'
     | '/_authenticated/mudwater/$roomId'
     | '/api/public/health'
+    | '/api/public/livekit-stream'
     | '/api/public/security-scan'
+    | '/api/public/stream-lifecycle'
     | '/_authenticated/admin/'
     | '/_authenticated/lifers/'
     | '/_authenticated/mudwater/'
@@ -742,7 +767,9 @@ export interface RootRouteChildren {
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   ApiPublicHealthRoute: typeof ApiPublicHealthRoute
+  ApiPublicLivekitStreamRoute: typeof ApiPublicLivekitStreamRoute
   ApiPublicSecurityScanRoute: typeof ApiPublicSecurityScanRoute
+  ApiPublicStreamLifecycleRoute: typeof ApiPublicStreamLifecycleRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1097,11 +1124,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/livekit-stream': {
+      id: '/api/public/livekit-stream'
+      path: '/api/public/livekit-stream'
+      fullPath: '/api/public/livekit-stream'
+      preLoaderRoute: typeof ApiPublicLivekitStreamRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/security-scan': {
       id: '/api/public/security-scan'
       path: '/api/public/security-scan'
       fullPath: '/api/public/security-scan'
       preLoaderRoute: typeof ApiPublicSecurityScanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/stream-lifecycle': {
+      id: '/api/public/stream-lifecycle'
+      path: '/api/public/stream-lifecycle'
+      fullPath: '/api/public/stream-lifecycle'
+      preLoaderRoute: typeof ApiPublicStreamLifecycleRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/_verified/ape-rides/$rideId': {
@@ -1323,7 +1364,9 @@ const rootRouteChildren: RootRouteChildren = {
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   ApiPublicHealthRoute: ApiPublicHealthRoute,
+  ApiPublicLivekitStreamRoute: ApiPublicLivekitStreamRoute,
   ApiPublicSecurityScanRoute: ApiPublicSecurityScanRoute,
+  ApiPublicStreamLifecycleRoute: ApiPublicStreamLifecycleRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
