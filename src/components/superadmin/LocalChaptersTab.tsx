@@ -37,8 +37,8 @@ export function LocalChaptersTab() {
       _order: patch.display_order ?? c?.display_order ?? (chapters?.length ?? 0) + 1,
       _active: patch.active ?? c?.active ?? true,
       // Always send region / X link so a rename or toggle never clears them.
-      _region: patch.region ?? c?.region ?? "",
-      _x_url: patch.x_url ?? c?.x_url ?? "",
+      _region: patch.region !== undefined ? (patch.region ?? "") : (c?.region ?? ""),
+      _x_url: patch.x_url !== undefined ? (patch.x_url ?? "") : (c?.x_url ?? ""),
     };
     const { error } = await supabase.rpc("chapter_save", args as unknown as Parameters<typeof supabase.rpc<"chapter_save">>[1]);
     setBusy(null);

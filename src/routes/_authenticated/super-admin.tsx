@@ -49,6 +49,7 @@ interface ChapterRow {
 type Role = "admin" | "super_admin" | "verified_user";
 
 export const Route = createFileRoute("/_authenticated/super-admin")({
+  ssr: false,
   beforeLoad: async () => {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) throw redirect({ to: "/" });

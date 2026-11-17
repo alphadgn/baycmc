@@ -225,7 +225,7 @@ export function LobbyChat({
   // Realtime
   useEffect(() => {
     const ch = supabase
-      .channel(`lobby-chat:${channelName}`)
+      .channel(`lobby-chat:${channelName}:${Math.random().toString(36).slice(2)}`)
       .on(
         "postgres_changes",
         {
