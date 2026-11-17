@@ -23,6 +23,7 @@ These are staged outside migration history so they cannot run automatically. App
 4. Deploy code and schema together. Recheck live staff/member media publishing, temporary network loss, sign-out, revocation and scheduler enforcement on real devices. Do not treat local mocked media tests as live media verification.
 
 ## Verification boundaries
+- 21 focused tests passed; changed-code lint has no errors (four existing warnings remain), the server import-boundary check passed, and the preview compiler reported success. No manual production build was run.
 - Actual staged lifecycle SQL executed only against temporary isolated PostgreSQL, including competing claims, exact five-minute expiry, staff bypass, consumption, revocation, session close and concurrent two-singer end-turn handoff.
 - The existing `auth.sessions` fields `id`, `user_id`, `not_after` were confirmed with a read-only schema query; no managed schema was changed.
 - Media API tests use isolated stubs to test fail-closed permission updates and removal; conference admission and device-preference regression tests cover open/booked/approved paths.
