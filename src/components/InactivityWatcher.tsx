@@ -38,6 +38,7 @@ export function InactivityWatcher() {
     const signOut = async () => {
       if (signedOutRef.current) return;
       signedOutRef.current = true;
+      window.dispatchEvent(new Event("baycmc:stream-session-end"));
       try {
         window.dispatchEvent(new Event("baycmc:karaoke-cleanup-self"));
       } catch {

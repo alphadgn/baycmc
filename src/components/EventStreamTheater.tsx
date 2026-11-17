@@ -1,4 +1,5 @@
-import { streamHostCheckIn, streamHostEnd } from "@/server/event-stream.functions";
+import { getStreamAccess, streamHostCheckIn, streamHostEnd } from "@/server/event-stream.functions";
+import { Button } from "@/components/ui/button";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Link } from "@tanstack/react-router";
@@ -59,7 +60,7 @@ type Phase =
   | { phase: "idle" }
   | { phase: "connecting" }
   | { phase: "error"; message: string }
-  | { phase: "live"; token: string; url: string; canPublish: boolean };
+  | { phase: "live"; token: string; url: string; canPublish: boolean; canStart: boolean; resumeId: string | null };
 
 /**
  * Event Stream — a movie-theatre style, watch-only room. The host (an
@@ -93,6 +94,8 @@ export function EventStreamTheater({
         token: res.token,
         url: res.url,
         canPublish: !!res.canPublish,
+        canStart: res.streamCanStart,
+        resumeId: res.streamResumeId,
       });
     } catch (e) {
       setState({ phase: "error", message: e instanceof Error ? e.message : "Couldn't join." });
@@ -137,7 +140,7 @@ export function EventStreamTheater({
             label="Tap to watch & listen"
             className="fixed left-1/2 top-1/2 z-[60] -translate-x-1/2 -translate-y-1/2 rounded-xl border-2 border-gold bg-black/85 px-6 py-4 font-display text-base font-semibold text-gold shadow-gold backdrop-blur"
           />
-          <Stage capacity={capacity} tokenCanPublish={state.canPublish} goLive={goLive} />
+          <Stage capacity={capacity} tokenCanPublish={state.canPublish} canStart={state.canStart} resumeId={state.resumeId} goLive={goLive} />
         </LiveKitRoom>
       ) : (
         <div className="relative z-10 flex flex-1 flex-col items-center justify-center gap-3 px-4 text-center">
@@ -220,27 +223,39 @@ function Stage({
   capacity,
   tokenCanPublish,
   goLive,
+  canStart,
+  resumeId,
 }: {
   capacity: number;
   tokenCanPublish: boolean;
   goLive: boolean;
+  canStart: boolean;
+  resumeId: string | null;
 }) {
   const { user } = useAuth();
   // Live permission: a super admin can assign (or remove) a host while they
   // are already in the room — LiveKit pushes the change, no rejoin needed.
   const perms = useLocalParticipantPermissions();
   const canPublish = perms ? !!perms.canPublish : tokenCanPublish;
-  const [wasHost, setWasHost] = useState(canPublish);
+  const access = useServerFn(getStreamAccess);
+  const [eligible, setEligible] = useState(canStart);
   useEffect(() => {
-    if (canPublish && !wasHost) {
+    const load = () => void access().then((r) => setEligible(r.canHost)).catch(() => setEligible(false));
+    const timer = window.setInterval(load, 15_000);
+    return () => window.clearInterval(timer);
+  }, [access]);
+  const [wasHost, setWasHost] = useState(eligible);
+  useEffect(() => {
+    if (eligible && !wasHost) {
       toast.success("You're now an Event Stream host — tap Start streaming to go live.", {
         duration: 10_000,
       });
-    } else if (!canPublish && wasHost) {
+    } else if (!eligible && wasHost) {
       toast.info("You're no longer a host for the Event Stream.");
     }
-    setWasHost(canPublish);
-  }, [canPublish, wasHost]);
+    setWasHost(eligible);
+  }, [eligible, wasHost]);
+  const controls = eligible || canPublish || resumeId ? <HostControls highlight={goLive} resumeId={resumeId} /> : null;
   const participants = useParticipants();
   const tracks = useTracks(
     [
@@ -275,7 +290,7 @@ function Stage({
           live={live}
           viewers={viewers}
           capacity={capacity}
-          hostControls={canPublish ? <HostControls highlight={goLive} overlay /> : null}
+          hostControls={controls}
         />
       ) : (
         <div className="mx-auto w-full max-w-6xl px-2 sm:px-4">
@@ -301,7 +316,7 @@ function Stage({
             </div>
             <ViewerCount viewers={viewers} capacity={capacity} />
           </div>
-          {canPublish && <HostControls highlight={goLive} />}
+          {controls}
         </div>
       )}
 
@@ -781,9 +796,16 @@ function captureOptions(facingMode: "environment" | "user") {
 }
 
 /** Shown only to assigned hosts: go live from this phone. */
-function HostControls({ highlight, overlay = false }: { highlight: boolean; overlay?: boolean }) {
+function HostControls({ highlight, overlay = false, resumeId }: { highlight: boolean; overlay?: boolean; resumeId: string | null }) {
   const { localParticipant, isCameraEnabled, isMicrophoneEnabled } = useLocalParticipant();
-  const streaming = isCameraEnabled || isMicrophoneEnabled;
+  const room = useRoomContext();
+  const [broadcastId] = useState(() => resumeId ?? crypto.randomUUID());
+  const [streaming, setStreaming] = useState(false);
+  const [ended, setEnded] = useState(false);
+  const starting = useRef(false);
+  const stopDevices = useCallback(async () => {
+    await Promise.all([localParticipant.setCameraEnabled(false), localParticipant.setMicrophoneEnabled(false), localParticipant.setScreenShareEnabled(false)]);
+  }, [localParticipant]);
   // Single-use grant: check in on start and every minute while live; End
   // broadcast uses the grant up (admins stream without one).
   const checkIn = useServerFn(streamHostCheckIn);
@@ -791,16 +813,28 @@ function HostControls({ highlight, overlay = false }: { highlight: boolean; over
   useEffect(() => {
     if (!streaming) return;
     const t = window.setInterval(() => {
-      void checkIn().then((r) => {
+      if (room.state !== "connected") return; // Do not keep a dropped connection's lease alive.
+      void checkIn({ data: { broadcastId, participantSid: localParticipant.sid } }).then((r) => {
         if (!r.ok) {
           toast.error(r.error);
-          void localParticipant.setCameraEnabled(false);
-          void localParticipant.setMicrophoneEnabled(false);
+          setStreaming(false);
+          setEnded(true);
+          void stopDevices();
         }
-      });
-    }, 60_000);
+      }).catch(() => { void stopDevices(); });
+    }, 15_000);
     return () => window.clearInterval(t);
-  }, [streaming, checkIn, localParticipant]);
+  }, [streaming, checkIn, localParticipant, room, broadcastId, stopDevices]);
+  useEffect(() => {
+    const stop = () => { setStreaming(false); setEnded(true); void stopDevices(); };
+    window.addEventListener("baycmc:stream-session-end", stop);
+    const permissionChanged = () => { if (!localParticipant.permissions?.canPublish) stop(); };
+    room.on(RoomEvent.ParticipantPermissionsChanged, permissionChanged);
+    return () => {
+      window.removeEventListener("baycmc:stream-session-end", stop);
+      room.off(RoomEvent.ParticipantPermissionsChanged, permissionChanged);
+    };
+  }, [room, localParticipant, stopDevices]);
   const [facing, setFacing] = useState<"environment" | "user">("environment");
   const [busy, setBusy] = useState(false);
 
@@ -830,23 +864,39 @@ function HostControls({ highlight, overlay = false }: { highlight: boolean; over
         <p className="text-xs text-gold/90">
           You're a host. Your camera and mic go out to everyone in the theatre.
         </p>
-        <button
+        <Button
           type="button"
-          disabled={busy}
+          disabled={busy || ended}
           onClick={() =>
             void run(async () => {
-              const ok = await checkIn();
-              if (!ok.ok) throw new Error(ok.error);
-              await localParticipant.setCameraEnabled(true, captureOptions(facing));
-              await localParticipant.setMicrophoneEnabled(true);
-              toast.success("You're live.");
+              if (starting.current) return;
+              starting.current = true;
+              try {
+                const ok = await checkIn({ data: { broadcastId, participantSid: localParticipant.sid, start: true } });
+                if (!ok.ok) throw new Error(ok.error);
+                // Wait for the media server's permission event before publishing devices.
+                await new Promise<void>((resolve, reject) => {
+                  const timer = window.setTimeout(() => { cleanup(); reject(new Error("Streaming permission did not arrive.")); }, 5000);
+                  const check = () => { if (localParticipant.permissions?.canPublish) { cleanup(); resolve(); } };
+                  const cleanup = () => { window.clearTimeout(timer); room.off(RoomEvent.ParticipantPermissionsChanged, check); };
+                  room.on(RoomEvent.ParticipantPermissionsChanged, check);
+                  check();
+                });
+                await localParticipant.setCameraEnabled(true, captureOptions(facing));
+                await localParticipant.setMicrophoneEnabled(true);
+                setStreaming(true);
+                toast.success("You're live.");
+              } catch (error) {
+                await stopDevices();
+                throw error;
+              } finally { starting.current = false; }
             })
           }
           className="inline-flex items-center gap-2 rounded-md bg-gradient-gold px-5 py-2.5 text-sm font-semibold text-gold-foreground shadow-gold disabled:opacity-60"
         >
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Radio className="h-4 w-4" />}
-          Start streaming
-        </button>
+          {ended ? "Broadcast ended" : resumeId ? "Resume streaming" : "Start streaming"}
+        </Button>
         <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
           <span>Camera:</span>
           <button
@@ -914,7 +964,7 @@ function HostControls({ highlight, overlay = false }: { highlight: boolean; over
           <RefreshCw className="h-4 w-4" /> Flip
         </button>
       )}
-      {(isCameraEnabled || isMicrophoneEnabled) && (
+      {streaming && (
         <button
           type="button"
           disabled={busy}
@@ -922,9 +972,10 @@ function HostControls({ highlight, overlay = false }: { highlight: boolean; over
             void run(async () => {
               if (!window.confirm("End the broadcast? A streaming grant covers one stream."))
                 return;
-              await localParticipant.setCameraEnabled(false);
-              await localParticipant.setMicrophoneEnabled(false);
-              await endStream();
+              await stopDevices();
+              await endStream({ data: { broadcastId } });
+              setStreaming(false);
+              setEnded(true);
               toast.success("Broadcast ended.");
             })
           }

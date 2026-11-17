@@ -54,6 +54,7 @@ export function useAuth() {
  * re-authenticate the user on next visit without the modal.
  */
 export async function signOut() {
+  window.dispatchEvent(new Event("baycmc:stream-session-end"));
   try {
     window.dispatchEvent(new Event("baycmc:karaoke-cleanup-self"));
   } catch {
