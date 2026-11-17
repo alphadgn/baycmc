@@ -17,6 +17,14 @@ interface RoomMeta {
 }
 
 export const Route = createFileRoute("/_authenticated/karaoke/$roomId")({
+  head: () => ({ meta: [
+    { title: "Karaoke Stage — BAYCmc" },
+    { name: "description", content: "Live member karaoke stage, singer waitlist and audience chat." },
+    { property: "og:title", content: "Karaoke Stage — BAYCmc" },
+    { property: "og:description", content: "Live member karaoke stage, singer waitlist and audience chat." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   beforeLoad: async () => {
     const { data: sess } = await supabase.auth.getSession();
     if (!sess.session) throw redirect({ to: "/" });

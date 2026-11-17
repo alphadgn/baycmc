@@ -301,6 +301,7 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
   const [sanctioned, setSanctioned] = useState(true);
   useEffect(() => {
     if (!user) return;
+    setSanctioned(true);
     let cancelled = false;
     const check = async () => {
       const { data, error } = await supabase.rpc("karaoke_is_sanctioned", { _room: roomId, _uid: user.id, _kind: "mute" });
@@ -311,7 +312,7 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
     return () => { cancelled = true; window.clearInterval(timer); };
   }, [roomId, user]);
   const joinAvailable = canJoinKaraokeQueue({ signedIn: !!user, queued: actuallyQueued,
-    performing: isMyTurn, bookingOnly: settings.require_booking, reserved, sanctioned });
+    performing: isMyTurn, bookingOnly: settings.require_booking, sanctioned });
 
   // Karaoke rules: when the stage changes hands, re-apply the server-side
   // mic rule (only the performer may publish during a performance). The

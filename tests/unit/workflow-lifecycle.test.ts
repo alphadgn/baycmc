@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import postgres from "postgres";
 import { readFileSync } from "node:fs";
-import { karaokeMicLocked, canJoinKaraokeQueue } from "@/lib/room-workflow";
+import { karaokeMicLocked, canJoinKaraokeQueue, conferenceAdmission } from "@/lib/room-workflow";
 import { leaseCanResume, streamSessionId } from "@/lib/stream-lifecycle";
 
 // Explicit isolated test socket only. NEVER accepts the app's connection string.
@@ -19,6 +19,15 @@ describe("room workflow boundaries", () => {
   it("regular conference rooms never inherit performer mic locks", () => {
     expect(karaokeMicLocked("conference", uid, false)).toBe(false);
     expect(karaokeMicLocked("karaoke", uid, false)).toBe(true);
+  });
+  it("open conferences admit peers; booked meetings admit host, staff and approved guests only", () => {
+    const input = { booked: true, ownsBooking: false, staff: false };
+    expect(conferenceAdmission({ ...input, booked: false })).toBe("admitted");
+    expect(conferenceAdmission(input)).toBe("waiting");
+    expect(conferenceAdmission({ ...input, ownsBooking: true })).toBe("admitted");
+    expect(conferenceAdmission({ ...input, staff: true })).toBe("admitted");
+    expect(conferenceAdmission({ ...input, guestStatus: "approved" })).toBe("admitted");
+    expect(conferenceAdmission({ ...input, guestStatus: "denied" })).toBe("denied");
   });
   it("queue invitation stops when queued or performing", () => {
     const input = { signedIn: true, queued: false, performing: false, bookingOnly: false, reserved: false, sanctioned: false };

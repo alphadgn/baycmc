@@ -4,6 +4,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { shortAddress } from "@/lib/short-address";
 import { streamSessionId } from "@/lib/stream-lifecycle";
+import { conferenceAdmission } from "@/lib/room-workflow";
 
 type RoomRecord = {
   id: string;
@@ -235,7 +236,8 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
         .eq("booking_id", booking.id)
         .eq("user_id", userId)
         .maybeSingle();
-      if (guest?.status === "denied") {
+      const admission = conferenceAdmission({ booked: true, ownsBooking: false, staff: isAdmin, guestStatus: guest?.status });
+      if (admission === "denied") {
         return {
           ok: false,
           error: `The host didn't approve you for "${booking.title}". You can come back when the meeting ends.`,
@@ -243,7 +245,7 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
           bookingId: booking.id as string,
         };
       }
-      if (guest?.status !== "approved") {
+      if (admission === "waiting") {
         if (!guest) {
           await supabaseAdmin
             .from("room_booking_guests")

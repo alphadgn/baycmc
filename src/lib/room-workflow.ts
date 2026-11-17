@@ -8,9 +8,13 @@ export function canJoinKaraokeQueue(input: {
   queued: boolean;
   performing: boolean;
   bookingOnly: boolean;
-  reserved: boolean;
   sanctioned: boolean;
 }) {
   return input.signedIn && !input.queued && !input.performing &&
-    !input.bookingOnly && !input.reserved && !input.sanctioned;
+    !input.bookingOnly && !input.sanctioned;
+}
+
+export function conferenceAdmission(input: { booked: boolean; ownsBooking: boolean; staff: boolean; guestStatus?: string }) {
+  if (!input.booked || input.ownsBooking || input.staff || input.guestStatus === "approved") return "admitted";
+  return input.guestStatus === "denied" ? "denied" : "waiting";
 }

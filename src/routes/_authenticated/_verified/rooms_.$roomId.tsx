@@ -14,6 +14,14 @@ interface RoomMeta {
 }
 
 export const Route = createFileRoute("/_authenticated/_verified/rooms_/$roomId")({
+  head: () => ({ meta: [
+    { title: "Conference Room — BAYCmc" },
+    { name: "description", content: "Member conference room with live audio, video and private room chat." },
+    { property: "og:title", content: "Conference Room — BAYCmc" },
+    { property: "og:description", content: "Member conference room with live audio, video and private room chat." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   component: RoomDetail,
 });
 
