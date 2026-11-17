@@ -1,6 +1,13 @@
 -- REVIEW ONLY. Not registered with Drizzle and NOT applied to any shared database.
 -- Apply through the migration workflow after approval, before deploying dependent code.
 BEGIN;
+CREATE TABLE public.stream_closed_sessions (
+  session_id uuid PRIMARY KEY,
+  user_id uuid NOT NULL,
+  closed_at timestamptz NOT NULL DEFAULT now()
+);
+GRANT ALL ON public.stream_closed_sessions TO service_role;
+ALTER TABLE public.stream_closed_sessions ENABLE ROW LEVEL SECURITY;
 CREATE TABLE public.stream_broadcasts (
   id uuid PRIMARY KEY,
   user_id uuid NOT NULL,
@@ -27,7 +34,8 @@ WHERE status='in_use';
 CREATE FUNCTION public.stream_session_valid(_uid uuid, _session uuid)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public AS $$
   SELECT EXISTS (SELECT 1 FROM auth.sessions WHERE id=_session AND user_id=_uid
-    AND (not_after IS NULL OR not_after > now()));
+    AND (not_after IS NULL OR not_after > now()))
+    AND NOT EXISTS (SELECT 1 FROM public.stream_closed_sessions WHERE session_id=_session);
 $$;
 
 CREATE FUNCTION public.stream_broadcast_finish(_uid uuid, _session uuid, _id uuid, _reason text)
@@ -99,6 +107,18 @@ RETURNS void LANGUAGE sql SECURITY DEFINER SET search_path=public AS $$
   WHERE id=_id AND user_id=_uid AND session_id=_session AND status='live';
 $$;
 
+CREATE FUNCTION public.stream_session_close(_uid uuid, _session uuid)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+BEGIN
+  PERFORM pg_advisory_xact_lock(hashtextextended('stream:' || _uid::text,0));
+  INSERT INTO public.stream_closed_sessions(session_id,user_id) VALUES(_session,_uid) ON CONFLICT DO NOTHING;
+  -- Manual sign-out is global in this app; terminate other broadcasting sessions too.
+  INSERT INTO public.stream_closed_sessions(session_id,user_id)
+    SELECT session_id,user_id FROM public.stream_broadcasts WHERE user_id=_uid AND status='live'
+    ON CONFLICT DO NOTHING;
+  PERFORM public.stream_grant_finish(_uid,'signed_out');
+END $$;
+
 -- Session end invalidates unused grants too; no old-session replay may claim a new grant.
 CREATE OR REPLACE FUNCTION public.stream_grant_finish(_uid uuid, _reason text)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
@@ -136,8 +156,8 @@ END $$;
 
 REVOKE ALL ON FUNCTION public.stream_session_valid(uuid,uuid), public.stream_broadcast_finish(uuid,uuid,uuid,text),
  public.stream_broadcast_valid(uuid,uuid,uuid), public.stream_broadcast_claim(uuid,uuid,uuid),
- public.stream_broadcast_touch(uuid,uuid,uuid), public.stream_broadcast_disconnect(uuid,uuid,uuid) FROM PUBLIC,anon,authenticated;
+ public.stream_broadcast_touch(uuid,uuid,uuid), public.stream_broadcast_disconnect(uuid,uuid,uuid), public.stream_session_close(uuid,uuid) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.stream_session_valid(uuid,uuid), public.stream_broadcast_finish(uuid,uuid,uuid,text),
  public.stream_broadcast_valid(uuid,uuid,uuid), public.stream_broadcast_claim(uuid,uuid,uuid),
- public.stream_broadcast_touch(uuid,uuid,uuid), public.stream_broadcast_disconnect(uuid,uuid,uuid) TO service_role;
+ public.stream_broadcast_touch(uuid,uuid,uuid), public.stream_broadcast_disconnect(uuid,uuid,uuid), public.stream_session_close(uuid,uuid) TO service_role;
 COMMIT;

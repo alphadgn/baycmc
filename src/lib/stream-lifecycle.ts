@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const STREAM_RECONNECT_MS = 5 * 60_000;
-export const streamAttemptSchema = z.object({ broadcastId: z.string().uuid() });
+export const streamAttemptSchema = z.object({ broadcastId: z.string().uuid(), participantSid: z.string().min(1) });
 export function streamSessionId(claims: Record<string, unknown>): string {
   const parsed = z.string().uuid().safeParse(claims.session_id);
   if (!parsed.success) throw new Error("Sign in again before streaming.");
