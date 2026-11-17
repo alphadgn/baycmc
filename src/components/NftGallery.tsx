@@ -6,6 +6,7 @@ import { listLinkedWallets } from "@/lib/linked-wallets.functions";
 import { getOwnershipGraph } from "@/server/verification.functions";
 import { useAuth } from "@/lib/auth/useAuth";
 import { mergeWalletNfts } from "@/lib/wallet-nfts";
+import { getClubConfiguration } from "@/server/club-configuration.functions";
 
 export function NftGallery({
   address,
@@ -19,6 +20,7 @@ export function NftGallery({
   const listFn = useServerFn(listWalletNfts);
   const listLinked = useServerFn(listLinkedWallets);
   const ownershipGraph = useServerFn(getOwnershipGraph);
+  const getConfiguration = useServerFn(getClubConfiguration);
   const [items, setItems] = useState<NftItem[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +39,7 @@ export function NftGallery({
     setError(null);
     (async () => {
       try {
+        const configuration = await getConfiguration();
         const addresses = new Set<string>();
         if (address) addresses.add(address.toLowerCase());
         const failures: string[] = [];
@@ -81,7 +84,7 @@ export function NftGallery({
                 : "Couldn't load wallet NFTs.",
             );
         }
-        setItems(mergeWalletNfts(holdings));
+        setItems(mergeWalletNfts(holdings, configuration.collections));
         setError(failures.length ? failures.join(" ") : null);
       } catch (e) {
         if (cancelled) return;
@@ -94,7 +97,16 @@ export function NftGallery({
     return () => {
       cancelled = true;
     };
-  }, [address, includeLinkedWallets, userId, listFn, listLinked, ownershipGraph, refreshVersion]);
+  }, [
+    address,
+    includeLinkedWallets,
+    userId,
+    listFn,
+    listLinked,
+    ownershipGraph,
+    getConfiguration,
+    refreshVersion,
+  ]);
 
   if (loading) {
     return (

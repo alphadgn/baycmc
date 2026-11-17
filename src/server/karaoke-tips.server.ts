@@ -9,7 +9,8 @@
  */
 import { getAddress, isAddress } from "viem";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { TIP_COLLECTIONS, TIP_CHAIN_ID, collectionByContract } from "@/lib/web3/constants";
+import { TIP_CHAIN_ID } from "@/lib/web3/constants";
+import { activeCollections } from "@/server/club-configuration.server";
 import { publicClientFor } from "@/server/ownership/chains";
 import { scanAllCollections } from "@/server/ownership/collectionScanner";
 
@@ -53,15 +54,20 @@ async function accountWallets(userId: string) {
 
 /** Collection label the user holds (first match), or null. */
 async function heldTipCollection(userId: string, wallets: `0x${string}`[]) {
-  const hit = memo.get(userId);
+  const collections = (await activeCollections()).filter((c) => c.tips);
+  const memoKey = `${userId}:${JSON.stringify(collections)}`;
+  const hit = memo.get(memoKey);
   if (hit && Date.now() - hit.at < MEMO_MS) return hit.holder;
   let holder: string | null = null;
   if (wallets.length > 0) {
-    const rows = await scanAllCollections(publicClientFor(1), wallets, 0n, TIP_COLLECTIONS);
+    const rows = await scanAllCollections(publicClientFor(1), wallets, 0n, collections);
     const first = rows[0];
-    holder = first ? (collectionByContract(first.contract)?.name ?? null) : null;
+    holder = first
+      ? (collections.find((c) => c.contract.toLowerCase() === first.contract.toLowerCase())?.name ??
+        null)
+      : null;
   }
-  memo.set(userId, { at: Date.now(), holder });
+  memo.set(memoKey, { at: Date.now(), holder });
   return holder;
 }
 

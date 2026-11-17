@@ -4,6 +4,7 @@ import { publicClientFor } from "./chains";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { resolveDelegations } from "./delegateResolver";
 import { scanAllCollectionsDetailed, type OwnershipRow } from "./collectionScanner";
+import { activeCollections } from "@/server/club-configuration.server";
 
 export interface OwnershipResult {
   userId: string;
@@ -16,6 +17,7 @@ export interface OwnershipResult {
   scanned: string[];
   edges: Array<{ from: string; to: string; via: "linked" | "delegate-in" | "delegate-out" }>;
   blockNumber: string; // serialized bigint for SSR safety
+  collections: Awaited<ReturnType<typeof activeCollections>>;
 }
 
 const MAX_ADDRESSES = 32;
@@ -28,6 +30,7 @@ const MAX_ADDRESSES = 32;
  * every whitelisted collection across the whole graph in parallel.
  */
 export async function resolveOwnership(userId: string): Promise<OwnershipResult> {
+  const collections = await activeCollections();
   // Which wallets are checked — all server-proven, never a list from the
   // browser:
   //   * wallets proven by signature in the CURRENT sign-in session
@@ -94,6 +97,7 @@ export async function resolveOwnership(userId: string): Promise<OwnershipResult>
       scanned: [],
       edges: [],
       blockNumber: "0",
+      collections,
     };
   }
 
@@ -110,7 +114,7 @@ export async function resolveOwnership(userId: string): Promise<OwnershipResult>
   const delegationResults = await Promise.all(
     seeds.map(async (addr) => {
       try {
-        const d = await resolveDelegations(client, addr);
+        const d = await resolveDelegations(client, addr, collections);
         return { addr, ...d };
       } catch (e) {
         console.warn("[nft-gate] resolveDelegations failed", addr, e);
@@ -139,7 +143,12 @@ export async function resolveOwnership(userId: string): Promise<OwnershipResult>
 
   const capped = [...addresses].slice(0, MAX_ADDRESSES).map((a) => getAddress(a) as `0x${string}`);
 
-  const { rows: ownership, failed } = await scanAllCollectionsDetailed(client, capped, block);
+  const { rows: ownership, failed } = await scanAllCollectionsDetailed(
+    client,
+    capped,
+    block,
+    collections,
+  );
   const allowed = ownership.length > 0;
 
   // Structured log — drives observability the spec asks for.
@@ -174,6 +183,7 @@ export async function resolveOwnership(userId: string): Promise<OwnershipResult>
     scanned: capped,
     edges,
     blockNumber: block.toString(),
+    collections,
   };
 }
 

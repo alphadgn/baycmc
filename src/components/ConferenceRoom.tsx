@@ -49,6 +49,7 @@ import { RoomsShell } from "@/components/RoomsShell";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
 import { MeetingGuestsPanel } from "@/components/rooms/MeetingGuestsPanel";
+import { RoomChat } from "@/components/rooms/RoomChat";
 
 interface ConferenceRoomProps {
   roomId: string;
@@ -82,6 +83,7 @@ export function ConferenceRoom({
   hostUserId = null,
 }: ConferenceRoomProps) {
   const [state, setState] = useState<JoinState>({ phase: "idle" });
+  const [chatOpen, setChatOpen] = useState(false);
   const getToken = useServerFn(getLivekitToken);
   const revalidateAccess = useServerFn(revalidateLivekitRoomAccess);
   const navigate = useNavigate();
@@ -283,6 +285,8 @@ export function ConferenceRoom({
           }
           bottomBar={
             <LiveBottomBar
+              chatOpen={chatOpen}
+              onChat={() => setChatOpen((open) => !open)}
               isHost={state.isHost}
               karaoke={kind === "karaoke"}
               onLeave={() => {
@@ -305,6 +309,12 @@ export function ConferenceRoom({
           )}
           {/* Exactly one renderer per room — a second one plays every voice twice. */}
           <RoomAudioRenderer />
+          <RoomChat
+            roomId={roomId}
+            roomName={roomName}
+            open={chatOpen}
+            onOpenChange={setChatOpen}
+          />
           <StartAudio
             label="Enable room sound"
             className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-lg"
@@ -766,10 +776,14 @@ function LiveBottomBar({
   onLeave,
   isHost,
   karaoke = false,
+  chatOpen,
+  onChat,
 }: {
   onLeave: () => void;
   isHost: boolean;
   karaoke?: boolean;
+  chatOpen: boolean;
+  onChat: () => void;
 }) {
   const local = useLocalParticipant();
   const room = useRoomContext();
@@ -948,9 +962,9 @@ function LiveBottomBar({
           />
           <BottomControl
             label="Chat"
-            tone="neutral"
+            tone={chatOpen ? "active" : "neutral"}
             icon={<MessageCircle className="h-4 w-4" />}
-            disabled
+            onClick={onChat}
           />
           {!karaoke && (
             <BottomControl

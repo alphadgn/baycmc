@@ -15,6 +15,7 @@ import { KaraokeSaveTakeDialog } from "@/components/karaoke/KaraokeSaveTakeDialo
 import { VerificationStatusProvider } from "@/lib/baycmc/useVerificationStatus";
 import { installDiagnostics } from "@/lib/diagnostics";
 import { useNotificationPrefs } from "@/lib/baycmc/useNotificationPrefs";
+import { ClubInformation } from "@/components/ClubInformation";
 
 import appCss from "../styles.css?url";
 
@@ -133,6 +134,7 @@ function RootComponent() {
         <div className="min-h-dvh grain">
           <AppHeader />
           <Outlet />
+          <ClubInformation />
           <GatedToaster />
           <KaraokeSaveTakeDialog />
           <InactivityWatcher />

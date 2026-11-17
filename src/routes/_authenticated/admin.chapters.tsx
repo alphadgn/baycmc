@@ -57,7 +57,7 @@ function AdminChapters() {
     const { error } = await supabase.rpc("chapter_review_meeting", {
       _meeting: m.id,
       _approve: approve,
-      _note: notes[m.id]?.trim() || null,
+      _note: notes[m.id]?.trim() || "",
     });
     setBusy(null);
     if (error) return toast.error(error.message);

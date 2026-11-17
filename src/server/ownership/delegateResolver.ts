@@ -1,5 +1,5 @@
 import { type PublicClient, parseAbi, getAddress } from "viem";
-import { DELEGATE_REGISTRY_V2, isAllowedCollection } from "@/lib/web3/constants";
+import { DELEGATE_REGISTRY_V2, ALLOWED_COLLECTIONS } from "@/lib/web3/constants";
 
 const NO_RIGHTS = "0x0000000000000000000000000000000000000000000000000000000000000000";
 
@@ -17,11 +17,12 @@ type RawDelegation = {
   contract_: `0x${string}`;
 };
 
-function relevant(d: RawDelegation): boolean {
+function relevant(d: RawDelegation, collections: readonly { contract: string }[]): boolean {
   // type_: 1 = ALL, 2 = CONTRACT, 3 = ERC721
   if (d.rights !== NO_RIGHTS) return false;
   if (d.type_ === 1) return true;
-  if (d.type_ === 2 || d.type_ === 3) return isAllowedCollection(d.contract_);
+  if (d.type_ === 2 || d.type_ === 3)
+    return collections.some((c) => c.contract.toLowerCase() === d.contract_.toLowerCase());
   return false;
 }
 
@@ -33,6 +34,7 @@ export interface DelegationEdges {
 export async function resolveDelegations(
   client: PublicClient,
   addr: `0x${string}`,
+  collections: readonly { contract: string }[] = ALLOWED_COLLECTIONS,
 ): Promise<DelegationEdges> {
   const [incoming, outgoing] = await Promise.allSettled([
     client.readContract({
@@ -53,12 +55,13 @@ export async function resolveDelegations(
   const outDelegates = new Set<string>();
 
   if (incoming.status === "fulfilled") {
-    for (const d of incoming.value) if (relevant(d)) inVaults.add(getAddress(d.from));
+    for (const d of incoming.value) if (relevant(d, collections)) inVaults.add(getAddress(d.from));
   } else {
     console.warn("[nft-gate] getIncomingDelegations failed", addr, incoming.reason);
   }
   if (outgoing.status === "fulfilled") {
-    for (const d of outgoing.value) if (relevant(d)) outDelegates.add(getAddress(d.to));
+    for (const d of outgoing.value)
+      if (relevant(d, collections)) outDelegates.add(getAddress(d.to));
   } else {
     console.warn("[nft-gate] getOutgoingDelegations failed", addr, outgoing.reason);
   }
