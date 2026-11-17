@@ -21,6 +21,8 @@ import {
   type AllowedCollection,
   type CollectionChainId,
 } from "@/lib/web3/constants";
+import { activeCollections } from "@/server/club-configuration.server";
+import type { ClubCollection } from "@/lib/club-configuration";
 import { publicClientFor } from "@/server/ownership/chains";
 
 export interface NftItem {
@@ -360,7 +362,8 @@ export async function listAllowedNfts(
   owner: `0x${string}`,
   alchemyKey: string | null,
 ): Promise<WalletNfts> {
-  const byChain = (id: CollectionChainId) => ALLOWED_COLLECTIONS.filter((c) => c.chainId === id);
+  const collections = await activeCollections();
+  const byChain = (id: CollectionChainId) => collections.filter((c) => c.chainId === id);
   const jobs: Array<{ chain: CollectionChainId; run: () => Promise<NftItem[]> }> = [];
 
   const eth = byChain(CHAIN_ETHEREUM);
@@ -392,7 +395,9 @@ export async function listAllowedNfts(
   settled.forEach((r, i) => {
     if (r.status === "fulfilled") items.push(...r.value);
     else {
-      const chain = CHAIN_LABEL[jobs[i]!.chain];
+      const job = jobs[i];
+      if (!job) return;
+      const chain = CHAIN_LABEL[job.chain];
       console.warn("[nft-holdings]", chain, r.reason);
       errors.push(`${chain} NFTs couldn't be loaded right now.`);
     }

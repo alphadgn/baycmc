@@ -6,8 +6,9 @@
 - Profile picture frames use avatarShapeClass from src/lib/profile-avatar.ts, keeping NFT and device-photo shapes consistent without importing the wallet picker.
 - Chat lists use useChatScroll with a bounded viewport and observed content wrapper; fetch newest limited history descending and reverse for display so entry never stops at an older message window.
 - Wallet columns (profiles.wallet_address / linked_wallets, linked_wallets.*) are server-written only (service role after a signature check); members may edit only username/bio/avatar and delete their own linked wallets.
-- Collections live in COLLECTION_REGISTRY (src/lib/web3/constants.ts) with chainId + active; only active ones (ALLOWED_COLLECTIONS) grant access, display or tips. user_verifications.verified_collections stores every held label.
+- Collection configuration is persisted through club_configuration/save_club_configuration RPCs; server ownership, delegations, NFTs, tips and menu management read the saved active registry, with the code registry used only before the first save, so admin edits affect real access.
 - Chat channels share lobby_messages via `channel`; access is decided by can_access_chat_channel() in RLS (punks-brunch = holds_collection(uid,'PUNKS')).
+- Conference and karaoke chat reuse LobbyChat on room:<uuid> channels with room_visible RLS, keeping each room's history and real-time delivery isolated.
 - Display wallet addresses with shortAddress() (src/lib/short-address.ts) — email accounts have no wallet.
 - Access tiers: collections have `access` "full" (BAYC/MAYC/CryptoPunks → bayc_verified, holder clubhouse) or "partner" (Temp Agency/Orca Business/Ugly Duck Labs → regular menu + Ape Rides via can_use_ape_rides()). Rooms can require one collection via rooms.required_collection (enforced in the LiveKit token gate).
 - Ownership scans batch JSON-RPC calls and retry; a failed check is "unknown" (ScanResult.failed) and must never be stored as "not held".

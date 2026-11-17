@@ -2,7 +2,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { MENU_ITEM_KEYS } from "@/lib/baycmc/menu-items";
-import { COLLECTION_REGISTRY } from "@/lib/web3/constants";
 
 async function admin() {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -25,7 +24,8 @@ export const getMenuMatrix = createServerFn({ method: "POST" })
       .from("collection_menu_items")
       .select("collection_label,item_key,enabled,updated_at");
     if (error) throw new Error(error.message);
-    const collections = COLLECTION_REGISTRY.filter((c) => c.active).map((c) => ({
+    const { activeCollections } = await import("@/server/club-configuration.server");
+    const collections = (await activeCollections()).map((c) => ({
       label: c.label as string,
       name: c.name as string,
       access: c.access as string,
@@ -46,7 +46,8 @@ export const setMenuItem = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const db = await requireSuperAdmin(context.userId);
-    const known = COLLECTION_REGISTRY.find((c) => c.label === data.collection && c.active);
+    const { activeCollections } = await import("@/server/club-configuration.server");
+    const known = (await activeCollections()).find((c) => c.label === data.collection);
     if (!known) throw new Error("Unknown collection");
     const { error } = await db.from("collection_menu_items").upsert(
       {

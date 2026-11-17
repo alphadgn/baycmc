@@ -15,6 +15,8 @@ import {
 import { shortAddress } from "@/lib/short-address";
 import { MenuAccessTab } from "@/components/superadmin/MenuAccessTab";
 import { ApeRidesAdminTab } from "@/components/superadmin/ApeRidesAdminTab";
+import { ClubSettingsTab } from "@/components/superadmin/ClubSettingsTab";
+import { Button } from "@/components/ui/button";
 
 interface UserRow {
   id: string;
@@ -57,12 +59,19 @@ export const Route = createFileRoute("/_authenticated/super-admin")({
     const ok = roles?.some((r) => r.role === "super_admin");
     if (!ok) throw redirect({ to: "/" });
   },
-  head: () => ({ meta: [{ title: "Super Admin — BAYCmc" }] }),
+  head: () => ({ meta: [
+    { title: "Super Admin — BAYCmc" },
+    { name: "description", content: "Manage BAYCmc members, collection access, club rules and social links." },
+    { property: "og:title", content: "Super Admin — BAYCmc" },
+    { property: "og:description", content: "BAYCmc club administration and member access settings." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   component: SuperAdminPage,
 });
 
 function SuperAdminPage() {
-  const [tab, setTab] = useState<"users" | "chapters" | "menu" | "rides" | "lifers" | "local">(
+  const [tab, setTab] = useState<"users" | "chapters" | "menu" | "rides" | "lifers" | "local" | "club">(
     "users",
   );
 
@@ -95,6 +104,7 @@ function SuperAdminPage() {
       </header>
 
       <div className="mb-4 flex flex-wrap gap-2 text-xs font-sans-display">
+        <Button size="sm" variant={tab === "club" ? "default" : "outline"} onClick={() => setTab("club")}>Club settings</Button>
         <button
           onClick={() => setTab("users")}
           className={`rounded-md px-3 py-2 ${tab === "users" ? "bg-gradient-gold text-gold-foreground shadow-gold" : "border border-border hover:bg-muted"}`}
@@ -139,7 +149,7 @@ function SuperAdminPage() {
         </Link>
       </div>
 
-      {tab === "users" ? (
+      {tab === "club" ? <ClubSettingsTab /> : tab === "users" ? (
         <UsersTab />
       ) : tab === "chapters" ? (
         <ChaptersTab />
