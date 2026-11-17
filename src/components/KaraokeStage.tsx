@@ -1,3 +1,4 @@
+import { getPendingTakes } from "@/lib/karaoke/pendingTakes";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarClock, ChevronLeft, GripVertical, Mic, Users } from "lucide-react";
 import { toast } from "sonner";
@@ -442,17 +443,43 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
     [isMyTurn, roomId, session.revision, applySession],
   );
 
+  const endingRef = useRef(false);
   const onEndSong = useCallback(async () => {
-    if (!isMyTurn || !user) return;
-    // Open mic: server pops us and promotes the next singer. Reserved slot:
-    // the server just stops the song — the singer keeps the stage until the
-    // slot ends.
-    const { data, error } = await supabase.rpc("karaoke_end_turn", {
-      _room: roomId,
-      _expected_generation: session.generation,
-    });
-    if (error) toast.error("Couldn't end the song", { description: friendly(error.message) });
-    else if (data) applySession(data as unknown as KaraokeSessionRow);
+    if (!isMyTurn || !user || endingRef.current) return;
+    endingRef.current = true;
+    try {
+      // 1. Close the take (engine replies, or we move on after 4s).
+      await new Promise<void>((resolve) => {
+        const done = () => {
+          window.removeEventListener("karaoke:take-finished", done);
+          clearTimeout(t);
+          resolve();
+        };
+        const t = setTimeout(done, 4000);
+        window.addEventListener("karaoke:take-finished", done);
+        window.dispatchEvent(new Event("karaoke:finish-take"));
+      });
+      // 2. Hold the stage until the singer taps Save or Discard.
+      await new Promise<void>((resolve) => {
+        const check = () => {
+          if (getPendingTakes().length === 0) {
+            clearInterval(iv);
+            resolve();
+          }
+        };
+        const iv = setInterval(check, 300);
+        check();
+      });
+      // 3. Server pops us back to the audience and promotes the next singer.
+      const { data, error } = await supabase.rpc("karaoke_end_turn", {
+        _room: roomId,
+        _expected_generation: session.generation,
+      });
+      if (error) toast.error("Couldn't end the song", { description: friendly(error.message) });
+      else if (data) applySession(data as unknown as KaraokeSessionRow);
+    } finally {
+      endingRef.current = false;
+    }
   }, [isMyTurn, user, roomId, session.generation, applySession]);
 
   // Uploaded backing track reached its end → finish the song automatically.

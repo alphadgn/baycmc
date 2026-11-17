@@ -15,8 +15,8 @@ export interface RoomPreferences {
 }
 
 const DEFAULT_PREFS: RoomPreferences = {
-  micEnabled: true,
-  cameraEnabled: true,
+  micEnabled: false,
+  cameraEnabled: false,
   applyToAll: true,
   audioInputDeviceId: null,
   videoInputDeviceId: null,

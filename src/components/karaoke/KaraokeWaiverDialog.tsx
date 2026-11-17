@@ -85,6 +85,7 @@ export function KaraokeWaiverDialog({
             If you decline, you can stay in the room and enjoy the show, but you can't get in line
             or take the stage.
           </p>
+          <p className="font-bold text-foreground">Join the waitlist to use the Karaoke Machine</p>
         </div>
         <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button

@@ -138,6 +138,18 @@ export function KaraokePerformerEngine({ roomId }: { roomId: string }) {
     });
   }, [roomId, saveFn]);
 
+  // End Performance: close the take first so the singer decides Save/Discard
+  // before the stage is handed to the next person in line.
+  useEffect(() => {
+    function onFinish() {
+      void finishRecording().finally(() =>
+        window.dispatchEvent(new Event("karaoke:take-finished")),
+      );
+    }
+    window.addEventListener("karaoke:finish-take", onFinish);
+    return () => window.removeEventListener("karaoke:finish-take", onFinish);
+  }, [finishRecording]);
+
   // ── Teardown ─────────────────────────────────────────────────────────────
   const teardown = useCallback(async () => {
     await finishRecording();
