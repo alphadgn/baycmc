@@ -21,7 +21,8 @@ function relevant(d: RawDelegation, collections: readonly { contract: string }[]
   // type_: 1 = ALL, 2 = CONTRACT, 3 = ERC721
   if (d.rights !== NO_RIGHTS) return false;
   if (d.type_ === 1) return true;
-  if (d.type_ === 2 || d.type_ === 3) return collections.some((c) => c.contract.toLowerCase() === d.contract_.toLowerCase());
+  if (d.type_ === 2 || d.type_ === 3)
+    return collections.some((c) => c.contract.toLowerCase() === d.contract_.toLowerCase());
   return false;
 }
 
@@ -59,7 +60,8 @@ export async function resolveDelegations(
     console.warn("[nft-gate] getIncomingDelegations failed", addr, incoming.reason);
   }
   if (outgoing.status === "fulfilled") {
-    for (const d of outgoing.value) if (relevant(d, collections)) outDelegates.add(getAddress(d.to));
+    for (const d of outgoing.value)
+      if (relevant(d, collections)) outDelegates.add(getAddress(d.to));
   } else {
     console.warn("[nft-gate] getOutgoingDelegations failed", addr, outgoing.reason);
   }

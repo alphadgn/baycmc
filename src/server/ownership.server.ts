@@ -92,8 +92,12 @@ export async function recomputeOwnership(
 ): Promise<OwnershipSnapshot> {
   const result = await resolveOwnership(userId);
   const ALLOWED_COLLECTIONS = result.collections;
-  const FULL_ACCESS_LABELS = ALLOWED_COLLECTIONS.filter((c) => c.access === "full").map((c) => c.label);
-  const collectionLabel = (contract: string) => ALLOWED_COLLECTIONS.find((c) => c.contract.toLowerCase() === contract.toLowerCase())?.label ?? null;
+  const FULL_ACCESS_LABELS = ALLOWED_COLLECTIONS.filter((c) => c.access === "full").map(
+    (c) => c.label,
+  );
+  const collectionLabel = (contract: string) =>
+    ALLOWED_COLLECTIONS.find((c) => c.contract.toLowerCase() === contract.toLowerCase())?.label ??
+    null;
 
   // Find the "winning" row — direct holder on the connected wallet wins;
   // anything else flags delegation/linked attribution for the UI banner.

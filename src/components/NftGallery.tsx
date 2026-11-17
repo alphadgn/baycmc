@@ -97,7 +97,16 @@ export function NftGallery({
     return () => {
       cancelled = true;
     };
-  }, [address, includeLinkedWallets, userId, listFn, listLinked, ownershipGraph, getConfiguration, refreshVersion]);
+  }, [
+    address,
+    includeLinkedWallets,
+    userId,
+    listFn,
+    listLinked,
+    ownershipGraph,
+    getConfiguration,
+    refreshVersion,
+  ]);
 
   if (loading) {
     return (

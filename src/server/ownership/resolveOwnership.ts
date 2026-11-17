@@ -143,7 +143,12 @@ export async function resolveOwnership(userId: string): Promise<OwnershipResult>
 
   const capped = [...addresses].slice(0, MAX_ADDRESSES).map((a) => getAddress(a) as `0x${string}`);
 
-  const { rows: ownership, failed } = await scanAllCollectionsDetailed(client, capped, block, collections);
+  const { rows: ownership, failed } = await scanAllCollectionsDetailed(
+    client,
+    capped,
+    block,
+    collections,
+  );
   const allowed = ownership.length > 0;
 
   // Structured log — drives observability the spec asks for.

@@ -11,22 +11,33 @@ export const clubCollectionSchema = z.object({
   active: z.boolean(),
 });
 export const clubConfigurationSchema = z.object({
-  collections: z.array(clubCollectionSchema).max(100).superRefine((rows, ctx) => {
-    const labels = new Set<string>();
-    const contracts = new Set<string>();
-    rows.forEach((row, i) => {
-      const contract = `${row.chainId}:${row.contract.toLowerCase()}`;
-      if (labels.has(row.label) || contracts.has(contract))
-        ctx.addIssue({ code: "custom", path: [i], message: "Duplicate collection label or contract" });
-      labels.add(row.label);
-      contracts.add(contract);
-    });
-  }),
+  collections: z
+    .array(clubCollectionSchema)
+    .max(100)
+    .superRefine((rows, ctx) => {
+      const labels = new Set<string>();
+      const contracts = new Set<string>();
+      rows.forEach((row, i) => {
+        const contract = `${row.chainId}:${row.contract.toLowerCase()}`;
+        if (labels.has(row.label) || contracts.has(contract))
+          ctx.addIssue({
+            code: "custom",
+            path: [i],
+            message: "Duplicate collection label or contract",
+          });
+        labels.add(row.label);
+        contracts.add(contract);
+      });
+    }),
   rules: z.string().trim().max(12000),
-  socialLinks: z.array(z.object({
-    label: z.string().trim().min(1).max(80),
-    url: z.url().refine((url) => new URL(url).protocol === "https:", "Use an HTTPS link"),
-  })).max(20),
+  socialLinks: z
+    .array(
+      z.object({
+        label: z.string().trim().min(1).max(80),
+        url: z.url().refine((url) => new URL(url).protocol === "https:", "Use an HTTPS link"),
+      }),
+    )
+    .max(20),
 });
 export type ClubConfiguration = z.infer<typeof clubConfigurationSchema>;
 export type ClubCollection = z.infer<typeof clubCollectionSchema>;

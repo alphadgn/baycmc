@@ -309,7 +309,12 @@ export function ConferenceRoom({
           )}
           {/* Exactly one renderer per room — a second one plays every voice twice. */}
           <RoomAudioRenderer />
-          <RoomChat roomId={roomId} roomName={roomName} open={chatOpen} onOpenChange={setChatOpen} />
+          <RoomChat
+            roomId={roomId}
+            roomName={roomName}
+            open={chatOpen}
+            onOpenChange={setChatOpen}
+          />
           <StartAudio
             label="Enable room sound"
             className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-lg"

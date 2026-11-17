@@ -62,7 +62,10 @@ async function heldTipCollection(userId: string, wallets: `0x${string}`[]) {
   if (wallets.length > 0) {
     const rows = await scanAllCollections(publicClientFor(1), wallets, 0n, collections);
     const first = rows[0];
-    holder = first ? (collections.find((c) => c.contract.toLowerCase() === first.contract.toLowerCase())?.name ?? null) : null;
+    holder = first
+      ? (collections.find((c) => c.contract.toLowerCase() === first.contract.toLowerCase())?.name ??
+        null)
+      : null;
   }
   memo.set(memoKey, { at: Date.now(), holder });
   return holder;
