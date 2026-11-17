@@ -290,7 +290,7 @@ function Stage({
           live={live}
           viewers={viewers}
           capacity={capacity}
-          hostControls={controls}
+          hostControls={null}
         />
       ) : (
         <div className="mx-auto w-full max-w-6xl px-2 sm:px-4">
@@ -316,9 +316,9 @@ function Stage({
             </div>
             <ViewerCount viewers={viewers} capacity={capacity} />
           </div>
-          {controls}
         </div>
       )}
+      {controls}
 
       {/* Seats — proof of attendance. You're highlighted; others are greyed. */}
       <div className="mx-auto mt-5 w-full max-w-6xl flex-1 px-2 pb-6 sm:px-4">
@@ -828,7 +828,9 @@ function HostControls({ highlight, overlay = false, resumeId }: { highlight: boo
   useEffect(() => {
     const stop = () => { setStreaming(false); setEnded(true); void stopDevices(); };
     window.addEventListener("baycmc:stream-session-end", stop);
-    const permissionChanged = () => { if (!localParticipant.permissions?.canPublish) stop(); };
+    const permissionChanged = () => {
+      if (!localParticipant.permissions?.canPublish && room.state === "connected") stop();
+    };
     room.on(RoomEvent.ParticipantPermissionsChanged, permissionChanged);
     return () => {
       window.removeEventListener("baycmc:stream-session-end", stop);

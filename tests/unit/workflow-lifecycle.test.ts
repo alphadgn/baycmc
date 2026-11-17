@@ -122,4 +122,52 @@ describe.skipIf(!isolated)("isolated PostgreSQL: actual staged lifecycle functio
     await sql`INSERT INTO public.stream_grants(user_id) VALUES(${uid})`;
     expect((await sql`SELECT public.stream_broadcast_claim(${uid},${sid},${crypto.randomUUID()}) AS ok`)[0].ok).toBe(false);
   });
+  it("real karaoke end-turn advances two singers in signup order exactly once", async () => {
+    const source = readFileSync("supabase/migrations/20261013000001_karaoke_v2_authoritative_stage.sql", "utf8");
+    const section = (name: string) => {
+      const start = source.indexOf(`CREATE OR REPLACE FUNCTION public.${name}(`);
+      return source.slice(start, source.indexOf("END $$;", start) + "END $$;".length);
+    };
+    await sql.unsafe(`
+      CREATE TABLE public.karaoke_sessions(room_id uuid PRIMARY KEY,performer_user_id uuid,video_id text,search_query text,backing_track_id uuid,song_title text,song_artist text,
+        playback_status text DEFAULT 'idle',position_ms integer DEFAULT 0,position_at timestamptz DEFAULT now(),stage_source text DEFAULT 'open',reservation_id uuid,
+        generation integer DEFAULT 0,revision bigint DEFAULT 0,performer_heartbeat_at timestamptz,updated_at timestamptz DEFAULT now());
+      CREATE TABLE public.karaoke_room_settings(room_id uuid,require_booking boolean DEFAULT false,holders_priority boolean DEFAULT true);
+      CREATE TABLE public.karaoke_queue(id uuid DEFAULT gen_random_uuid(),room_id uuid,user_id uuid,joined_at timestamptz DEFAULT now(),last_seen_at timestamptz DEFAULT now());
+      CREATE TABLE public.karaoke_reservations(id uuid,status text);
+      CREATE TABLE public.test_entitlement(performer uuid,source text,reservation uuid);
+      CREATE FUNCTION public.karaoke_entitled_performer(_room uuid,OUT performer uuid,OUT source text,OUT reservation uuid) LANGUAGE sql AS $$ SELECT * FROM public.test_entitlement $$;
+      CREATE FUNCTION public.karaoke_settings(_room uuid) RETURNS public.karaoke_room_settings LANGUAGE sql AS $$ SELECT * FROM public.karaoke_room_settings WHERE room_id=_room $$;
+      CREATE FUNCTION public.karaoke_is_sanctioned(_room uuid,_uid uuid,_kind text) RETURNS boolean LANGUAGE sql AS $$ SELECT false $$;
+      CREATE FUNCTION public.karaoke_is_admin(_uid uuid) RETURNS boolean LANGUAGE sql AS $$ SELECT false $$;
+      CREATE FUNCTION public.karaoke_is_moderator(_room uuid,_uid uuid) RETURNS boolean LANGUAGE sql AS $$ SELECT false $$;
+      CREATE FUNCTION public.karaoke_assert_room(_room uuid) RETURNS void LANGUAGE plpgsql AS $$ BEGIN RETURN; END $$;
+      INSERT INTO public.test_entitlement VALUES(NULL,'open',NULL);
+      INSERT INTO public.karaoke_room_settings(room_id) VALUES('${room}');
+      INSERT INTO public.karaoke_sessions(room_id) VALUES('${room}');
+      INSERT INTO public.karaoke_queue(room_id,user_id,joined_at) VALUES('${room}','${uid}',now()-interval '2 minutes'),('${room}','${singer2}',now()-interval '1 minute');
+    `);
+    await sql.unsafe(section("karaoke_lock_session"));
+    await sql.unsafe(section("karaoke_end_turn"));
+    const reserved = await sql.reserve();
+    try { await reserved.unsafe(readFileSync("docs/review/20261117_karaoke_fifo.sql", "utf8")); }
+    finally { reserved.release(); }
+    expect((await sql`SELECT public.karaoke_promote_next(${room}) AS singer`)[0].singer).toBe(uid);
+    const generation = (await sql`SELECT generation FROM public.karaoke_sessions WHERE room_id=${room}`)[0].generation;
+    const end = () => sql.begin(async tx => {
+      await tx`SELECT set_config('test.uid',${uid},true)`;
+      return tx`SELECT (public.karaoke_end_turn(${room},${generation})).performer_user_id AS singer`;
+    });
+    const outcomes = await Promise.allSettled([end(), end()]);
+    expect(outcomes.filter(r => r.status === "fulfilled")).toHaveLength(1);
+    expect((await sql`SELECT performer_user_id FROM public.karaoke_sessions WHERE room_id=${room}`)[0].performer_user_id).toBe(singer2);
+    expect((await sql`SELECT count(*)::int AS count FROM public.karaoke_queue WHERE room_id=${room}`)[0].count).toBe(0);
+  });
+  it("karaoke reservation takes precedence over the open queue", async () => {
+    await sql`UPDATE public.test_entitlement SET performer=${uid},source='reservation',reservation=${attempt}`;
+    await sql`INSERT INTO public.karaoke_queue(room_id,user_id) VALUES(${room},${singer2})`;
+    expect((await sql`SELECT public.karaoke_promote_next(${room}) AS singer`)[0].singer).toBe(uid);
+    expect((await sql`SELECT stage_source FROM public.karaoke_sessions WHERE room_id=${room}`)[0].stage_source).toBe("reservation");
+    expect((await sql`SELECT count(*)::int AS count FROM public.karaoke_queue WHERE room_id=${room}`)[0].count).toBe(1);
+  });
 });

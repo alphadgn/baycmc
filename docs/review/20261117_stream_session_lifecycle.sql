@@ -102,9 +102,12 @@ BEGIN
 END $$;
 
 CREATE FUNCTION public.stream_broadcast_disconnect(_uid uuid, _session uuid, _id uuid)
-RETURNS void LANGUAGE sql SECURITY DEFINER SET search_path=public AS $$
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+BEGIN
+  PERFORM pg_advisory_xact_lock(hashtextextended('stream:' || _uid::text,0));
   UPDATE public.stream_broadcasts SET disconnected_at=coalesce(disconnected_at,now())
   WHERE id=_id AND user_id=_uid AND session_id=_session AND status='live';
+END
 $$;
 
 CREATE FUNCTION public.stream_session_close(_uid uuid, _session uuid)

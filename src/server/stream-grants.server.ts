@@ -16,7 +16,7 @@ async function rpc(name: string, args: Record<string, unknown>) {
 
 /**
  * Grant / revoke broadcasting for someone already in the Event Stream, so a
- * change takes effect without a rejoin. Best effort, never blocks > 4 s.
+ * change takes effect without a rejoin; removal is the fail-closed fallback.
  */
 export function streamMediaClient() {
   const apiKey = process.env.LIVEKIT_API_KEY;
