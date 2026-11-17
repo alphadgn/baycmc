@@ -1,5 +1,11 @@
 # Karaoke overhaul roadmap
 
+## Room chat and club administration
+- [ ] Add room-scoped live chat in conference and karaoke rooms
+- [ ] Add collection management connected to ownership and NFT display
+- [ ] Add club rules and social links editing with member-facing display
+- [ ] Verify authenticated settings saves and chat delivery
+
 ## Global pictures and chat opening
 - [x] Apply NFT versus device photo shapes to every profile picture display
 - [x] Open every chat thread at the newest messages, including delayed media
