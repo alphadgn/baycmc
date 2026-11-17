@@ -297,7 +297,6 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
   const performerId = session.performer_user_id;
   const reserved = session.stage_source !== "open";
   const isMyTurn = !!user && !!performerId && user.id === performerId;
-  const meInQueue = !!user && visibleQueue.some((q) => q.user_id === user.id);
   const actuallyQueued = !!user && queue.some((q) => q.user_id === user.id);
   const [sanctioned, setSanctioned] = useState(true);
   useEffect(() => {

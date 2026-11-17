@@ -648,13 +648,11 @@ function VideoArea({
   kind,
   roomName,
   hostUserId,
-  karaoke,
 }: {
   backgroundImage: string | null;
   kind: "conference" | "game" | "karaoke";
   roomName: string;
   hostUserId: string | null;
-  karaoke: boolean;
 }) {
   // Game rooms keep a framed stage with their own background. Conference
   // rooms render the video tiles directly on top of the page-level room
@@ -694,11 +692,13 @@ function LiveRightRail({
   isHost,
   connecting,
   hostUserId,
+  karaoke,
 }: {
   roomId: string;
   isHost: boolean;
   connecting: boolean;
   hostUserId: string | null;
+  karaoke: boolean;
 }) {
   // We surface a compact "no host booked" status card here when no host is
   // present in the room — the big central HostTile has been hidden so the
