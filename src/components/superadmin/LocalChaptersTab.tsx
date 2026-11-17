@@ -30,15 +30,17 @@ export function LocalChaptersTab() {
   async function save(c: LocalChapter | null, patch: Partial<LocalChapter> & { name: string }) {
     const key = c?.id ?? "new";
     setBusy(key);
-    const { error } = await supabase.rpc("chapter_save", {
+    // The SQL function accepts a null ID to create a chapter; generated RPC types omit null.
+    const args = {
       _id: c?.id ?? null,
       _name: patch.name,
       _order: patch.display_order ?? c?.display_order ?? (chapters?.length ?? 0) + 1,
       _active: patch.active ?? c?.active ?? true,
       // Always send region / X link so a rename or toggle never clears them.
-      _region: patch.region !== undefined ? patch.region : (c?.region ?? null),
-      _x_url: patch.x_url !== undefined ? patch.x_url : (c?.x_url ?? null),
-    });
+      _region: patch.region ?? c?.region ?? "",
+      _x_url: patch.x_url ?? c?.x_url ?? "",
+    };
+    const { error } = await supabase.rpc("chapter_save", args as unknown as Parameters<typeof supabase.rpc<"chapter_save">>[1]);
     setBusy(null);
     if (error) return toast.error(error.message);
     if (!c) setNewName("");
@@ -56,19 +58,20 @@ export function LocalChaptersTab() {
       _name: a.name,
       _order: b.display_order,
       _active: a.active,
-      _region: a.region,
-      _x_url: a.x_url,
+      _region: a.region ?? "",
+      _x_url: a.x_url ?? "",
     });
     const r2 = await supabase.rpc("chapter_save", {
       _id: b.id,
       _name: b.name,
       _order: a.display_order === b.display_order ? a.display_order + dir : a.display_order,
       _active: b.active,
-      _region: b.region,
-      _x_url: b.x_url,
+      _region: b.region ?? "",
+      _x_url: b.x_url ?? "",
     });
     setBusy(null);
-    if (r1.error || r2.error) toast.error((r1.error ?? r2.error)!.message);
+    const error = r1.error ?? r2.error;
+    if (error) toast.error(error.message);
     changed();
   }
 

@@ -139,7 +139,7 @@ function BookChapterMeeting() {
       _starts: start.toISOString(),
       _minutes: minutes,
       _capacity: capacity,
-      _notes: notes.trim() || null,
+      _notes: notes.trim() || "",
     });
     setBusy(false);
     if (error) return toast.error(error.message);
