@@ -1,11 +1,12 @@
 # Karaoke overhaul roadmap
 
 ## Approved workflow revision (review only; no shared database changes or publishing)
-- [ ] Session-bound single-use Event Stream grants and live media enforcement
-- [ ] Regular conference rooms without performer UI; preserve booked admission
-- [ ] Karaoke waitlist pulse and ordered authoritative handoff
-- [ ] Isolated lifecycle/concurrency tests and room-entry regression checks
-- [ ] Document unapplied SQL, deployment prerequisites, and unverified live flows
+- [x] Prepare session-bound single-use Event Stream grants and live media enforcement
+- [x] Regular conference rooms without performer UI; preserve booked admission
+- [x] Karaoke waitlist pulse and ordered authoritative handoff (SQL staged, not applied)
+- [x] Isolated lifecycle/concurrency tests and room-entry regression checks
+- [x] Document unapplied SQL, deployment prerequisites, and unverified live flows
+- [ ] Live media verification — blocked by intentionally unapplied SQL, unconfigured scheduler/webhook and live staff/member test sessions; review details in docs/review/WORKFLOW_REVIEW.md
 
 ## Room chat and club administration
 - [x] Add room-scoped live chat in conference and karaoke rooms

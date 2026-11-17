@@ -163,4 +163,8 @@ REVOKE ALL ON FUNCTION public.stream_session_valid(uuid,uuid), public.stream_bro
 GRANT EXECUTE ON FUNCTION public.stream_session_valid(uuid,uuid), public.stream_broadcast_finish(uuid,uuid,uuid,text),
  public.stream_broadcast_valid(uuid,uuid,uuid), public.stream_broadcast_claim(uuid,uuid,uuid),
  public.stream_broadcast_touch(uuid,uuid,uuid), public.stream_broadcast_disconnect(uuid,uuid,uuid), public.stream_session_close(uuid,uuid) TO service_role;
+REVOKE ALL ON FUNCTION public.stream_grant_finish(uuid,text), public.stream_grant_sweep(), public.stream_grant_touch(uuid) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.stream_grant_finish(uuid,text), public.stream_grant_sweep(), public.stream_grant_touch(uuid) TO service_role;
+REVOKE ALL ON FUNCTION public.stream_grant_revoke(uuid) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.stream_grant_revoke(uuid) TO authenticated;
 COMMIT;
