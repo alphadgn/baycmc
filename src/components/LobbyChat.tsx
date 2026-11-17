@@ -120,6 +120,7 @@ const INSERT_EMOJI = [
 
 interface LobbyChatProps {
   channelName?: string;
+  channelTitle?: string;
   /** Heading for the members panel (default "Members in lobby"). */
   membersTitle?: string;
   /** Shown when the channel has no messages yet. */
@@ -128,6 +129,7 @@ interface LobbyChatProps {
 
 export function LobbyChat({
   channelName = "lobby",
+  channelTitle,
   membersTitle = "Members in lobby",
   emptyText = "Welcome to the lobby. Say hi 👋",
 }: LobbyChatProps) {
@@ -468,7 +470,7 @@ export function LobbyChat({
       <div className="flex items-center justify-between gap-2 border-b border-border/60 px-3 py-2.5 sm:px-4">
         <div className="flex min-w-0 items-center gap-2">
           <Hash className="h-4 w-4 text-muted-foreground" />
-          <span className="truncate text-sm font-semibold">{channelName}</span>
+          <span className="truncate text-sm font-semibold">{channelTitle ?? channelName}</span>
         </div>
         <Sheet open={membersOpen} onOpenChange={setMembersOpen}>
           <SheetTrigger asChild>
