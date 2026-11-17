@@ -60,7 +60,14 @@ type Phase =
   | { phase: "idle" }
   | { phase: "connecting" }
   | { phase: "error"; message: string }
-  | { phase: "live"; token: string; url: string; canPublish: boolean; canStart: boolean; resumeId: string | null };
+  | {
+      phase: "live";
+      token: string;
+      url: string;
+      canPublish: boolean;
+      canStart: boolean;
+      resumeId: string | null;
+    };
 
 /**
  * Event Stream — a movie-theatre style, watch-only room. The host (an
@@ -140,7 +147,13 @@ export function EventStreamTheater({
             label="Tap to watch & listen"
             className="fixed left-1/2 top-1/2 z-[60] -translate-x-1/2 -translate-y-1/2 rounded-xl border-2 border-gold bg-black/85 px-6 py-4 font-display text-base font-semibold text-gold shadow-gold backdrop-blur"
           />
-          <Stage capacity={capacity} tokenCanPublish={state.canPublish} canStart={state.canStart} resumeId={state.resumeId} goLive={goLive} />
+          <Stage
+            capacity={capacity}
+            tokenCanPublish={state.canPublish}
+            canStart={state.canStart}
+            resumeId={state.resumeId}
+            goLive={goLive}
+          />
         </LiveKitRoom>
       ) : (
         <div className="relative z-10 flex flex-1 flex-col items-center justify-center gap-3 px-4 text-center">
@@ -240,7 +253,10 @@ function Stage({
   const access = useServerFn(getStreamAccess);
   const [eligible, setEligible] = useState(canStart);
   useEffect(() => {
-    const load = () => void access().then((r) => setEligible(r.canHost)).catch(() => setEligible(false));
+    const load = () =>
+      void access()
+        .then((r) => setEligible(r.canHost))
+        .catch(() => setEligible(false));
     const timer = window.setInterval(load, 15_000);
     return () => window.clearInterval(timer);
   }, [access]);
@@ -255,7 +271,10 @@ function Stage({
     }
     setWasHost(eligible);
   }, [eligible, wasHost]);
-  const controls = eligible || canPublish || resumeId ? <HostControls highlight={goLive} resumeId={resumeId} /> : null;
+  const controls =
+    eligible || canPublish || resumeId ? (
+      <HostControls highlight={goLive} resumeId={resumeId} />
+    ) : null;
   const participants = useParticipants();
   const tracks = useTracks(
     [
@@ -796,7 +815,15 @@ function captureOptions(facingMode: "environment" | "user") {
 }
 
 /** Shown only to assigned hosts: go live from this phone. */
-function HostControls({ highlight, overlay = false, resumeId }: { highlight: boolean; overlay?: boolean; resumeId: string | null }) {
+function HostControls({
+  highlight,
+  overlay = false,
+  resumeId,
+}: {
+  highlight: boolean;
+  overlay?: boolean;
+  resumeId: string | null;
+}) {
   const { localParticipant, isCameraEnabled, isMicrophoneEnabled } = useLocalParticipant();
   const room = useRoomContext();
   const [broadcastId] = useState(() => resumeId ?? crypto.randomUUID());
@@ -804,7 +831,11 @@ function HostControls({ highlight, overlay = false, resumeId }: { highlight: boo
   const [ended, setEnded] = useState(false);
   const starting = useRef(false);
   const stopDevices = useCallback(async () => {
-    await Promise.all([localParticipant.setCameraEnabled(false), localParticipant.setMicrophoneEnabled(false), localParticipant.setScreenShareEnabled(false)]);
+    await Promise.all([
+      localParticipant.setCameraEnabled(false),
+      localParticipant.setMicrophoneEnabled(false),
+      localParticipant.setScreenShareEnabled(false),
+    ]);
   }, [localParticipant]);
   // Single-use grant: check in on start and every minute while live; End
   // broadcast uses the grant up (admins stream without one).
@@ -814,19 +845,27 @@ function HostControls({ highlight, overlay = false, resumeId }: { highlight: boo
     if (!streaming) return;
     const t = window.setInterval(() => {
       if (room.state !== "connected") return; // Do not keep a dropped connection's lease alive.
-      void checkIn({ data: { broadcastId, participantSid: localParticipant.sid } }).then((r) => {
-        if (!r.ok) {
-          toast.error(r.error);
-          setStreaming(false);
-          setEnded(true);
+      void checkIn({ data: { broadcastId, participantSid: localParticipant.sid } })
+        .then((r) => {
+          if (!r.ok) {
+            toast.error(r.error);
+            setStreaming(false);
+            setEnded(true);
+            void stopDevices();
+          }
+        })
+        .catch(() => {
           void stopDevices();
-        }
-      }).catch(() => { void stopDevices(); });
+        });
     }, 15_000);
     return () => window.clearInterval(t);
   }, [streaming, checkIn, localParticipant, room, broadcastId, stopDevices]);
   useEffect(() => {
-    const stop = () => { setStreaming(false); setEnded(true); void stopDevices(); };
+    const stop = () => {
+      setStreaming(false);
+      setEnded(true);
+      void stopDevices();
+    };
     window.addEventListener("baycmc:stream-session-end", stop);
     const permissionChanged = () => {
       if (!localParticipant.permissions?.canPublish && room.state === "connected") stop();
@@ -874,13 +913,26 @@ function HostControls({ highlight, overlay = false, resumeId }: { highlight: boo
               if (starting.current) return;
               starting.current = true;
               try {
-                const ok = await checkIn({ data: { broadcastId, participantSid: localParticipant.sid, start: true } });
+                const ok = await checkIn({
+                  data: { broadcastId, participantSid: localParticipant.sid, start: true },
+                });
                 if (!ok.ok) throw new Error(ok.error);
                 // Wait for the media server's permission event before publishing devices.
                 await new Promise<void>((resolve, reject) => {
-                  const timer = window.setTimeout(() => { cleanup(); reject(new Error("Streaming permission did not arrive.")); }, 5000);
-                  const check = () => { if (localParticipant.permissions?.canPublish) { cleanup(); resolve(); } };
-                  const cleanup = () => { window.clearTimeout(timer); room.off(RoomEvent.ParticipantPermissionsChanged, check); };
+                  const timer = window.setTimeout(() => {
+                    cleanup();
+                    reject(new Error("Streaming permission did not arrive."));
+                  }, 5000);
+                  const check = () => {
+                    if (localParticipant.permissions?.canPublish) {
+                      cleanup();
+                      resolve();
+                    }
+                  };
+                  const cleanup = () => {
+                    window.clearTimeout(timer);
+                    room.off(RoomEvent.ParticipantPermissionsChanged, check);
+                  };
                   room.on(RoomEvent.ParticipantPermissionsChanged, check);
                   check();
                 });
@@ -891,7 +943,9 @@ function HostControls({ highlight, overlay = false, resumeId }: { highlight: boo
               } catch (error) {
                 await stopDevices();
                 throw error;
-              } finally { starting.current = false; }
+              } finally {
+                starting.current = false;
+              }
             })
           }
           className="inline-flex items-center gap-2 rounded-md bg-gradient-gold px-5 py-2.5 text-sm font-semibold text-gold-foreground shadow-gold disabled:opacity-60"

@@ -6,7 +6,13 @@ import { leaseCanResume, streamSessionId } from "@/lib/stream-lifecycle";
 
 // Explicit isolated test socket only. NEVER accepts the app's connection string.
 const isolated = process.env.BAYCMC_ISOLATED_DB === "1";
-const sql = postgres({ host: "/tmp/baycmc-workflow-db", port: 55439, username: "lovable", database: "postgres", max: 5 });
+const sql = postgres({
+  host: "/tmp/baycmc-workflow-db",
+  port: 55439,
+  username: "lovable",
+  database: "postgres",
+  max: 5,
+});
 const uid = "00000000-0000-4000-8000-000000000001";
 const sid = "00000000-0000-4000-8000-000000000002";
 const otherSession = "00000000-0000-4000-8000-000000000003";
@@ -30,14 +36,28 @@ describe("room workflow boundaries", () => {
     expect(conferenceAdmission({ ...input, guestStatus: "denied" })).toBe("denied");
   });
   it("queue invitation stops when queued or performing", () => {
-    const input = { signedIn: true, queued: false, performing: false, bookingOnly: false, reserved: false, sanctioned: false };
+    const input = {
+      signedIn: true,
+      queued: false,
+      performing: false,
+      bookingOnly: false,
+      reserved: false,
+      sanctioned: false,
+    };
     expect(canJoinKaraokeQueue(input)).toBe(true);
     expect(canJoinKaraokeQueue({ ...input, queued: true })).toBe(false);
     expect(canJoinKaraokeQueue({ ...input, performing: true })).toBe(false);
     expect(canJoinKaraokeQueue({ ...input, sanctioned: true })).toBe(false);
   });
   it("reconnection has an exact five-minute cutoff and the same session", () => {
-    const lease = { id: attempt, user_id: uid, session_id: sid, status: "live", last_live_at: new Date(0).toISOString(), disconnected_at: null };
+    const lease = {
+      id: attempt,
+      user_id: uid,
+      session_id: sid,
+      status: "live",
+      last_live_at: new Date(0).toISOString(),
+      disconnected_at: null,
+    };
     expect(leaseCanResume(lease, sid, 299999)).toBe(true);
     expect(leaseCanResume(lease, sid, 300000)).toBe(false);
     expect(leaseCanResume(lease, otherSession, 1)).toBe(false);
@@ -65,11 +85,18 @@ describe.skipIf(!isolated)("isolated PostgreSQL: actual staged lifecycle functio
       INSERT INTO auth.sessions VALUES('${sid}','${uid}',NULL),('${otherSession}','${uid}',NULL);
     `);
     await sql.reserve().then(async (reserved) => {
-      try { await reserved.unsafe(readFileSync("docs/review/20261117_stream_session_lifecycle.sql", "utf8")); }
-      finally { reserved.release(); }
+      try {
+        await reserved.unsafe(
+          readFileSync("docs/review/20261117_stream_session_lifecycle.sql", "utf8"),
+        );
+      } finally {
+        reserved.release();
+      }
     });
   });
-  afterAll(async () => { await sql.end(); });
+  afterAll(async () => {
+    await sql.end();
+  });
   it("member cannot start without a grant", async () => {
     const [r] = await sql`SELECT public.stream_broadcast_claim(${uid},${sid},${attempt}) AS ok`;
     expect(r.ok).toBe(false);
@@ -82,7 +109,8 @@ describe.skipIf(!isolated)("isolated PostgreSQL: actual staged lifecycle functio
     ]);
     expect(results.map(([r]) => r.ok).filter(Boolean)).toHaveLength(1);
     const [b] = await sql`SELECT * FROM public.stream_broadcasts WHERE status='live'`;
-    const [retry] = await sql`SELECT public.stream_broadcast_claim(${uid},${b.session_id},${b.id}) AS ok`;
+    const [retry] =
+      await sql`SELECT public.stream_broadcast_claim(${uid},${b.session_id},${b.id}) AS ok`;
     expect(retry.ok).toBe(true);
     const [g] = await sql`SELECT status FROM public.stream_grants WHERE user_id=${uid}`;
     expect(g.status).toBe("in_use");
@@ -90,49 +118,85 @@ describe.skipIf(!isolated)("isolated PostgreSQL: actual staged lifecycle functio
   it("same broadcast reconnects within five minutes, cannot reconnect after", async () => {
     const [b] = await sql`SELECT * FROM public.stream_broadcasts WHERE status='live'`;
     await sql`UPDATE public.stream_broadcasts SET disconnected_at=now()-interval '4 minutes' WHERE id=${b.id}`;
-    expect((await sql`SELECT public.stream_broadcast_touch(${uid},${b.session_id},${b.id}) AS ok`)[0].ok).toBe(true);
+    expect(
+      (await sql`SELECT public.stream_broadcast_touch(${uid},${b.session_id},${b.id}) AS ok`)[0].ok,
+    ).toBe(true);
     await sql`UPDATE public.stream_broadcasts SET disconnected_at=now()-interval '5 minutes' WHERE id=${b.id}`;
-    expect((await sql`SELECT public.stream_broadcast_touch(${uid},${b.session_id},${b.id}) AS ok`)[0].ok).toBe(false);
-    expect((await sql`SELECT status FROM public.stream_grants WHERE user_id=${uid}`)[0].status).toBe("expired");
+    expect(
+      (await sql`SELECT public.stream_broadcast_touch(${uid},${b.session_id},${b.id}) AS ok`)[0].ok,
+    ).toBe(false);
+    expect(
+      (await sql`SELECT status FROM public.stream_grants WHERE user_id=${uid}`)[0].status,
+    ).toBe("expired");
   });
   it("admin and super admin start without grants; End consumes the broadcast", async () => {
     for (const role of ["admin", "super_admin"]) {
       await sql`DELETE FROM public.user_roles`;
       await sql`INSERT INTO public.user_roles VALUES(${uid},${role})`;
       const id = crypto.randomUUID();
-      expect((await sql`SELECT public.stream_broadcast_claim(${uid},${sid},${id}) AS ok`)[0].ok).toBe(true);
+      expect(
+        (await sql`SELECT public.stream_broadcast_claim(${uid},${sid},${id}) AS ok`)[0].ok,
+      ).toBe(true);
       await sql`SELECT public.stream_broadcast_finish(${uid},${sid},${id},'ended')`;
-      expect((await sql`SELECT public.stream_broadcast_claim(${uid},${sid},${id}) AS ok`)[0].ok).toBe(false);
+      expect(
+        (await sql`SELECT public.stream_broadcast_claim(${uid},${sid},${id}) AS ok`)[0].ok,
+      ).toBe(false);
     }
     await sql`DELETE FROM public.user_roles`;
   });
   it("member End consumes grant; a fresh broadcast needs a fresh grant", async () => {
     const id = crypto.randomUUID();
     await sql`INSERT INTO public.stream_grants(user_id) VALUES(${uid})`;
-    expect((await sql`SELECT public.stream_broadcast_claim(${uid},${sid},${id}) AS ok`)[0].ok).toBe(true);
+    expect((await sql`SELECT public.stream_broadcast_claim(${uid},${sid},${id}) AS ok`)[0].ok).toBe(
+      true,
+    );
     await sql`SELECT public.stream_broadcast_finish(${uid},${sid},${id},'ended')`;
-    expect((await sql`SELECT status FROM public.stream_grants WHERE user_id=${uid} ORDER BY created_at DESC LIMIT 1`)[0].status).toBe("used");
-    expect((await sql`SELECT public.stream_broadcast_claim(${uid},${sid},${crypto.randomUUID()}) AS ok`)[0].ok).toBe(false);
+    expect(
+      (
+        await sql`SELECT status FROM public.stream_grants WHERE user_id=${uid} ORDER BY created_at DESC LIMIT 1`
+      )[0].status,
+    ).toBe("used");
+    expect(
+      (
+        await sql`SELECT public.stream_broadcast_claim(${uid},${sid},${crypto.randomUUID()}) AS ok`
+      )[0].ok,
+    ).toBe(false);
   });
   it("revocation invalidates connected broadcast authorization", async () => {
     const id = crypto.randomUUID();
     await sql`INSERT INTO public.stream_grants(user_id) VALUES(${uid})`;
     await sql`SELECT public.stream_broadcast_claim(${uid},${sid},${id})`;
     await sql`INSERT INTO public.user_roles VALUES(${uid},'admin')`;
-    await sql.begin(async (tx) => { await tx`SELECT set_config('test.uid',${uid},true)`; await tx`SELECT public.stream_grant_revoke(${uid})`; });
-    expect((await sql`SELECT public.stream_broadcast_valid(${uid},${sid},${id}) AS ok`)[0].ok).toBe(false);
+    await sql.begin(async (tx) => {
+      await tx`SELECT set_config('test.uid',${uid},true)`;
+      await tx`SELECT public.stream_grant_revoke(${uid})`;
+    });
+    expect((await sql`SELECT public.stream_broadcast_valid(${uid},${sid},${id}) AS ok`)[0].ok).toBe(
+      false,
+    );
     await sql`DELETE FROM public.user_roles`;
   });
   it("sign-out/inactivity closes session and expires unused grants", async () => {
     await sql`INSERT INTO public.stream_grants(user_id) VALUES(${uid})`;
     await sql`SELECT public.stream_session_close(${uid},${sid})`;
     expect((await sql`SELECT public.stream_session_valid(${uid},${sid}) AS ok`)[0].ok).toBe(false);
-    expect((await sql`SELECT status FROM public.stream_grants WHERE user_id=${uid} ORDER BY created_at DESC LIMIT 1`)[0].status).toBe("expired");
+    expect(
+      (
+        await sql`SELECT status FROM public.stream_grants WHERE user_id=${uid} ORDER BY created_at DESC LIMIT 1`
+      )[0].status,
+    ).toBe("expired");
     await sql`INSERT INTO public.stream_grants(user_id) VALUES(${uid})`;
-    expect((await sql`SELECT public.stream_broadcast_claim(${uid},${sid},${crypto.randomUUID()}) AS ok`)[0].ok).toBe(false);
+    expect(
+      (
+        await sql`SELECT public.stream_broadcast_claim(${uid},${sid},${crypto.randomUUID()}) AS ok`
+      )[0].ok,
+    ).toBe(false);
   });
   it("real karaoke end-turn advances two singers in signup order exactly once", async () => {
-    const source = readFileSync("supabase/migrations/20261013000001_karaoke_v2_authoritative_stage.sql", "utf8");
+    const source = readFileSync(
+      "supabase/migrations/20261013000001_karaoke_v2_authoritative_stage.sql",
+      "utf8",
+    );
     const section = (name: string) => {
       const start = source.indexOf(`CREATE OR REPLACE FUNCTION public.${name}(`);
       return source.slice(start, source.indexOf("END $$;", start) + "END $$;".length);
@@ -159,24 +223,42 @@ describe.skipIf(!isolated)("isolated PostgreSQL: actual staged lifecycle functio
     await sql.unsafe(section("karaoke_lock_session"));
     await sql.unsafe(section("karaoke_end_turn"));
     const reserved = await sql.reserve();
-    try { await reserved.unsafe(readFileSync("docs/review/20261117_karaoke_fifo.sql", "utf8")); }
-    finally { reserved.release(); }
+    try {
+      await reserved.unsafe(readFileSync("docs/review/20261117_karaoke_fifo.sql", "utf8"));
+    } finally {
+      reserved.release();
+    }
     expect((await sql`SELECT public.karaoke_promote_next(${room}) AS singer`)[0].singer).toBe(uid);
-    const generation = (await sql`SELECT generation FROM public.karaoke_sessions WHERE room_id=${room}`)[0].generation;
-    const end = () => sql.begin(async tx => {
-      await tx`SELECT set_config('test.uid',${uid},true)`;
-      return tx`SELECT (public.karaoke_end_turn(${room},${generation})).performer_user_id AS singer`;
-    });
+    const generation = (
+      await sql`SELECT generation FROM public.karaoke_sessions WHERE room_id=${room}`
+    )[0].generation;
+    const end = () =>
+      sql.begin(async (tx) => {
+        await tx`SELECT set_config('test.uid',${uid},true)`;
+        return tx`SELECT (public.karaoke_end_turn(${room},${generation})).performer_user_id AS singer`;
+      });
     const outcomes = await Promise.allSettled([end(), end()]);
-    expect(outcomes.filter(r => r.status === "fulfilled")).toHaveLength(1);
-    expect((await sql`SELECT performer_user_id FROM public.karaoke_sessions WHERE room_id=${room}`)[0].performer_user_id).toBe(singer2);
-    expect((await sql`SELECT count(*)::int AS count FROM public.karaoke_queue WHERE room_id=${room}`)[0].count).toBe(0);
+    expect(outcomes.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    expect(
+      (await sql`SELECT performer_user_id FROM public.karaoke_sessions WHERE room_id=${room}`)[0]
+        .performer_user_id,
+    ).toBe(singer2);
+    expect(
+      (await sql`SELECT count(*)::int AS count FROM public.karaoke_queue WHERE room_id=${room}`)[0]
+        .count,
+    ).toBe(0);
   });
   it("karaoke reservation takes precedence over the open queue", async () => {
     await sql`UPDATE public.test_entitlement SET performer=${uid},source='reservation',reservation=${attempt}`;
     await sql`INSERT INTO public.karaoke_queue(room_id,user_id) VALUES(${room},${singer2})`;
     expect((await sql`SELECT public.karaoke_promote_next(${room}) AS singer`)[0].singer).toBe(uid);
-    expect((await sql`SELECT stage_source FROM public.karaoke_sessions WHERE room_id=${room}`)[0].stage_source).toBe("reservation");
-    expect((await sql`SELECT count(*)::int AS count FROM public.karaoke_queue WHERE room_id=${room}`)[0].count).toBe(1);
+    expect(
+      (await sql`SELECT stage_source FROM public.karaoke_sessions WHERE room_id=${room}`)[0]
+        .stage_source,
+    ).toBe("reservation");
+    expect(
+      (await sql`SELECT count(*)::int AS count FROM public.karaoke_queue WHERE room_id=${room}`)[0]
+        .count,
+    ).toBe(1);
   });
 });

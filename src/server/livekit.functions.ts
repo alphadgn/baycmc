@@ -132,10 +132,12 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
   // moment access is requested or refreshed. This is the hard gate that makes
   // revoked delegations/sold tokens stop future room entry and token minting.
   const { recomputeOwnership } = await import("@/server/ownership.server");
-  const fresh = isPublicRoom ? null : await recomputeOwnership(userId).catch((e) => {
-    console.error("recomputeOwnership for room access failed", e);
-    return null;
-  });
+  const fresh = isPublicRoom
+    ? null
+    : await recomputeOwnership(userId).catch((e) => {
+        console.error("recomputeOwnership for room access failed", e);
+        return null;
+      });
 
   const ver = fresh
     ? {
@@ -236,7 +238,12 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
         .eq("booking_id", booking.id)
         .eq("user_id", userId)
         .maybeSingle();
-      const admission = conferenceAdmission({ booked: true, ownsBooking: false, staff: isAdmin, guestStatus: guest?.status });
+      const admission = conferenceAdmission({
+        booked: true,
+        ownsBooking: false,
+        staff: isAdmin,
+        guestStatus: guest?.status,
+      });
       if (admission === "denied") {
         return {
           ok: false,
@@ -470,7 +477,9 @@ export const getLivekitToken = createServerFn({ method: "POST" })
 
     const { AccessToken } = await import("livekit-server-sdk");
     const at = new AccessToken(cfg.apiKey, cfg.apiSecret, {
-      identity, name, ttl: room.kind === "stream" ? "1m" : "2h",
+      identity,
+      name,
+      ttl: room.kind === "stream" ? "1m" : "2h",
       ...(streamSession ? { metadata: JSON.stringify({ streamSession }) } : {}),
     });
     at.addGrant({

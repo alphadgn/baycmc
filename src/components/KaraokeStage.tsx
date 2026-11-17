@@ -304,15 +304,27 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
     setSanctioned(true);
     let cancelled = false;
     const check = async () => {
-      const { data, error } = await supabase.rpc("karaoke_is_sanctioned", { _room: roomId, _uid: user.id, _kind: "mute" });
+      const { data, error } = await supabase.rpc("karaoke_is_sanctioned", {
+        _room: roomId,
+        _uid: user.id,
+        _kind: "mute",
+      });
       if (!cancelled) setSanctioned(!!error || data !== false);
     };
     void check();
     const timer = window.setInterval(() => void check(), 15_000);
-    return () => { cancelled = true; window.clearInterval(timer); };
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
   }, [roomId, user]);
-  const joinAvailable = canJoinKaraokeQueue({ signedIn: !!user, queued: actuallyQueued,
-    performing: isMyTurn, bookingOnly: settings.require_booking, sanctioned });
+  const joinAvailable = canJoinKaraokeQueue({
+    signedIn: !!user,
+    queued: actuallyQueued,
+    performing: isMyTurn,
+    bookingOnly: settings.require_booking,
+    sanctioned,
+  });
 
   // Karaoke rules: when the stage changes hands, re-apply the server-side
   // mic rule (only the performer may publish during a performance). The

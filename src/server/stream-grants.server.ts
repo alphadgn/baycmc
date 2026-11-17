@@ -7,7 +7,10 @@ import { leaseCanResume, type BroadcastLease } from "@/lib/stream-lifecycle";
  */
 export const STREAM_ROOM = "event-stream";
 
-type Rpc = (name: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }>;
+type Rpc = (
+  name: string,
+  args: Record<string, unknown>,
+) => Promise<{ data: unknown; error: { message: string } | null }>;
 async function rpc(name: string, args: Record<string, unknown>) {
   const result = await (supabaseAdmin.rpc as unknown as Rpc)(name, args);
   if (result.error) throw new Error("Streaming authorization unavailable. Please try again later.");
@@ -23,7 +26,9 @@ export function streamMediaClient() {
   const apiSecret = process.env.LIVEKIT_API_SECRET;
   const url = process.env.LIVEKIT_URL;
   if (!apiKey || !apiSecret || !url) throw new Error("Live streaming is not configured.");
-  return import("livekit-server-sdk").then(({ RoomServiceClient }) => new RoomServiceClient(url, apiKey, apiSecret));
+  return import("livekit-server-sdk").then(
+    ({ RoomServiceClient }) => new RoomServiceClient(url, apiKey, apiSecret),
+  );
 }
 
 export async function setLivePublish(userId: string, canPublish: false) {
@@ -32,7 +37,12 @@ export async function setLivePublish(userId: string, canPublish: false) {
   if (!people.some((p) => p.identity === userId)) return;
   try {
     await client.updateParticipant(STREAM_ROOM, userId, {
-      permission: { canSubscribe: true, canPublish, canPublishData: false, canUpdateMetadata: false },
+      permission: {
+        canSubscribe: true,
+        canPublish,
+        canPublishData: false,
+        canUpdateMetadata: false,
+      },
     });
   } catch (e) {
     // Never silently keep a revoked publisher connected.
@@ -42,20 +52,34 @@ export async function setLivePublish(userId: string, canPublish: false) {
 }
 
 function binding(metadata: string) {
-  try { return JSON.parse(metadata) as { streamSession?: string; broadcastId?: string }; }
-  catch { return {}; }
+  try {
+    return JSON.parse(metadata) as { streamSession?: string; broadcastId?: string };
+  } catch {
+    return {};
+  }
 }
 
 /** Session comes only from verified auth claims, never from input. */
-export async function authorizeBroadcast(userId: string, sessionId: string, broadcastId: string, participantSid: string, start: boolean) {
+export async function authorizeBroadcast(
+  userId: string,
+  sessionId: string,
+  broadcastId: string,
+  participantSid: string,
+  start: boolean,
+) {
   const client = await streamMediaClient();
   const participant = await client.getParticipant(STREAM_ROOM, userId);
-  if (participant.sid !== participantSid || binding(participant.metadata).streamSession !== sessionId) return false;
+  if (
+    participant.sid !== participantSid ||
+    binding(participant.metadata).streamSession !== sessionId
+  )
+    return false;
   const args = { _uid: userId, _session: sessionId, _id: broadcastId };
   const allowed = await rpc(start ? "stream_broadcast_claim" : "stream_broadcast_touch", args);
   if (allowed !== true) {
     // An unrelated tab cannot demote the valid owner of a competing broadcast.
-    if (binding(participant.metadata).broadcastId === broadcastId) await setLivePublish(userId, false);
+    if (binding(participant.metadata).broadcastId === broadcastId)
+      await setLivePublish(userId, false);
     return false;
   }
   try {
@@ -63,10 +87,15 @@ export async function authorizeBroadcast(userId: string, sessionId: string, broa
     if (current.sid !== participantSid) return false;
     await client.updateParticipant(STREAM_ROOM, userId, {
       metadata: JSON.stringify({ streamSession: sessionId, broadcastId }),
-      permission: { canSubscribe: true, canPublish: true, canPublishData: false, canUpdateMetadata: false },
+      permission: {
+        canSubscribe: true,
+        canPublish: true,
+        canPublishData: false,
+        canUpdateMetadata: false,
+      },
     });
     // Revocation/End may have raced the media call; check again AFTER enabling.
-    if (await rpc("stream_broadcast_valid", args) !== true) {
+    if ((await rpc("stream_broadcast_valid", args)) !== true) {
       await setLivePublish(userId, false);
       return false;
     }
@@ -78,7 +107,12 @@ export async function authorizeBroadcast(userId: string, sessionId: string, broa
 }
 
 export async function finishBroadcast(userId: string, sessionId: string, broadcastId: string) {
-  await rpc("stream_broadcast_finish", { _uid: userId, _session: sessionId, _id: broadcastId, _reason: "ended" });
+  await rpc("stream_broadcast_finish", {
+    _uid: userId,
+    _session: sessionId,
+    _id: broadcastId,
+    _reason: "ended",
+  });
   await reconcileStreamPublishers();
 }
 
@@ -95,21 +129,43 @@ export async function reconcileStreamPublishers() {
   for (const participant of people) {
     if (!participant.permission?.canPublish) continue;
     const meta = binding(participant.metadata);
-    const args = { _uid: participant.identity, _session: meta.streamSession, _id: meta.broadcastId };
-    const valid = meta.streamSession && meta.broadcastId && await rpc("stream_broadcast_valid", args) === true;
+    const args = {
+      _uid: participant.identity,
+      _session: meta.streamSession,
+      _id: meta.broadcastId,
+    };
+    const valid =
+      meta.streamSession &&
+      meta.broadcastId &&
+      (await rpc("stream_broadcast_valid", args)) === true;
     if (!valid) await setLivePublish(participant.identity, false);
   }
 }
 
 export async function resumeBroadcast(userId: string, sessionId: string): Promise<string | null> {
-  const { data, error } = await supabaseAdmin.from("stream_broadcasts" as never).select("*")
-    .eq("user_id", userId).eq("session_id", sessionId).eq("status", "live").maybeSingle();
+  const { data, error } = await supabaseAdmin
+    .from("stream_broadcasts" as never)
+    .select("*")
+    .eq("user_id", userId)
+    .eq("session_id", sessionId)
+    .eq("status", "live")
+    .maybeSingle();
   if (error) return null; // Unapplied schema must fail closed: viewers may still enter.
   const lease = data as unknown as BroadcastLease | null;
   if (!lease || !leaseCanResume(lease, sessionId, Date.now())) return null;
-  return await rpc("stream_broadcast_valid", { _uid: userId, _session: sessionId, _id: lease.id }) === true ? lease.id : null;
+  return (await rpc("stream_broadcast_valid", {
+    _uid: userId,
+    _session: sessionId,
+    _id: lease.id,
+  })) === true
+    ? lease.id
+    : null;
 }
 
-export async function markBroadcastDisconnected(userId: string, sessionId: string, broadcastId: string) {
+export async function markBroadcastDisconnected(
+  userId: string,
+  sessionId: string,
+  broadcastId: string,
+) {
   await rpc("stream_broadcast_disconnect", { _uid: userId, _session: sessionId, _id: broadcastId });
 }

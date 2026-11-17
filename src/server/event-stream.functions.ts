@@ -153,10 +153,17 @@ export const revokeStream = createServerFn({ method: "POST" })
 export const streamHostCheckIn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { broadcastId: string; participantSid: string; start?: boolean }) =>
-    streamAttemptSchema.extend({ start: z.boolean().default(false) }).parse(d))
+    streamAttemptSchema.extend({ start: z.boolean().default(false) }).parse(d),
+  )
   .handler(async ({ data, context }) => {
     const { authorizeBroadcast } = await import("@/server/stream-grants.server");
-    const ok = await authorizeBroadcast(context.userId, streamSessionId(context.claims), data.broadcastId, data.participantSid, data.start);
+    const ok = await authorizeBroadcast(
+      context.userId,
+      streamSessionId(context.claims),
+      data.broadcastId,
+      data.participantSid,
+      data.start,
+    );
     return ok
       ? { ok: true as const }
       : {
@@ -168,7 +175,9 @@ export const streamHostCheckIn = createServerFn({ method: "POST" })
 /** Host: End broadcast — the grant is used up. */
 export const streamHostEnd = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { broadcastId: string }) => z.object({ broadcastId: z.string().uuid() }).parse(d))
+  .inputValidator((d: { broadcastId: string }) =>
+    z.object({ broadcastId: z.string().uuid() }).parse(d),
+  )
   .handler(async ({ data, context }) => {
     const { finishBroadcast } = await import("@/server/stream-grants.server");
     await finishBroadcast(context.userId, streamSessionId(context.claims), data.broadcastId);

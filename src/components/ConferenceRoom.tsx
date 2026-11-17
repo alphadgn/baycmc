@@ -627,7 +627,11 @@ function PreLiveBottomBar({ onLeave }: { onLeave: () => void }) {
  */
 function useStageMicLock(karaoke: boolean): boolean {
   const { session, isMyTurn } = useKaraokeStage();
-  return karaokeMicLocked(karaoke ? "karaoke" : "conference", session?.performer_user_id ?? null, isMyTurn);
+  return karaokeMicLocked(
+    karaoke ? "karaoke" : "conference",
+    session?.performer_user_id ?? null,
+    isMyTurn,
+  );
 }
 
 function useMicLock(): boolean {

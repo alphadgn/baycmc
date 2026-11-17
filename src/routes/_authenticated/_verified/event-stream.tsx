@@ -12,7 +12,10 @@ export const Route = createFileRoute("/_authenticated/_verified/event-stream")({
       { title: "Event Stream — BAYCmc" },
       { name: "description", content: "Live event broadcast for verified clubhouse holders." },
       { property: "og:title", content: "Event Stream — BAYCmc" },
-      { property: "og:description", content: "Live event broadcast for verified clubhouse holders." },
+      {
+        property: "og:description",
+        content: "Live event broadcast for verified clubhouse holders.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
