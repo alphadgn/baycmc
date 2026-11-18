@@ -5,7 +5,8 @@ import { dbError, jsonResult, supabaseForUser, unauthenticated } from "../supaba
 export default defineTool({
   name: "list_karaoke_sessions",
   title: "List active karaoke sessions",
-  description: "Show current karaoke sessions across karaoke rooms, including who is performing and what video is queued.",
+  description:
+    "Show current karaoke sessions across karaoke rooms, including who is performing and what video is queued.",
   inputSchema: {
     room_id: z.string().uuid().optional(),
     limit: z.number().int().min(1).max(100).optional(),

@@ -5,7 +5,8 @@ import { dbError, jsonResult, supabaseForUser, unauthenticated } from "../supaba
 export default defineTool({
   name: "get_karaoke_queue",
   title: "Get karaoke queue for a room",
-  description: "Return the current karaoke queue (users waiting to sing) for a specific karaoke room, ordered by join time.",
+  description:
+    "Return the current karaoke queue (users waiting to sing) for a specific karaoke room, ordered by join time.",
   inputSchema: {
     room_id: z.string().uuid().describe("Karaoke room UUID."),
   },
