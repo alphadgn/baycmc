@@ -98,6 +98,9 @@ export async function resolveTipTarget(roomId: string, callerId: string): Promis
 
 export class TipError extends Error {}
 
+/** A tip tx must be mined within this window before it is recorded. */
+export const TIP_MAX_AGE_MS = 2 * 60 * 60 * 1000;
+
 /**
  * Verify a tip transaction on ApeChain and record it. Idempotent per tx.
  * The recipient must be eligible right now OR have been the performer when
@@ -130,6 +133,18 @@ export async function verifyAndRecordTip(input: {
   if (!acct.wallets.some((w) => getAddress(w) === to)) {
     throw new TipError("That transaction didn't pay this performer.");
   }
+  // The tip must come from the tipper's own wallet (primary or verified linked),
+  // the same rule as ticket and ride payments — otherwise anyone could claim
+  // someone else's on-chain tip as their own.
+  const payer = await accountWallets(input.tipperId);
+  const from = getAddress(tx.from);
+  if (!payer.wallets.some((w) => getAddress(w) === from)) {
+    throw new TipError("Tip from a wallet connected or linked to your account.");
+  }
+  // And it must be recent: an old transfer can't be replayed as a new tip.
+  const block = await client.getBlock({ blockNumber: receipt.blockNumber });
+  const ageMs = Date.now() - Number(block.timestamp) * 1000;
+  if (ageMs > TIP_MAX_AGE_MS) throw new TipError("That tip transaction is too old to record.");
 
   const { error } = await supabaseAdmin.from("karaoke_tips").insert({
     room_id: input.roomId,
@@ -137,7 +152,7 @@ export async function verifyAndRecordTip(input: {
     recipient_id: input.recipientId,
     chain_id: TIP_CHAIN_ID,
     tx_hash: input.txHash.toLowerCase(),
-    from_address: getAddress(tx.from),
+    from_address: from,
     to_address: to,
     // numeric column: send as string to keep full wei precision.
     amount_wei: tx.value.toString() as unknown as number,

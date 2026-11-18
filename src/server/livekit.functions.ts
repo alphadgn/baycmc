@@ -491,10 +491,9 @@ export const getLivekitToken = createServerFn({ method: "POST" })
       // Lets the singer flag "music is in my mix" via participant attributes
       // so listeners mute their local YouTube copy (no double audio).
       canUpdateOwnMetadata: room.kind !== "stream",
-      // Hosts get room-admin grants so the client SDK exposes the kick/mute
-      // surface. The server-side fns still re-check is_room_host before
-      // acting — the grant alone is not a permission.
-      roomAdmin: room.kind !== "stream" && host,
+      // No roomAdmin grant: it would let a host's own token call LiveKit's
+      // admin API directly (kick, unmute, grant publish) and bypass the
+      // server checks. Kick / mute / stage changes go through server functions.
     });
 
     const token = await at.toJwt();

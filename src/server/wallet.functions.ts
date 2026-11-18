@@ -203,28 +203,20 @@ async function resolveDelegatedVaults(
   }
 }
 
-// Simple in-memory token-bucket rate limiter, keyed by wallet address.
-// Protects against verification spam / DDoS / re-entry attacks. Best-effort
-// only — production deployments should layer a CDN / WAF on top.
-const RATE_LIMIT_WINDOW_MS = 60_000;
+// Per-wallet rate limits, shared across every Worker instance through the
+// database (consume_rate_limit, migration 20261118000001). Falls back to a
+// per-instance window if that migration isn't applied yet.
+const RATE_LIMIT_WINDOW_S = 60;
 const RATE_LIMIT_MAX = 6; // 6 verification attempts per wallet per minute
 const INSPECT_RATE_LIMIT_MAX = 30;
-type Bucket = { count: number; resetAt: number };
-const verifyBuckets = new Map<string, Bucket>();
-const inspectBuckets = new Map<string, Bucket>();
+const NONCE_RATE_LIMIT_MAX = 12;
 
-function rateLimit(map: Map<string, Bucket>, key: string, max: number) {
-  const now = Date.now();
-  const b = map.get(key);
-  if (!b || b.resetAt < now) {
-    map.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return { ok: true as const, retryAfterMs: 0 };
-  }
-  if (b.count >= max) {
-    return { ok: false as const, retryAfterMs: b.resetAt - now };
-  }
-  b.count += 1;
-  return { ok: true as const, retryAfterMs: 0 };
+async function rateLimit(bucket: string, key: string, max: number) {
+  const { consumeRateLimit } = await import("@/server/api-auth.server");
+  const r = await consumeRateLimit(bucket, key, max, RATE_LIMIT_WINDOW_S);
+  return r.allowed
+    ? { ok: true as const, retryAfterMs: 0 }
+    : { ok: false as const, retryAfterMs: Math.max(r.resetAt - Date.now(), 1000) };
 }
 
 /**
@@ -241,7 +233,7 @@ export const inspectWalletHoldings = createServerFn({ method: "POST" })
       return { ok: false as const, reason: "invalid-address" };
     }
     const address = getAddress(data.address) as `0x${string}`;
-    const rl = rateLimit(inspectBuckets, address.toLowerCase(), INSPECT_RATE_LIMIT_MAX);
+    const rl = await rateLimit("wallet_inspect", address.toLowerCase(), INSPECT_RATE_LIMIT_MAX);
     if (!rl.ok) {
       return { ok: false as const, reason: "rate-limited", retryAfterMs: rl.retryAfterMs };
     }
@@ -277,7 +269,6 @@ export const inspectWalletHoldings = createServerFn({ method: "POST" })
     };
   });
 
-const nonceBuckets = new Map<string, Bucket>();
 const SIWE_NONCE_TTL_MS = 10 * 60 * 1000;
 
 /**
@@ -294,7 +285,7 @@ export const getSiweNonce = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const address = getAddress(data.address);
-    const rl = rateLimit(nonceBuckets, address.toLowerCase(), 12);
+    const rl = await rateLimit("siwe_nonce", address.toLowerCase(), NONCE_RATE_LIMIT_MAX);
     if (!rl.ok) {
       throw new Error(
         `Too many sign-in attempts. Try again in ${Math.ceil(rl.retryAfterMs / 1000)}s.`,
@@ -418,11 +409,11 @@ export const verifyOwnership = createServerFn({ method: "POST" })
     try {
       const siwe = new SiweMessage(data.message);
 
-      // Domain check: the SIWE message must be bound to the host the user
-      // actually visited. In preview / proxy environments the worker's
-      // internal request host (e.g. "localhost:8080") differs from the
-      // browser-visible host, so prefer the Origin/Referer header (set by
-      // the browser to the real site) and fall back to the request host.
+      // Domain check: the SIWE message must be bound to THIS site. The
+      // configured SITE_DOMAIN allowlist (plus the request host) is
+      // authoritative; the Origin/Referer header is only consulted when
+      // SITE_DOMAIN isn't set (legacy previews), because a relaying site
+      // controls that header.
       const headerHost = (() => {
         try {
           const origin = getRequestHeader("origin") ?? getRequestHeader("referer");
@@ -439,11 +430,11 @@ export const verifyOwnership = createServerFn({ method: "POST" })
           return null;
         }
       })();
-      const acceptedDomains = new Set(
-        [process.env.SITE_DOMAIN, headerHost, requestHost]
-          .filter((d): d is string => Boolean(d))
-          .map((d) => d.toLowerCase()),
-      );
+      if (!process.env.SITE_DOMAIN?.trim()) {
+        console.warn("[siwe] SITE_DOMAIN is not set; accepting the Origin host (legacy).");
+      }
+      const { acceptedSiweDomains } = await import("@/lib/auth/siwe-domains");
+      const acceptedDomains = acceptedSiweDomains(process.env.SITE_DOMAIN, requestHost, headerHost);
       if (acceptedDomains.size === 0) {
         throw new Error("Server domain not configured");
       }
@@ -506,7 +497,7 @@ export const verifyOwnership = createServerFn({ method: "POST" })
     }
     const wallet = getAddress(address);
 
-    const rl = rateLimit(verifyBuckets, wallet.toLowerCase(), RATE_LIMIT_MAX);
+    const rl = await rateLimit("siwe_verify", wallet.toLowerCase(), RATE_LIMIT_MAX);
     if (!rl.ok) {
       return {
         verified: false as const,
@@ -661,6 +652,9 @@ export const verifyOwnership = createServerFn({ method: "POST" })
           password,
           email_confirm: true,
           user_metadata: { wallet: lower, via: "glyph" },
+          // Server-only marker (users can't set app_metadata): proves this
+          // @wallet.baycmc.local account was minted here, not by an email sign-up.
+          app_metadata: { wallet_account: true },
         });
     let userId = created.user?.id;
 
@@ -677,18 +671,35 @@ export const verifyOwnership = createServerFn({ method: "POST" })
         .eq("wallet_address", lower)
         .maybeSingle();
       userId = (prof?.id as string | undefined) ?? undefined;
-      for (let page = 1; !userId && page <= 50; page++) {
-        const { data: existing } = await supabaseAdmin.auth.admin.listUsers({
-          page,
-          perPage: 1000,
-        });
-        const found = existing?.users.find((u) => u.email === email);
-        userId = found?.id;
-        if (!existing || existing.users.length < 1000) break;
+      if (!userId) {
+        // No profile carries this wallet: the account behind the reserved
+        // address must be one this server minted (app_metadata marker).
+        // Otherwise someone registered "<wallet>@wallet.baycmc.local" through
+        // the email sign-up form and would keep a session on the owner's
+        // account, so refuse rather than reset its password.
+        for (let page = 1; !userId && page <= 50; page++) {
+          const { data: existing } = await supabaseAdmin.auth.admin.listUsers({
+            page,
+            perPage: 1000,
+          });
+          const found = existing?.users.find((u) => u.email === email);
+          if (found) {
+            if (found.app_metadata?.wallet_account !== true) {
+              console.error("[siwe] reserved wallet email without marker", { wallet: lower });
+              throw new Error(
+                "This wallet's sign-in is blocked for your safety. Please contact support.",
+              );
+            }
+            userId = found.id;
+          }
+          if (!existing || existing.users.length < 1000) break;
+        }
       }
       if (!userId) throw new Error("Could not find wallet session");
       const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(userId, {
         password,
+        // Backfill the marker on accounts minted before it existed.
+        app_metadata: { wallet_account: true },
       });
       if (updateErr) throw updateErr;
     }
