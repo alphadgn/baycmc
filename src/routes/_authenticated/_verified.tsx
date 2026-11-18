@@ -2,6 +2,8 @@ import { createFileRoute, redirect, Outlet } from "@tanstack/react-router";
 import { areaForPath } from "@/lib/baycmc/menu-items";
 import { supabase } from "@/integrations/supabase/client";
 import { revalidateOwnership } from "@/server/verification.functions";
+import { getAccessibleMenuItems } from "@/server/menu-access.functions";
+import type { MenuItemKey } from "@/lib/baycmc/menu-items";
 
 /**
  * Verified-holder gate (Tier 2).
@@ -30,7 +32,10 @@ export const Route = createFileRoute("/_authenticated/_verified")({
       .from("user_roles")
       .select("role")
       .eq("user_id", sess.session.user.id);
-    if (roles?.some((r) => r.role === "admin" || r.role === "super_admin")) {
+    if (
+      roles?.some((r) => r.role === "admin" || r.role === "super_admin") &&
+      areaForPath(location.pathname) !== "event_stream"
+    ) {
       return;
     }
     // The verified role counts exactly like a BAYC/MAYC holding: the menu
@@ -58,8 +63,8 @@ export const Route = createFileRoute("/_authenticated/_verified")({
       if (v?.bayc_verified || verifiedRole) return;
       throw redirect({ to: "/lobby" });
     }
-    const { data: allowed } = await supabase.rpc("my_menu_items");
-    if ((allowed ?? []).includes(area)) return;
+    const allowed = await getAccessibleMenuItems().catch((): MenuItemKey[] => []);
+    if (allowed.includes(area)) return;
     throw redirect({ to: "/lobby" });
   },
   component: () => <Outlet />,

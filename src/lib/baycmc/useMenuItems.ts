@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useServerFn } from "@tanstack/react-start";
+import { getAccessibleMenuItems } from "@/server/menu-access.functions";
 import { useAuth } from "@/lib/auth/useAuth";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import type { MenuItemKey } from "@/lib/baycmc/menu-items";
@@ -12,27 +13,34 @@ import type { MenuItemKey } from "@/lib/baycmc/menu-items";
 export function useMenuItems(): Set<MenuItemKey> {
   const { user } = useAuth();
   const { collections } = useVerificationStatus();
-  const [items, setItems] = useState<Set<MenuItemKey>>(new Set());
+  const fetchItems = useServerFn(getAccessibleMenuItems);
+  const [snapshot, setSnapshot] = useState<{ key: string; items: Set<MenuItemKey> } | null>(null);
   const key = `${user?.id ?? ""}|${collections.join(",")}`;
   useEffect(() => {
     if (!user) {
-      setItems(new Set());
+      setSnapshot(null);
       return;
     }
     let cancelled = false;
     const load = () =>
-      void supabase.rpc("my_menu_items").then(({ data }) => {
-        if (!cancelled) setItems(new Set((data ?? []) as MenuItemKey[]));
-      });
+      void fetchItems()
+        .then((data) => {
+          if (!cancelled) setSnapshot({ key, items: new Set(data) });
+        })
+        .catch(() => {
+          if (!cancelled) setSnapshot({ key, items: new Set() });
+        });
     load();
+    const timer = window.setInterval(load, 15_000);
     window.addEventListener("baycmc:verification-refresh", load);
     window.addEventListener("baycmc:menu-access-changed", load);
     return () => {
       cancelled = true;
+      window.clearInterval(timer);
       window.removeEventListener("baycmc:verification-refresh", load);
       window.removeEventListener("baycmc:menu-access-changed", load);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
-  return items;
+  }, [key, fetchItems]);
+  return snapshot?.key === key ? snapshot.items : new Set();
 }

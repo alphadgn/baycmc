@@ -13,6 +13,8 @@ import { RoomsShell } from "@/components/RoomsShell";
 import { getRoomThemeImage, getRoomThemeAmbience } from "@/lib/baycmc/roomThemes";
 import { useRoomPreferences } from "@/lib/baycmc/useRoomPreferences";
 import { useVerificationRevalidation } from "@/hooks/useVerificationRevalidation";
+import { useMenuItems } from "@/lib/baycmc/useMenuItems";
+import { getVisibleRooms } from "@/server/visible-rooms.functions";
 
 interface Room {
   id: string;
@@ -47,6 +49,13 @@ export const Route = createFileRoute("/_authenticated/_verified/rooms")({
         content:
           "Choose a themed conference room to join and connect with verified members in real time.",
       },
+      { property: "og:title", content: "Conference Rooms — BAYCmc" },
+      {
+        property: "og:description",
+        content: "Collection-authorized conference rooms for BAYCmc members.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: RoomsPage,
@@ -54,6 +63,7 @@ export const Route = createFileRoute("/_authenticated/_verified/rooms")({
 
 function RoomsPage() {
   const { user } = useAuth();
+  const areas = useMenuItems();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,6 +75,7 @@ function RoomsPage() {
   const prevAccessRef = useRef<{ bayc: boolean; op: boolean } | null>(null);
 
   const create = useServerFn(createBooking);
+  const fetchRooms = useServerFn(getVisibleRooms);
   const fetchOccupancy = useServerFn(getRoomsOccupancy);
   // Live headcount per room (from LiveKit), refreshed every 10s and when the
   // page comes back into view.
@@ -90,18 +101,11 @@ function RoomsPage() {
   async function load() {
     setLoading(true);
     const [{ data: r }, { data: b }, { data: roles }, { data: ver }] = await Promise.all([
-      supabase
-        .from("rooms")
-        .select(
-          "id,name,description,capacity,tier,livekit_room,theme,display_order,is_locked,kind,required_collection,coming_soon",
-        )
-        .eq("active", true)
-        // Mudwater game tables live on their own page.
-        .neq("kind", "mudwater")
-        // Chapter rooms open only through approved chapter meetings.
-        .neq("kind", "chapter")
-        .order("display_order", { ascending: true, nullsFirst: false })
-        .order("name"),
+      fetchRooms()
+        .then((data) => ({
+          data: data.filter((rm) => rm.kind !== "mudwater" && rm.kind !== "chapter"),
+        }))
+        .catch(() => ({ data: [] })),
       supabase
         .from("room_bookings")
         .select("id,room_id,user_id,title,starts_at,ends_at,override_by")
@@ -130,7 +134,6 @@ function RoomsPage() {
     const admin = !!roles?.some((x) => x.role === "admin" || x.role === "super_admin");
     // Admins administer the clubhouse — they see every tier including
     // Lifer-only rooms without holding tokens.
-    const seesLiferRooms = (bayc && op) || admin;
 
     // We used to fire a toast here when bayc flipped from true → false, but
     // transient revalidation gaps (e.g. when returning from a room) made it
@@ -142,16 +145,9 @@ function RoomsPage() {
     setOtherpageVerified(op);
     // Collection rooms (e.g. Punks Brunch) only show to that collection's
     // holders; the LiveKit token gate enforces it server-side as well.
-    const held = ver?.verified_collections ?? [];
-    setRooms(
-      allRooms.filter(
-        (rm) =>
-          (seesLiferRooms || rm.tier !== "lifer") &&
-          (!rm.required_collection ||
-            admin ||
-            rm.required_collection.split(",").some((l) => held.includes(l.trim()))),
-      ),
-    );
+    // Room visibility (including verified-role and Lifer exceptions) is
+    // authoritative in RLS, not reconstructed from unrelated profile flags.
+    setRooms(allRooms);
     setBookings((b as Booking[]) ?? []);
     setIsAdmin(admin);
     setLoading(false);
@@ -179,9 +175,9 @@ function RoomsPage() {
   const visibleRooms = useMemo(
     () =>
       rooms
-        .filter((r) => r.theme)
+        .filter((r) => r.theme && (r.kind !== "stream" || areas.has("event_stream")))
         .sort((a, b) => (a.tier === "lifer" ? 1 : 0) - (b.tier === "lifer" ? 1 : 0)),
-    [rooms],
+    [rooms, areas],
   );
 
   // Verified BAYC/MAYC OR an elevated role can create bookings. Lifer rooms

@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { streamVisible } from "@/lib/baycmc/stream-visibility";
+import type { MenuItemKey } from "@/lib/baycmc/menu-items";
 import { MENU_ITEM_KEYS } from "@/lib/baycmc/menu-items";
 
 async function admin() {
@@ -66,4 +68,22 @@ export const setMenuItem = createServerFn({ method: "POST" })
       metadata: { collection: data.collection, item: data.item, enabled: data.enabled },
     });
     return { ok: true };
+  });
+
+/** Shared by navigation and direct-route admission; errors fail closed. */
+export const getAccessibleMenuItems = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<MenuItemKey[]> => {
+    const { data, error } = await context.supabase.rpc("my_menu_items");
+    if (error) return [];
+    const items = (data ?? []) as MenuItemKey[];
+    if (!items.includes("event_stream")) return items;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const [free, ticket] = await Promise.all([
+      supabaseAdmin.rpc("stream_viewer_free", { _uid: context.userId }),
+      supabaseAdmin.rpc("stream_has_ticket", { _uid: context.userId }),
+    ]);
+    return streamVisible({ free: free.data === true, hasTicket: ticket.data === true })
+      ? items
+      : items.filter((item) => item !== "event_stream");
   });

@@ -1,4 +1,3 @@
-import { collectionNameForLabel } from "@/lib/web3/constants";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -46,6 +45,10 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
     .maybeSingle();
   if (error || !room || !room.active) {
     return { ok: false, error: "Room not found or inactive", code: "room_unavailable" };
+  }
+  const { roomVisibleTo } = await import("@/server/room-visibility.server");
+  if (!(await roomVisibleTo(userId, room))) {
+    return { ok: false, error: "Room not found or unavailable", code: "room_unavailable" };
   }
   // Mudwater rooms are game tables with no voice/video in Phase 1 — never
   // issue a LiveKit token for them (this also keeps the admin/public
@@ -139,90 +142,16 @@ async function validateRoomAccess(userId: string, roomId: string): Promise<RoomA
         return null;
       });
 
-  const ver = fresh
-    ? {
-        bayc_verified: fresh.tokenProof,
-        otherpage_verified: fresh.otherpageVerified,
-      }
-    : (
-        await supabaseAdmin
-          .from("user_verifications")
-          .select("bayc_verified, otherpage_verified")
-          .eq("user_id", userId)
-          .maybeSingle()
-      ).data;
-
-  // Role bypass:
-  //   * super_admin / admin → skip BOTH the BAYC and the Lifer gate. Admins
-  //     administer the clubhouse and need access to every room.
-  //   * verified_user → skips the BAYC gate only (Lifer still requires
-  //     real on-chain Otherpage + BAYC).
   const { data: roleRows } = await supabaseAdmin
     .from("user_roles")
     .select("role")
     .eq("user_id", userId);
   const isAdmin = !!roleRows?.some((r) => r.role === "super_admin" || r.role === "admin");
-  const isVerifiedRole = !!roleRows?.some((r) => r.role === "verified_user");
-  const bypassesBaycGate = isAdmin || isVerifiedRole;
-
-  // Which collections may enter is decided by the super admin's
-  // per-collection menu matrix (can_access_area), evaluated AFTER the fresh
-  // ownership recompute above. Lifer rooms keep their own rule below.
-  void bypassesBaycGate;
-  const area = room.kind === "stream" ? "event_stream" : "conference_rooms";
-  const { data: areaOk } = await supabaseAdmin.rpc("can_access_area", {
-    _uid: userId,
-    _item: area,
-  });
-  if (!isPublicRoom && !areaOk && !isAdmin) {
-    return {
-      ok: false,
-      error:
-        room.kind === "stream"
-          ? "The Event Stream is for verified holders of the clubhouse collections."
-          : "Your holder access isn't active. Reconnect a wallet that owns or is delegated an eligible NFT to enter.",
-      code: "bayc_revoked",
-    };
-  }
-  // Collection-specific rooms (e.g. Punks Brunch = CryptoPunks holders).
-  const required = (room as { required_collection?: string | null }).required_collection;
-  if (!isPublicRoom && required && !isAdmin) {
-    const held =
-      fresh?.collections ??
-      ((
-        await supabaseAdmin
-          .from("user_verifications")
-          .select("verified_collections")
-          .eq("user_id", userId)
-          .maybeSingle()
-      ).data?.verified_collections as string[] | null) ??
-      [];
-    // The verified role counts exactly like a BAYC/MAYC holding.
-    const heldWithRole = isVerifiedRole ? [...held, "BAYC", "MAYC"] : held;
-    const allowed = required
-      .split(",")
-      .map((l) => l.trim())
-      .filter(Boolean);
-    if (!allowed.some((l) => heldWithRole.includes(l))) {
-      return {
-        ok: false,
-        error: `This room is only for verified ${allowed
-          .map((l) => collectionNameForLabel(l))
-          .join(" / ")} holders.`,
-        code: "bayc_revoked",
-      };
-    }
-  }
-  // Lifer rooms: super-admin grant only (lifer_grants via is_lifer).
-  if (room.tier === "lifer" && !isAdmin) {
-    const { data: lifer } = await supabaseAdmin.rpc("is_lifer", { _user_id: userId });
-    if (lifer !== true) {
-      return {
-        ok: false,
-        error: "The Lifer room is open only to members the super admin has granted Lifer access.",
-        code: "otherpage_revoked",
-      };
-    }
+  // All collection/menu, Punks, Lifer and viewer entitlements use the same
+  // authoritative discovery rule after fresh ownership verification.
+  void fresh;
+  if (!(await roomVisibleTo(userId, room))) {
+    return { ok: false, error: "Room not found or unavailable", code: "room_unavailable" };
   }
 
   // Booked meetings: while a booking is in progress, only its host, admins

@@ -12,7 +12,13 @@ export default defineTool({
       .string()
       .optional()
       .describe("Optional filter on room kind, e.g. 'conference' or 'karaoke'."),
-    limit: z.number().int().min(1).max(100).optional().describe("Max rooms to return (default 50)."),
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .optional()
+      .describe("Max rooms to return (default 50)."),
   },
   annotations: { readOnlyHint: true, openWorldHint: false },
   handler: async ({ kind, limit }, ctx) => {
@@ -20,13 +26,20 @@ export default defineTool({
     const supabase = supabaseForUser(ctx);
     let q = supabase
       .from("rooms")
-      .select("id,name,description,capacity,tier,kind,theme,active,is_locked,display_order")
+      .select(
+        "id,name,description,capacity,tier,kind,theme,active,is_locked,display_order,required_collection",
+      )
       .eq("active", true)
       .order("display_order", { ascending: true })
       .limit(limit ?? 50);
     if (kind) q = q.eq("kind", kind);
     const { data, error } = await q;
     if (error) return dbError(error.message);
-    return jsonResult(data);
+    const { data: identity, error: identityError } = await supabase.auth.getUser();
+    if (identityError || !identity.user) return unauthenticated();
+    const { roomVisibleTo } = await import("@/server/room-visibility.server");
+    const rows = data ?? [];
+    const allowed = await Promise.all(rows.map((room) => roomVisibleTo(identity.user.id, room)));
+    return jsonResult(rows.filter((_, index) => allowed[index]));
   },
 });

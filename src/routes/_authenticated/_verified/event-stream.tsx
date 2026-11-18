@@ -1,9 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
 import { EventStreamTheater } from "@/components/EventStreamTheater";
-import { TicketGate } from "@/components/eventstream/TicketGate";
+import { streamVisible } from "@/lib/baycmc/stream-visibility";
 import { getStreamAccess } from "@/server/event-stream.functions";
 
 export const Route = createFileRoute("/_authenticated/_verified/event-stream")({
@@ -35,14 +35,13 @@ function EventStreamPage() {
   const [room, setRoom] = useState<{ id: string; capacity: number } | null | undefined>(undefined);
   const accessFn = useServerFn(getStreamAccess);
   const [access, setAccess] = useState<Awaited<ReturnType<typeof getStreamAccess>> | null>(null);
-  // If the check itself fails, fall through to the theatre: the server still
-  // refuses the stream token to anyone who needs a ticket.
+  // A failed entitlement check must never open the theatre.
   const loadAccess = () =>
     void accessFn()
       .then(setAccess)
       .catch(() =>
         setAccess({
-          free: true,
+          free: false,
           canHost: false,
           currentEventId: null,
           hasTicket: false,
@@ -77,15 +76,8 @@ function EventStreamPage() {
   }
   // Pay-per-view: members whose collection isn't free need a ticket for the
   // event on now (the server enforces this again when issuing the stream token).
-  if (!access.free && !access.hasTicket) {
-    return (
-      <TicketGate
-        events={access.events}
-        currentEventId={access.currentEventId}
-        myTickets={access.myTickets}
-        onTicket={loadAccess}
-      />
-    );
+  if (!streamVisible(access)) {
+    return <Navigate to="/lobby" replace />;
   }
   return <EventStreamTheater roomId={room.id} capacity={room.capacity} goLive={!!golive} />;
 }

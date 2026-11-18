@@ -19,19 +19,23 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | null> {
 /** Live headcount per room (keyed by room id), straight from LiveKit. */
 export const getRoomsOccupancy = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async (): Promise<{ counts: Record<string, number>; checkedAt: string }> => {
+  .handler(async ({ context }): Promise<{ counts: Record<string, number>; checkedAt: string }> => {
     const checkedAt = new Date().toISOString();
     const apiKey = process.env.LIVEKIT_API_KEY;
     const apiSecret = process.env.LIVEKIT_API_SECRET;
     const url = process.env.LIVEKIT_URL;
     if (!apiKey || !apiSecret || !url) return { counts: {}, checkedAt };
-    const { data: rooms } = await (
-      await db()
-    )
+    const { data: rooms } = await context.supabase
       .from("rooms")
-      .select("id,livekit_room")
+      .select("id,livekit_room,kind,tier,required_collection")
       .eq("active", true);
-    const byName = new Map((rooms ?? []).map((r) => [r.livekit_room as string, r.id as string]));
+    const { roomVisibleTo } = await import("@/server/room-visibility.server");
+    const visible = await Promise.all((rooms ?? []).map((r) => roomVisibleTo(context.userId, r)));
+    const byName = new Map(
+      (rooms ?? [])
+        .filter((_, index) => visible[index])
+        .map((r) => [r.livekit_room as string, r.id as string]),
+    );
     const { RoomServiceClient } = await import("livekit-server-sdk");
     const client = new RoomServiceClient(url, apiKey, apiSecret);
     const live = await withTimeout(

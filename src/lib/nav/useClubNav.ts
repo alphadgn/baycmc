@@ -4,6 +4,8 @@ import { useAuth } from "@/lib/auth/useAuth";
 import { useVerificationStatus } from "@/lib/baycmc/useVerificationStatus";
 import { useMenuItems } from "@/lib/baycmc/useMenuItems";
 import { useMudwaterAccess } from "@/lib/mudwater/useMudwaterAccess";
+import { useServerFn } from "@tanstack/react-start";
+import { getVisibleRooms } from "@/server/visible-rooms.functions";
 
 /**
  * The clubhouse menu, shared by the header menu and the rooms sidebar.
@@ -47,6 +49,7 @@ export function useClubNav(): NavEntry[] {
   const v = useVerificationStatus();
   const areas = useMenuItems();
   const mudwaterOk = useMudwaterAccess();
+  const fetchRooms = useServerFn(getVisibleRooms);
   const [rooms, setRooms] = useState<RoomRow[]>([]);
   const [chapters, setChapters] = useState<{ id: string; name: string }[] | null>(null);
   const userId = user?.id ?? null;
@@ -59,15 +62,15 @@ export function useClubNav(): NavEntry[] {
     }
     let cancelled = false;
     const load = () =>
-      void supabase
-        .from("rooms")
-        .select("id,name,kind,tier,display_order,coming_soon,required_collection")
-        .eq("active", true)
-        .in("kind", ["karaoke", "conference", "game"])
-        .order("display_order", { ascending: true, nullsFirst: false })
-        .order("name")
-        .then(({ data }) => {
-          if (!cancelled) setRooms((data ?? []) as RoomRow[]);
+      void fetchRooms()
+        .then((data) => {
+          if (!cancelled)
+            setRooms(
+              data.filter((r) => ["karaoke", "conference", "game"].includes(r.kind)) as RoomRow[],
+            );
+        })
+        .catch(() => {
+          if (!cancelled) setRooms([]);
         });
     // Local Chapters: verified BAYC / MAYC / CryptoPunks holders and staff.
     const loadChapters = () =>
@@ -87,16 +90,20 @@ export function useClubNav(): NavEntry[] {
       });
     load();
     loadChapters();
+    const timer = window.setInterval(load, 15_000);
     window.addEventListener("baycmc:verification-refresh", load);
     window.addEventListener("baycmc:verification-refresh", loadChapters);
+    window.addEventListener("baycmc:menu-access-changed", load);
     window.addEventListener("baycmc:chapters-changed", loadChapters);
     return () => {
       cancelled = true;
+      window.clearInterval(timer);
       window.removeEventListener("baycmc:verification-refresh", load);
       window.removeEventListener("baycmc:verification-refresh", loadChapters);
+      window.removeEventListener("baycmc:menu-access-changed", load);
       window.removeEventListener("baycmc:chapters-changed", loadChapters);
     };
-  }, [userId, collectionsKey]);
+  }, [userId, collectionsKey, fetchRooms]);
 
   if (!isAuthenticated) return [];
 
@@ -175,13 +182,13 @@ export function useClubNav(): NavEntry[] {
       to: "/chapters/book",
       tone: "gold",
     });
-    children.push({
-      kind: "link",
-      key: "lifer-room",
-      label: "Lifer Room (Cellar)",
-      to: "/lifers/room",
-      ...(v.isLifer ? {} : { disabled: "lifer" as const }),
-    });
+    if (v.isLifer || isAdmin)
+      children.push({
+        kind: "link",
+        key: "lifer-room",
+        label: "Lifer Room (Cellar)",
+        to: "/lifers/room",
+      });
     entries.push({ kind: "group", key: "chapters", label: "Local Chapters", children });
   }
   if (v.isLifer) {
@@ -193,7 +200,7 @@ export function useClubNav(): NavEntry[] {
       tone: "gold",
     });
   }
-  if (isAdmin || areas.has("event_stream")) {
+  if (areas.has("event_stream")) {
     entries.push({ kind: "link", key: "event-stream", label: "Event Stream", to: "/event-stream" });
   }
   if (isAdmin || areas.has("ape_rides")) {

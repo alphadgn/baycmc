@@ -1,5 +1,12 @@
 # Karaoke overhaul roadmap
 
+## Collection room visibility
+- [x] Hide inaccessible paid streams in shared navigation, room lists and direct entry
+- [x] Align collection-specific room visibility and media authorization; preserve stated exceptions
+- [x] Prepare database visibility rules for review only and run regression checks (18 passed)
+- [ ] Apply reviewed visibility SQL — awaiting approval; raw room/chat RLS retains old visibility until applied
+- [ ] Signed-in browser verification — session restoration did not succeed; only public/empty state observed
+
 ## Approved workflow revision (review only; no shared database changes or publishing)
 - [x] Prepare session-bound single-use Event Stream grants and live media enforcement
 - [x] Regular conference rooms without performer UI; preserve booked admission
