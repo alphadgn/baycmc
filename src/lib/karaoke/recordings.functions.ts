@@ -49,6 +49,18 @@ export const saveKaraokeRecording = createServerFn({ method: "POST" })
       throw new Error("Recording upload not found");
     }
 
+    // Matches the insert policy (migration 20261118000007): a performance waiver
+    // accepted within the last 7 days is required to publish a take.
+    const waiverSince = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: waiver } = await supabase
+      .from("karaoke_waivers")
+      .select("id")
+      .eq("user_id", userId)
+      .gte("accepted_at", waiverSince)
+      .limit(1)
+      .maybeSingle();
+    if (!waiver) throw new Error("Accept the performance waiver before saving a take.");
+
     const { data: room } = await supabase
       .from("karaoke_room_settings")
       .select("recording_enabled")

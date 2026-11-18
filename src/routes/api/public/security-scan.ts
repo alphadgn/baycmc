@@ -2,9 +2,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
 
 /**
- * Hourly security-scan hook. Called by pg_cron via pg_net with the project's
- * anon key in the `apikey` header. Runs lightweight heuristic checks and
- * writes any findings to `public.security_scan_findings`.
+ * Hourly security-scan hook. Called by pg_cron via pg_net with
+ * `Authorization: Bearer <SECURITY_SCAN_SECRET>`. Runs lightweight heuristic
+ * checks and writes any findings to `public.security_scan_findings`.
+ *
+ * The publishable (anon) key is public — it ships in the browser bundle — so it
+ * is not accepted as proof of the scheduler. Fails closed (503) until
+ * SECURITY_SCAN_SECRET is configured.
  *
  * This runs on the Worker; use the service-role client so heuristics can
  * inspect audit_logs and other tables regardless of the caller's RLS.
@@ -13,9 +17,9 @@ export const Route = createFileRoute("/api/public/security-scan")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const apikey = request.headers.get("apikey");
-        const expected = process.env.SUPABASE_PUBLISHABLE_KEY;
-        if (!apikey || !expected || apikey !== expected) {
+        const secret = process.env.SECURITY_SCAN_SECRET?.trim();
+        if (!secret) return new Response("Unavailable", { status: 503 });
+        if (request.headers.get("authorization") !== `Bearer ${secret}`) {
           return new Response("Unauthorized", { status: 401 });
         }
 
@@ -53,7 +57,9 @@ export const Route = createFileRoute("/api/public/security-scan")({
           .from("audit_logs")
           .select("id, actor_id, event_type, metadata, created_at")
           .gte("created_at", since)
-          .ilike("event_type", "%role%");
+          .ilike("event_type", "%role%")
+          .order("created_at", { ascending: false })
+          .limit(200);
         for (const ev of roleEvents ?? []) {
           findings.push({
             severity: "high",
