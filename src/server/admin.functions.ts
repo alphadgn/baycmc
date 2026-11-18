@@ -50,7 +50,10 @@ export const listUsers = createServerFn({ method: "POST" })
 
     if (data.search && data.search.trim()) {
       // Strip PostgREST filter syntax so a search can't inject extra filters.
-      const s = data.search.trim().replace(/[,()*%\\:"']/g, " ").trim();
+      const s = data.search
+        .trim()
+        .replace(/[,()*%\\:"']/g, " ")
+        .trim();
       if (s) q = q.or(`wallet_address.ilike.%${s}%,username.ilike.%${s}%`);
     }
 

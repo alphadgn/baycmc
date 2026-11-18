@@ -144,7 +144,8 @@ function ApeRidesPage() {
           status: "ok",
           lat,
           lng,
-          inside: haversineMeters({ lat, lng }, { lat: venue.lat, lng: venue.lng }) <= venue.radius_m,
+          inside:
+            haversineMeters({ lat, lng }, { lat: venue.lat, lng: venue.lng }) <= venue.radius_m,
           venue,
         });
       },

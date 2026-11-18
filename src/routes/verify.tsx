@@ -104,8 +104,8 @@ const STEPS: Step[] = [
         >
           delegate.cash v2 registry
         </a>{" "}
-        for every vault that delegated to you (ALL or BAYC/MAYC-scoped, no-rights filter) and
-        checks each one. Cold-wallet holders get full access without exposing their vault.
+        for every vault that delegated to you (ALL or BAYC/MAYC-scoped, no-rights filter) and checks
+        each one. Cold-wallet holders get full access without exposing their vault.
       </>
     ),
   },
@@ -116,8 +116,8 @@ const STEPS: Step[] = [
     body: (
       <>
         Hold your ape on a wallet you don't sign in with — and don't use delegate.cash? Add it
-        below. Each linked wallet must sign a one-time challenge to prove control, then BAYCmc
-        walks it on-chain alongside the signer wallet and every incoming delegation.
+        below. Each linked wallet must sign a one-time challenge to prove control, then BAYCmc walks
+        it on-chain alongside the signer wallet and every incoming delegation.
       </>
     ),
   },
@@ -214,8 +214,8 @@ function VerifyPage() {
           <div className="rounded-xl border border-border bg-secondary/20 px-4 py-4 text-sm">
             <div className="font-semibold">Not yet verified</div>
             <div className="text-muted-foreground">
-              We didn't find BAYC or MAYC on your signer wallet or any delegated vault. Add a
-              linked wallet below if your ape is on another address.
+              We didn't find BAYC or MAYC on your signer wallet or any delegated vault. Add a linked
+              wallet below if your ape is on another address.
             </div>
           </div>
         )}
@@ -288,9 +288,7 @@ function VerifyPage() {
                     Linked wallets ({graph.linked.length})
                   </div>
                   <div className="font-mono">
-                    {graph.linked.length === 0
-                      ? "—"
-                      : graph.linked.map(shortAddr).join(", ")}
+                    {graph.linked.length === 0 ? "—" : graph.linked.map(shortAddr).join(", ")}
                   </div>
                 </div>
                 <div>
@@ -298,9 +296,7 @@ function VerifyPage() {
                     Addresses scanned ({graph.scanned.length})
                   </div>
                   <div className="font-mono break-all">
-                    {graph.scanned.length === 0
-                      ? "—"
-                      : graph.scanned.map(shortAddr).join(", ")}
+                    {graph.scanned.length === 0 ? "—" : graph.scanned.map(shortAddr).join(", ")}
                   </div>
                 </div>
                 <div>

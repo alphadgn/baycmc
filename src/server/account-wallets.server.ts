@@ -17,7 +17,8 @@ export async function accountWallets(userId: string) {
       : null;
   const all = new Set<string>();
   if (primary) all.add(primary);
-  for (const r of linked ?? []) if (r.address && isAddress(r.address)) all.add(getAddress(r.address));
+  for (const r of linked ?? [])
+    if (r.address && isAddress(r.address)) all.add(getAddress(r.address));
   return {
     primary,
     wallets: [...all] as `0x${string}`[],
