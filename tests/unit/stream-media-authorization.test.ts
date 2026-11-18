@@ -17,7 +17,6 @@ vi.mock("livekit-server-sdk", () => ({
   },
 }));
 // Node-only isolated tests deliberately exercise the server-only authorization helper.
-// eslint-disable-next-line no-restricted-imports
 import { authorizeBroadcast, reconcileStreamPublishers } from "@/server/stream-grants.server";
 
 describe("stream media authorization", () => {
