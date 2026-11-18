@@ -42,6 +42,28 @@ async function livekitRoomName(roomId: string): Promise<string | null> {
   return data.livekit_room as string;
 }
 
+/**
+ * Karaoke mic rule for one member right now (same rule as the LiveKit token in
+ * livekit.functions.ts): the current performer only; with an empty stage, any
+ * member who isn't muted.
+ */
+async function mayPublishNow(roomId: string, userId: string): Promise<boolean> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: session } = await supabaseAdmin
+    .from("karaoke_sessions")
+    .select("performer_user_id")
+    .eq("room_id", roomId)
+    .maybeSingle();
+  const performer = session?.performer_user_id ?? null;
+  if (performer) return performer === userId;
+  const { data: muted } = await supabaseAdmin.rpc("karaoke_is_sanctioned", {
+    _room: roomId,
+    _uid: userId,
+    _kind: "mute",
+  });
+  return !muted;
+}
+
 /** Apply (or lift) a LiveKit publish block for one member. Best effort. */
 async function setLivekitPublish(roomId: string, identity: string, canPublish: boolean) {
   const svc = await roomService();
@@ -117,7 +139,13 @@ export const karaokeModerateMember = createServerFn({ method: "POST" })
 
     if (data.action === "mute") await setLivekitPublish(data.roomId, data.userId, false);
     if (data.action === "unmute" || data.action === "unban") {
-      await setLivekitPublish(data.roomId, data.userId, true);
+      // Lifting a sanction restores the normal mic rule, not an open mic: while
+      // someone else is performing, only the performer may publish.
+      await setLivekitPublish(
+        data.roomId,
+        data.userId,
+        await mayPublishNow(data.roomId, data.userId),
+      );
     }
     if (data.action === "kick" || data.action === "ban") {
       const svc = await roomService();

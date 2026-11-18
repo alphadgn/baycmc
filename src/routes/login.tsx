@@ -3,6 +3,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth/useAuth";
+import { isReservedWalletEmail } from "@/lib/auth/siwe-domains";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -42,6 +43,10 @@ function LoginPage() {
     setBusy(true);
     try {
       if (mode === "signup") {
+        // Wallet accounts live on a reserved address; it can't be registered by email.
+        if (isReservedWalletEmail(email)) {
+          throw new Error("That email address can't be used. Use your own email address.");
+        }
         const { error } = await supabase.auth.signUp({
           email: email.trim(),
           password,

@@ -57,25 +57,55 @@ export const reserveApeRide = createServerFn({ method: "POST" })
       return { ok: false as const, error: "This ride isn't open for reservations." };
     }
     if (ride.host_id === uid) return { ok: false as const, error: "You're hosting this ride." };
-    const { count } = await admin
-      .from("ape_ride_reservations")
-      .select("id", { count: "exact", head: true })
-      .eq("ride_id", ride.id)
-      .neq("status", "cancelled");
-    if ((count ?? 0) >= (ride.capacity ?? 1)) {
-      return { ok: false as const, error: "This ride is fully booked." };
-    }
-    const { data: row, error } = await admin
-      .from("ape_ride_reservations")
-      .insert({ ride_id: ride.id, viewer_id: uid, price_ape: ride.price_ape ?? 0 })
-      .select("id,status,price_ape")
-      .single();
-    if (error) {
-      if (/duplicate key/i.test(error.message)) {
-        return { ok: false as const, error: "You already have a reservation for this ride." };
+
+    // Atomic capacity check + insert under a row lock (migration 20261118000003), so
+    // two members can't both take the last seat.
+    type ReserveRpc = (
+      name: string,
+      args: Record<string, unknown>,
+    ) => Promise<{
+      data: { id: string; status: string; price_ape: number } | null;
+      error: { message: string; code?: string } | null;
+    }>;
+    const atomic = await (admin.rpc as unknown as ReserveRpc)("ape_ride_reserve", {
+      _ride: ride.id,
+      _viewer: uid,
+    });
+    let row: { id: string; status: string; price_ape: number } | null = atomic.data;
+    if (atomic.error) {
+      const msg = atomic.error.message ?? "";
+      if (msg.startsWith("AR: ")) return { ok: false as const, error: msg.slice(4) };
+      // PGRST202 / 42883: the RPC isn't deployed yet — legacy (non-atomic) path.
+      if (
+        !/PGRST202|42883|could not find the function|does not exist/i.test(
+          `${atomic.error.code ?? ""} ${msg}`,
+        )
+      ) {
+        return { ok: false as const, error: msg };
       }
-      return { ok: false as const, error: error.message };
+      console.warn("[reserveApeRide] ape_ride_reserve RPC missing; using non-atomic fallback");
+      const { count } = await admin
+        .from("ape_ride_reservations")
+        .select("id", { count: "exact", head: true })
+        .eq("ride_id", ride.id)
+        .neq("status", "cancelled");
+      if ((count ?? 0) >= (ride.capacity ?? 1)) {
+        return { ok: false as const, error: "This ride is fully booked." };
+      }
+      const ins = await admin
+        .from("ape_ride_reservations")
+        .insert({ ride_id: ride.id, viewer_id: uid, price_ape: ride.price_ape ?? 0 })
+        .select("id,status,price_ape")
+        .single();
+      if (ins.error) {
+        if (/duplicate key/i.test(ins.error.message)) {
+          return { ok: false as const, error: "You already have a reservation for this ride." };
+        }
+        return { ok: false as const, error: ins.error.message };
+      }
+      row = ins.data;
     }
+    if (!row) return { ok: false as const, error: "Reservation failed. Please try again." };
     await audit(uid, "ape_ride.reserve", ride.id, { reservation: row.id });
     return { ok: true as const, reservation: row };
   });

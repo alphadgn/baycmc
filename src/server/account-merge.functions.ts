@@ -280,130 +280,45 @@ export const mergeAccounts = createServerFn({ method: "POST" })
     const pick = <K extends "username" | "avatar_url" | "bio">(field: K) =>
       data.keep[field] === "mine" ? myProf[field] : otherProf[field];
 
-    // 1. Reassign content owned by `removed` → `survivor` across every
-    //    user-keyed table. Errors here are non-fatal individually but we
-    //    log them — the operation is best-effort transactional outside
-    //    of a real DB transaction (Supabase admin REST doesn't expose one).
-    const reassignTables: Array<{ table: string; column: string }> = [
-      { table: "posts", column: "author_id" },
-      { table: "post_likes", column: "user_id" },
-      { table: "post_comments", column: "author_id" },
-      { table: "lobby_messages", column: "user_id" },
-      { table: "lobby_message_reactions", column: "user_id" },
-      { table: "messages", column: "sender_id" },
-      { table: "lifer_messages", column: "user_id" },
-      { table: "karaoke_recordings", column: "performer_id" },
-      { table: "ape_rides", column: "host_id" },
-      { table: "ape_ride_requests", column: "user_id" },
-      { table: "room_bookings", column: "user_id" },
-      { table: "karaoke_reservations", column: "booked_by" },
-      { table: "karaoke_reservations", column: "singer_user_id" },
-      { table: "karaoke_backing_tracks", column: "owner_id" },
-      { table: "linked_wallets", column: "user_id" },
-      { table: "notifications", column: "user_id" },
-    ];
-    for (const { table, column } of reassignTables) {
-      // Dynamic table name — typed Supabase client can't narrow this; cast.
-      const { error } = await (
-        admin.from(table as never) as unknown as {
-          update: (v: Record<string, string>) => {
-            eq: (c: string, v: string) => Promise<{ error: { message: string } | null }>;
-          };
-        }
-      )
-        .update({ [column]: survivor })
-        .eq(column, removed);
-      if (error) console.warn("[mergeAccounts] reassign", table, column, error.message);
-    }
-
-    // 2. Wallet/profile carry-over → survivor. Removed profile will be
-    //    deleted by the auth.users cascade, but unique constraints on
-    //    `profiles.wallet_address` mean we must clear the removed wallet
-    //    BEFORE writing it onto the survivor.
+    // 1-5. Move every user-owned row, carry the chosen profile fields and wallet
+    //      over, union roles/verifications, and record the decision + audit log —
+    //      all in ONE database transaction (merge_accounts, migration
+    //      20261118000006). Any failure rolls the whole merge back, and the removed
+    //      account is only deleted after it commits.
     const removedWallet = (survivor === me ? otherProf : myProf).wallet_address;
-    if (removedWallet) {
-      await admin.from("profiles").update({ wallet_address: null }).eq("id", removed);
-    }
-    const survivorPatch: {
-      username: string | null;
-      avatar_url: string | null;
-      bio: string | null;
-      wallet_address?: string | null;
-    } = {
-      username: pick("username") ?? null,
-      avatar_url: pick("avatar_url") ?? null,
-      bio: pick("bio") ?? null,
-    };
-    // If survivor has no wallet, inherit the removed one. Otherwise keep the
-    // removed account's wallet as a VERIFIED linked wallet of the survivor
-    // (it signed in with SIWE, so control is proven) — it used to be dropped,
-    // and signing in with it later minted a new account without the
-    // survivor's roles (e.g. super_admin).
     const survivorProf = survivor === me ? myProf : otherProf;
-    if (!survivorProf.wallet_address && removedWallet) {
-      survivorPatch.wallet_address = removedWallet;
-    } else if (removedWallet && /^0x[0-9a-fA-F]{40}$/.test(removedWallet)) {
-      const nowIso = new Date().toISOString();
-      const { error: linkErr } = await admin.from("linked_wallets").upsert(
-        {
-          user_id: survivor,
-          address: getAddress(removedWallet),
-          label: "Merged account",
-          verified_at: nowIso,
-          last_checked_at: nowIso,
-        },
-        { onConflict: "user_id,address" },
-      );
-      if (linkErr) console.warn("[mergeAccounts] keep removed wallet:", linkErr.message);
-    }
-    const { error: patchErr } = await admin
-      .from("profiles")
-      .update(survivorPatch)
-      .eq("id", survivor);
-    if (patchErr) throw new Error("Profile merge failed: " + patchErr.message);
-
-    // 3. Promote any role/verification rows from removed → survivor
-    //    (ignore conflicts where survivor already holds them).
-    // Copy roles the survivor doesn't already hold (a blanket UPDATE failed
-    // on the (user_id, role) unique key and silently moved nothing).
-    const { data: removedRoles } = await admin
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", removed);
-    for (const r of removedRoles ?? []) {
-      await admin
-        .from("user_roles")
-        .upsert({ user_id: survivor, role: r.role }, { onConflict: "user_id,role" });
-    }
-    // user_verifications has UNIQUE(user_id); only move if survivor lacks one.
-    const { data: survVer } = await admin
-      .from("user_verifications")
-      .select("user_id")
-      .eq("user_id", survivor)
-      .maybeSingle();
-    if (!survVer) {
-      await admin.from("user_verifications").update({ user_id: survivor }).eq("user_id", removed);
-    }
-
-    // 4. Record decision (canonical pair).
-    await admin.from("account_merge_decisions").insert({
-      user_a_id: a,
-      user_b_id: b,
-      decision: "merged",
-      decided_by: me,
+    const validWallet = removedWallet && /^0x[0-9a-fA-F]{40}$/.test(removedWallet);
+    // Survivor without a wallet inherits the removed one as primary; otherwise the
+    // removed wallet is kept as a VERIFIED linked wallet (it signed in with SIWE, so
+    // control is proven) so signing in with it later doesn't mint a new account.
+    const inheritWallet = !survivorProf.wallet_address && removedWallet ? removedWallet : null;
+    const linkWallet =
+      !inheritWallet && validWallet ? getAddress(removedWallet as `0x${string}`) : null;
+    type MergeRpc = (
+      name: string,
+      args: Record<string, unknown>,
+    ) => Promise<{ data: unknown; error: { message: string } | null }>;
+    const { error: mergeErr } = await (admin.rpc as unknown as MergeRpc)("merge_accounts", {
+      _survivor: survivor,
+      _removed: removed,
+      _actor: me,
+      _username: pick("username") ?? null,
+      _avatar_url: pick("avatar_url") ?? null,
+      _bio: pick("bio") ?? null,
+      _inherit_wallet: inheritWallet,
+      _link_wallet: linkWallet,
     });
-
-    // 5. Audit log.
-    await admin.from("audit_logs").insert({
-      event_type: "account.merge",
-      actor_id: me,
-      target_id: removed,
-      metadata: { survivor, removed, reason: "user-initiated" },
-    });
+    if (mergeErr) {
+      const msg = mergeErr.message.replace(/^MERGE:\s*/, "");
+      throw new Error(`Merge failed, nothing was changed: ${msg}`);
+    }
 
     // 6. Hard-delete the removed account from auth (cascades profile).
     const { error: delErr } = await admin.auth.admin.deleteUser(removed);
-    if (delErr) console.warn("[mergeAccounts] deleteUser:", delErr.message);
+    if (delErr) {
+      // Data already lives on the survivor; the empty account can be removed later.
+      console.error("[mergeAccounts] deleteUser after merge:", delErr.message);
+    }
 
     return {
       ok: true,
