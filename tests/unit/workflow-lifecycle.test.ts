@@ -87,7 +87,7 @@ describe.skipIf(!isolated)("isolated PostgreSQL: actual staged lifecycle functio
     await sql.reserve().then(async (reserved) => {
       try {
         await reserved.unsafe(
-          readFileSync("docs/review/20261117_stream_session_lifecycle.sql", "utf8"),
+          readFileSync("supabase/migrations/20261118000004_stream_session_lifecycle.sql", "utf8"),
         );
       } finally {
         reserved.release();
@@ -224,7 +224,9 @@ describe.skipIf(!isolated)("isolated PostgreSQL: actual staged lifecycle functio
     await sql.unsafe(section("karaoke_end_turn"));
     const reserved = await sql.reserve();
     try {
-      await reserved.unsafe(readFileSync("docs/review/20261117_karaoke_fifo.sql", "utf8"));
+      await reserved.unsafe(
+        readFileSync("supabase/migrations/20261118000005_karaoke_fifo.sql", "utf8"),
+      );
     } finally {
       reserved.release();
     }
