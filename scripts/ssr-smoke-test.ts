@@ -46,11 +46,10 @@ const FORWARD_VARS = [
   "GIPHY_API_KEY",
   "LOVABLE_API_KEY",
 ] as const;
-const devVarLines = FORWARD_VARS.filter((k) => typeof process.env[k] === "string" && process.env[k]!.length > 0).map(
-  (k) => `${k}=${JSON.stringify(process.env[k])}`,
-);
+const devVarLines = FORWARD_VARS.filter(
+  (k) => typeof process.env[k] === "string" && process.env[k]!.length > 0,
+).map((k) => `${k}=${JSON.stringify(process.env[k])}`);
 writeFileSync(DEV_VARS, devVarLines.join("\n") + "\n");
-
 
 const child = spawn(
   "bunx",

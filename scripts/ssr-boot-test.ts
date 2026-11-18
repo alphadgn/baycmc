@@ -67,7 +67,6 @@ const devVarLines = FORWARD_VARS.filter(
 ).map((k) => `${k}=${JSON.stringify(process.env[k])}`);
 writeFileSync(DEV_VARS, devVarLines.join("\n") + "\n");
 
-
 const child = spawn(
   "bunx",
   [

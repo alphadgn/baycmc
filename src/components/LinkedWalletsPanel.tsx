@@ -1,10 +1,7 @@
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Loader2, Trash2, CheckCircle2, Wallet } from "lucide-react";
-import {
-  listLinkedWallets,
-  removeLinkedWallet,
-} from "@/lib/linked-wallets.functions";
+import { listLinkedWallets, removeLinkedWallet } from "@/lib/linked-wallets.functions";
 import { toast } from "sonner";
 
 interface LinkedWalletRow {
@@ -29,7 +26,6 @@ export function LinkedWalletsPanel() {
     </div>
   );
 }
-
 
 function LinkedWalletsPanelInner() {
   const [rows, setRows] = useState<LinkedWalletRow[]>([]);

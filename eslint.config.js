@@ -55,6 +55,8 @@ export default tseslint.config(
       "src/**/*.functions.{ts,tsx}",
       "src/integrations/supabase/auth-middleware.ts",
       "src/routes/api/**/*.{ts,tsx}",
+      // Tests run in Node and exercise server modules directly.
+      "tests/**/*.{ts,tsx}",
     ],
     rules: {
       "no-restricted-imports": "off",
