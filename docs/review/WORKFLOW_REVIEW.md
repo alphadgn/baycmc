@@ -1,4 +1,4 @@
-# BAYCmc workflow revision — review only
+# BAYCmc workflow revision
 
 No publishing or shared-database writes were performed.
 
@@ -10,14 +10,15 @@ No publishing or shared-database writes were performed.
 - Karaoke waitlist pulses only while eligible, respects reduced motion, and stops when queued/performing. Queue promotion remains inside authoritative functions; reservation and booked-stage entitlement are preserved, with eligible open-queue participants ordered by signup time and serialized handoff.
 - Microphone/camera preferences and the one-track karaoke mix are unchanged.
 
-## Unapplied SQL for review
-1. `20261117_stream_session_lifecycle.sql`: additive broadcast/session records, restricted server-only lifecycle functions, grant consumption and expiration. Existing unbound `in_use` grants are intentionally expired at upgrade; they cannot be safely migrated to a signed-in session.
-2. `20261117_karaoke_fifo.sql`: authoritative signup-order promotion and claim protection; no changes to audio, reservation timing or consent.
+## SQL (now in migration history)
+The two review drafts were promoted, made idempotent, into the migration history (health-report fixes):
+1. `supabase/migrations/20261118000004_stream_session_lifecycle.sql`: additive broadcast/session records, restricted server-only lifecycle functions, grant consumption and expiration. Existing unbound `in_use` grants are expired once, on first application only; they cannot be safely migrated to a signed-in session.
+2. `supabase/migrations/20261118000005_karaoke_fifo.sql`: authoritative signup-order promotion and claim protection; no changes to audio, reservation timing or consent.
 
-These are staged outside migration history so they cannot run automatically. Apply only through the approved migration tool after review. Do not deploy the dependent code first.
+Deploy the dependent stream code together with these migrations (see prerequisites).
 
 ## Deployment prerequisites (not performed)
-1. Apply both reviewed SQL drafts and regenerate database types. The server uses narrow temporary type adapters until the new schema is available.
+1. Apply migrations 20261118000004 and 20261118000005 (with the rest of the 20261118 series) and regenerate database types. The server uses narrow temporary type adapters until the new schema is available.
 2. Add `STREAM_LIFECYCLE_SECRET` in Project Settings → Secrets. Configure a trusted scheduler to POST `/api/public/stream-lifecycle` at least every 15 seconds with its bearer secret, retrying failed requests. Revocation through the app acts immediately; background reconciliation latency is bounded by this schedule and successful media-service requests.
 3. Configure LiveKit signed webhooks to POST `/api/public/livekit-stream`; enable participant joined/left and track events. Confirm retries and lifecycle monitoring before enabling broadcast grants.
 4. Deploy code and schema together. Recheck live staff/member media publishing, temporary network loss, sign-out, revocation and scheduler enforcement on real devices. Do not treat local mocked media tests as live media verification.

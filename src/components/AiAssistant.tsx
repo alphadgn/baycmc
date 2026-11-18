@@ -14,19 +14,29 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useChatScroll } from "@/hooks/use-chat-scroll";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth/useAuth";
 
 /**
  * Floating BAYCmc Assistant — customer-facing help for BAYCmc and
  * Bored Ape Yacht Club / Yuga Labs questions, answered from official
- * sources (see /api/chat).
+ * sources (see /api/chat). The endpoint requires a signed-in member (each
+ * answer spends model credits), so the request carries the Supabase session.
  */
 export function AiAssistant() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
+  const { isAuthenticated, loading: authLoading } = useAuth();
 
-  const { messages, sendMessage, status, setMessages } = useChat({
+  const { messages, sendMessage, status, error } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/chat",
+      headers: async (): Promise<Record<string, string>> => {
+        const { data } = await supabase.auth.getSession();
+        return data.session?.access_token
+          ? { Authorization: `Bearer ${data.session.access_token}` }
+          : {};
+      },
     }),
   });
 
@@ -35,7 +45,7 @@ export function AiAssistant() {
 
   async function handleSend() {
     const text = input.trim();
-    if (!text || isLoading) return;
+    if (!text || isLoading || !isAuthenticated) return;
     setInput("");
     await sendMessage({ text });
   }
@@ -71,7 +81,11 @@ export function AiAssistant() {
           className="min-h-0 flex-1 overflow-y-auto rounded-md border p-3"
         >
           <div ref={contentRef}>
-            {messages.length === 0 ? (
+            {!authLoading && !isAuthenticated ? (
+              <p className="text-center text-sm text-muted-foreground">
+                Sign in to chat with the BAYCmc Assistant.
+              </p>
+            ) : messages.length === 0 ? (
               <p className="text-center text-sm text-muted-foreground">
                 Ask about BAYCmc (sign-in, rooms, karaoke, verification) or about Bored Ape Yacht
                 Club and Yuga Labs.
@@ -102,6 +116,11 @@ export function AiAssistant() {
                     <Loader2 className="h-3 w-3 animate-spin" /> Thinking…
                   </div>
                 )}
+                {error && !isLoading && (
+                  <p role="alert" className="text-xs text-destructive">
+                    {error.message || "The assistant couldn't answer. Please try again."}
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -114,6 +133,7 @@ export function AiAssistant() {
             placeholder="Ask about BAYCmc or BAYC…"
             rows={2}
             className="resize-none"
+            disabled={!isAuthenticated}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -124,7 +144,7 @@ export function AiAssistant() {
           <Button
             size="icon"
             onClick={() => void handleSend()}
-            disabled={isLoading || !input.trim()}
+            disabled={isLoading || !input.trim() || !isAuthenticated}
             aria-label="Send message"
           >
             {isLoading ? (

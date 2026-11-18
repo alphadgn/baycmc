@@ -6,7 +6,7 @@
 - [x] Karaoke waitlist pulse and ordered authoritative handoff (SQL staged, not applied)
 - [x] Isolated lifecycle/concurrency tests and room-entry regression checks
 - [x] Document unapplied SQL, deployment prerequisites, and unverified live flows
-- [ ] Live media verification — blocked by intentionally unapplied SQL, unconfigured scheduler/webhook and live staff/member test sessions; review details in docs/review/WORKFLOW_REVIEW.md
+- [ ] Live media verification — blocked by applying migrations 20261118000004/5, unconfigured scheduler/webhook and live staff/member test sessions; review details in docs/review/WORKFLOW_REVIEW.md
 
 ## Room chat and club administration
 - [x] Add room-scoped live chat in conference and karaoke rooms
