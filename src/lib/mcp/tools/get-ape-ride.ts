@@ -5,7 +5,8 @@ import { dbError, jsonResult, supabaseForUser, unauthenticated } from "../supaba
 export default defineTool({
   name: "get_ape_ride",
   title: "Get Ape Rides stream detail",
-  description: "Return details for a single Ape Rides stream, including its current viewer requests.",
+  description:
+    "Return details for a single Ape Rides stream, including its current viewer requests.",
   inputSchema: {
     ride_id: z.string().uuid(),
   },

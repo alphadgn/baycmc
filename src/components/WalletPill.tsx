@@ -154,8 +154,8 @@ export function WalletPill({
               {verifying ? "Verifying…" : "Verify holder access"}
             </button>
             <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
-              Re-checks every approved collection on-chain (direct or via delegate.cash). You'll be asked
-              to sign a message.
+              Re-checks every approved collection on-chain (direct or via delegate.cash). You'll be
+              asked to sign a message.
             </p>
           </div>
         )}

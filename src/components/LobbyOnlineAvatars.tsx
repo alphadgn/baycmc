@@ -118,10 +118,7 @@ export function LobbyOnlineAvatars({ max = 12 }: LobbyOnlineAvatarsProps) {
       <ul className="flex items-center -space-x-2">
         {visible.map((m) => {
           const name =
-            m.username ??
-            (m.wallet_address
-              ? `${shortAddress(m.wallet_address)}`
-              : "anon");
+            m.username ?? (m.wallet_address ? `${shortAddress(m.wallet_address)}` : "anon");
           const initials = (name ?? "??").slice(0, 2).toUpperCase();
           return (
             <li
