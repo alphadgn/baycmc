@@ -58,8 +58,16 @@ function WatchMatch() {
     };
   }, [load, matchId]);
   const live = data?.match.status === "playing";
-  // Spectators also help settle expired clocks so a game never hangs.
-  useInterval(() => void tick({ data: { matchId } }), live ? 10000 : null);
+  // Spectators also help settle expired clocks so a game never hangs. The
+  // players' own 5 s tick drives the game; a slower, visible-tab-only
+  // spectator tick is just a backstop (large audiences multiplied the load).
+  useInterval(
+    () => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      void tick({ data: { matchId } });
+    },
+    live ? 20000 : null,
+  );
   useInterval(() => void load(), live ? 15000 : null);
 
   return (

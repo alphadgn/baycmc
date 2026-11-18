@@ -135,6 +135,44 @@ async function loadSeats(matchId: string): Promise<SeatRow[]> {
     .order("seat");
   return (data ?? []) as SeatRow[];
 }
+/** Seats for many matches in one query, grouped by match id. */
+async function loadSeatsFor(matchIds: string[]): Promise<Map<string, SeatRow[]>> {
+  const out = new Map<string, SeatRow[]>();
+  if (matchIds.length === 0) return out;
+  const { data } = await supabaseAdmin
+    .from("mudwater_seats")
+    .select(SEAT_COLS)
+    .in("match_id", matchIds)
+    .order("seat");
+  for (const row of (data ?? []) as SeatRow[]) {
+    const list = out.get(row.match_id) ?? [];
+    list.push(row);
+    out.set(row.match_id, list);
+  }
+  return out;
+}
+
+/** canPlay for every room in one RPC (migration 20261118000008); per-room fallback. */
+async function canPlayRooms(roomIds: string[], userId: string): Promise<Map<string, boolean>> {
+  const out = new Map<string, boolean>();
+  if (roomIds.length === 0) return out;
+  type BatchRpc = (
+    name: string,
+    args: Record<string, unknown>,
+  ) => Promise<{ data: { room_id: string; can_play: boolean }[] | null; error: unknown }>;
+  const { data, error } = await (supabaseAdmin.rpc as unknown as BatchRpc)(
+    "mudwater_can_play_rooms",
+    { _uid: userId, _rooms: roomIds },
+  );
+  if (!error && Array.isArray(data)) {
+    for (const r of data) out.set(r.room_id, r.can_play === true);
+    return out;
+  }
+  const flags = await Promise.all(roomIds.map((id) => canPlay(id, userId)));
+  roomIds.forEach((id, i) => out.set(id, flags[i] ?? false));
+  return out;
+}
+
 async function loadState(matchId: string): Promise<GameState | null> {
   const { data } = await supabaseAdmin
     .from("mudwater_state")
@@ -758,18 +796,24 @@ export async function listRooms(userId: string) {
     .from("mudwater_matches")
     .select("id,room_id,status,mode")
     .in("status", ["waiting", "playing"]);
-  const watch = await canWatch(userId);
+  const roomIds = (rooms ?? []).map((r) => r.id as string);
+  const openFor = (roomId: string) => open?.find((x) => x.room_id === roomId) ?? null;
+  const openIds = (rooms ?? []).map((r) => openFor(r.id)?.id).filter((id): id is string => !!id);
+  const [watch, playable, seatsByMatch] = await Promise.all([
+    canWatch(userId),
+    canPlayRooms(roomIds, userId),
+    loadSeatsFor(openIds),
+  ]);
   const out = [];
   for (const r of rooms ?? []) {
-    const m = open?.find((x) => x.room_id === r.id) ?? null;
-    let seatsTaken = 0;
-    if (m) seatsTaken = (await loadSeats(m.id)).filter((s) => s.active).length;
+    const m = openFor(r.id);
+    const seatsTaken = m ? (seatsByMatch.get(m.id) ?? []).filter((s) => s.active).length : 0;
     out.push({
       id: r.id,
       name: r.name,
       description: r.description,
       requiredCollection: r.required_collection,
-      canPlay: await canPlay(r.id, userId),
+      canPlay: playable.get(r.id) ?? false,
       status: (m?.status ?? "empty") as "empty" | "waiting" | "playing",
       mode: (m?.mode ?? null) as "agent" | "pvp" | null,
       seatsTaken,
@@ -797,12 +841,16 @@ export async function listWatchable(userId: string) {
     .eq("status", "finished")
     .order("finished_at", { ascending: false })
     .limit(20);
-  const withSeats = async (rows: MatchRow[]) =>
-    Promise.all(rows.map(async (m) => toMatchView(m, await loadSeats(m.id), userId)));
+  const liveRows = (live ?? []) as MatchRow[];
+  const recentRows = (recent ?? []) as MatchRow[];
+  // One seat query for all 70 matches instead of one per match.
+  const seats = await loadSeatsFor([...liveRows, ...recentRows].map((m) => m.id));
+  const withSeats = (rows: MatchRow[]) =>
+    Promise.all(rows.map((m) => toMatchView(m, seats.get(m.id) ?? [], userId)));
   return {
     allowed: true as const,
-    live: await withSeats((live ?? []) as MatchRow[]),
-    recent: await withSeats((recent ?? []) as MatchRow[]),
+    live: await withSeats(liveRows),
+    recent: await withSeats(recentRows),
   };
 }
 
