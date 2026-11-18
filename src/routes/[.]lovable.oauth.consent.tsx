@@ -14,17 +14,13 @@ type OAuthAuthorizationDetails = {
 
 type AuthOAuth = {
   getAuthorizationDetails: (
-    id: string
+    id: string,
   ) => Promise<{ data: OAuthAuthorizationDetails; error: { message: string } | null }>;
-  approveAuthorization: (
-    id: string
-  ) => Promise<{
+  approveAuthorization: (id: string) => Promise<{
     data: { redirect_url?: string | null; redirect_to?: string | null } | null;
     error: { message: string } | null;
   }>;
-  denyAuthorization: (
-    id: string
-  ) => Promise<{
+  denyAuthorization: (id: string) => Promise<{
     data: { redirect_url?: string | null; redirect_to?: string | null } | null;
     error: { message: string } | null;
   }>;
@@ -38,8 +34,7 @@ function oauth(): AuthOAuth {
 export const Route = createFileRoute("/.lovable/oauth/consent")({
   ssr: false,
   validateSearch: (s: Record<string, unknown>) => ({
-    authorization_id:
-      typeof s.authorization_id === "string" ? s.authorization_id : "",
+    authorization_id: typeof s.authorization_id === "string" ? s.authorization_id : "",
   }),
   beforeLoad: async ({ search, location }) => {
     if (!search.authorization_id) {
@@ -52,12 +47,8 @@ export const Route = createFileRoute("/.lovable/oauth/consent")({
     }
   },
   loader: async ({ location }) => {
-    const authorizationId = new URLSearchParams(location.search).get(
-      "authorization_id"
-    )!;
-    const { data, error } = await oauth().getAuthorizationDetails(
-      authorizationId
-    );
+    const authorizationId = new URLSearchParams(location.search).get("authorization_id")!;
+    const { data, error } = await oauth().getAuthorizationDetails(authorizationId);
     if (error) throw new Error(error.message);
     const immediate = data?.redirect_url ?? data?.redirect_to;
     if (immediate && !data?.client) {
@@ -84,8 +75,7 @@ function Consent() {
 
   const clientName = details?.client?.name ?? "an external app";
   const scopes =
-    details?.scopes ??
-    (details?.scope ? details.scope.split(/\s+/).filter(Boolean) : []);
+    details?.scopes ?? (details?.scope ? details.scope.split(/\s+/).filter(Boolean) : []);
 
   async function decide(approve: boolean) {
     setBusy(true);
@@ -110,13 +100,10 @@ function Consent() {
   return (
     <main className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-md flex-col justify-center px-4 py-12">
       <div className="glass rounded-2xl border border-gold/20 p-6 shadow-card sm:p-8">
-        <h1 className="font-display text-2xl font-bold">
-          Connect {clientName} to BAYCmc
-        </h1>
+        <h1 className="font-display text-2xl font-bold">Connect {clientName} to BAYCmc</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          This lets {clientName} use BAYCmc's enabled tools while you are
-          signed in. It does not bypass BAYCmc's permissions or backend
-          policies.
+          This lets {clientName} use BAYCmc's enabled tools while you are signed in. It does not
+          bypass BAYCmc's permissions or backend policies.
         </p>
 
         {scopes.length > 0 && (

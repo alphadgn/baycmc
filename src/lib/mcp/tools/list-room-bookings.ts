@@ -9,7 +9,10 @@ export default defineTool({
     "List upcoming and currently-active bookings across the signed-in user's visible rooms. Useful for finding scheduled Zoom-style conferences and karaoke sessions.",
   inputSchema: {
     room_id: z.string().uuid().optional().describe("Optional room UUID to filter to."),
-    mine_only: z.boolean().optional().describe("If true, only return bookings hosted by the caller."),
+    mine_only: z
+      .boolean()
+      .optional()
+      .describe("If true, only return bookings hosted by the caller."),
     limit: z.number().int().min(1).max(100).optional(),
   },
   annotations: { readOnlyHint: true, openWorldHint: false },

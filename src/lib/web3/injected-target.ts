@@ -50,8 +50,7 @@ export function injectedTarget() {
   return {
     id: "injected",
     name: injectedWalletName(provider),
-    provider: (w?: unknown) =>
-      (w as { ethereum?: unknown } | undefined)?.ethereum as never,
+    provider: (w?: unknown) => (w as { ethereum?: unknown } | undefined)?.ethereum as never,
   };
 }
 

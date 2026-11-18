@@ -12,7 +12,13 @@ export default defineTool({
       .string()
       .optional()
       .describe("Optional filter on room kind, e.g. 'conference' or 'karaoke'."),
-    limit: z.number().int().min(1).max(100).optional().describe("Max rooms to return (default 50)."),
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .optional()
+      .describe("Max rooms to return (default 50)."),
   },
   annotations: { readOnlyHint: true, openWorldHint: false },
   handler: async ({ kind, limit }, ctx) => {
