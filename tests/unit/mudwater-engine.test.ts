@@ -16,7 +16,6 @@ import {
   validateAction,
 } from "@/lib/mudwater/rules";
 import type { GameState, Seat, Square } from "@/lib/mudwater/types";
-// eslint-disable-next-line no-restricted-imports -- unit tests run server-side
 import { chooseAgentAction, chooseAgentDeck } from "@/server/mudwater/agent.server";
 
 // Cards used below (live catalogue values, N/E/S/W):

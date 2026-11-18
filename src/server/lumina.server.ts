@@ -74,8 +74,7 @@ export async function runLuminaCheckAndPersist(args: {
     const res = await fetchWithTimeout(url, 6_000);
     if (res.ok) {
       const body = (await res.json()) as
-        | { owns?: boolean; balance?: number | string; tokens?: unknown[] }
-        | unknown[];
+        { owns?: boolean; balance?: number | string; tokens?: unknown[] } | unknown[];
       if (Array.isArray(body)) {
         verified = body.length > 0;
       } else {

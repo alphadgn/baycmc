@@ -3,7 +3,12 @@ import { describe, it, expect } from "vitest";
 import type { PublicClient } from "viem";
 import { scanCollections } from "@/server/ownership/collectionScanner";
 import { resolveDelegations } from "@/server/ownership/delegateResolver";
-import { collectionLabel, BAYC_CONTRACT, MAYC_CONTRACT, REQUIRED_COLLECTIONS } from "@/server/ownership/collections";
+import {
+  collectionLabel,
+  BAYC_CONTRACT,
+  MAYC_CONTRACT,
+  REQUIRED_COLLECTIONS,
+} from "@/server/ownership/collections";
 
 const SIGNER = "0x1111111111111111111111111111111111111111" as const;
 const LINKED = "0x2222222222222222222222222222222222222222" as const;
@@ -45,33 +50,25 @@ describe("scanCollections (8 acceptance scenarios)", () => {
   const next = () => ++block;
 
   it("1. Connected wallet owns BAYC → PASS", async () => {
-    const c = mockClient(
-      balanceHandler({ [SIGNER]: { [BAYC_CONTRACT.toLowerCase()]: 1n } }),
-    );
+    const c = mockClient(balanceHandler({ [SIGNER]: { [BAYC_CONTRACT.toLowerCase()]: 1n } }));
     const r = await scanCollections(c, [SIGNER], REQUIRED_COLLECTIONS, next());
     expect(r).toEqual([{ wallet: SIGNER, contract: BAYC_CONTRACT, balance: 1 }]);
   });
 
   it("2. Connected wallet owns MAYC → PASS", async () => {
-    const c = mockClient(
-      balanceHandler({ [SIGNER]: { [MAYC_CONTRACT.toLowerCase()]: 3n } }),
-    );
+    const c = mockClient(balanceHandler({ [SIGNER]: { [MAYC_CONTRACT.toLowerCase()]: 3n } }));
     const r = await scanCollections(c, [SIGNER], REQUIRED_COLLECTIONS, next());
     expect(r).toEqual([{ wallet: SIGNER, contract: MAYC_CONTRACT, balance: 3 }]);
   });
 
   it("3. Delegate vault owns BAYC → PASS (when vault is in the scan set)", async () => {
-    const c = mockClient(
-      balanceHandler({ [VAULT]: { [BAYC_CONTRACT.toLowerCase()]: 2n } }),
-    );
+    const c = mockClient(balanceHandler({ [VAULT]: { [BAYC_CONTRACT.toLowerCase()]: 2n } }));
     const r = await scanCollections(c, [SIGNER, VAULT], REQUIRED_COLLECTIONS, next());
     expect(r).toContainEqual({ wallet: VAULT, contract: BAYC_CONTRACT, balance: 2 });
   });
 
   it("4. Vault owns MAYC → PASS", async () => {
-    const c = mockClient(
-      balanceHandler({ [VAULT]: { [MAYC_CONTRACT.toLowerCase()]: 5n } }),
-    );
+    const c = mockClient(balanceHandler({ [VAULT]: { [MAYC_CONTRACT.toLowerCase()]: 5n } }));
     const r = await scanCollections(c, [SIGNER, VAULT], REQUIRED_COLLECTIONS, next());
     expect(r.find((o) => o.contract === MAYC_CONTRACT)?.balance).toBe(5);
   });
@@ -111,7 +108,10 @@ describe("scanCollections (8 acceptance scenarios)", () => {
     const c = mockClient((p) => {
       const owner = (p.args![0] as string).toLowerCase();
       if (owner === SIGNER.toLowerCase()) throw new Error("rpc-down");
-      if (owner === LINKED.toLowerCase() && (p.address as string).toLowerCase() === BAYC_CONTRACT.toLowerCase()) {
+      if (
+        owner === LINKED.toLowerCase() &&
+        (p.address as string).toLowerCase() === BAYC_CONTRACT.toLowerCase()
+      ) {
         return 1n;
       }
       return 0n;
@@ -165,8 +165,7 @@ describe("resolveDelegations (incoming + outgoing walk)", () => {
             type_: 2,
             to: SIGNER,
             from: VAULT,
-            rights:
-              "0x1111111111111111111111111111111111111111111111111111111111111111",
+            rights: "0x1111111111111111111111111111111111111111111111111111111111111111",
             contract_: BAYC_CONTRACT,
             tokenId: 0n,
             amount: 0n,
@@ -186,34 +185,34 @@ describe("resolveDelegations (incoming + outgoing walk)", () => {
     });
     const r = await resolveDelegations(client, SIGNER);
     expect(r.incomingVaults).toEqual([]);
-});
-
-describe("ownership lifecycle (scenarios 9 + 10)", () => {
-  let block = 2_000_000n;
-  const next = () => ++block;
-
-  it("9. Ownership removed → access revoked on next scan", async () => {
-    let owns = true;
-    const c = mockClient(({ args }) =>
-      (args![0] as string).toLowerCase() === SIGNER.toLowerCase() && owns ? 1n : 0n,
-    );
-    const first = await scanCollections(c, [SIGNER], REQUIRED_COLLECTIONS, next());
-    expect(first.length).toBeGreaterThan(0);
-    owns = false;
-    const second = await scanCollections(c, [SIGNER], REQUIRED_COLLECTIONS, next());
-    expect(second).toEqual([]);
   });
 
-  it("10. Cache invalidation (new block) re-queries RPC", async () => {
-    let rpcCalls = 0;
-    const c = mockClient(({ args }) => {
-      rpcCalls++;
-      return (args![0] as string).toLowerCase() === SIGNER.toLowerCase() ? 1n : 0n;
+  describe("ownership lifecycle (scenarios 9 + 10)", () => {
+    let block = 2_000_000n;
+    const next = () => ++block;
+
+    it("9. Ownership removed → access revoked on next scan", async () => {
+      let owns = true;
+      const c = mockClient(({ args }) =>
+        (args![0] as string).toLowerCase() === SIGNER.toLowerCase() && owns ? 1n : 0n,
+      );
+      const first = await scanCollections(c, [SIGNER], REQUIRED_COLLECTIONS, next());
+      expect(first.length).toBeGreaterThan(0);
+      owns = false;
+      const second = await scanCollections(c, [SIGNER], REQUIRED_COLLECTIONS, next());
+      expect(second).toEqual([]);
     });
-    await scanCollections(c, [SIGNER], REQUIRED_COLLECTIONS, next());
-    const cached = rpcCalls;
-    await scanCollections(c, [SIGNER], REQUIRED_COLLECTIONS, next()); // new block ⇒ cache miss
-    expect(rpcCalls).toBeGreaterThan(cached);
+
+    it("10. Cache invalidation (new block) re-queries RPC", async () => {
+      let rpcCalls = 0;
+      const c = mockClient(({ args }) => {
+        rpcCalls++;
+        return (args![0] as string).toLowerCase() === SIGNER.toLowerCase() ? 1n : 0n;
+      });
+      await scanCollections(c, [SIGNER], REQUIRED_COLLECTIONS, next());
+      const cached = rpcCalls;
+      await scanCollections(c, [SIGNER], REQUIRED_COLLECTIONS, next()); // new block ⇒ cache miss
+      expect(rpcCalls).toBeGreaterThan(cached);
+    });
   });
-});
 });

@@ -7,7 +7,9 @@ describe("injected wallet name", () => {
   });
   it("names MetaMask, Coinbase and unknown wallets", () => {
     expect(injectedWalletName({ isMetaMask: true })).toBe("MetaMask");
-    expect(injectedWalletName({ isCoinbaseWallet: true, isMetaMask: true })).toBe("Coinbase Wallet");
+    expect(injectedWalletName({ isCoinbaseWallet: true, isMetaMask: true })).toBe(
+      "Coinbase Wallet",
+    );
     expect(injectedWalletName({})).toBe("Browser wallet");
     expect(injectedWalletName(undefined)).toBe("Browser wallet");
   });
