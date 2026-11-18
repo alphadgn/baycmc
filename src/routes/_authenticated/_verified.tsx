@@ -2,6 +2,7 @@ import { createFileRoute, redirect, Outlet } from "@tanstack/react-router";
 import { areaForPath } from "@/lib/baycmc/menu-items";
 import { supabase } from "@/integrations/supabase/client";
 import { revalidateOwnership } from "@/server/verification.functions";
+import { markOwnershipRechecked, ownershipRecheckDue } from "@/lib/auth/revalidate-cache";
 
 /**
  * Verified-holder gate (Tier 2).
@@ -10,9 +11,9 @@ import { revalidateOwnership } from "@/server/verification.functions";
  * keep their original URLs (/feed, /messages, /rooms, etc.) but require
  * a confirmed BAYC/MAYC ownership flag in user_verifications.
  *
- * On every navigation we force a fresh on-chain + delegate.cash recompute
- * so a transferred ape or revoked delegation drops the user back into the
- * lobby without needing to sign out.
+ * A fresh on-chain + delegate.cash recompute runs at most once a minute per
+ * user (not on every navigation), so a transferred ape or revoked delegation
+ * still drops the user back into the lobby without needing to sign out.
  */
 export const Route = createFileRoute("/_authenticated/_verified")({
   beforeLoad: async ({ location }) => {
@@ -37,11 +38,15 @@ export const Route = createFileRoute("/_authenticated/_verified")({
     // matrix (my_menu_items) applies BAYC/MAYC's settings to it.
     const verifiedRole = !!roles?.some((r) => r.role === "verified_user");
 
+    const uid = sess.session.user.id;
     let snap: Awaited<ReturnType<typeof revalidateOwnership>> | null = null;
-    try {
-      snap = await revalidateOwnership();
-    } catch (e) {
-      console.warn("_verified beforeLoad: revalidate failed, falling back to cached row", e);
+    if (ownershipRecheckDue(uid)) {
+      try {
+        snap = await revalidateOwnership();
+        markOwnershipRechecked(uid);
+      } catch (e) {
+        console.warn("_verified beforeLoad: revalidate failed, falling back to cached row", e);
+      }
     }
 
     // Which gated area this page belongs to; the super admin's

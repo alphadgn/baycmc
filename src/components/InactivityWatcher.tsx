@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { clearWalletAuthLocalState } from "@/lib/auth/useGlyphBridge";
+import { isMediaPlaying } from "@/lib/media-activity";
 
 const INACTIVITY_MS = 5 * 60 * 1000; // 5 minutes — strict
 const ACTIVITY_EVENTS = [
@@ -14,7 +15,7 @@ const ACTIVITY_EVENTS = [
 ] as const;
 
 /**
- * Strict 5-minute inactivity sign-out.
+ * 5-minute inactivity sign-out (input events), paused while media plays.
  *
  * On timeout we:
  *   1. Sign out of Supabase.
@@ -76,6 +77,11 @@ export function InactivityWatcher() {
       if (signedOutRef.current) return;
       if (timerRef.current) window.clearTimeout(timerRef.current);
       timerRef.current = window.setTimeout(() => {
+        // Passive watching/listening counts as activity: re-arm instead.
+        if (isMediaPlaying()) {
+          reset();
+          return;
+        }
         void signOut();
       }, INACTIVITY_MS);
     };
