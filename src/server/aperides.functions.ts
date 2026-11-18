@@ -55,15 +55,17 @@ export const startApeRide = createServerFn({ method: "POST" })
       };
     }
 
+    // Members have no direct write access to ape_rides (migration 20261118000003);
+    // the venue and holder checks above are the gate, then the service role writes.
     // End any prior live ride from the same host
-    await supabase
+    await admin
       .from("ape_rides")
       .update({ status: "ended", ended_at: new Date().toISOString() })
       .eq("host_id", userId)
       .eq("status", "live");
 
     const livekitRoom = `ape-ride-${userId.slice(0, 8)}-${Date.now()}`;
-    const { data: ride, error } = await supabase
+    const { data: ride, error } = await admin
       .from("ape_rides")
       .insert({
         host_id: userId,
@@ -77,7 +79,7 @@ export const startApeRide = createServerFn({ method: "POST" })
       return { ok: false as const, error: error?.message ?? "Failed to start ride" };
     }
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = admin;
     // Store precise GPS in private locations table (server-only writes).
     await supabaseAdmin.from("ape_ride_locations").insert({
       ride_id: ride.id,
@@ -102,12 +104,20 @@ export const endApeRide = createServerFn({ method: "POST" })
     z.object({ rideId: z.string().uuid() }).parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
-    const { error } = await supabase
+    const { userId } = context;
+    // Only the host (or an admin) may end a ride; checked here, written by the service role.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: roles } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId);
+    const isAdmin = !!roles?.some((r) => r.role === "admin" || r.role === "super_admin");
+    let q = supabaseAdmin
       .from("ape_rides")
       .update({ status: "ended", ended_at: new Date().toISOString() })
-      .eq("id", data.rideId)
-      .eq("host_id", userId);
+      .eq("id", data.rideId);
+    if (!isAdmin) q = q.eq("host_id", userId);
+    const { error } = await q;
     if (error) return { ok: false as const, error: error.message };
     return { ok: true as const };
   });

@@ -77,38 +77,38 @@ export const createBooking = createServerFn({ method: "POST" })
       };
     }
 
-    let overrideBy: string | null = null;
-    if (data.override) {
-      const { data: roles } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", userId);
-      const isAdmin = roles?.some((r) => r.role === "admin" || r.role === "super_admin");
-      if (!isAdmin) {
-        return { ok: false as const, error: "Only admins can override conflicts" };
-      }
-      overrideBy = userId;
+    // Conflict override is admin-only. Members can't write `override_by` at all
+    // (column grant + guard trigger, migration 20261118000002); after the admin check
+    // above, the override insert goes through the service role.
+    if (data.override && !isAdmin) {
+      return { ok: false as const, error: "Only admins can override conflicts" };
     }
-
-    const { data: booking, error } = await supabase
-      .from("room_bookings")
-      .insert({
-        room_id: data.roomId,
-        user_id: userId,
-        title: data.title,
-        starts_at: data.startsAt,
-        ends_at: data.endsAt,
-        notes: data.notes ?? null,
-        override_by: overrideBy,
-      })
-      .select("id, room_id, starts_at, ends_at, title")
-      .single();
+    const overrideBy: string | null = data.override ? userId : null;
+    const row = {
+      room_id: data.roomId,
+      user_id: userId,
+      title: data.title,
+      starts_at: data.startsAt,
+      ends_at: data.endsAt,
+      notes: data.notes ?? null,
+    };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: booking, error } = overrideBy
+      ? await supabaseAdmin
+          .from("room_bookings")
+          .insert({ ...row, override_by: overrideBy })
+          .select("id, room_id, starts_at, ends_at, title")
+          .single()
+      : await supabase
+          .from("room_bookings")
+          .insert(row)
+          .select("id, room_id, starts_at, ends_at, title")
+          .single();
 
     if (error) {
       return { ok: false as const, error: error.message };
     }
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin.from("audit_logs").insert({
       event_type: "booking.create",
       actor_id: userId,

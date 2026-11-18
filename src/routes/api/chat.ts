@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { convertToModelMessages, stepCountIs, streamText, tool, type UIMessage } from "ai";
 import { z } from "zod";
-import {
-  createLovableAiGatewayProvider,
-  getLovableAiGatewayRunId,
-} from "@/lib/ai-gateway.server";
+import { createLovableAiGatewayProvider, getLovableAiGatewayRunId } from "@/lib/ai-gateway.server";
+import { authenticateRequest, consumeRateLimit, tooManyRequests } from "@/server/api-auth.server";
+
+/** Per-user assistant budget (durable, shared across instances). */
+export const CHAT_RATE_LIMIT = { limit: 30, windowSeconds: 600 } as const;
 
 /**
  * BAYCmc Assistant — customer-facing help ONLY:
@@ -103,11 +104,14 @@ const tools = {
     execute: async ({ url }) => {
       if (!isOfficialUrl(url)) return { error: "Only official domains can be read." };
       try {
-        const out = await firecrawl<{ data?: { markdown?: string; metadata?: { title?: string } } }>(
-          "scrape",
-          { url, formats: ["markdown"], onlyMainContent: true },
-        );
-        return { url, title: out.data?.metadata?.title ?? null, text: clip(out.data?.markdown, 8_000) };
+        const out = await firecrawl<{
+          data?: { markdown?: string; metadata?: { title?: string } };
+        }>("scrape", { url, formats: ["markdown"], onlyMainContent: true });
+        return {
+          url,
+          title: out.data?.metadata?.title ?? null,
+          text: clip(out.data?.markdown, 8_000),
+        };
       } catch (e) {
         return { url, error: e instanceof Error ? e.message : "scrape failed" };
       }
@@ -119,6 +123,21 @@ export const Route = createFileRoute("/api/chat")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        // Signed-in members only: every call spends model + Firecrawl credits.
+        const auth = await authenticateRequest(request);
+        if (!auth) return new Response("Sign in to use the assistant.", { status: 401 });
+        const rate = await consumeRateLimit(
+          "api_chat",
+          auth.userId,
+          CHAT_RATE_LIMIT.limit,
+          CHAT_RATE_LIMIT.windowSeconds,
+        );
+        if (!rate.allowed) {
+          return tooManyRequests(
+            rate,
+            "You've sent a lot of questions. Try again in a few minutes.",
+          );
+        }
         const body = (await request.json().catch(() => null)) as { messages?: unknown } | null;
         const messages = body?.messages;
         if (!Array.isArray(messages) || messages.length === 0) {
@@ -139,6 +158,8 @@ export const Route = createFileRoute("/api/chat")({
           messages: await convertToModelMessages(recent),
           tools,
           stopWhen: stepCountIs(4),
+          maxOutputTokens: 4000,
+          abortSignal: request.signal,
         });
         return result.toUIMessageStreamResponse({ originalMessages: recent });
       },
