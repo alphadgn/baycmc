@@ -5,3 +5,9 @@ dist
 pnpm-lock.yaml
 package-lock.json
 routeTree.gen.ts
+# Generated files (rewritten by Lovable / Supabase tooling; never hand-format)
+src/integrations/supabase/types.ts
+src/integrations/supabase/previewAuthStorage.ts
+src/routes/\[.mcp\]/**
+src/routes/\[.well-known\]/**
+src/routes/mcp.ts

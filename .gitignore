@@ -30,3 +30,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment files: secrets live in Lovable Cloud → Project Settings → Secrets
+# (and repo CI secrets). Never commit real values; .env.example lists the names.
+.env
+.env.*
+!.env.example

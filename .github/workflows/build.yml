@@ -34,8 +34,8 @@ jobs:
       - name: Install deps
         run: bun install --frozen-lockfile
 
-      - name: Lint (non-blocking)
-        run: bun run lint || true
+      - name: Lint
+        run: bun run lint
 
       - name: Validate required env vars
         run: bun scripts/check-required-env.ts
