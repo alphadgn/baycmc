@@ -48,6 +48,13 @@ export const endVerificationSession = createServerFn({ method: "POST" })
     // Single-use stream grants end with the session (sign-out or timeout).
     const { finishStreamGrant } = await import("@/server/stream-grants.server");
     await finishStreamGrant(context.userId, streamSessionId(context.claims));
+    // Karaoke waiver lasts until ANY sign-out of the account (karaoke_waiver_ok,
+    // migration 20261120000001). Sign-out also revokes every session, which the
+    // rule checks too; this marker covers a sign-out that only ends one session.
+    await supabaseAdmin.rpc("record_account_sign_out", { _uid: context.userId }).then(
+      ({ error }) => error && console.warn("[signOut] waiver reset failed", error.message),
+      () => undefined,
+    );
     await supabaseAdmin
       .from("user_verifications")
       .update({
