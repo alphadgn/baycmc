@@ -1,5 +1,6 @@
 import { KaraokeWaiverDialog } from "@/components/karaoke/KaraokeWaiverDialog";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useKaraokeWaiver } from "@/lib/karaoke/waiverStatus";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
   ChevronDown,
@@ -145,8 +146,24 @@ export function KaraokeMusicBoard({
   const paused = session.playback_status === "paused";
 
   const [open, setOpen] = useState(false);
-  // The performance waiver shows every time the machine is opened.
+  // The performance waiver is accepted once per account sign-in (server-
+  // checked); it only shows when this account has no valid acceptance.
+  const waiver = useKaraokeWaiver(stage.userId);
   const [waiverOpen, setWaiverOpen] = useState(false);
+  const openMachine = useCallback(() => {
+    if (waiver.needed) setWaiverOpen(true);
+    else {
+      setPos({ dx: 0, dy: 0 });
+      setOpen(true);
+    }
+  }, [waiver.needed]);
+  // The server refused to queue / seat this member for lack of a waiver
+  // (signed out elsewhere, or a new waiver version): ask again.
+  useEffect(() => {
+    const onRequired = () => setWaiverOpen(true);
+    window.addEventListener("karaoke:waiver-required", onRequired);
+    return () => window.removeEventListener("karaoke:waiver-required", onRequired);
+  }, []);
   const [forceExpanded, setForceExpanded] = useState(false);
   const isPlaying = hasSong && !paused;
   const minimized = isPlaying && !forceExpanded;
@@ -154,8 +171,10 @@ export function KaraokeMusicBoard({
     if (!hasSong) setForceExpanded(false);
   }, [hasSong]);
   // Pop the machine open for the singer when their turn starts.
+  const openMachineRef = useRef(openMachine);
+  openMachineRef.current = openMachine;
   useEffect(() => {
-    if (isMyTurn) setWaiverOpen(true);
+    if (isMyTurn) openMachineRef.current();
   }, [isMyTurn]);
 
   const [tab, setTab] = useState<"youtube" | "tracks">(
@@ -422,7 +441,7 @@ export function KaraokeMusicBoard({
     return () => window.clearTimeout(t);
   }, [sizeMode, open]);
 
-  const waiver = (
+  const waiverDialog = (
     <KaraokeWaiverDialog
       open={waiverOpen}
       onAccept={() => {
@@ -440,10 +459,10 @@ export function KaraokeMusicBoard({
   if (!open) {
     return (
       <>
-        {waiver}
+        {waiverDialog}
         <button
           type="button"
-          onClick={() => setWaiverOpen(true)}
+          onClick={openMachine}
           aria-label="Open music machine"
           style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 8.5rem)" }}
           className="group fixed left-1/2 z-50 inline-flex -translate-x-1/2 items-center gap-2 rounded-full border border-gold/60 bg-background/80 px-3 py-1.5 text-[11px] font-semibold text-gold shadow-gold backdrop-blur transition hover:bg-gold/10"
@@ -486,7 +505,7 @@ export function KaraokeMusicBoard({
   // vertically inside the player instead of growing it.
   return (
     <>
-      {waiver}
+      {waiverDialog}
       {scrollHint && (
         <div
           key={scrollHint.n}

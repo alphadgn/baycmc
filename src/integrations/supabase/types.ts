@@ -38,6 +38,21 @@ export type Database = {
         }
         Relationships: []
       }
+      account_signouts: {
+        Row: {
+          signed_out_at: string
+          user_id: string
+        }
+        Insert: {
+          signed_out_at?: string
+          user_id: string
+        }
+        Update: {
+          signed_out_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       ape_ride_locations: {
         Row: {
           host_id: string
@@ -971,6 +986,7 @@ export type Database = {
         Row: {
           backing_track_id: string | null
           generation: number
+          last_end: Json | null
           performer_heartbeat_at: string | null
           performer_user_id: string | null
           playback_status: string
@@ -989,6 +1005,7 @@ export type Database = {
         Insert: {
           backing_track_id?: string | null
           generation?: number
+          last_end?: Json | null
           performer_heartbeat_at?: string | null
           performer_user_id?: string | null
           playback_status?: string
@@ -1007,6 +1024,7 @@ export type Database = {
         Update: {
           backing_track_id?: string | null
           generation?: number
+          last_end?: Json | null
           performer_heartbeat_at?: string | null
           performer_user_id?: string | null
           playback_status?: string
@@ -1139,6 +1157,24 @@ export type Database = {
           embeddable?: boolean
           reason?: string | null
           youtube_id?: string
+        }
+        Relationships: []
+      }
+      karaoke_waiver_versions: {
+        Row: {
+          effective_at: string
+          note: string | null
+          version: string
+        }
+        Insert: {
+          effective_at?: string
+          note?: string | null
+          version: string
+        }
+        Update: {
+          effective_at?: string
+          note?: string | null
+          version?: string
         }
         Relationships: []
       }
@@ -2632,7 +2668,9 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      karaoke_waiver_current_version: { Args: never; Returns: string }
       karaoke_waiver_ok: { Args: { _uid: string }; Returns: boolean }
+      karaoke_waiver_status: { Args: never; Returns: Json }
       log_audit_event: {
         Args: { _event_type: string; _metadata?: Json; _target_id?: string }
         Returns: string
@@ -2716,6 +2754,7 @@ export type Database = {
       my_menu_items: { Args: never; Returns: string[] }
       my_mudwater_access: { Args: never; Returns: boolean }
       purge_expired_auth_nonces: { Args: never; Returns: number }
+      record_account_sign_out: { Args: { _uid: string }; Returns: undefined }
       room_visible: { Args: { _room: string; _uid: string }; Returns: boolean }
       save_club_configuration: { Args: { _value: Json }; Returns: undefined }
       search_members: {

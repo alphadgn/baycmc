@@ -1,18 +1,62 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { Loader2, ShieldCheck } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { acceptKaraokeWaiver, KARAOKE_WAIVER_VERSION } from "@/lib/karaoke/waiverStatus";
+
+export { KARAOKE_WAIVER_VERSION };
 
 /**
- * Performance waiver, shown every time the Karaoke Machine is opened.
- * Accepting records the acceptance (the server requires one in the last
- * 12 hours to get in line or take the stage). Declining closes the machine;
- * the member can stay in the room and listen.
+ * Performance waiver. Accepted once per account sign-in: the app only shows
+ * it when the server says this account has no valid acceptance (first time
+ * after signing in, after any sign-out, or when the wording changes).
+ * Declining closes the machine; the member can stay in the room and listen.
  *
  * DRAFT wording — to be reviewed by the owner's legal adviser before it is
- * relied on. Bump KARAOKE_WAIVER_VERSION whenever the wording changes.
+ * relied on. Whenever the wording changes, bump KARAOKE_WAIVER_VERSION
+ * (src/lib/karaoke/waiverStatus.ts) AND add the same version to
+ * public.karaoke_waiver_versions in a migration; members then accept again.
  */
-export const KARAOKE_WAIVER_VERSION = "2026-10-28-draft-1";
+export function KaraokeWaiverTerms() {
+  return (
+    <div className="space-y-3 text-sm leading-relaxed text-foreground/90">
+      <p>Before you perform on the BAYCmc karaoke stage, please read and accept the following.</p>
+      <ol className="list-decimal space-y-2 pl-5">
+        <li>
+          <strong>Live performances.</strong> Your performance, including your voice, any video of
+          you, your username and profile picture, is streamed live to everyone in the room.
+        </li>
+        <li>
+          <strong>Saved performances: you choose.</strong> Your performance is only saved if you tap
+          Save at the end. When you save, you choose <strong>Private</strong> (only you can play it;
+          club admins can see it for moderation) or <strong>Public</strong> (anyone, including
+          people without a BAYCmc account, can watch or listen through a share link and on your
+          public performer page). You can change this later under Takes.
+        </li>
+        <li>
+          <strong>Promotional use of public performances.</strong> For performances you save as
+          Public, you grant BAYCmc, LLC a non-exclusive, worldwide, royalty-free, perpetual licence
+          to use, reproduce, edit, publish and share them, in whole or in part, to promote BAYCmc,
+          on any platform, without further notice or payment to you. Private performances are not
+          used for promotion.
+        </li>
+        <li>
+          <strong>Your content.</strong> You confirm you have the right to perform what you perform,
+          and that your performance will not break the law or infringe anyone else&apos;s rights.
+          You are responsible for what you say and do on stage.
+        </li>
+        <li>
+          <strong>Removing performances.</strong> You can delete your own saved performances, or
+          make them private, at any time from your profile or the room&apos;s Takes tab. Copies
+          already used in promotion while a performance was public may remain in use.
+        </li>
+      </ol>
+      <p className="text-xs text-muted-foreground">
+        You accept this once per sign-in. Signing out (on any device) means you&apos;ll be asked
+        again next time.
+      </p>
+    </div>
+  );
+}
 
 export function KaraokeWaiverDialog({
   open,
@@ -28,12 +72,10 @@ export function KaraokeWaiverDialog({
 
   async function accept() {
     setBusy(true);
-    const { error } = await supabase.rpc("accept_karaoke_waiver", {
-      _version: KARAOKE_WAIVER_VERSION,
-    });
+    const err = await acceptKaraokeWaiver();
     setBusy(false);
-    if (error) {
-      toast.error(error.message);
+    if (err) {
+      toast.error(err);
       return;
     }
     onAccept();
@@ -53,39 +95,15 @@ export function KaraokeWaiverDialog({
         >
           <ShieldCheck className="h-5 w-5 text-gold" /> Performance waiver
         </h2>
-        <div className="mt-3 space-y-3 text-sm leading-relaxed text-foreground/90">
-          <p>
-            Before you perform on the BAYCmc karaoke stage, please read and accept the following.
-          </p>
-          <ol className="list-decimal space-y-2 pl-5">
-            <li>
-              <strong>Public performances.</strong> Your performance, including your voice, any
-              video of you, your username and profile picture, may be streamed live to the room and
-              saved. Saved performances are public: anyone, including people without a BAYCmc
-              account, can watch or listen through a share link and on your public performer page.
-            </li>
-            <li>
-              <strong>Promotional use.</strong> You grant BAYCmc, LLC a non-exclusive, worldwide,
-              royalty-free, perpetual licence to use, reproduce, edit, publish and share your saved
-              performances, in whole or in part, to promote BAYCmc, on any platform, without further
-              notice or payment to you.
-            </li>
-            <li>
-              <strong>Your content.</strong> You confirm you have the right to perform what you
-              perform, and that your performance will not break the law or infringe anyone else's
-              rights. You are responsible for what you say and do on stage.
-            </li>
-            <li>
-              <strong>Removing performances.</strong> You can delete your own saved performances at
-              any time from your profile or the room's Takes tab. Copies already used in promotion
-              before you deleted them may remain in use.
-            </li>
-          </ol>
+        <div className="mt-3 space-y-3">
+          <KaraokeWaiverTerms />
           <p className="text-xs text-muted-foreground">
-            If you decline, you can stay in the room and enjoy the show, but you can't get in line
-            or take the stage.
+            If you decline, you can stay in the room and enjoy the show, but you can&apos;t get in
+            line or take the stage.
           </p>
-          <p className="font-bold text-foreground">Join the waitlist to use the Karaoke Machine</p>
+          <p className="text-sm font-bold text-foreground">
+            Join the waitlist to use the Karaoke Machine
+          </p>
         </div>
         <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button
