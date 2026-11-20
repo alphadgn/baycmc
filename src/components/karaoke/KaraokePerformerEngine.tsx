@@ -31,7 +31,6 @@ import {
   Track,
   type RemoteParticipant,
 } from "livekit-client";
-import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -40,9 +39,19 @@ import {
   setKaraokeAudioSession,
   getBackingElement,
 } from "@/lib/karaoke/audioMixBus";
-import { saveKaraokeRecording } from "@/lib/karaoke/recordings.functions";
-import { addPendingTake } from "@/lib/karaoke/pendingTakes";
-import { shouldKeepRecording } from "@/lib/karaoke/takeLifecycle";
+import { addPendingTake, usePendingTakes } from "@/lib/karaoke/pendingTakes";
+import {
+  appendDraftChunk,
+  deleteDraft,
+  putDraft,
+  setDraftLive,
+} from "@/lib/karaoke/pendingTakesDb";
+import {
+  assessTake,
+  classifyTakeEnd,
+  shouldKeepRecording,
+  shouldStartTake,
+} from "@/lib/karaoke/takeLifecycle";
 import { useRoomPreferences } from "@/lib/baycmc/useRoomPreferences";
 import {
   getKaraokeStage,
@@ -61,7 +70,6 @@ export function KaraokePerformerEngine({ roomId }: { roomId: string }) {
   // singer it means "my voice is in the mix".
   const { prefs, setPrefs } = useRoomPreferences();
   const micWanted = prefs.micEnabled;
-  const saveFn = useServerFn(saveKaraokeRecording);
 
   const busRef = useRef<KaraokeMixBus | null>(null);
   const micAttachedRef = useRef<{ headphones: boolean } | null>(null);
@@ -69,7 +77,13 @@ export function KaraokePerformerEngine({ roomId }: { roomId: string }) {
   const publishingRef = useRef(false);
   const [published, setPublished] = useState(false);
   const recKeyRef = useRef<string | null>(null);
+  // Everything about the take is captured when recording STARTS (including
+  // who is singing), so it can't be lost if the stage resets while the take
+  // is being closed (leaving the room used to drop the take silently).
   const recMetaRef = useRef<{
+    takeId: string;
+    userId: string;
+    startedAt: number;
     title: string | null;
     artist: string | null;
     youtubeId: string | null;
@@ -77,6 +91,10 @@ export function KaraokePerformerEngine({ roomId }: { roomId: string }) {
     reservationId: string | null;
     generation: number;
   } | null>(null);
+  /** The song whose take was just closed — no second take of it (see shouldStartTake). */
+  const closedSongKeyRef = useRef<string | null>(null);
+  /** Last time LiveKit or the network dropped (for "your connection dropped"). */
+  const lastDisconnectAtRef = useRef(0);
 
   const active = stage.isMyTurn && stage.roomId === roomId;
   const session = stage.session;
@@ -88,61 +106,66 @@ export function KaraokePerformerEngine({ roomId }: { roomId: string }) {
   const backingPlaying = active && !!session?.backing_track_id && playing;
 
   // ── Recording upload ─────────────────────────────────────────────────────
-  const finishRecording = useCallback(async () => {
-    const bus = busRef.current;
-    const meta = recMetaRef.current;
-    recKeyRef.current = null;
-    recMetaRef.current = null;
-    patchKaraokeStage({ recording: false });
-    if (!bus || !bus.isRecording()) return;
-    const result = await bus.stopRecording().catch(() => null);
-    const { userId } = getKaraokeStage();
-    if (!result || !userId || !meta || result.blob.size < 8_000 || result.durationMs < 5_000)
-      return;
-    const hasInstrumental = !!meta.backingTrackId || bus.hasMusicStream();
-    // Never auto-save: park the take and ask the singer (KaraokeSaveTakeDialog).
-    const save = async () => {
-      const baseMime = result.mime.split(";")[0] || "audio/webm";
-      const ext = baseMime.includes("mp4") ? "m4a" : "webm";
-      const storagePath = `${userId}/${roomId}/take-${Date.now()}.${ext}`;
-      const up = await supabase.storage
-        .from("karaoke-recordings")
-        .upload(storagePath, result.blob, { contentType: baseMime, upsert: false });
-      if (up.error) throw new Error(up.error.message);
-      await saveFn({
-        data: {
-          roomId,
-          storagePath,
-          songTitle: meta.title,
-          songArtist: meta.artist,
-          youtubeId: meta.youtubeId,
-          backingTrackId: meta.backingTrackId,
-          reservationId: meta.reservationId,
-          sessionGeneration: meta.generation,
-          durationMs: result.durationMs,
-          mimeType: baseMime,
-          hasInstrumental,
-        },
+  const finishRecording = useCallback(
+    async (opts: { localAction?: boolean; leaving?: boolean } = {}) => {
+      const bus = busRef.current;
+      const meta = recMetaRef.current;
+      closedSongKeyRef.current = recKeyRef.current ?? closedSongKeyRef.current;
+      recKeyRef.current = null;
+      recMetaRef.current = null;
+      patchKaraokeStage({ recording: false });
+      if (meta) setDraftLive(meta.takeId, false);
+      if (!bus || !bus.isRecording() || !meta) return;
+      const result = await bus.stopRecording().catch(() => null);
+      const size = result?.blob.size ?? 0;
+      const durationMs = result?.durationMs ?? 0;
+      const { offer, note } = assessTake({ sizeBytes: size, durationMs });
+      if (!result || !offer) {
+        // Never vanish without a word: nothing was captured at all.
+        void deleteDraft(meta.takeId);
+        toast.message("Nothing was recorded", {
+          description: "Your take had no audio. Was your mic on?",
+        });
+        return;
+      }
+      const reason = classifyTakeEnd({
+        localAction: !!opts.localAction,
+        leaving: !!opts.leaving,
+        userId: meta.userId,
+        generation: meta.generation,
+        serverEnd: getKaraokeStage().session?.last_end ?? null,
+        recentlyDisconnected:
+          Date.now() - lastDisconnectAtRef.current < 120_000 ||
+          (typeof navigator !== "undefined" && navigator.onLine === false),
       });
-      window.dispatchEvent(new Event("karaoke:recordings-changed"));
-      toast.success("Performance saved", { description: "Replay it any time under Takes." });
-    };
-    addPendingTake({
-      id: `${roomId}:${meta.generation}:${Date.now()}`,
-      blob: result.blob,
-      mime: result.mime,
-      durationMs: result.durationMs,
-      title: meta.title,
-      artist: meta.artist,
-      save,
-    });
-  }, [roomId, saveFn]);
+      // Never auto-save: park the take and ask the singer (KaraokeSaveTakeDialog).
+      addPendingTake({
+        id: meta.takeId,
+        userId: meta.userId,
+        roomId,
+        blob: result.blob,
+        mime: result.mime,
+        durationMs: result.durationMs,
+        title: meta.title,
+        artist: meta.artist,
+        youtubeId: meta.youtubeId,
+        backingTrackId: meta.backingTrackId,
+        reservationId: meta.reservationId,
+        generation: meta.generation,
+        hasInstrumental: !!meta.backingTrackId || bus.hasMusicStream(),
+        reason,
+        note,
+        createdAt: meta.startedAt,
+      });
+    },
+    [roomId],
+  );
 
   // End Performance: close the take first so the singer decides Save/Discard
   // before the stage is handed to the next person in line.
   useEffect(() => {
     function onFinish() {
-      void finishRecording().finally(() =>
+      void finishRecording({ localAction: true }).finally(() =>
         window.dispatchEvent(new Event("karaoke:take-finished")),
       );
     }
@@ -151,26 +174,29 @@ export function KaraokePerformerEngine({ roomId }: { roomId: string }) {
   }, [finishRecording]);
 
   // ── Teardown ─────────────────────────────────────────────────────────────
-  const teardown = useCallback(async () => {
-    await finishRecording();
-    const t = publishedRef.current;
-    publishedRef.current = null;
-    setPublished(false);
-    if (t && room) {
-      await room.localParticipant.unpublishTrack(t, true).catch(() => undefined);
-    }
-    const el = typeof window !== "undefined" ? getBackingElement() : null;
-    if (el) {
-      el.pause();
-    }
-    const bus = busRef.current;
-    busRef.current = null;
-    micAttachedRef.current = null;
-    if (bus) await bus.dispose().catch(() => undefined);
-    void room?.localParticipant.setAttributes({ karaokeMusic: "" }).catch(() => undefined);
-    patchKaraokeStage({ engineLive: false, recording: false, musicInMyMix: false });
-    window.dispatchEvent(new CustomEvent("karaoke:mic-state", { detail: { enabled: false } }));
-  }, [finishRecording, room]);
+  const teardown = useCallback(
+    async (leaving = false) => {
+      await finishRecording({ leaving });
+      const t = publishedRef.current;
+      publishedRef.current = null;
+      setPublished(false);
+      if (t && room) {
+        await room.localParticipant.unpublishTrack(t, true).catch(() => undefined);
+      }
+      const el = typeof window !== "undefined" ? getBackingElement() : null;
+      if (el) {
+        el.pause();
+      }
+      const bus = busRef.current;
+      busRef.current = null;
+      micAttachedRef.current = null;
+      if (bus) await bus.dispose().catch(() => undefined);
+      void room?.localParticipant.setAttributes({ karaokeMusic: "" }).catch(() => undefined);
+      patchKaraokeStage({ engineLive: false, recording: false, musicInMyMix: false });
+      window.dispatchEvent(new CustomEvent("karaoke:mic-state", { detail: { enabled: false } }));
+    },
+    [finishRecording, room],
+  );
 
   // 1. Bus lifecycle — exists for as long as I'm the performer.
   useEffect(() => {
@@ -187,7 +213,20 @@ export function KaraokePerformerEngine({ roomId }: { roomId: string }) {
     }
   }, [active, teardown]);
 
-  useEffect(() => () => void teardown(), [teardown]);
+  useEffect(() => () => void teardown(true), [teardown]);
+
+  // Remember connection drops so a turn lost to one says so on the prompt.
+  useEffect(() => {
+    const mark = () => {
+      lastDisconnectAtRef.current = Date.now();
+    };
+    room?.on(RoomEvent.Reconnecting, mark).on(RoomEvent.Disconnected, mark);
+    window.addEventListener("offline", mark);
+    return () => {
+      room?.off(RoomEvent.Reconnecting, mark).off(RoomEvent.Disconnected, mark);
+      window.removeEventListener("offline", mark);
+    };
+  }, [room]);
   useEffect(() => {
     patchKaraokeStage({ engineMounted: true });
     return () => patchKaraokeStage({ engineMounted: false });
@@ -419,6 +458,8 @@ export function KaraokePerformerEngine({ roomId }: { roomId: string }) {
   // the mix bus, so it doesn't depend on being on air. (It used to require
   // `published`; muting the mic during a YouTube song took the mix off air,
   // which ended the take and popped "Save this performance?" mid-song.)
+  const myTakes = usePendingTakes(stage.userId);
+  const promptPending = myTakes.some((t) => t.roomId === roomId);
   useEffect(() => {
     const bus = busRef.current;
     const wantRecord =
@@ -428,20 +469,39 @@ export function KaraokePerformerEngine({ roomId }: { roomId: string }) {
         recordingEnabled: stage.settings.recording_enabled,
         songKey,
       });
+    // A cleared song resets the guard: the same song may be sung again.
+    if (!songKey) closedSongKeyRef.current = null;
     if (!wantRecord) {
-      if (recKeyRef.current) void finishRecording();
+      // Still my turn → I pressed Stop (song cleared) or recording was
+      // switched off. Turn over → teardown (effect 1) closes the take.
+      if (recKeyRef.current) void finishRecording({ localAction: active });
       return;
     }
     if (recKeyRef.current && recKeyRef.current !== songKey) {
       // New song: close the previous take (its recorder detaches
       // synchronously) and fall through to start the next one.
-      void finishRecording();
+      void finishRecording({ localAction: true });
+      closedSongKeyRef.current = null;
     }
-    if (!recKeyRef.current && playing && session) {
+    const userId = stage.userId;
+    if (
+      userId &&
+      session &&
+      shouldStartTake({
+        wantRecord,
+        recording: !!recKeyRef.current,
+        playing,
+        promptPending,
+        songKey,
+        closedSongKey: closedSongKeyRef.current,
+      })
+    ) {
       try {
-        bus.startRecording();
-        recKeyRef.current = songKey;
-        recMetaRef.current = {
+        const takeId = `${roomId}:${session.generation}:${Date.now()}`;
+        const meta = {
+          takeId,
+          userId,
+          startedAt: Date.now(),
           title: session.song_title ?? stage.backingTrack?.title ?? null,
           artist: session.song_artist ?? stage.backingTrack?.artist ?? null,
           youtubeId: session.video_id,
@@ -449,6 +509,28 @@ export function KaraokePerformerEngine({ roomId }: { roomId: string }) {
           reservationId: session.reservation_id,
           generation: session.generation,
         };
+        setDraftLive(takeId, true);
+        bus.startRecording((chunk, seq) => void appendDraftChunk(takeId, seq, chunk));
+        // Keep the take on the device while it records, so closing the tab
+        // mid-song still leaves something to Save / Discard next visit.
+        void putDraft({
+          id: takeId,
+          userId,
+          roomId,
+          mime: bus.recordingMime() || "audio/webm",
+          title: meta.title,
+          artist: meta.artist,
+          youtubeId: meta.youtubeId,
+          backingTrackId: meta.backingTrackId,
+          reservationId: meta.reservationId,
+          generation: meta.generation,
+          hasInstrumental: !!meta.backingTrackId,
+          createdAt: meta.startedAt,
+          startedAt: meta.startedAt,
+          updatedAt: meta.startedAt,
+        });
+        recKeyRef.current = songKey;
+        recMetaRef.current = meta;
         patchKaraokeStage({ recording: true });
       } catch (e) {
         console.warn("[karaoke-engine] recorder unavailable", e);
@@ -464,6 +546,9 @@ export function KaraokePerformerEngine({ roomId }: { roomId: string }) {
     songKey,
     playing,
     session,
+    roomId,
+    promptPending,
+    stage.userId,
     stage.settings.recording_enabled,
     stage.backingTrack,
     finishRecording,

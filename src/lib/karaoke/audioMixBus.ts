@@ -369,8 +369,13 @@ export class KaraokeMixBus {
     return "audio/webm";
   }
 
-  startRecording(): void {
+  /**
+   * @param onChunk receives every recorded chunk (about once a second) so the
+   *   take can be kept on the device while it is still being recorded.
+   */
+  startRecording(onChunk?: (chunk: Blob, seq: number) => void): void {
     if (this.recorder && this.recorder.state !== "inactive") return;
+    let seq = 0;
     // Each take owns its chunk array so a late `dataavailable` from the
     // previous take can never leak into the next one.
     const chunks: Blob[] = [];
@@ -381,7 +386,14 @@ export class KaraokeMixBus {
       audioBitsPerSecond: 128_000,
     });
     this.recorder.ondataavailable = (e) => {
-      if (e.data && e.data.size > 0) chunks.push(e.data);
+      if (e.data && e.data.size > 0) {
+        chunks.push(e.data);
+        try {
+          onChunk?.(e.data, seq++);
+        } catch {
+          /* persistence is best-effort */
+        }
+      }
     };
     this.recorder.start(1000); // 1s chunks → smooth uploads, low memory
     this.recordStartedAt = Date.now();

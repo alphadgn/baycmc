@@ -10,6 +10,7 @@
  * events fired before a listener mounted were simply lost, which is how the
  * singer's mic toggle silently did nothing on some loads.
  */
+import type { ServerTurnEnd } from "@/lib/karaoke/takeLifecycle";
 import { useSyncExternalStore } from "react";
 
 export interface KaraokeSessionRow {
@@ -26,6 +27,8 @@ export interface KaraokeSessionRow {
   revision: number;
   stage_source: string;
   reservation_id: string | null;
+  /** How the previous turn ended (migration 20261120000001; absent before it). */
+  last_end?: ServerTurnEnd | null;
 }
 
 export interface KaraokeRoomSettings {
