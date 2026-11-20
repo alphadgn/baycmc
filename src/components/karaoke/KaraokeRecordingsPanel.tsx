@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Disc3, Loader2, Music, Share2, Trash2 } from "lucide-react";
+import { Disc3, Globe2, Loader2, Lock, Music, Share2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   deleteKaraokeRecording,
   listRoomKaraokeRecordings,
+  setKaraokeRecordingVisibility,
   type RecordingListItem,
 } from "@/lib/karaoke/recordings.functions";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,10 +18,12 @@ function fmtDuration(ms: number | null): string {
 }
 
 /**
- * Replayable performances for a karaoke room. Every song a singer performs
- * while on air is recorded on their device (voice + backing track, exactly
- * what the room heard) and uploaded to the private karaoke-recordings
- * bucket; this list plays them back through short-lived signed URLs.
+ * Replayable performances for a karaoke room. Each performance is recorded on
+ * the singer's device (voice + backing track, exactly what the room heard)
+ * and uploaded to the private karaoke-recordings bucket only when the singer
+ * taps Save, as Private or Public; this list plays them back through
+ * short-lived signed URLs. Singers can switch their own takes between
+ * Private and Public here.
  */
 export function KaraokeRecordingsPanel({
   roomId,
@@ -32,6 +35,7 @@ export function KaraokeRecordingsPanel({
   const { user } = useAuth();
   const listFn = useServerFn(listRoomKaraokeRecordings);
   const deleteFn = useServerFn(deleteKaraokeRecording);
+  const visibilityFn = useServerFn(setKaraokeRecordingVisibility);
   const [rows, setRows] = useState<RecordingListItem[] | null>(null);
   const [names, setNames] = useState<Record<string, string>>({});
   const [mineOnly, setMineOnly] = useState(false);
@@ -73,7 +77,17 @@ export function KaraokeRecordingsPanel({
     if (!res.ok) toast.error(res.error);
     else void load();
   }
-  // Performances are public: share a link anyone can open, no account needed.
+  async function toggleVisibility(r: RecordingListItem) {
+    const next = r.visibility === "public" ? "private" : "public";
+    const res = await visibilityFn({ data: { id: r.id, visibility: next } });
+    if (!res.ok) toast.error(res.error);
+    else {
+      toast.success(next === "public" ? "This take is now public." : "This take is now private.");
+      void load();
+    }
+  }
+
+  // Public takes: share a link anyone can open, no account needed.
   async function share(r: RecordingListItem) {
     const url = `${window.location.origin}/performance/${r.id}`;
     const title = r.song_title ? `${r.song_title} — BAYCmc karaoke` : "BAYCmc karaoke performance";
@@ -106,7 +120,7 @@ export function KaraokeRecordingsPanel({
 
       {rows !== null && rows.length === 0 ? (
         <p className="py-6 text-center text-xs text-muted-foreground">
-          No recordings yet — every song performed on air is saved here automatically.
+          No saved takes yet. When a performance ends, the singer chooses Save or Discard.
         </p>
       ) : (
         <ul className="space-y-2">
@@ -137,6 +151,25 @@ export function KaraokeRecordingsPanel({
                       className="rounded p-1 text-muted-foreground hover:text-foreground"
                     >
                       <Share2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  {own && (
+                    <button
+                      type="button"
+                      onClick={() => void toggleVisibility(r)}
+                      aria-label={r.visibility === "public" ? "Make private" : "Make public"}
+                      title={
+                        r.visibility === "public"
+                          ? "Public · tap to make private"
+                          : "Private · tap to make public"
+                      }
+                      className="rounded p-1 text-muted-foreground hover:text-foreground"
+                    >
+                      {r.visibility === "public" ? (
+                        <Globe2 className="h-3.5 w-3.5" />
+                      ) : (
+                        <Lock className="h-3.5 w-3.5" />
+                      )}
                     </button>
                   )}
                   {(own || isAdmin) && (

@@ -20,8 +20,8 @@ const InsertSchema = z.object({
     .nullable(),
   mimeType: z.string().max(64).default("audio/webm"),
   hasInstrumental: z.boolean().default(true),
-  // Every performance is public (performance waiver, 2026-10-28).
-  visibility: z.enum(["room", "private", "public"]).default("public"),
+  // The singer picks Private (default) or Public in the Save dialog.
+  visibility: z.enum(["private", "public"]).default("private"),
 });
 
 const SIGNED_URL_TTL_S = 60 * 60;
@@ -49,17 +49,15 @@ export const saveKaraokeRecording = createServerFn({ method: "POST" })
       throw new Error("Recording upload not found");
     }
 
-    // Matches the insert policy (migration 20261118000007): a performance waiver
-    // accepted within the last 7 days is required to publish a take.
-    const waiverSince = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const { data: waiver } = await supabase
-      .from("karaoke_waivers")
-      .select("id")
-      .eq("user_id", userId)
-      .gte("accepted_at", waiverSince)
-      .limit(1)
-      .maybeSingle();
-    if (!waiver) throw new Error("Accept the performance waiver before saving a take.");
+    // Same rule as joining the line / taking the stage and the insert policy
+    // (karaoke_waiver_ok, migration 20261120000001): the current waiver version,
+    // accepted during this account sign-in (after its most recent sign-out).
+    const { data: waiverOk, error: waiverErr } = await supabase.rpc("karaoke_waiver_ok", {
+      _uid: userId,
+    });
+    if (waiverErr || waiverOk !== true) {
+      throw new Error("WAIVER_REQUIRED: Accept the performance waiver before saving a take.");
+    }
 
     const { data: room } = await supabase
       .from("karaoke_room_settings")
@@ -86,7 +84,7 @@ export const saveKaraokeRecording = createServerFn({ method: "POST" })
         duration_ms: data.durationMs ?? null,
         mime_type: data.mimeType,
         has_instrumental: data.hasInstrumental,
-        visibility: "public",
+        visibility: data.visibility,
       })
       .select("id")
       .single();
@@ -172,11 +170,11 @@ export const deleteKaraokeRecording = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 
-/** Toggle a take between room-visible and private (performer only, via RLS). */
+/** Switch a take between public and private (performer only, via RLS + column grant). */
 export const setKaraokeRecordingVisibility = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { id: string; visibility: "room" | "private" }) =>
-    z.object({ id: z.string().uuid(), visibility: z.enum(["room", "private"]) }).parse(input),
+  .inputValidator((input: { id: string; visibility: "public" | "private" }) =>
+    z.object({ id: z.string().uuid(), visibility: z.enum(["public", "private"]) }).parse(input),
   )
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase

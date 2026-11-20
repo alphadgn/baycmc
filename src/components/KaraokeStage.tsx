@@ -1,4 +1,5 @@
-import { getPendingTakes } from "@/lib/karaoke/pendingTakes";
+import { hasPendingTakeFor } from "@/lib/karaoke/pendingTakes";
+import { isWaiverError, markWaiverRequired } from "@/lib/karaoke/waiverStatus";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarClock, ChevronLeft, GripVertical, Mic, Users } from "lucide-react";
 import { toast } from "sonner";
@@ -31,8 +32,9 @@ interface KaraokeStageProps {
   bookingHostUserId: string | null;
 }
 
-const SESSION_COLUMNS =
-  "performer_user_id,video_id,search_query,backing_track_id,song_title,song_artist,playback_status,position_ms,position_at,generation,revision,stage_source,reservation_id";
+// "*" so last_end (how a turn ended, added by migration 20261120000001) comes
+// along when present, without breaking before that migration is applied.
+const SESSION_COLUMNS = "*";
 
 const EMPTY_SESSION: KaraokeSessionRow = {
   performer_user_id: null,
@@ -402,6 +404,7 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
       if (stageFree) {
         const { data, error } = await supabase.rpc("karaoke_claim_stage", { _room: roomId });
         if (error || !data) {
+          if (isWaiverError(error?.message)) markWaiverRequired();
           toast.error("Couldn't take the stage", { description: friendly(error?.message) });
           return;
         }
@@ -462,7 +465,7 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
       // 2. Hold the stage until the singer taps Save or Discard.
       await new Promise<void>((resolve) => {
         const check = () => {
-          if (getPendingTakes().length === 0) {
+          if (!hasPendingTakeFor(user.id, roomId)) {
             clearInterval(iv);
             resolve();
           }
@@ -537,6 +540,7 @@ export function KaraokeStage({ roomId, bookingHostUserId }: KaraokeStageProps) {
     if (!getKaraokeStage().engineMounted) window.dispatchEvent(new Event("karaoke:request-join"));
     const { error } = await supabase.rpc("karaoke_join_queue", { _room: roomId });
     if (error) {
+      if (isWaiverError(error.message)) markWaiverRequired();
       toast.error("Could not join the line", { description: friendly(error.message) });
       return;
     }
