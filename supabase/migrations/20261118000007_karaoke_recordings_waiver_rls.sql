@@ -1,8 +1,9 @@
 -- Health report N-16: a direct REST insert into karaoke_recordings only checked performer_id,
 -- skipping the performance waiver and the storage-path check done by saveKaraokeRecording,
 -- and the update policy let a performer repoint storage_path at someone else's file
--- (which the server would then sign). Visibility stays 'public' by default: every
--- performance is public by the owner decision of 2026-10-28.
+-- (which the server would then sign). The waiver check is the same rule used for
+-- joining the line and taking the stage (karaoke_waiver_ok; account-sign-in scoped
+-- by migration 20261120000001). Visibility is chosen by the singer (Private or Public).
 
 drop policy if exists "Performers can insert their own recordings" on public.karaoke_recordings;
 create policy "Performers can insert their own recordings" on public.karaoke_recordings
@@ -11,11 +12,8 @@ create policy "Performers can insert their own recordings" on public.karaoke_rec
     performer_id = (select auth.uid())
     and storage_path like (select auth.uid())::text || '/' || room_id::text || '/%'
     and storage_path not like '%..%'
-    -- Waiver accepted within the last 7 days (takes may be saved some time after the
-    -- performance, which itself requires a waiver from the last 12 hours).
-    and exists (select 1 from public.karaoke_waivers w
-                 where w.user_id = (select auth.uid())
-                   and w.accepted_at > now() - interval '7 days')
+    -- One waiver rule everywhere: valid for the current account sign-in and version.
+    and public.karaoke_waiver_ok((select auth.uid()))
   );
 
 -- Members may only change presentation fields; paths and ownership are server-written.

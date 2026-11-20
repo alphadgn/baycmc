@@ -1,4 +1,5 @@
--- Isolated-database checks for migrations 20261118000001..08 (health-report fixes).
+-- Isolated-database checks for migrations 20261118000001..08 (health-report fixes)
+-- (07's waiver clause uses the account-sign-in rule from 20261120000001).
 -- Run ONLY against a throwaway database after replaying supabase/migrations
 -- (CI-free: executed locally with PGlite + Supabase role/auth stubs). Never run on a shared DB.
 -- Behavioural checks for migrations 20261118000001..08 (run after replay).
@@ -77,7 +78,8 @@ select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000a1'
 select pg_temp.expect_error($q$insert into public.karaoke_recordings(room_id,performer_id,song_title,public_url,storage_path)
   values ('00000000-0000-0000-0000-0000000000f1',auth.uid(),'s','u','00000000-0000-0000-0000-0000000000a1/00000000-0000-0000-0000-0000000000f1/a.webm')$q$, '%row-level security%');
 reset role;
-insert into public.karaoke_waivers(user_id, version) values ('00000000-0000-0000-0000-0000000000a1','v1');
+insert into auth.sessions(id, user_id, created_at) values ('00000000-0000-0000-0000-00000000aa01','00000000-0000-0000-0000-0000000000a1', now() - interval '1 minute');
+insert into public.karaoke_waivers(user_id, version) values ('00000000-0000-0000-0000-0000000000a1', public.karaoke_waiver_current_version());
 set role authenticated;
 select pg_temp.expect_error($q$insert into public.karaoke_recordings(room_id,performer_id,song_title,public_url,storage_path)
   values ('00000000-0000-0000-0000-0000000000f1',auth.uid(),'s','u','00000000-0000-0000-0000-0000000000a3/x/a.webm')$q$, '%row-level security%');
