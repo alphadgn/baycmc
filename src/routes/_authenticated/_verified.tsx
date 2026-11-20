@@ -1,8 +1,8 @@
 import { createFileRoute, redirect, Outlet } from "@tanstack/react-router";
+import { markOwnershipRechecked, ownershipRecheckDue } from "@/lib/auth/revalidate-cache";
 import { areaForPath } from "@/lib/baycmc/menu-items";
 import { supabase } from "@/integrations/supabase/client";
 import { revalidateOwnership } from "@/server/verification.functions";
-import { markOwnershipRechecked, ownershipRecheckDue } from "@/lib/auth/revalidate-cache";
 
 /**
  * Verified-holder gate (Tier 2).
