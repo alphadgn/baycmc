@@ -1,5 +1,13 @@
 # Karaoke overhaul roadmap
 
+## Paid-broadcast deployment (approved November 21)
+- [x] Verify LiveKit credentials against the real media service
+- [ ] Apply reviewed streaming lifecycle schema
+- [ ] Configure authenticated 15-second media reconciliation — managed scheduling tools/helper unavailable in this session after credential repair
+- [ ] Confirm signed LiveKit webhook — awaiting user configuration
+- [ ] Configure ticket recipient — awaiting user's ApeChain payment wallet
+- [ ] Verify live staff/member paid-broadcast flow and publish — blocked by webhook, scheduler and payment setup
+
 ## Collection room visibility
 - [x] Hide inaccessible paid streams in shared navigation, room lists and direct entry
 - [x] Align collection-specific room visibility and media authorization; preserve stated exceptions

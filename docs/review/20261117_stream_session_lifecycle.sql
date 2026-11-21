@@ -1,6 +1,5 @@
 -- REVIEW ONLY. Not registered with Drizzle and NOT applied to any shared database.
 -- Apply through the migration workflow after approval, before deploying dependent code.
-BEGIN;
 CREATE TABLE public.stream_closed_sessions (
   session_id uuid PRIMARY KEY,
   user_id uuid NOT NULL,
@@ -167,4 +166,3 @@ REVOKE ALL ON FUNCTION public.stream_grant_finish(uuid,text), public.stream_gran
 GRANT EXECUTE ON FUNCTION public.stream_grant_finish(uuid,text), public.stream_grant_sweep(), public.stream_grant_touch(uuid) TO service_role;
 REVOKE ALL ON FUNCTION public.stream_grant_revoke(uuid) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.stream_grant_revoke(uuid) TO authenticated;
-COMMIT;
