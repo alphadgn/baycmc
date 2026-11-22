@@ -7,8 +7,8 @@
 - [ ] Resolve pre-publish security review decision — awaiting user answer
 - [ ] Configure authenticated 15-second media reconciliation — managed scheduling tools/helper unavailable in this session after credential repair
 - [ ] Confirm signed LiveKit webhook — awaiting user configuration
-- [ ] Configure ticket recipient — awaiting user's ApeChain payment wallet
-- [ ] Verify live staff/member paid-broadcast flow and publish — blocked by webhook, scheduler and payment setup
+- [x] Configure ticket recipient — user-designated ApeChain wallet saved November 22; read-only recipient assertion passed
+- [ ] Verify live staff/member paid-broadcast flow and publish — blocked by webhook, scheduler and security-review decision; payment recipient configured
 
 ## Collection room visibility
 - [x] Hide inaccessible paid streams in shared navigation, room lists and direct entry
