@@ -5,10 +5,10 @@
 - [x] Apply reviewed streaming lifecycle schema; confirm server-only claims in live database
 - [x] Run 17 lifecycle/media tests including real isolated SQL and 7 visibility regressions
 - [x] Resolve pre-publish security review decision — user chose to continue publishing (November 22)
-- [ ] Configure authenticated media reconciliation scheduler — switching route to managed cron auth, then creating schedule
+- [x] Configure authenticated media reconciliation — managed schedule `stream-lifecycle-sweep` (id 5) calls /api/public/stream-lifecycle every minute (fastest supported); route uses managed cron auth
 - [x] Confirm signed LiveKit webhook — user confirmed they will configure it in LiveKit (November 22)
 - [x] Configure ticket recipient — user-designated ApeChain wallet saved November 22; read-only recipient assertion passed
-- [ ] Verify live staff/member paid-broadcast flow and publish — blocked by webhook, scheduler and security-review decision; payment recipient configured
+- [x] Publish streaming changes — publish requested November 22; 4 non-blocking critical security findings remain (broad member read on stream_settings, local_chapters, stream_events; chat-attachments download rule) for later review
 
 ## Collection room visibility
 - [x] Hide inaccessible paid streams in shared navigation, room lists and direct entry
