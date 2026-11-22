@@ -2014,6 +2014,71 @@ export type Database = {
         }
         Relationships: []
       }
+      stream_broadcasts: {
+        Row: {
+          disconnected_at: string | null
+          end_reason: string | null
+          ended_at: string | null
+          grant_id: string | null
+          id: string
+          last_live_at: string
+          session_id: string
+          started_at: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          disconnected_at?: string | null
+          end_reason?: string | null
+          ended_at?: string | null
+          grant_id?: string | null
+          id: string
+          last_live_at?: string
+          session_id: string
+          started_at?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          disconnected_at?: string | null
+          end_reason?: string | null
+          ended_at?: string | null
+          grant_id?: string | null
+          id?: string
+          last_live_at?: string
+          session_id?: string
+          started_at?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stream_broadcasts_grant_id_fkey"
+            columns: ["grant_id"]
+            isOneToOne: false
+            referencedRelation: "stream_grants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stream_closed_sessions: {
+        Row: {
+          closed_at: string
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          closed_at?: string
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          closed_at?: string
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       stream_events: {
         Row: {
           cancelled_at: string | null
@@ -2733,6 +2798,26 @@ export type Database = {
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      stream_broadcast_claim: {
+        Args: { _id: string; _session: string; _uid: string }
+        Returns: boolean
+      }
+      stream_broadcast_disconnect: {
+        Args: { _id: string; _session: string; _uid: string }
+        Returns: undefined
+      }
+      stream_broadcast_finish: {
+        Args: { _id: string; _reason: string; _session: string; _uid: string }
+        Returns: undefined
+      }
+      stream_broadcast_touch: {
+        Args: { _id: string; _session: string; _uid: string }
+        Returns: boolean
+      }
+      stream_broadcast_valid: {
+        Args: { _id: string; _session: string; _uid: string }
+        Returns: boolean
+      }
       stream_can_host: { Args: { _uid: string }; Returns: boolean }
       stream_current_event: { Args: never; Returns: string }
       stream_grant_finish: {
@@ -2744,6 +2829,14 @@ export type Database = {
       stream_grant_sweep: { Args: never; Returns: undefined }
       stream_grant_touch: { Args: { _uid: string }; Returns: boolean }
       stream_has_ticket: { Args: { _uid: string }; Returns: boolean }
+      stream_session_close: {
+        Args: { _session: string; _uid: string }
+        Returns: undefined
+      }
+      stream_session_valid: {
+        Args: { _session: string; _uid: string }
+        Returns: boolean
+      }
       stream_viewer_free: { Args: { _uid: string }; Returns: boolean }
     }
     Enums: {

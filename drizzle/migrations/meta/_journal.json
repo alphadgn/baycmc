@@ -29,6 +29,13 @@
       "when": 1794885738889,
       "tag": "0003_validate_club_configuration",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795344096984,
+      "tag": "0004_stream_session_lifecycle",
+      "breakpoints": true
     }
   ]
 }

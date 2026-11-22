@@ -2,7 +2,9 @@
 
 ## Paid-broadcast deployment (approved November 21)
 - [x] Verify LiveKit credentials against the real media service
-- [ ] Apply reviewed streaming lifecycle schema
+- [x] Apply reviewed streaming lifecycle schema; confirm server-only claims in live database
+- [x] Run 17 lifecycle/media tests including real isolated SQL and 7 visibility regressions
+- [ ] Resolve pre-publish security review decision — awaiting user answer
 - [ ] Configure authenticated 15-second media reconciliation — managed scheduling tools/helper unavailable in this session after credential repair
 - [ ] Confirm signed LiveKit webhook — awaiting user configuration
 - [ ] Configure ticket recipient — awaiting user's ApeChain payment wallet

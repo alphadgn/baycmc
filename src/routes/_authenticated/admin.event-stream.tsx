@@ -12,9 +12,16 @@ export const Route = createFileRoute("/_authenticated/admin/event-stream")({
   head: () => ({
     meta: [
       { title: "Event Stream · Admin — BAYCmc" },
-      { name: "description", content: "Manage BAYCmc broadcasts, single-use hosting grants, paid events and ticket payments." },
+      {
+        name: "description",
+        content:
+          "Manage BAYCmc broadcasts, single-use hosting grants, paid events and ticket payments.",
+      },
       { property: "og:title", content: "Event Stream · Admin — BAYCmc" },
-      { property: "og:description", content: "Manage BAYCmc broadcasts, hosting grants and paid events." },
+      {
+        property: "og:description",
+        content: "Manage BAYCmc broadcasts, hosting grants and paid events.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],

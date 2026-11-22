@@ -1,6 +1,16 @@
 # BAYCmc workflow revision — review only
 
-No publishing or shared-database writes were performed.
+The original review performed no publishing or shared-database writes. The approved streaming deployment preparation below has now applied the stream lifecycle schema; publishing remains on hold.
+
+## Approved streaming deployment preparation
+- Applied the reviewed stream lifecycle through the migration tool as `drizzle/migrations/0004_stream_session_lifecycle.sql`; regenerated database types. Transaction wrappers were removed because the migration tool manages the transaction. The old unbound start path is now disabled, including for the previously published code.
+- Confirmed live database broadcast/session tables exist, members cannot directly execute broadcast claims, and the service role can.
+- Verified the configured LiveKit credentials with a successful real room-list request. No new media domain or DNS record was created; the configured media endpoint already answers.
+- Passed 17 lifecycle/media tests, including isolated PostgreSQL grant claims, competing attempts, staff bypass, grant consumption, sign-out, revocation, five-minute cutoff and karaoke handoff. Seven room visibility regressions also passed. Import-boundary checks and changed-page lint passed.
+- Managed scheduler credential repair succeeded, but this session exposes neither a scheduling tool nor the generated callback helper; no authenticated HTTP reconciliation job could be configured. The SQL-only sweep job is not a substitute for revoking connected media permissions.
+- LiveKit webhook configuration remains unconfirmed. The payment recipient is not configured; the user has been asked for the ApeChain wallet. A paid event's price and schedule must be set through the existing admin controls before ticket sales.
+- The security check reported broad member read access to stream events/settings, chapters and chat attachments; the user has been asked whether to review those before publishing. No findings were dismissed.
+- No publish requested. Live staff/member hosting, payments and reconnect media behavior remain unverified until scheduler/webhook/payment setup is complete. Karaoke FIFO and collection visibility drafts remain unapplied and outside this streaming-only deployment step.
 
 ## Prepared changes
 - Event Stream enters viewer-only, including staff. Start atomically claims a broadcast bound to the authenticated session before enabling media permissions. Admin and Super Admin need no grant; members consume one grant. Idempotent retry requires the same broadcast/session; competing attempts cannot claim another broadcast.
@@ -10,11 +20,11 @@ No publishing or shared-database writes were performed.
 - Karaoke waitlist pulses only while eligible, respects reduced motion, and stops when queued/performing. Queue promotion remains inside authoritative functions; reservation and booked-stage entitlement are preserved, with eligible open-queue participants ordered by signup time and serialized handoff.
 - Microphone/camera preferences and the one-track karaoke mix are unchanged.
 
-## Unapplied SQL for review
-1. `20261117_stream_session_lifecycle.sql`: additive broadcast/session records, restricted server-only lifecycle functions, grant consumption and expiration. Existing unbound `in_use` grants are intentionally expired at upgrade; they cannot be safely migrated to a signed-in session.
+## SQL review status
+1. `20261117_stream_session_lifecycle.sql`: applied through the approved migration workflow; additive broadcast/session records, restricted server-only lifecycle functions, grant consumption and expiration. Existing unbound `in_use` grants are intentionally expired at upgrade; they cannot be safely migrated to a signed-in session.
 2. `20261117_karaoke_fifo.sql`: authoritative signup-order promotion and claim protection; no changes to audio, reservation timing or consent.
 
-These are staged outside migration history so they cannot run automatically. Apply only through the approved migration tool after review. Do not deploy the dependent code first.
+The karaoke draft remains outside migration history so it cannot run automatically. Apply only through the approved migration tool after review. Do not deploy dependent code without its prerequisites.
 
 ## Deployment prerequisites (not performed)
 1. Apply both reviewed SQL drafts and regenerate database types. The server uses narrow temporary type adapters until the new schema is available.
