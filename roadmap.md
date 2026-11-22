@@ -4,9 +4,9 @@
 - [x] Verify LiveKit credentials against the real media service
 - [x] Apply reviewed streaming lifecycle schema; confirm server-only claims in live database
 - [x] Run 17 lifecycle/media tests including real isolated SQL and 7 visibility regressions
-- [ ] Resolve pre-publish security review decision — awaiting user answer
-- [ ] Configure authenticated 15-second media reconciliation — managed scheduling tools/helper unavailable in this session after credential repair
-- [ ] Confirm signed LiveKit webhook — awaiting user configuration
+- [x] Resolve pre-publish security review decision — user chose to continue publishing (November 22)
+- [ ] Configure authenticated media reconciliation scheduler — switching route to managed cron auth, then creating schedule
+- [x] Confirm signed LiveKit webhook — user confirmed they will configure it in LiveKit (November 22)
 - [x] Configure ticket recipient — user-designated ApeChain wallet saved November 22; read-only recipient assertion passed
 - [ ] Verify live staff/member paid-broadcast flow and publish — blocked by webhook, scheduler and security-review decision; payment recipient configured
 

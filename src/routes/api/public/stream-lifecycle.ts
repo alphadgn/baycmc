@@ -1,14 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { authenticateCronRequest } from "@/integrations/supabase/cron-auth";
 
 /** Scheduled enforcement for connected publishers, independent of client cooperation. */
 export const Route = createFileRoute("/api/public/stream-lifecycle")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const secret = process.env.STREAM_LIFECYCLE_SECRET;
-        if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
-          return new Response("Unauthorized", { status: 401 });
-        }
+        const authFailure = await authenticateCronRequest(request);
+        if (authFailure) return authFailure;
         try {
           const { reconcileStreamPublishers } = await import("@/server/stream-grants.server");
           await reconcileStreamPublishers();
